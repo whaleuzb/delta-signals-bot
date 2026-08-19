@@ -4,6 +4,7 @@ bilan to'liq qayta o'ynatadi (entry/TP/SL teginishi, R-multiple va h.k. —
 xuddi bot jonli kuzatgandek aniq chiqadi).
 """
 import asyncio
+from datetime import datetime, timezone, timedelta
 
 import config
 import db
@@ -15,7 +16,7 @@ SIDE = "LONG"
 ENTRY = 0.324
 SL = 0.303
 TPS = [0.400]
-CREATED_AT = "2026-08-03T21:00:00+05:00"  # Asia/Tashkent
+CREATED_AT = datetime(2026, 8, 3, 21, 0, tzinfo=timezone(timedelta(hours=5)))  # Asia/Tashkent
 MARKER = "manual-add-2026-08-03-ALPINEUSDT"
 
 
