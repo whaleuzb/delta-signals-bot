@@ -364,6 +364,18 @@ async def post_shutdown(app: Application) -> None:
     await exchange.close()
 
 
+async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    log.exception("Ishlov berishda xato", exc_info=ctx.error)
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "⚠️ Xatolik yuz berdi (masalan, Binance narx serveriga vaqtincha "
+                "ulanib bo'lmadi). Birozdan so'ng qayta urinib ko'ring."
+            )
+        except Exception:
+            pass
+
+
 def main() -> None:
     app = (
         Application.builder()
@@ -386,6 +398,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, on_photo))
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, on_text_signal))
+    app.add_error_handler(on_error)
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
 
