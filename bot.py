@@ -288,7 +288,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                     reply_markup=symbols_nav_kb(now.year, now.month))
     elif action == "open":
         text, kb = await open_signals_view(q.from_user.id)
-        rows = (kb.inline_keyboard if kb else []) + list(MENU_BACK_KB.inline_keyboard)
+        rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
     elif action == "equity":
