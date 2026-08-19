@@ -27,7 +27,7 @@ ajratish mumkin, lekin hozirgi hajmda kerak emas.
 | `vision.py` | caption bo'lmasa grafik rasmidan o'qish (Claude tool use) |
 | `tracker.py` | **asosiy dvigatel** — shamlarni qayta o'ynatib TP/SL aniqlaydi |
 | `stats.py` | hisobotlar, equity curve + drawdown |
-| `bot.py` | handlerlar, tasdiqlash oqimi, guruhga e'lonlar |
+| `bot.py` | handlerlar, asosiy menyu, signal kiritish sehrgari (wizard), tasdiqlash oqimi, guruhga e'lonlar |
 | `test_tracker.py` | sintetik shamlarda dvigatel testi (baza/internet kerak emas) |
 
 Signal hayot sikli:
@@ -71,6 +71,20 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
 8. **Spot rejimi.** PnL leveragesiz. TP'lar `TP_ALLOCATION` bo'yicha bo'lib sotiladi
    (50/30/20), foiz shu ulushlarga tortiladi. `r_multiple` `sl_initial` dan hisoblanadi,
    BE ga ko'chgan `sl` dan emas.
+
+9. **Signal kiritishning IKKI yo'li bor, ikkalasi ham ishlaydi.**
+   - Tezkor: bitta xabar (caption/matn, `on_photo`/`on_text_signal`) — tajribali admin uchun.
+   - Sehrgar (wizard): `➕ Yangi signal` tugmasi yoki `/new` — `ConversationHandler`
+     orqali bosqichma-bosqich (grafik → juftlik → yo'nalish → entry → TP → SL).
+   Ikkalasi ham oxirida bitta umumiy `show_preview()` ga tushadi — tasdiqlash/tahrirlash/
+   bekor tugmalari bir xil. Wizard faqat shaxsiy chatda ishlaydi (guruhda emas).
+
+10. **Guruh — forum (topics) rejimida.** `CHANNEL_ID` supergroup uchun `-100` prefiksi
+    bilan bo'lishi SHART (masalan `-1001804915914`, oddiy `-1804915914` emas — aks holda
+    Telegram "Chat not found" beradi). Aniq mavzuga yozish uchun `CHANNEL_TOPIC_ID`
+    (`message_thread_id`) kerak — bo'sh bo'lsa umumiy (General) mavzuga tushadi.
+    To'g'ri qiymatlarni topish uchun `on_group_message` debug logi ishlatiladi (guruhga
+    xabar yozilganda `chat_id`/`thread_id`ni logga chiqaradi).
 
 ---
 

@@ -10,7 +10,7 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters,
+    ConversationHandler, ContextTypes, filters,
 )
 
 import config
@@ -66,7 +66,222 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
     return "\n".join(lines)
 
 
-# ─────────────────────────── Signal kiritish ───────────────────────────
+# ─────────────────────────── Asosiy menyu ───────────────────────────
+
+def main_menu_kb(uid: int) -> InlineKeyboardMarkup:
+    rows = []
+    if is_admin(uid):
+        rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig")])
+    rows += [
+        [InlineKeyboardButton("📊 Statistika", callback_data="m:stats"),
+         InlineKeyboardButton("📅 Oy", callback_data="m:month")],
+        [InlineKeyboardButton("📆 Yil", callback_data="m:year"),
+         InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
+        [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
+         InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+MENU_BACK_KB = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]])
+
+
+async def open_signals_text() -> str:
+    rows = await db.live_signals()
+    if not rows:
+        return "Ochiq signal yo'q."
+    lines = ["<b>Ochiq signallar</b>", ""]
+    for s in rows:
+        price = await exchange.last_price(s["symbol"])
+        cur = ""
+        if price:
+            p = tracker.pnl_at(s["side"], float(s["entry"]), price)
+            cur = f"  ({p:+.2f}%)"
+        mark = "▶️" if s["status"] == "ACTIVE" else "⏳"
+        lines.append(
+            f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
+            f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
+        )
+    return "\n".join(lines)
+
+
+async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    action = q.data.split(":", 1)[1]
+
+    if action == "stats":
+        await q.message.reply_text(await stats.summary(), parse_mode=ParseMode.HTML,
+                                    reply_markup=MENU_BACK_KB)
+    elif action == "month":
+        now = datetime.now(stats.TZ)
+        a, b = stats.month_bounds(now.year, now.month)
+        cur = await stats.summary(a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
+        await q.message.reply_text(cur + "\n\n" + await stats.monthly_table(),
+                                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    elif action == "year":
+        y = datetime.now(stats.TZ).year
+        a, b = stats.year_bounds(y)
+        await q.message.reply_text(await stats.summary(a, b, f"{y}-yil natijalari"),
+                                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    elif action == "symbols":
+        await q.message.reply_text(await stats.symbols_table(), parse_mode=ParseMode.HTML,
+                                    reply_markup=MENU_BACK_KB)
+    elif action == "open":
+        await q.message.reply_text(await open_signals_text(), parse_mode=ParseMode.HTML,
+                                    reply_markup=MENU_BACK_KB)
+    elif action == "equity":
+        buf = await stats.equity_chart()
+        if buf is None:
+            await q.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
+                                        reply_markup=MENU_BACK_KB)
+        else:
+            await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=MENU_BACK_KB)
+
+
+async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    if q:
+        await q.answer()
+        uid = q.from_user.id
+        await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
+    else:
+        uid = update.effective_user.id
+        await update.effective_message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
+
+
+# ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
+
+WIZ_PHOTO, WIZ_SYMBOL, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
+
+WIZ_CANCEL_KB = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")]])
+WIZ_PHOTO_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("⏭ Rasmsiz davom etish", callback_data="wiz_skip_photo")],
+    [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+])
+
+
+def _parse_price(raw: str) -> float | None:
+    try:
+        return float(raw.strip().replace(" ", "").replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+
+
+async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    uid = (q.from_user if q else update.effective_user).id
+    if not is_admin(uid):
+        return ConversationHandler.END
+    if q:
+        await q.answer()
+    target = q.message if q else update.effective_message
+    if update.effective_chat.type != "private":
+        await target.reply_text("Iltimos, botga shaxsiy xabar (DM) yozib, shu yerda qayta urining.")
+        return ConversationHandler.END
+    ctx.user_data["wiz"] = {}
+    await target.reply_text("1/5 — 📈 Grafik rasmni yuboring.", reply_markup=WIZ_PHOTO_KB)
+    return WIZ_PHOTO
+
+
+async def wizard_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    ctx.user_data["wiz"]["file_id"] = msg.photo[-1].file_id
+    await msg.reply_text("2/5 — Juftlik nomini yozing (masalan BTCUSDT):",
+                         reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SYMBOL
+
+
+async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    ctx.user_data["wiz"]["file_id"] = None
+    await q.edit_message_text("1/5 — Rasmsiz davom etilmoqda.")
+    await q.message.reply_text("2/5 — Juftlik nomini yozing (masalan BTCUSDT):",
+                               reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SYMBOL
+
+
+async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    raw = (msg.text or "").strip()
+    sym = await exchange.resolve(raw)
+    if not sym:
+        await msg.reply_text(f"❌ <code>{raw}</code> MEXC'da topilmadi. Qayta yozing:",
+                             parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+        return WIZ_SYMBOL
+    ctx.user_data["wiz"]["symbol"] = sym
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
+         InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
+        [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+    ])
+    await msg.reply_text(f"3/5 — {sym}: yo'nalishni tanlang:", reply_markup=kb)
+    return WIZ_SIDE
+
+
+async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    side = q.data.split(":", 1)[1]
+    ctx.user_data["wiz"]["side"] = side
+    await q.edit_message_text(f"3/5 — Yo'nalish: {side}")
+    await q.message.reply_text("4/5 — Entry (kirish) narxini kiriting:",
+                               reply_markup=WIZ_CANCEL_KB)
+    return WIZ_ENTRY
+
+
+async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    entry = _parse_price(msg.text or "")
+    if entry is None or entry <= 0:
+        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_ENTRY
+    ctx.user_data["wiz"]["entry"] = entry
+    await msg.reply_text(
+        "5/5 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
+        "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
+    return WIZ_TP
+
+
+async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    tps = [x for x in (_parse_price(x) for x in (msg.text or "").split()) if x and x > 0]
+    if not tps:
+        await msg.reply_text("Noto'g'ri format. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_TP
+    side = ctx.user_data["wiz"]["side"]
+    ctx.user_data["wiz"]["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
+    await msg.reply_text("SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SL
+
+
+async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    sl = _parse_price(msg.text or "")
+    if sl is None or sl <= 0:
+        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_SL
+    wiz = ctx.user_data.pop("wiz")
+    draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
+             "sl": sl, "tps": wiz["tps"]}
+    await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard")
+    return ConversationHandler.END
+
+
+async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    ctx.user_data.pop("wiz", None)
+    if q:
+        await q.answer()
+        await q.edit_message_text("❌ Bekor qilindi.")
+    else:
+        await update.effective_message.reply_text("❌ Bekor qilindi.")
+    return ConversationHandler.END
+
+
+# ─────────────────────────── Signal kiritish — tezkor usul ───────────────────────────
 
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
@@ -131,7 +346,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, token=None) 
     sym = await exchange.resolve(draft["symbol"])
     if not sym:
         await msg.reply_text(
-            f"❌ <code>{draft['symbol']}</code> Binance Futures'da topilmadi.",
+            f"❌ <code>{draft['symbol']}</code> MEXC'da topilmadi.",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -290,15 +505,13 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Delta Signals Bot.\n\n"
-        "/stats — umumiy statistika\n"
-        "/month — oylik jadval\n"
-        "/year — joriy yil\n"
-        "/open — ochiq signallar\n"
-        "/symbols — juftliklar kesimi\n"
-        "/equity — equity curve\n"
-        "/cancel <id> — signalni bekor qilish"
-    )
+        "Delta Signals Bot — tugmalardan foydalaning 👇",
+        reply_markup=main_menu_kb(update.effective_user.id))
+
+
+async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    AWAITING_EDIT.pop(update.effective_user.id, None)
+    await update.message.reply_text("❌ Bekor qilindi.")
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -333,23 +546,7 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    rows = await db.live_signals()
-    if not rows:
-        await update.message.reply_text("Ochiq signal yo'q.")
-        return
-    lines = ["<b>Ochiq signallar</b>", ""]
-    for s in rows:
-        price = await exchange.last_price(s["symbol"])
-        cur = ""
-        if price:
-            p = tracker.pnl_at(s["side"], float(s["entry"]), price)
-            cur = f"  ({p:+.2f}%)"
-        mark = "▶️" if s["status"] == "ACTIVE" else "⏳"
-        lines.append(
-            f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
-            f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
-        )
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+    await update.message.reply_text(await open_signals_text(), parse_mode=ParseMode.HTML)
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -396,6 +593,8 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
+    app.add_handler(CommandHandler("menu", cmd_start))
+    app.add_handler(CommandHandler("bekor", cmd_bekor))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("month", cmd_month))
     app.add_handler(CommandHandler("year", cmd_year))
@@ -404,6 +603,33 @@ def main() -> None:
     app.add_handler(CommandHandler("open", cmd_open))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
+    app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
+    app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
+
+    app.add_handler(ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(wizard_start, pattern=r"^newsig$"),
+            CommandHandler("new", wizard_start),
+        ],
+        states={
+            WIZ_PHOTO: [
+                MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, wizard_photo),
+                CallbackQueryHandler(wizard_skip_photo, pattern=r"^wiz_skip_photo$"),
+            ],
+            WIZ_SYMBOL: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_symbol)],
+            WIZ_SIDE: [CallbackQueryHandler(wizard_side, pattern=r"^wiz_side:")],
+            WIZ_ENTRY: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_entry)],
+            WIZ_TP: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_tp)],
+            WIZ_SL: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_sl)],
+        },
+        fallbacks=[CallbackQueryHandler(wizard_cancel, pattern=r"^wiz_cancel$")],
+        conversation_timeout=900,
+    ))
+
     app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, on_photo))
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, on_text_signal))
