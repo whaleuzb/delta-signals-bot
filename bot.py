@@ -74,8 +74,6 @@ def main_menu_kb(uid: int) -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig")])
     rows += [
         [InlineKeyboardButton("📊 Statistika", callback_data="m:stats"),
-         InlineKeyboardButton("📅 Oy", callback_data="m:month")],
-        [InlineKeyboardButton("📆 Yil", callback_data="m:year"),
          InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
         [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
          InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
@@ -185,6 +183,57 @@ async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.")
 
 
+def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> InlineKeyboardMarkup:
+    now = datetime.now(stats.TZ)
+    tabs = [
+        InlineKeyboardButton("• Barchasi" if mode == "all" else "Barchasi", callback_data="st:all"),
+        InlineKeyboardButton(
+            "• Oy" if mode == "m" else "Oy",
+            callback_data=f"st:m:{y}:{m}" if mode == "m" else f"st:m:{now.year}:{now.month}"),
+        InlineKeyboardButton(
+            "• Yil" if mode == "y" else "Yil",
+            callback_data=f"st:y:{y}" if mode == "y" else f"st:y:{now.year}"),
+    ]
+    rows = [tabs]
+
+    if mode == "m":
+        py, pm = _shift_month(y, m, -1)
+        nav = [InlineKeyboardButton(f"◀ {stats.MONTHS_UZ[pm - 1][:3]}", callback_data=f"st:m:{py}:{pm}")]
+        ny, nm = _shift_month(y, m, 1)
+        if (ny, nm) <= (now.year, now.month):
+            nav.append(InlineKeyboardButton(f"{stats.MONTHS_UZ[nm - 1][:3]} ▶", callback_data=f"st:m:{ny}:{nm}"))
+        rows.append(nav)
+    elif mode == "y":
+        nav = [InlineKeyboardButton(f"◀ {y - 1}", callback_data=f"st:y:{y - 1}")]
+        if y < now.year:
+            nav.append(InlineKeyboardButton(f"{y + 1} ▶", callback_data=f"st:y:{y + 1}"))
+        rows.append(nav)
+
+    rows.append(list(MENU_BACK_KB.inline_keyboard[0]))
+    return InlineKeyboardMarkup(rows)
+
+
+async def stats_view_text(mode: str, y: int | None = None, m: int | None = None) -> str:
+    if mode == "m":
+        a, b = stats.month_bounds(y, m)
+        return await stats.summary(a, b, f"{stats.MONTHS_UZ[m - 1]} {y}")
+    if mode == "y":
+        a, b = stats.year_bounds(y)
+        return await stats.summary(a, b, f"{y}-yil natijalari")
+    return await stats.summary()
+
+
+async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    parts = q.data.split(":")  # st:all | st:m:Y:M | st:y:Y
+    mode = parts[1]
+    y = int(parts[2]) if mode in ("m", "y") else None
+    m = int(parts[3]) if mode == "m" else None
+    text = await stats_view_text(mode, y, m)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb(mode, y, m))
+
+
 def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
     idx = y * 12 + (m - 1) + delta
     return idx // 12, idx % 12 + 1
@@ -230,19 +279,8 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     action = q.data.split(":", 1)[1]
 
     if action == "stats":
-        await q.message.reply_text(await stats.summary(), parse_mode=ParseMode.HTML,
-                                    reply_markup=MENU_BACK_KB)
-    elif action == "month":
-        now = datetime.now(stats.TZ)
-        a, b = stats.month_bounds(now.year, now.month)
-        cur = await stats.summary(a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
-        await q.message.reply_text(cur + "\n\n" + await stats.monthly_table(),
-                                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
-    elif action == "year":
-        y = datetime.now(stats.TZ).year
-        a, b = stats.year_bounds(y)
-        await q.message.reply_text(await stats.summary(a, b, f"{y}-yil natijalari"),
-                                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        await q.message.reply_text(await stats_view_text("all"), parse_mode=ParseMode.HTML,
+                                    reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
         now = datetime.now(stats.TZ)
         text = await symbols_view_text(now.year, now.month)
@@ -638,7 +676,8 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(await stats.summary(), parse_mode=ParseMode.HTML)
+    await update.message.reply_text(await stats_view_text("all"), parse_mode=ParseMode.HTML,
+                                     reply_markup=stats_nav_kb("all"))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -736,6 +775,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
+    app.add_handler(CallbackQueryHandler(on_stats_nav, pattern=r"^st:"))
 
     app.add_handler(ConversationHandler(
         entry_points=[
