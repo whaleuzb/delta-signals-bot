@@ -1,7 +1,7 @@
 # Delta Signals Bot
 
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
-yurituvchi bot. Narx manbasi — **Binance USDⓈ-M Futures**, hisob-kitob esa **spot (1x)**.
+yurituvchi bot. Narx manbasi — **MEXC Spot**, hisob-kitob esa **spot (1x)**.
 
 ---
 
@@ -11,7 +11,7 @@ yurituvchi bot. Narx manbasi — **Binance USDⓈ-M Futures**, hisob-kitob esa *
 2. Caption bo'lsa — undan o'qiladi. Bo'lmasa — Claude vision grafikdan darajalarni topadi.
 3. Bot parse qilingan darajalarni **tasdiqlash tugmasi** bilan ko'rsatadi. Bir bosish —
    signal bazaga tushadi va guruhga post bo'ladi.
-4. Har 45 soniyada worker Binance'dan 1 daqiqalik shamlarni oladi va TP/SL teginishini
+4. Har 45 soniyada worker MEXC'dan 1 daqiqalik shamlarni oladi va TP/SL teginishini
    tekshiradi. Yopilgan signal guruhdagi asl postga **reply** qilib e'lon qilinadi.
 5. `/stats`, `/month`, `/year`, `/equity` — statistika.
 
@@ -94,7 +94,7 @@ ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80
 eth long 3200 3400 3550 3100      ← kalit so'zsiz: entry, TP lar, SL
 ```
 
-Bot juftlikni Binance Futures ro'yxati bilan tekshiradi, LONG/SHORT mantiqini
+Bot juftlikni MEXC Spot ro'yxati bilan tekshiradi, LONG/SHORT mantiqini
 validatsiya qiladi (SL entrydan past bo'lishi va h.k.) va risk 25% dan oshsa
 ogohlantiradi.
 

@@ -20,8 +20,9 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 VISION_MODEL = os.getenv("VISION_MODEL", "claude-sonnet-5")
 
-# --- Narx manbasi: Binance USDⓈ-M Futures (TradingView'dagi .P juftliklari bilan bir xil) ---
-BINANCE_BASE = os.getenv("BINANCE_BASE", "https://fapi.binance.com")
+# --- Narx manbasi: MEXC Spot (Binance Futures AQSH IP'larini 451 bilan bloklagani uchun
+#     almashtirildi; MEXC'da kichik altcoinlar ham ko'proq bor) ---
+EXCHANGE_BASE = os.getenv("EXCHANGE_BASE", "https://api.mexc.com")
 QUOTE = "USDT"
 
 # --- Kuzatuv ---

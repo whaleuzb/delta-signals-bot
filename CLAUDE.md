@@ -4,7 +4,11 @@ Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasi
 yurituvchi bot. Delta Community uchun.
 
 **Stack:** Python 3.11+ · python-telegram-bot 21 · asyncpg + Railway PostgreSQL ·
-Binance USDⓈ-M Futures public API · matplotlib · Claude vision (ixtiyoriy)
+MEXC Spot public API · matplotlib · Claude vision (ixtiyoriy)
+
+> Avval Binance USDⓈ-M Futures ishlatilgan, lekin Railway serveri joylashgan
+> hududni Binance 451 (huquqiy sabab) bilan bloklagani uchun MEXC Spot'ga
+> o'tildi (2026-08). MEXC'da kichik altcoinlar ham ko'proq bor.
 
 ---
 
@@ -18,7 +22,7 @@ ajratish mumkin, lekin hozirgi hajmda kerak emas.
 |---|---|
 | `config.py` | barcha env o'zgaruvchilar va savdo qoidalari |
 | `db.py` | schema, pool, so'rovlar, statistika SQL |
-| `exchange.py` | Binance klines/exchangeInfo, symbol normalizatsiya |
+| `exchange.py` | MEXC klines/exchangeInfo, symbol normalizatsiya |
 | `parsing.py` | caption matnidan darajalarni o'qish + validatsiya |
 | `vision.py` | caption bo'lmasa grafik rasmidan o'qish (Claude tool use) |
 | `tracker.py` | **asosiy dvigatel** — shamlarni qayta o'ynatib TP/SL aniqlaydi |
