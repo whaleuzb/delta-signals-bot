@@ -157,6 +157,42 @@ async def process(sig) -> list[dict]:
     return events
 
 
+async def close_now(sig_id: int) -> dict | None:
+    """Ochiq signalni joriy bozor narxida qo'lda (TP/SL kutmasdan) yopadi."""
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+        return None
+
+    if sig["status"] == "PENDING":
+        await db.cancel_signal(sig_id, "CANCELLED")
+        return {"type": "MANUAL_CLOSE", "signal_id": sig_id, "symbol": sig["symbol"],
+                "status": "CANCELLED", "pnl": None, "r": None, "price": None}
+
+    price = await exchange.last_price(sig["symbol"])
+    if not price:
+        return None
+
+    entry = float(sig["entry"])
+    sl_init = float(sig["sl_initial"])
+    filled = float(sig["filled_pct"])
+    realized = float(sig["realized_pct"])
+    rest = max(0.0, 1.0 - filled)
+    pnl = round(realized + rest * pnl_at(sig["side"], entry, price), 4)
+    risk = abs(entry - sl_init) / entry * 100
+    r = round(pnl / risk, 3) if risk > 0 else None
+    status = "BREAKEVEN" if abs(pnl) < 1e-9 else ("TP" if pnl > 0 else "SL")
+
+    await db.save_progress(sig_id, {
+        "sl": float(sig["sl"]), "tp_hit": sig["tp_hit"], "filled_pct": 1.0,
+        "realized_pct": pnl, "status": status,
+        "opened_at": sig["opened_at"], "closed_at": datetime.now(timezone.utc),
+        "exit_price": price, "pnl_pct": pnl, "r_multiple": r,
+        "last_checked_ms": sig["last_checked_ms"], "ambiguous": sig["ambiguous"],
+    })
+    return {"type": "MANUAL_CLOSE", "signal_id": sig_id, "symbol": sig["symbol"],
+            "status": status, "pnl": pnl, "r": r, "price": price}
+
+
 async def run_once() -> list[dict]:
     out = []
     for sig in await db.live_signals():

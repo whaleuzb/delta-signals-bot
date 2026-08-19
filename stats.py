@@ -67,15 +67,33 @@ async def monthly_table(limit: int = 12) -> str:
     return "\n".join(t)
 
 
-async def symbols_table(limit: int = 8) -> str:
-    rows = await db.top_symbols(limit)
-    if not rows:
-        return "Ma'lumot yo'q."
-    t = ["<b>Juftliklar bo'yicha</b>", "<pre>"]
-    t.append(f"{'Juftlik':<12}{'N':>4}{'WR':>7}{'Foiz':>9}")
-    for r in rows:
-        wr = r["wins"] / r["total"] * 100 if r["total"] else 0
-        t.append(f"{r['symbol']:<12}{r['total']:>4}{wr:>6.0f}%{float(r['sum_pct']):>+9.2f}")
+async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> str:
+    """since/until berilmasa — butun davr (+ hozir ochiq soni). Berilsa — faqat
+    shu oyda yopilganlar (ochiq pozitsiya hali yopilmagani uchun ko'rinmaydi —
+    u yopilganda avtomatik o'z oyiga tushadi)."""
+    rows = await db.top_symbols(since, until)
+    opens = await db.open_symbols_count() if since is None else {}
+    symbols = {r["symbol"] for r in rows} | set(opens)
+    if not symbols:
+        return f"<b>Juftliklar — {title}</b>\n\nMa'lumot yo'q."
+
+    by_sym = {r["symbol"]: r for r in rows}
+    ordered = sorted(symbols, key=lambda s: -float(by_sym[s]["sum_pct"]) if s in by_sym else 0)
+
+    t = [f"<b>Juftliklar — {title}</b>", "<pre>"]
+    header = f"{'Juftlik':<12}{'N':>4}{'WR':>7}{'Foiz':>9}"
+    if since is None:
+        header += f"{'Ochiq':>7}"
+    t.append(header)
+    for sym in ordered:
+        r = by_sym.get(sym)
+        closed = r["closed"] if r else 0
+        wr = r["wins"] / closed * 100 if r and closed else 0
+        sum_pct = float(r["sum_pct"]) if r else 0.0
+        line = f"{sym:<12}{closed:>4}{wr:>6.0f}%{sum_pct:>+9.2f}"
+        if since is None:
+            line += f"{opens.get(sym, 0):>7}"
+        t.append(line)
     t.append("</pre>")
     return "\n".join(t)
 

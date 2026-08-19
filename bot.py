@@ -86,11 +86,12 @@ def main_menu_kb(uid: int) -> InlineKeyboardMarkup:
 MENU_BACK_KB = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]])
 
 
-async def open_signals_text() -> str:
+async def open_signals_view(uid: int) -> tuple[str, InlineKeyboardMarkup | None]:
     rows = await db.live_signals()
     if not rows:
-        return "Ochiq signal yo'q."
+        return "Ochiq signal yo'q.", None
     lines = ["<b>Ochiq signallar</b>", ""]
+    kb_rows = []
     for s in rows:
         price = await exchange.last_price(s["symbol"])
         cur = ""
@@ -102,7 +103,125 @@ async def open_signals_text() -> str:
             f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
             f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
         )
-    return "\n".join(lines)
+        if is_admin(uid):
+            kb_rows.append([InlineKeyboardButton(
+                f"🔻 #{s['id']} {s['symbol']} — vaqtidan oldin yopish",
+                callback_data=f"close:{s['id']}")])
+    kb = InlineKeyboardMarkup(kb_rows) if kb_rows else None
+    return "\n".join(lines), kb
+
+
+async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    if not is_admin(q.from_user.id):
+        return
+    sig_id = int(q.data.split(":", 1)[1])
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.")
+        return
+
+    if sig["status"] == "PENDING":
+        text = f"#{sig_id} {sig['symbol']} hali entryga tegmagan. Bekor qilinsinmi?"
+    else:
+        price = await exchange.last_price(sig["symbol"])
+        est_txt = ""
+        if price:
+            entry = float(sig["entry"])
+            filled = float(sig["filled_pct"])
+            realized = float(sig["realized_pct"])
+            rest = max(0.0, 1.0 - filled)
+            est = realized + rest * tracker.pnl_at(sig["side"], entry, price)
+            est_txt = f" (~{est:+.2f}%)"
+        text = f"#{sig_id} {sig['symbol']} joriy narxda yopilsinmi?{est_txt}"
+
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Ha, yopish", callback_data=f"closeok:{sig_id}"),
+        InlineKeyboardButton("↩️ Yo'q", callback_data="closeno"),
+    ]])
+    await q.edit_message_text(text, reply_markup=kb)
+
+
+async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    if not is_admin(q.from_user.id):
+        return
+    sig_id = int(q.data.split(":", 1)[1])
+    ev = await tracker.close_now(sig_id)
+    if not ev:
+        await q.edit_message_text("Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).")
+        return
+
+    if ev["status"] == "CANCELLED":
+        await q.edit_message_text(f"🗑 #{sig_id} {ev['symbol']} bekor qilindi (entryga tegmagan edi).")
+        return
+
+    pnl, r = ev["pnl"], ev["r"]
+    icon = "✅" if pnl >= 0 else "❌"
+    rtxt = f" ({r:+.2f}R)" if r is not None else ""
+    await q.edit_message_text(
+        f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
+        f"Yakuniy: {pnl:+.2f}%{rtxt}")
+
+    if config.CHANNEL_ID:
+        sig = await db.get_signal(sig_id)
+        reply_to = sig["group_msg_id"] if sig else None
+        try:
+            await ctx.bot.send_message(
+                config.CHANNEL_ID,
+                f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
+                f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}",
+                parse_mode=ParseMode.HTML, reply_to_message_id=reply_to,
+                allow_sending_without_reply=True)
+        except Exception:
+            log.exception("Guruhga yuborilmadi (qo'lda yopish)")
+
+
+async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.")
+
+
+def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
+    idx = y * 12 + (m - 1) + delta
+    return idx // 12, idx % 12 + 1
+
+
+def symbols_nav_kb(y: int | None, m: int | None) -> InlineKeyboardMarkup:
+    now = datetime.now(stats.TZ)
+    if y is None:  # "Barchasi" ko'rinishidan — orqaga joriy oyga
+        py, pm = now.year, now.month
+        ny, nm = None, None
+    else:
+        py, pm = _shift_month(y, m, -1)
+        ny_, nm_ = _shift_month(y, m, 1)
+        ny, nm = (ny_, nm_) if (ny_, nm_) <= (now.year, now.month) else (None, None)
+
+    row = [InlineKeyboardButton(f"◀ {stats.MONTHS_UZ[pm - 1][:3]}", callback_data=f"sym:{py}:{pm}")]
+    if y is not None:
+        row.append(InlineKeyboardButton("Barchasi", callback_data="sym:all"))
+    if ny is not None:
+        row.append(InlineKeyboardButton(f"{stats.MONTHS_UZ[nm - 1][:3]} ▶", callback_data=f"sym:{ny}:{nm}"))
+    return InlineKeyboardMarkup([row, list(MENU_BACK_KB.inline_keyboard[0])])
+
+
+async def symbols_view_text(y: int | None, m: int | None) -> str:
+    if y is None:
+        return await stats.symbols_table(title="Barcha davr")
+    a, b = stats.month_bounds(y, m)
+    return await stats.symbols_table(a, b, title=f"{stats.MONTHS_UZ[m - 1]} {y}")
+
+
+async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    parts = q.data.split(":")
+    y, m = (None, None) if parts[1] == "all" else (int(parts[1]), int(parts[2]))
+    text = await symbols_view_text(y, m)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=symbols_nav_kb(y, m))
 
 
 async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -125,11 +244,15 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text(await stats.summary(a, b, f"{y}-yil natijalari"),
                                     parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
     elif action == "symbols":
-        await q.message.reply_text(await stats.symbols_table(), parse_mode=ParseMode.HTML,
-                                    reply_markup=MENU_BACK_KB)
+        now = datetime.now(stats.TZ)
+        text = await symbols_view_text(now.year, now.month)
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
+                                    reply_markup=symbols_nav_kb(now.year, now.month))
     elif action == "open":
-        await q.message.reply_text(await open_signals_text(), parse_mode=ParseMode.HTML,
-                                    reply_markup=MENU_BACK_KB)
+        text, kb = await open_signals_view(q.from_user.id)
+        rows = (kb.inline_keyboard if kb else []) + list(MENU_BACK_KB.inline_keyboard)
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
+                                    reply_markup=InlineKeyboardMarkup(rows))
     elif action == "equity":
         buf = await stats.equity_chart()
         if buf is None:
@@ -534,7 +657,10 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(await stats.symbols_table(), parse_mode=ParseMode.HTML)
+    now = datetime.now(stats.TZ)
+    text = await symbols_view_text(now.year, now.month)
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML,
+                                     reply_markup=symbols_nav_kb(now.year, now.month))
 
 
 async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -546,7 +672,8 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(await open_signals_text(), parse_mode=ParseMode.HTML)
+    text, kb = await open_signals_view(update.effective_user.id)
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -605,6 +732,10 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
+    app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
+    app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
+    app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
+    app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
 
     app.add_handler(ConversationHandler(
         entry_points=[

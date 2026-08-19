@@ -161,13 +161,39 @@ async def equity_series() -> list[asyncpg.Record]:
         )
 
 
-async def top_symbols(limit: int = 8) -> list[asyncpg.Record]:
+async def top_symbols(since=None, until=None, limit: int | None = None) -> list[asyncpg.Record]:
+    """Juftlik bo'yicha yopilgan (TP/SL/BREAKEVEN) signallar kesimi.
+    since/until berilsa — faqat shu oraliqda YOPILGAN signallar (closed_at bo'yicha).
+    Hali ochiq (PENDING/ACTIVE) signal hech qaysi oraliqqa tushmaydi — u yopilgan
+    paytidagi oyga avtomatik o'tadi."""
+    where = f"status IN {CLOSED}"
+    params = []
+    if since is not None:
+        params.append(since)
+        where += f" AND closed_at >= ${len(params)}"
+    if until is not None:
+        params.append(until)
+        where += f" AND closed_at < ${len(params)}"
+    limit_sql = ""
+    if limit:
+        params.append(limit)
+        limit_sql = f"LIMIT ${len(params)}"
     q = f"""
-    SELECT symbol, COUNT(*) AS total,
+    SELECT symbol, COUNT(*) AS closed,
            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
            ROUND(COALESCE(SUM(pnl_pct),0), 2) AS sum_pct
-    FROM signals WHERE status IN {CLOSED}
-    GROUP BY symbol ORDER BY sum_pct DESC LIMIT $1
+    FROM signals WHERE {where}
+    GROUP BY symbol ORDER BY sum_pct DESC {limit_sql}
     """
     async with pool().acquire() as c:
-        return await c.fetch(q, limit)
+        return await c.fetch(q, *params)
+
+
+async def open_symbols_count() -> dict[str, int]:
+    """Har bir juftlik bo'yicha hozir ochiq (PENDING/ACTIVE) signallar soni."""
+    async with pool().acquire() as c:
+        rows = await c.fetch(
+            "SELECT symbol, COUNT(*) AS n FROM signals "
+            "WHERE status IN ('PENDING','ACTIVE') GROUP BY symbol"
+        )
+    return {r["symbol"]: r["n"] for r in rows}
