@@ -80,21 +80,25 @@ async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> s
     by_sym = {r["symbol"]: r for r in rows}
     ordered = sorted(symbols, key=lambda s: -float(by_sym[s]["sum_pct"]) if s in by_sym else 0)
 
-    t = [f"<b>Juftliklar — {title}</b>", "<pre>"]
-    header = f"{'Juftlik':<12}{'N':>4}{'WR':>7}{'Foiz':>9}"
-    if since is None:
-        header += f"{'Ochiq':>7}"
-    t.append(header)
+    t = [f"<b>Juftliklar — {title}</b>", ""]
     for sym in ordered:
         r = by_sym.get(sym)
         closed = r["closed"] if r else 0
-        wr = r["wins"] / closed * 100 if r and closed else 0
+        wins = r["wins"] if r else 0
+        losses = closed - wins
         sum_pct = float(r["sum_pct"]) if r else 0.0
-        line = f"{sym:<12}{closed:>4}{wr:>6.0f}%{sum_pct:>+9.2f}"
-        if since is None:
-            line += f"{opens.get(sym, 0):>7}"
-        t.append(line)
-    t.append("</pre>")
+        op = opens.get(sym, 0) if since is None else 0
+
+        badges = []
+        if wins:
+            badges.append(f"🟢{wins}")
+        if losses:
+            badges.append(f"🔴{losses}")
+        if op:
+            badges.append(f"⏳{op}")
+        badge_txt = "  ".join(badges) if badges else "—"
+
+        t.append(f"<b>{sym}</b>  {badge_txt}  <b>{sum_pct:+.2f}%</b>")
     return "\n".join(t)
 
 
