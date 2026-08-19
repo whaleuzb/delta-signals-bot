@@ -119,6 +119,14 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await show_preview(msg, ctx, draft, None, "matn")
 
 
+async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Vaqtinchalik debug: guruh/mavzu ID'larini aniqlash uchun loglaydi."""
+    chat = update.effective_chat
+    msg = update.effective_message
+    log.info("DEBUG guruh xabari: chat_id=%s title=%r type=%s thread_id=%s",
+              chat.id, chat.title, chat.type, msg.message_thread_id)
+
+
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, token=None) -> None:
     sym = await exchange.resolve(draft["symbol"])
     if not sym:
@@ -205,10 +213,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             if item["file_id"]:
                 sent = await ctx.bot.send_photo(
                     config.CHANNEL_ID, item["file_id"], caption=body,
-                    parse_mode=ParseMode.HTML)
+                    parse_mode=ParseMode.HTML, message_thread_id=config.CHANNEL_TOPIC_ID)
             else:
                 sent = await ctx.bot.send_message(
-                    config.CHANNEL_ID, body, parse_mode=ParseMode.HTML)
+                    config.CHANNEL_ID, body, parse_mode=ParseMode.HTML,
+                    message_thread_id=config.CHANNEL_TOPIC_ID)
             await db.set_group_msg(sig_id, sent.message_id)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
@@ -398,6 +407,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, on_photo))
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, on_text_signal))
+    app.add_handler(MessageHandler(filters.ChatType.GROUPS, on_group_message))
     app.add_error_handler(on_error)
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
