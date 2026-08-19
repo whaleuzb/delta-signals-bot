@@ -1,0 +1,120 @@
+"""Rasm captionidan yoki matndan signalni o'qish.
+
+Qo'llab-quvvatlanadigan ko'rinishlar (registr ahamiyatsiz):
+    BTCUSDT LONG 65000 tp 67000 68500 sl 64000
+    BTC/USDT
+    Entry: 65 000
+    TP1 67000  TP2 68500
+    Stop: 64000
+"""
+import re
+
+# Ikkita variant kerak:
+#   NUM  — "65 000" kabi bo'sh joyli minglikni tushunadi (bitta qiymat kutilgan joyda)
+#   NUMS — bo'sh joyni ajratgich deb biladi, ya'ni "172 168" = ikkita raqam
+#          (bir nechta qiymat ketma-ket kelishi mumkin bo'lgan joyda)
+NUM = r"[-+]?\d+(?:[ ,]\d{3}(?!\d))*(?:\.\d+)?"
+NUMS = r"[-+]?\d+(?:,\d{3}(?!\d))*(?:\.\d+)?"
+
+
+def _f(raw: str) -> float:
+    return float(raw.replace(" ", "").replace(",", ""))
+
+
+def _nums(text: str) -> list[float]:
+    """Ketma-ket kelgan raqamlarni ajratib oladi (bo'sh joy = ajratgich)."""
+    out = []
+    for m in re.finditer(NUMS, text):
+        try:
+            out.append(_f(m.group()))
+        except ValueError:
+            pass
+    return out
+
+
+def parse(text: str) -> dict | None:
+    """Muvaffaqiyatli bo'lsa {symbol, side, entry, sl, tps} qaytaradi."""
+    if not text:
+        return None
+    t = text.replace("\u00a0", " ")
+    low = t.lower()
+
+    # --- tomon ---
+    if re.search(r"\b(short|sell|sotish)\b", low):
+        side = "SHORT"
+    else:
+        side = "LONG"
+
+    # --- juftlik ---
+    m = re.search(r"\b([A-Za-z]{2,10})\s*[/\-:]?\s*(usdt|usd)?\b(?:\.p)?", t)
+    symbol = None
+    for cand in re.finditer(r"\b([A-Za-z]{2,12}(?:/|-)?(?:USDT|USD)?(?:\.P)?)\b", t, re.I):
+        w = cand.group(1)
+        if w.lower() in {"long", "short", "buy", "sell", "entry", "tp", "sl", "stop",
+                         "target", "kirish", "maqsad", "signal", "spot"}:
+            continue
+        symbol = w
+        break
+    if not symbol:
+        return None
+
+    # --- SL ---
+    sl = None
+    m = re.search(r"(?:sl|stop\s*loss|stop|stoploss|zarar)\D{0,6}(" + NUM + ")", low)
+    if m:
+        sl = _f(m.group(1))
+
+    # --- Entry ---
+    entry = None
+    m = re.search(r"(?:entry|enter|kirish|buy|narx|price)\D{0,6}(" + NUM + ")", low)
+    if m:
+        entry = _f(m.group(1))
+
+    # --- TP lar ---
+    # 1-usul: indeksli yorliqlar — "TP1: 67 000", "TP2 68500". Indeks tp ga yopishgan
+    # bo'lishi shart, shuning uchun bu yerda bitta qiymat kutiladi (bo'sh joyli minglik ok).
+    tps: list[float] = [
+        _f(m.group(1))
+        for m in re.finditer(r"(?:tp\d|take\s*profit\s*\d)\D{0,6}(" + NUM + ")", low)
+    ]
+    # 2-usul: indekssiz — "tp 67000 68500" yoki "maqsad 0.92 0.98"
+    if not tps:
+        m = re.search(
+            r"(?:tp|take\s*profit|target|maqsad)\s*[:\-=]?\s*((?:" + NUMS + r"[\s,]*)+)", low
+        )
+        if m:
+            tps = _nums(m.group(1))
+
+    # --- kalit so'zsiz qisqa format: SYMBOL SIDE e tp... sl ---
+    if entry is None or sl is None or not tps:
+        nums = _nums(re.sub(r"[A-Za-z]+", " ", t))
+        if entry is None and sl is None and not tps and len(nums) >= 3:
+            entry, *mid, sl = nums[0], *nums[1:-1], nums[-1]
+            tps = mid
+
+    if entry is None or sl is None or not tps:
+        return None
+
+    tps = sorted(set(tps), reverse=(side == "SHORT"))
+    return {"symbol": symbol, "side": side, "entry": entry, "sl": sl, "tps": tps}
+
+
+def validate(d: dict) -> str | None:
+    """Mantiqiy xatolarni tutadi. Xato bo'lsa matn qaytaradi."""
+    e, sl, tps = d["entry"], d["sl"], d["tps"]
+    if e <= 0 or sl <= 0 or any(t <= 0 for t in tps):
+        return "Narxlar musbat bo'lishi kerak."
+    if d["side"] == "LONG":
+        if sl >= e:
+            return f"LONG uchun SL ({sl}) entry ({e}) dan past bo'lishi kerak."
+        if any(t <= e for t in tps):
+            return f"LONG uchun barcha TP entry ({e}) dan yuqori bo'lishi kerak."
+    else:
+        if sl <= e:
+            return f"SHORT uchun SL ({sl}) entry ({e}) dan yuqori bo'lishi kerak."
+        if any(t >= e for t in tps):
+            return f"SHORT uchun barcha TP entry ({e}) dan past bo'lishi kerak."
+    risk = abs(e - sl) / e * 100
+    if risk > 25:
+        return f"Risk juda katta ({risk:.1f}%) — darajalar to'g'ri o'qildimi?"
+    return None
