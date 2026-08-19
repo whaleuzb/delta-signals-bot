@@ -86,6 +86,14 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     To'g'ri qiymatlarni topish uchun `on_group_message` debug logi ishlatiladi (guruhga
     xabar yozilganda `chat_id`/`thread_id`ni logga chiqaradi).
 
+11. **Kirish nazorati — alohida obunachilar bazasi YO'Q, guruh a'zoligi tekshiriladi.**
+    whale-payment-bot muddati tugagan obunachilarni "Whales Uzb" guruhidan (aynan shu
+    `CHANNEL_ID`) har 6 soatda avtomatik chiqarib turadi — shuning uchun "hozir guruh
+    a'zosimi" tekshiruvi "hozir obunachimi" degani bilan bir xil. `is_subscriber()`
+    (`bot.py`) `get_chat_member(CHANNEL_ID, uid)` chaqiradi, ikkala botni DB darajasida
+    bog'lash SHART EMAS. Statistikaga oid barcha buyruq/tugmalar shu bilan himoyalangan;
+    adminlar (`is_admin`) har doim o'tadi.
+
 ---
 
 ## Buyruqlar

@@ -37,6 +37,28 @@ def is_admin(uid: int) -> bool:
     return uid in config.ADMIN_IDS
 
 
+NOT_SUBSCRIBER_TEXT = (
+    "🔒 Bu ma'lumotlar faqat Whales Uzb obunachilariga ochiq.\n"
+    "Obuna bo'lish/tiklash uchun whale-payment-bot orqali murojaat qiling."
+)
+
+
+async def is_subscriber(bot, uid: int) -> bool:
+    """Kirish nazorati: whale-payment-bot muddati tugagan obunachilarni guruhdan
+    avtomatik chiqarib turadi, shuning uchun "hozir guruh a'zosimi" tekshiruvi
+    "hozir obunachimi" degani bilan bir xil — alohida DB ulanishi shart emas."""
+    if is_admin(uid):
+        return True
+    if not config.CHANNEL_ID:
+        return True
+    try:
+        member = await bot.get_chat_member(config.CHANNEL_ID, uid)
+        return member.status not in ("left", "kicked")
+    except Exception:
+        log.exception("Obuna tekshiruvida xato (uid=%s)", uid)
+        return False
+
+
 def fmt_price(x: float) -> str:
     if x >= 1000:
         return f"{x:,.2f}".rstrip("0").rstrip(".")
@@ -226,6 +248,9 @@ async def stats_view_text(mode: str, y: int | None = None, m: int | None = None)
 async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
+    if not await is_subscriber(ctx.bot, q.from_user.id):
+        await q.edit_message_text(NOT_SUBSCRIBER_TEXT)
+        return
     parts = q.data.split(":")  # st:all | st:m:Y:M | st:y:Y
     mode = parts[1]
     y = int(parts[2]) if mode in ("m", "y") else None
@@ -267,6 +292,9 @@ async def symbols_view_text(y: int | None, m: int | None) -> str:
 async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
+    if not await is_subscriber(ctx.bot, q.from_user.id):
+        await q.edit_message_text(NOT_SUBSCRIBER_TEXT)
+        return
     parts = q.data.split(":")
     y, m = (None, None) if parts[1] == "all" else (int(parts[1]), int(parts[2]))
     text = await symbols_view_text(y, m)
@@ -276,6 +304,9 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
+    if not await is_subscriber(ctx.bot, q.from_user.id):
+        await q.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     action = q.data.split(":", 1)[1]
 
     if action == "stats":
@@ -302,13 +333,15 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
+    uid = q.from_user.id if q else update.effective_user.id
     if q:
         await q.answer()
-        uid = q.from_user.id
-        await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
-    else:
-        uid = update.effective_user.id
-        await update.effective_message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
+    if not await is_subscriber(ctx.bot, uid):
+        target = q.message if q else update.effective_message
+        await target.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
+    target = q.message if q else update.effective_message
+    await target.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
 
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
@@ -665,9 +698,13 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ─────────────────────────── Komandalar ───────────────────────────
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    if not await is_subscriber(ctx.bot, uid):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     await update.message.reply_text(
         "Delta Signals Bot — tugmalardan foydalaning 👇",
-        reply_markup=main_menu_kb(update.effective_user.id))
+        reply_markup=main_menu_kb(uid))
 
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -676,11 +713,17 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     await update.message.reply_text(await stats_view_text("all"), parse_mode=ParseMode.HTML,
                                      reply_markup=stats_nav_kb("all"))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     now = datetime.now(stats.TZ)
     a, b = stats.month_bounds(now.year, now.month)
     cur = await stats.summary(a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
@@ -689,6 +732,9 @@ async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     y = datetime.now(stats.TZ).year
     a, b = stats.year_bounds(y)
     await update.message.reply_text(
@@ -696,6 +742,9 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     now = datetime.now(stats.TZ)
     text = await symbols_view_text(now.year, now.month)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
@@ -703,6 +752,9 @@ async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     buf = await stats.equity_chart()
     if buf is None:
         await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.")
@@ -711,6 +763,9 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_subscriber(ctx.bot, update.effective_user.id):
+        await update.message.reply_text(NOT_SUBSCRIBER_TEXT)
+        return
     text, kb = await open_signals_view(update.effective_user.id)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
