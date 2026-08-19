@@ -68,17 +68,22 @@ async def monthly_table(limit: int = 12) -> str:
 
 
 async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> str:
-    """since/until berilmasa — butun davr (+ hozir ochiq soni). Berilsa — faqat
-    shu oyda yopilganlar (ochiq pozitsiya hali yopilmagani uchun ko'rinmaydi —
-    u yopilganda avtomatik o'z oyiga tushadi)."""
+    """since/until berilmasa — butun davr. Berilsa — shu oraliqda yopilganlar
+    (o'tgan, tugagan oylarda ochiq pozitsiya ko'rinmaydi — yopilganda avtomatik
+    o'z oyiga tushadi). Joriy (hali davom etayotgan) davrda — hozir ochiq
+    pozitsiyalar ham ⏳ bilan ko'rinadi."""
+    show_open = since is None or until is None or until > datetime.now(timezone.utc)
     rows = await db.top_symbols(since, until)
-    opens = await db.open_symbols_count() if since is None else {}
+    opens = await db.open_symbols_count() if show_open else {}
     symbols = {r["symbol"] for r in rows} | set(opens)
     if not symbols:
         return f"<b>Juftliklar — {title}</b>\n\nMa'lumot yo'q."
 
     by_sym = {r["symbol"]: r for r in rows}
     ordered = sorted(symbols, key=lambda s: -float(by_sym[s]["sum_pct"]) if s in by_sym else 0)
+
+    def badge(icon: str, n: int) -> str:
+        return icon if n == 1 else f"{icon}{n}"
 
     t = [f"<b>Juftliklar — {title}</b>", ""]
     for sym in ordered:
@@ -87,18 +92,19 @@ async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> s
         wins = r["wins"] if r else 0
         losses = closed - wins
         sum_pct = float(r["sum_pct"]) if r else 0.0
-        op = opens.get(sym, 0) if since is None else 0
+        op = opens.get(sym, 0)
 
         badges = []
         if wins:
-            badges.append(f"🟢{wins}")
+            badges.append(badge("🟢", wins))
         if losses:
-            badges.append(f"🔴{losses}")
+            badges.append(badge("🔴", losses))
         if op:
-            badges.append(f"⏳{op}")
-        badge_txt = "  ".join(badges) if badges else "—"
+            badges.append(badge("⏳", op))
+        badge_txt = " ".join(badges) if badges else "—"
+        pct_txt = f"<b>{sum_pct:+.2f}%</b>" if closed else "<i>ochiq</i>"
 
-        t.append(f"<b>{sym}</b>  {badge_txt}  <b>{sum_pct:+.2f}%</b>")
+        t.append(f"{badge_txt} <b>{sym}</b>  {pct_txt}")
     return "\n".join(t)
 
 
