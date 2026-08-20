@@ -13,12 +13,6 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # --- Kim signal qo'sha oladi ---
 ADMIN_IDS = _ids(os.getenv("ADMIN_IDS", "1101182189"))
 
-# --- Signal qayerga post bo'ladi (guruh/kanal id, masalan -1001234567890) ---
-CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
-# --- Agar guruh forum (mavzular/topics) rejimida bo'lsa — signal shu mavzuga yoziladi.
-#     Bo'sh bo'lsa umumiy (General) mavzuga yoziladi. ---
-CHANNEL_TOPIC_ID = int(os.getenv("CHANNEL_TOPIC_ID", "0")) or None
-
 # --- Claude vision (caption yozilmagan rasmlarni o'qish uchun). Bo'sh bo'lsa o'chadi ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 VISION_MODEL = os.getenv("VISION_MODEL", "claude-sonnet-5")

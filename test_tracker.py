@@ -25,7 +25,7 @@ def candle(i, o, h, l, c):
 
 def signal(**kw):
     d = {
-        "id": 1, "symbol": "BTCUSDT", "side": "LONG",
+        "id": 1, "workspace_id": 1, "symbol": "BTCUSDT", "side": "LONG",
         "entry": 100.0, "sl": 96.0, "sl_initial": 96.0, "tps": [104.0, 108.0, 112.0],
         "tp_hit": 0, "filled_pct": 0.0, "realized_pct": 0.0, "status": "PENDING",
         "created_at": NOW, "opened_at": None, "last_checked_ms": None,

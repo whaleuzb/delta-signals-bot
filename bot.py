@@ -1,5 +1,10 @@
-"""Delta Signals Bot — asosiy fayl."""
-import asyncio
+"""Delta Signals Bot — asosiy fayl.
+
+Multi-tenant: bitta bot bir nechta mustaqil "workspace"ga xizmat qiladi —
+har bir yopiq Telegram guruhi o'z workspace'ini (/setup orqali) ochishi,
+yoki istalgan odam shaxsiy jurnal sifatida foydalanishi mumkin. Workspace'lar
+bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
+"""
 import logging
 import secrets
 from datetime import datetime, timezone
@@ -27,38 +32,129 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("bot")
 
-# token -> {"draft": {...}, "file_id": str, "user": int}
+# token -> {"draft": {...}, "file_id": str, "user": int, "workspace_id": int}
 PENDING: dict[str, dict] = {}
 # admin id -> token (tahrir kutilmoqda)
 AWAITING_EDIT: dict[int, str] = {}
 
 
 def is_admin(uid: int) -> bool:
+    """Super-admin — barcha workspace'larga kirish (qo'llab-quvvatlash uchun)."""
     return uid in config.ADMIN_IDS
 
 
+def can_manage(uid: int, ws) -> bool:
+    """Shu workspace uchun signal kirita/yopa oladimi (workspace admini yoki super-admin)."""
+    return is_admin(uid) or ws["owner_id"] == uid
+
+
 NOT_SUBSCRIBER_TEXT = (
-    "🔒 Bu ma'lumotlar faqat Whales Uzb obunachilariga ochiq.\n"
+    "🔒 Bu ma'lumotlar faqat shu guruh obunachilariga ochiq.\n"
     "Obunani faollashtirgach, bot avtomatik ishlay boshlaydi."
 )
 NOT_SUBSCRIBER_KB = InlineKeyboardMarkup(
     [[InlineKeyboardButton("💳 Obuna bo'lish", url="https://t.me/mamurjonpaybot")]])
 
 
-async def is_subscriber(bot, uid: int) -> bool:
-    """Kirish nazorati: whale-payment-bot muddati tugagan obunachilarni guruhdan
+async def can_view(bot, uid: int, ws) -> bool:
+    """Guruh workspace — whale-payment-bot muddati tugagan obunachilarni guruhdan
     avtomatik chiqarib turadi, shuning uchun "hozir guruh a'zosimi" tekshiruvi
-    "hozir obunachimi" degani bilan bir xil — alohida DB ulanishi shart emas."""
-    if is_admin(uid):
+    "hozir obunachimi" degani bilan bir xil. Shaxsiy workspace — faqat egasi."""
+    if can_manage(uid, ws):
         return True
-    if not config.CHANNEL_ID:
-        return True
+    if ws["type"] == "personal":
+        return False
+    if not ws["group_chat_id"]:
+        return False
     try:
-        member = await bot.get_chat_member(config.CHANNEL_ID, uid)
+        member = await bot.get_chat_member(ws["group_chat_id"], uid)
         return member.status not in ("left", "kicked")
     except Exception:
-        log.exception("Obuna tekshiruvida xato (uid=%s)", uid)
+        log.exception("Obuna tekshiruvida xato (uid=%s ws=%s)", uid, ws["id"])
         return False
+
+
+def access_denied(ws) -> tuple[str, InlineKeyboardMarkup | None]:
+    if ws["type"] == "personal":
+        return "🔒 Bu boshqa foydalanuvchining shaxsiy jurnali.", None
+    return NOT_SUBSCRIBER_TEXT, NOT_SUBSCRIBER_KB
+
+
+# ─────────────────────────── Workspace aniqlash ───────────────────────────
+
+async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Joriy update qaysi workspace'ga tegishli ekanini aniqlaydi.
+    Guruh ichida — o'sha guruhning workspace'i (agar /setup qilingan bo'lsa, aks
+    holda None). Shaxsiy chatda — avval tanlab keshlangan workspace; agar bo'lmasa
+    va foydalanuvchida faqat bitta variant (shaxsiy) bo'lsa — avtomatik shu; agar
+    bir nechta variant bo'lsa (o'z guruhi + shaxsiy) — None qaytaradi, chaqiruvchi
+    switcher ko'rsatishi kerak."""
+    chat = update.effective_chat
+    uid = update.effective_user.id
+
+    if chat.type in ("group", "supergroup"):
+        return await db.get_workspace_by_group(chat.id)
+
+    cached_id = ctx.user_data.get("workspace_id")
+    if cached_id:
+        ws = await db.get_workspace(cached_id)
+        if ws:
+            return ws
+
+    owned_group = await db.get_group_workspace_by_owner(uid)
+    if not owned_group:
+        ws = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+        ctx.user_data["workspace_id"] = ws["id"]
+        return ws
+
+    return None  # bir nechta variant bor — tanlash kerak
+
+
+async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    owned_group = await db.get_group_workspace_by_owner(uid)
+    personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+    rows = []
+    if owned_group:
+        rows.append([InlineKeyboardButton(
+            f"🏘 {owned_group['name']}", callback_data=f"ws:{owned_group['id']}")])
+    rows.append([InlineKeyboardButton("🧑 Shaxsiy jurnal", callback_data=f"ws:{personal['id']}")])
+    await update.effective_message.reply_text("Qaysi joy uchun?", reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Workspace'ni aniqlaydi. Topilmasa mos xabar/tanlov ko'rsatadi va None
+    qaytaradi — chaqiruvchi shu holda darhol return qilishi kerak."""
+    ws = await resolve_workspace(update, ctx)
+    if ws is not None:
+        return ws
+    chat = update.effective_chat
+    if chat.type in ("group", "supergroup"):
+        await update.effective_message.reply_text(
+            "Bu guruh hali ro'yxatdan o'tmagan. Guruh admini /setup buyrug'ini yozsin.")
+    else:
+        await send_workspace_switcher(update, ctx)
+    return None
+
+
+async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    wid = int(q.data.split(":", 1)[1])
+    ws = await db.get_workspace(wid)
+    if not ws or (ws["owner_id"] != q.from_user.id and not is_admin(q.from_user.id)):
+        await q.edit_message_text("Ruxsat yo'q.")
+        return
+    ctx.user_data["workspace_id"] = wid
+    await q.edit_message_text(f"✅ Tanlandi: {ws['name']}")
+    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(q.from_user.id, ws))
+
+
+async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    ctx.user_data.pop("workspace_id", None)
+    await send_workspace_switcher(update, ctx)
 
 
 def fmt_price(x: float) -> str:
@@ -92,15 +188,16 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
 
 # ─────────────────────────── Asosiy menyu ───────────────────────────
 
-def main_menu_kb(uid: int) -> InlineKeyboardMarkup:
+def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
     rows = []
-    if is_admin(uid):
+    if can_manage(uid, ws):
         rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig")])
     rows += [
         [InlineKeyboardButton("📊 Statistika", callback_data="m:stats"),
          InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
         [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
          InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
+        [InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -108,12 +205,13 @@ def main_menu_kb(uid: int) -> InlineKeyboardMarkup:
 MENU_BACK_KB = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]])
 
 
-async def open_signals_view(uid: int) -> tuple[str, InlineKeyboardMarkup | None]:
-    rows = await db.live_signals()
+async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | None]:
+    rows = await db.live_signals(ws["id"])
     if not rows:
         return "Ochiq signal yo'q.", None
     lines = ["<b>Ochiq signallar</b>", ""]
     kb_rows = []
+    manage = can_manage(uid, ws)
     for s in rows:
         price = await exchange.last_price(s["symbol"])
         cur = ""
@@ -125,7 +223,7 @@ async def open_signals_view(uid: int) -> tuple[str, InlineKeyboardMarkup | None]
             f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
             f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
         )
-        if is_admin(uid):
+        if manage:
             kb_rows.append([InlineKeyboardButton(
                 f"🔻 #{s['id']} {s['symbol']} — vaqtidan oldin yopish",
                 callback_data=f"close:{s['id']}")])
@@ -136,12 +234,13 @@ async def open_signals_view(uid: int) -> tuple[str, InlineKeyboardMarkup | None]
 async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not is_admin(q.from_user.id):
-        return
     sig_id = int(q.data.split(":", 1)[1])
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
         await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.")
+        return
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(q.from_user.id, ws):
         return
 
     if sig["status"] == "PENDING":
@@ -168,9 +267,15 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not is_admin(q.from_user.id):
-        return
     sig_id = int(q.data.split(":", 1)[1])
+    sig = await db.get_signal(sig_id)
+    if not sig:
+        await q.edit_message_text("Topilmadi.")
+        return
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(q.from_user.id, ws):
+        return
+
     ev = await tracker.close_now(sig_id)
     if not ev:
         await q.edit_message_text("Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).")
@@ -187,16 +292,14 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
         f"Yakuniy: {pnl:+.2f}%{rtxt}")
 
-    if config.CHANNEL_ID:
-        sig = await db.get_signal(sig_id)
-        reply_to = sig["group_msg_id"] if sig else None
+    if ws["type"] == "group" and ws["group_chat_id"]:
         try:
             await ctx.bot.send_message(
-                config.CHANNEL_ID,
+                ws["group_chat_id"],
                 f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
                 f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}",
-                parse_mode=ParseMode.HTML, reply_to_message_id=reply_to,
-                allow_sending_without_reply=True)
+                parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
+                allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
         except Exception:
             log.exception("Guruhga yuborilmadi (qo'lda yopish)")
 
@@ -205,6 +308,11 @@ async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     q = update.callback_query
     await q.answer()
     await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.")
+
+
+def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
+    idx = y * 12 + (m - 1) + delta
+    return idx // 12, idx % 12 + 1
 
 
 def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> InlineKeyboardMarkup:
@@ -237,33 +345,32 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> Inlin
     return InlineKeyboardMarkup(rows)
 
 
-async def stats_view_text(mode: str, y: int | None = None, m: int | None = None) -> str:
+async def stats_view_text(ws_id: int, mode: str, y: int | None = None, m: int | None = None) -> str:
     if mode == "m":
         a, b = stats.month_bounds(y, m)
-        return await stats.summary(a, b, f"{stats.MONTHS_UZ[m - 1]} {y}")
+        return await stats.summary(ws_id, a, b, f"{stats.MONTHS_UZ[m - 1]} {y}")
     if mode == "y":
         a, b = stats.year_bounds(y)
-        return await stats.summary(a, b, f"{y}-yil natijalari")
-    return await stats.summary()
+        return await stats.summary(ws_id, a, b, f"{y}-yil natijalari")
+    return await stats.summary(ws_id)
 
 
 async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not await is_subscriber(ctx.bot, q.from_user.id):
-        await q.edit_message_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, q.from_user.id, ws):
+        text, kb = access_denied(ws)
+        await q.edit_message_text(text, reply_markup=kb)
         return
     parts = q.data.split(":")  # st:all | st:m:Y:M | st:y:Y
     mode = parts[1]
     y = int(parts[2]) if mode in ("m", "y") else None
     m = int(parts[3]) if mode == "m" else None
-    text = await stats_view_text(mode, y, m)
+    text = await stats_view_text(ws["id"], mode, y, m)
     await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb(mode, y, m))
-
-
-def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
-    idx = y * 12 + (m - 1) + delta
-    return idx // 12, idx % 12 + 1
 
 
 def symbols_nav_kb(y: int | None, m: int | None) -> InlineKeyboardMarkup:
@@ -284,48 +391,56 @@ def symbols_nav_kb(y: int | None, m: int | None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([row, list(MENU_BACK_KB.inline_keyboard[0])])
 
 
-async def symbols_view_text(y: int | None, m: int | None) -> str:
+async def symbols_view_text(ws_id: int, y: int | None, m: int | None) -> str:
     if y is None:
-        return await stats.symbols_table(title="Barcha davr")
+        return await stats.symbols_table(ws_id, title="Barcha davr")
     a, b = stats.month_bounds(y, m)
-    return await stats.symbols_table(a, b, title=f"{stats.MONTHS_UZ[m - 1]} {y}")
+    return await stats.symbols_table(ws_id, a, b, title=f"{stats.MONTHS_UZ[m - 1]} {y}")
 
 
 async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not await is_subscriber(ctx.bot, q.from_user.id):
-        await q.edit_message_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, q.from_user.id, ws):
+        text, kb = access_denied(ws)
+        await q.edit_message_text(text, reply_markup=kb)
         return
     parts = q.data.split(":")
     y, m = (None, None) if parts[1] == "all" else (int(parts[1]), int(parts[2]))
-    text = await symbols_view_text(y, m)
+    text = await symbols_view_text(ws["id"], y, m)
     await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=symbols_nav_kb(y, m))
 
 
 async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    if not await is_subscriber(ctx.bot, q.from_user.id):
-        await q.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, q.from_user.id, ws):
+        text, kb = access_denied(ws)
+        await q.message.reply_text(text, reply_markup=kb)
         return
     action = q.data.split(":", 1)[1]
 
     if action == "stats":
-        await q.message.reply_text(await stats_view_text("all"), parse_mode=ParseMode.HTML,
+        await q.message.reply_text(await stats_view_text(ws["id"], "all"), parse_mode=ParseMode.HTML,
                                     reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
         now = datetime.now(stats.TZ)
-        text = await symbols_view_text(now.year, now.month)
+        text = await symbols_view_text(ws["id"], now.year, now.month)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=symbols_nav_kb(now.year, now.month))
     elif action == "open":
-        text, kb = await open_signals_view(q.from_user.id)
+        text, kb = await open_signals_view(ws, q.from_user.id)
         rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
     elif action == "equity":
-        buf = await stats.equity_chart()
+        buf = await stats.equity_chart(ws["id"])
         if buf is None:
             await q.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
                                         reply_markup=MENU_BACK_KB)
@@ -335,15 +450,59 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
-    uid = q.from_user.id if q else update.effective_user.id
     if q:
         await q.answer()
-    if not await is_subscriber(ctx.bot, uid):
-        target = q.message if q else update.effective_message
-        await target.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
         return
-    target = q.message if q else update.effective_message
-    await target.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid))
+    uid = update.effective_user.id
+    if not await can_view(ctx.bot, uid, ws):
+        text, kb = access_denied(ws)
+        await update.effective_message.reply_text(text, reply_markup=kb)
+        return
+    await update.effective_message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+
+
+# ─────────────────────────── Guruhni ro'yxatdan o'tkazish ───────────────────────────
+
+async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    chat = update.effective_chat
+    if chat.type not in ("group", "supergroup"):
+        await update.message.reply_text("Bu buyruq faqat guruh ichida ishlaydi.")
+        return
+
+    uid = update.effective_user.id
+    try:
+        member = await ctx.bot.get_chat_member(chat.id, uid)
+    except Exception:
+        await update.message.reply_text("Guruh a'zoligini tekshirib bo'lmadi.")
+        return
+    if member.status not in ("creator", "administrator") and not is_admin(uid):
+        await update.message.reply_text("Faqat guruh admini /setup qila oladi.")
+        return
+
+    existing = await db.get_workspace_by_group(chat.id)
+    if existing:
+        await update.message.reply_text(f"Bu guruh allaqachon ro'yxatdan o'tgan: {existing['name']}")
+        return
+
+    if not is_admin(uid):
+        owned = await db.get_group_workspace_by_owner(uid)
+        if owned:
+            await update.message.reply_text(
+                f"Sizda allaqachon boshqa guruh bor: \"{owned['name']}\". "
+                "Har bir admin faqat bitta guruhni boshqara oladi.")
+            return
+
+    topic_id = update.message.message_thread_id
+    name = chat.title or "Guruh"
+    wid = await db.create_group_workspace(uid, chat.id, name, topic_id)
+    log.info("Yangi workspace: #%s %s (owner=%s chat=%s topic=%s)",
+              wid, name, uid, chat.id, topic_id)
+    await update.message.reply_text(
+        f"✅ \"{name}\" workspace sifatida ro'yxatdan o'tdi!\n"
+        "Endi botga shaxsiy xabar yozib (/start) signal kirita olasiz."
+    )
 
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
@@ -367,16 +526,22 @@ def _parse_price(raw: str) -> float | None:
 
 async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
-    uid = (q.from_user if q else update.effective_user).id
-    if not is_admin(uid):
-        return ConversationHandler.END
     if q:
         await q.answer()
     target = q.message if q else update.effective_message
     if update.effective_chat.type != "private":
         await target.reply_text("Iltimos, botga shaxsiy xabar (DM) yozib, shu yerda qayta urining.")
         return ConversationHandler.END
-    ctx.user_data["wiz"] = {}
+
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return ConversationHandler.END
+    uid = (q.from_user if q else update.effective_user).id
+    if not can_manage(uid, ws):
+        await target.reply_text("Sizda bu joy uchun signal kiritish huquqi yo'q.")
+        return ConversationHandler.END
+
+    ctx.user_data["wiz"] = {"workspace_id": ws["id"]}
     await target.reply_text("1/5 — 📈 Grafik rasmni yuboring.", reply_markup=WIZ_PHOTO_KB)
     return WIZ_PHOTO
 
@@ -462,7 +627,7 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz = ctx.user_data.pop("wiz")
     draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
              "sl": sl, "tps": wiz["tps"]}
-    await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard")
+    await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard", wiz["workspace_id"])
     return ConversationHandler.END
 
 
@@ -481,7 +646,10 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
-    if not is_admin(update.effective_user.id):
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not can_manage(update.effective_user.id, ws):
         return
 
     caption = msg.caption or ""
@@ -503,42 +671,55 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
 
-    await show_preview(msg, ctx, draft, file_id, source)
+    await show_preview(msg, ctx, draft, file_id, source, ws["id"])
 
 
 async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Rasmsiz matnli signal yoki tahrir javobi."""
     uid = update.effective_user.id
-    if not is_admin(uid):
-        return
     msg = update.effective_message
     text = msg.text or ""
 
-    token = AWAITING_EDIT.pop(uid, None)
+    token = AWAITING_EDIT.get(uid)
     if token and token in PENDING:
+        AWAITING_EDIT.pop(uid, None)
         draft = parsing.parse(text)
         if draft is None:
             AWAITING_EDIT[uid] = token
             await msg.reply_text("O'qiy olmadim. Yana urinib ko'ring yoki /bekor yozing.")
             return
-        PENDING[token]["draft"] = draft
-        await show_preview(msg, ctx, draft, PENDING[token]["file_id"], "tahrir", token)
+        item = PENDING[token]
+        ws = await db.get_workspace(item["workspace_id"])
+        if not ws or not can_manage(uid, ws):
+            PENDING.pop(token, None)
+            return
+        item["draft"] = draft
+        await show_preview(msg, ctx, draft, item["file_id"], "tahrir", ws["id"], token)
         return
 
     draft = parsing.parse(text)
-    if draft:
-        await show_preview(msg, ctx, draft, None, "matn")
+    if not draft:
+        return  # oddiy suhbat — signalga o'xshamaydi, e'tiborsiz qoldiramiz
+
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not can_manage(uid, ws):
+        return
+    await show_preview(msg, ctx, draft, None, "matn", ws["id"])
 
 
 async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """Vaqtinchalik debug: guruh/mavzu ID'larini aniqlash uchun loglaydi."""
+    """Debug: guruh/mavzu ID'larini aniqlash uchun loglaydi (masalan mavjud
+    workspace'ga mavzu qo'shish kerak bo'lganda)."""
     chat = update.effective_chat
     msg = update.effective_message
     log.info("DEBUG guruh xabari: chat_id=%s title=%r type=%s thread_id=%s",
               chat.id, chat.title, chat.type, msg.message_thread_id)
 
 
-async def show_preview(msg, ctx, draft: dict, file_id, source: str, token=None) -> None:
+async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
+                        token: str | None = None) -> None:
     sym = await exchange.resolve(draft["symbol"])
     if not sym:
         await msg.reply_text(
@@ -568,7 +749,8 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, token=None) 
         warn.append(f"Joriy narx: <b>{fmt_price(price)}</b> (entrydan {d:+.2f}%)")
 
     token = token or secrets.token_urlsafe(8)
-    PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id}
+    PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id,
+                       "workspace_id": workspace_id}
 
     body = draft_text(draft)
     if warn:
@@ -608,8 +790,13 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     # --- tasdiqlash ---
+    ws = await db.get_workspace(item["workspace_id"])
+    if not ws or not can_manage(q.from_user.id, ws):
+        await q.edit_message_text("Ruxsat yo'q.")
+        return
+
     d = item["draft"]
-    sig_id = await db.create_signal({
+    sig_id = await db.create_signal(ws["id"], {
         "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
         "sl": d["sl"], "tps": d["tps"], "chart_file_id": item["file_id"],
         "author_id": q.from_user.id, "note": d.get("reasoning"),
@@ -618,17 +805,17 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
                               parse_mode=ParseMode.HTML)
 
-    if config.CHANNEL_ID:
+    if ws["type"] == "group" and ws["group_chat_id"]:
         body = draft_text(d, sig_id)
         try:
             if item["file_id"]:
                 sent = await ctx.bot.send_photo(
-                    config.CHANNEL_ID, item["file_id"], caption=body,
-                    parse_mode=ParseMode.HTML, message_thread_id=config.CHANNEL_TOPIC_ID)
+                    ws["group_chat_id"], item["file_id"], caption=body,
+                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
             else:
                 sent = await ctx.bot.send_message(
-                    config.CHANNEL_ID, body, parse_mode=ParseMode.HTML,
-                    message_thread_id=config.CHANNEL_TOPIC_ID)
+                    ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
+                    message_thread_id=ws["group_topic_id"])
             await db.set_group_msg(sig_id, sent.message_id)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
@@ -651,8 +838,17 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Kuzatuv siklida xato")
         return
 
+    ws_cache: dict[int, object] = {}
+
+    async def get_ws(wid: int):
+        if wid not in ws_cache:
+            ws_cache[wid] = await db.get_workspace(wid)
+        return ws_cache[wid]
+
     for e in events:
         sid, sym = e["signal_id"], e["symbol"]
+        ws = await get_ws(e["workspace_id"])
+
         if e["type"] == "STOP":
             pnl = e["final_pnl"] or 0
             if e["was_be"]:
@@ -674,90 +870,115 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not txt:
             continue
 
+        if not ws or ws["type"] != "group" or not ws["group_chat_id"]:
+            continue  # shaxsiy workspace — guruhga hech narsa yuborilmaydi
+
         sig = await db.get_signal(sid)
         reply_to = sig["group_msg_id"] if sig else None
-        if config.CHANNEL_ID:
-            try:
-                await ctx.bot.send_message(
-                    config.CHANNEL_ID, txt, parse_mode=ParseMode.HTML,
-                    reply_to_message_id=reply_to,
-                    allow_sending_without_reply=True)
-            except Exception:
-                log.exception("Xabar yuborilmadi")
+        try:
+            await ctx.bot.send_message(
+                ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                reply_to_message_id=reply_to, allow_sending_without_reply=True,
+                message_thread_id=ws["group_topic_id"])
+        except Exception:
+            log.exception("Xabar yuborilmadi")
 
         if sig and sig["ambiguous"] and e["type"] == "STOP":
-            for admin in config.ADMIN_IDS:
-                try:
-                    await ctx.bot.send_message(
-                        admin,
-                        f"⚠️ #{sid} — TP va SL bitta 1m shamda tegdi. "
-                        f"Konservativ hisob ishlatildi (SL). Qo'lda tekshiring.",
-                    )
-                except Exception:
-                    pass
+            try:
+                await ctx.bot.send_message(
+                    ws["owner_id"],
+                    f"⚠️ #{sid} — TP va SL bitta 1m shamda tegdi. "
+                    f"Konservativ hisob ishlatildi (SL). Qo'lda tekshiring.",
+                )
+            except Exception:
+                pass
 
 
 # ─────────────────────────── Komandalar ───────────────────────────
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
     uid = update.effective_user.id
-    if not await is_subscriber(ctx.bot, uid):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    if not await can_view(ctx.bot, uid, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
         return
     await update.message.reply_text(
-        "Delta Signals Bot — tugmalardan foydalaning 👇",
-        reply_markup=main_menu_kb(uid))
+        f"Delta Signals Bot — {ws['name']} 👇", reply_markup=main_menu_kb(uid, ws))
 
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_EDIT.pop(update.effective_user.id, None)
+    ctx.user_data.pop("wiz", None)
     await update.message.reply_text("❌ Bekor qilindi.")
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
         return
-    await update.message.reply_text(await stats_view_text("all"), parse_mode=ParseMode.HTML,
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
+        return
+    await update.message.reply_text(await stats_view_text(ws["id"], "all"), parse_mode=ParseMode.HTML,
                                      reply_markup=stats_nav_kb("all"))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
         return
     now = datetime.now(stats.TZ)
     a, b = stats.month_bounds(now.year, now.month)
-    cur = await stats.summary(a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
+    cur = await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
     await update.message.reply_text(
-        cur + "\n\n" + await stats.monthly_table(), parse_mode=ParseMode.HTML)
+        cur + "\n\n" + await stats.monthly_table(ws["id"]), parse_mode=ParseMode.HTML)
 
 
 async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
         return
     y = datetime.now(stats.TZ).year
     a, b = stats.year_bounds(y)
     await update.message.reply_text(
-        await stats.summary(a, b, f"{y}-yil natijalari"), parse_mode=ParseMode.HTML)
+        await stats.summary(ws["id"], a, b, f"{y}-yil natijalari"), parse_mode=ParseMode.HTML)
 
 
 async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
         return
     now = datetime.now(stats.TZ)
-    text = await symbols_view_text(now.year, now.month)
+    text = await symbols_view_text(ws["id"], now.year, now.month)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
                                      reply_markup=symbols_nav_kb(now.year, now.month))
 
 
 async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
         return
-    buf = await stats.equity_chart()
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
+        return
+    buf = await stats.equity_chart(ws["id"])
     if buf is None:
         await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.")
         return
@@ -765,20 +986,29 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await is_subscriber(ctx.bot, update.effective_user.id):
-        await update.message.reply_text(NOT_SUBSCRIBER_TEXT, reply_markup=NOT_SUBSCRIBER_KB)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
         return
-    text, kb = await open_signals_view(update.effective_user.id)
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
+        return
+    text, kb = await open_signals_view(ws, update.effective_user.id)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not is_admin(update.effective_user.id):
-        return
     if not ctx.args:
         await update.message.reply_text("Foydalanish: /cancel 12")
         return
-    ok = await db.cancel_signal(int(ctx.args[0]))
+    sig = await db.get_signal(int(ctx.args[0]))
+    if not sig:
+        await update.message.reply_text("Topilmadi.")
+        return
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(update.effective_user.id, ws):
+        return
+    ok = await db.cancel_signal(sig["id"])
     await update.message.reply_text("✅ Bekor qilindi." if ok else "Topilmadi yoki allaqachon yopilgan.")
 
 
@@ -786,7 +1016,7 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def post_init(app: Application) -> None:
     await db.init()
-    log.info("Baza tayyor. Adminlar: %s", config.ADMIN_IDS)
+    log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
 
 
 async def post_shutdown(app: Application) -> None:
@@ -798,7 +1028,7 @@ async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if isinstance(update, Update) and update.effective_message:
         try:
             await update.effective_message.reply_text(
-                "⚠️ Xatolik yuz berdi (masalan, Binance narx serveriga vaqtincha "
+                "⚠️ Xatolik yuz berdi (masalan, narx serveriga vaqtincha "
                 "ulanib bo'lmadi). Birozdan so'ng qayta urinib ko'ring."
             )
         except Exception:
@@ -817,6 +1047,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("menu", cmd_start))
+    app.add_handler(CommandHandler("setup", cmd_setup))
     app.add_handler(CommandHandler("bekor", cmd_bekor))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("month", cmd_month))
@@ -828,6 +1059,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
+    app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
+    app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))

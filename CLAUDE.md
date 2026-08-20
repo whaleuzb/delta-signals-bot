@@ -88,11 +88,41 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
 
 11. **Kirish nazorati — alohida obunachilar bazasi YO'Q, guruh a'zoligi tekshiriladi.**
     whale-payment-bot muddati tugagan obunachilarni "Whales Uzb" guruhidan (aynan shu
-    `CHANNEL_ID`) har 6 soatda avtomatik chiqarib turadi — shuning uchun "hozir guruh
-    a'zosimi" tekshiruvi "hozir obunachimi" degani bilan bir xil. `is_subscriber()`
-    (`bot.py`) `get_chat_member(CHANNEL_ID, uid)` chaqiradi, ikkala botni DB darajasida
-    bog'lash SHART EMAS. Statistikaga oid barcha buyruq/tugmalar shu bilan himoyalangan;
-    adminlar (`is_admin`) har doim o'tadi.
+    workspace'ning `group_chat_id`'si) har 6 soatda avtomatik chiqarib turadi — shuning
+    uchun "hozir guruh a'zosimi" tekshiruvi "hozir obunachimi" degani bilan bir xil.
+    `can_view()` (`bot.py`) `get_chat_member(group_chat_id, uid)` chaqiradi, ikkala botni
+    DB darajasida bog'lash SHART EMAS. Bu faqat `type='group'` workspace'larga tegishli —
+    shaxsiy workspace'da faqat egasi ko'radi. Statistikaga oid barcha buyruq/tugmalar
+    shu bilan himoyalangan; super-adminlar (`is_admin`, `config.ADMIN_IDS`) har doim o'tadi.
+
+12. **Multi-tenant: `workspaces` jadvali, `CHANNEL_ID` env o'zgaruvchisi endi YO'Q.**
+    Bitta bot ko'p mustaqil "joy"ga xizmat qiladi — har bir `signals` yozuvi bitta
+    `workspace_id`ga tegishli, workspace'lar bir-birining ma'lumotini ko'rmaydi.
+    - `type='group'` — yopiq Telegram guruhi, guruh admini `/setup` yozib ochadi
+      (`cmd_setup`, faqat guruh ichida, faqat creator/administrator, bitta admin —
+      bitta guruh: `UNIQUE(owner_id,type)`). `group_chat_id`/`group_topic_id` shu
+      workspace ichida saqlanadi (avval global `CHANNEL_ID`/`CHANNEL_TOPIC_ID` edi).
+    - `type='personal'` — istalgan odam uchun avtomatik ochiladigan shaxsiy jurnal
+      (`get_or_create_personal_workspace`), hech qayerga post qilinmaydi, faqat egasi
+      ko'radi.
+    - Ruxsat ikki bosqich: `can_manage()` (signal kirita/yopa oladi — workspace admini
+      yoki super-admin) va `can_view()` (statistikani ko'ra oladi — yuqoridagi #11).
+    - Shaxsiy chatda qaysi workspace ishlatilishini `resolve_workspace()` aniqlaydi:
+      `ctx.user_data["workspace_id"]` keshi → agar bitta variant bo'lsa avtomatik →
+      bir nechta variant bo'lsa (o'z guruhi + shaxsiy) `send_workspace_switcher()`
+      tugmalarini ko'rsatadi (`switch` / `ws:<id>` callback'lar). Guruh ichida — doim
+      o'sha guruhning workspace'i, tanlov yo'q.
+    - Signal kiritish (tezkor va sehrgar) endi FAQAT shaxsiy chatda ishlaydi (guruh
+      ichida emas) — chunki bitta guruh xabaridan qaysi workspace'ga tegishli ekanini
+      bilib bo'lmaydi (agar bitta admin bir nechta guruhni boshqarsa). Guruhga post
+      `ws["group_chat_id"]` orqali `on_button`/`poll_job` ichida amalga oshadi.
+    - `tracker.run_once()` barcha workspace'lardagi ochiq signallarni bitta so'rovda
+      oladi (`db.live_signals(None)`), har hodisaga o'z `workspace_id`sini qo'shib
+      qaytaradi — `poll_job` shu bo'yicha guruhni topib xabar yuboradi (yoki shaxsiy
+      bo'lsa hech narsa yubormaydi).
+    - Eski production ma'lumotlar `migrate_multitenant.py` bir martalik skripti bilan
+      "Whales Uzb" workspace'iga bog'landi (startCommand vaqtincha
+      `python migrate_multitenant.py; python bot.py` qilingan holda ishga tushirildi).
 
 ---
 
@@ -111,9 +141,10 @@ Schema `db.init()` da avtomatik yaratiladi.
 
 ## Env o'zgaruvchilar
 
-`BOT_TOKEN` · `DATABASE_URL` · `ADMIN_IDS` · `CHANNEL_ID` — majburiy.
+`BOT_TOKEN` · `DATABASE_URL` · `ADMIN_IDS` — majburiy.
 `ANTHROPIC_API_KEY` — bo'sh bo'lsa vision jim o'chadi, bot ishlayveradi.
-Qolganlari `.env.example` da.
+`CHANNEL_ID`/`CHANNEL_TOPIC_ID` endi YO'Q — har bir guruh o'zini `/setup` bilan
+ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 
 ---
 

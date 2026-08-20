@@ -24,8 +24,8 @@ def _compound(pcts: list[float]) -> float:
     return (eq - 1) * 100
 
 
-async def summary(since=None, until=None, title="Umumiy statistika") -> str:
-    s = await db.period_stats(since, until)
+async def summary(workspace_id: int, since=None, until=None, title="Umumiy statistika") -> str:
+    s = await db.period_stats(workspace_id, since, until)
     if not s or s["total"] == 0:
         return f"<b>{title}</b>\n\nHali yopilgan signal yo'q."
 
@@ -37,7 +37,7 @@ async def summary(since=None, until=None, title="Umumiy statistika") -> str:
         gross_loss = abs(float(s["avg_loss"])) * s["losses"]
         pf = gross_win / gross_loss if gross_loss else None
 
-    rows = await db.equity_series()
+    rows = await db.equity_series(workspace_id)
     pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
 
     t = [f"<b>{title}</b>", ""]
@@ -52,8 +52,8 @@ async def summary(since=None, until=None, title="Umumiy statistika") -> str:
     return "\n".join(t)
 
 
-async def monthly_table(limit: int = 12) -> str:
-    rows = await db.monthly_breakdown(limit)
+async def monthly_table(workspace_id: int, limit: int = 12) -> str:
+    rows = await db.monthly_breakdown(workspace_id, limit)
     if not rows:
         return "Ma'lumot yo'q."
     t = ["<b>Oylik natijalar</b>", "<pre>"]
@@ -67,14 +67,15 @@ async def monthly_table(limit: int = 12) -> str:
     return "\n".join(t)
 
 
-async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> str:
+async def symbols_table(workspace_id: int, since=None, until=None,
+                         title: str = "Barcha davr") -> str:
     """since/until berilmasa — butun davr. Berilsa — shu oraliqda yopilganlar
     (o'tgan, tugagan oylarda ochiq pozitsiya ko'rinmaydi — yopilganda avtomatik
     o'z oyiga tushadi). Joriy (hali davom etayotgan) davrda — hozir ochiq
     pozitsiyalar ham ⏳ bilan ko'rinadi."""
     show_open = since is None or until is None or until > datetime.now(timezone.utc)
-    rows = await db.top_symbols(since, until)
-    opens = await db.open_symbols_count() if show_open else {}
+    rows = await db.top_symbols(workspace_id, since, until)
+    opens = await db.open_symbols_count(workspace_id) if show_open else {}
     symbols = {r["symbol"] for r in rows} | set(opens)
     if not symbols:
         return f"<b>Juftliklar — {title}</b>\n\nMa'lumot yo'q."
@@ -108,8 +109,8 @@ async def symbols_table(since=None, until=None, title: str = "Barcha davr") -> s
     return "\n".join(t)
 
 
-async def equity_chart() -> io.BytesIO | None:
-    rows = await db.equity_series()
+async def equity_chart(workspace_id: int) -> io.BytesIO | None:
+    rows = await db.equity_series(workspace_id)
     if len(rows) < 2:
         return None
 

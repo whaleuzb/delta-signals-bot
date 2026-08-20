@@ -1,4 +1,12 @@
-"""PostgreSQL qatlami — schema va so'rovlar."""
+"""PostgreSQL qatlami — schema va so'rovlar.
+
+Multi-tenant: har bir signal bitta workspace'ga tegishli.
+  - type='group'    — Telegram guruhi, /setup orqali ro'yxatdan o'tgan.
+                       group_chat_id/group_topic_id'ga signal e'lon qilinadi,
+                       shu guruh a'zolari statistikani ko'ra oladi.
+  - type='personal' — shaxsiy jurnal, hech qayerga e'lon qilinmaydi,
+                       faqat owner_id o'zi ko'ra oladi.
+"""
 from decimal import Decimal
 
 import asyncpg
@@ -14,6 +22,18 @@ def _d(x):
 _pool: asyncpg.Pool | None = None
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS workspaces (
+    id              SERIAL PRIMARY KEY,
+    type            TEXT        NOT NULL,   -- 'group' | 'personal'
+    owner_id        BIGINT      NOT NULL,   -- shu workspace admini (yagona)
+    group_chat_id   BIGINT,                 -- faqat type='group'
+    group_topic_id  BIGINT,                 -- ixtiyoriy, forum mavzusi
+    name            TEXT        NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (group_chat_id),
+    UNIQUE (owner_id, type)  -- bitta odam — bitta shaxsiy, bitta guruh workspace
+);
+
 CREATE TABLE IF NOT EXISTS signals (
     id              SERIAL PRIMARY KEY,
     symbol          TEXT        NOT NULL,
@@ -44,12 +64,23 @@ CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
 CREATE INDEX IF NOT EXISTS idx_signals_closed ON signals(closed_at);
 """
 
+# signals.workspace_id — ALTER orqali qo'shiladi (yangi ustun eski jadvalga ham,
+# yangi jadvalga ham bir xil yo'l bilan qo'shilishi uchun; CREATE TABLE IF NOT
+# EXISTS eski (allaqachon mavjud) jadvalni o'zgartira olmaydi). Boshida NULL
+# qabul qiladi — mavjud yozuvlar workspace'ga bog'langach, bir martalik
+# migratsiya skripti uni NOT NULL qiladi.
+MIGRATE = """
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS workspace_id INT REFERENCES workspaces(id);
+CREATE INDEX IF NOT EXISTS idx_signals_workspace ON signals(workspace_id);
+"""
+
 
 async def init() -> asyncpg.Pool:
     global _pool
     _pool = await asyncpg.create_pool(config.DATABASE_URL, min_size=1, max_size=5)
     async with _pool.acquire() as c:
         await c.execute(SCHEMA)
+        await c.execute(MIGRATE)
     return _pool
 
 
@@ -58,15 +89,64 @@ def pool() -> asyncpg.Pool:
     return _pool
 
 
-async def create_signal(d: dict) -> int:
+# ─────────────────────────── Workspace'lar ───────────────────────────
+
+async def create_group_workspace(owner_id: int, chat_id: int, name: str,
+                                  topic_id: int | None = None) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO workspaces (type, owner_id, group_chat_id, group_topic_id, name) "
+            "VALUES ('group', $1, $2, $3, $4) RETURNING id",
+            owner_id, chat_id, topic_id, name,
+        )
+
+
+async def get_or_create_personal_workspace(owner_id: int, name: str) -> asyncpg.Record:
+    async with pool().acquire() as c:
+        row = await c.fetchrow(
+            "SELECT * FROM workspaces WHERE type='personal' AND owner_id=$1", owner_id)
+        if row:
+            return row
+        wid = await c.fetchval(
+            "INSERT INTO workspaces (type, owner_id, name) VALUES ('personal', $1, $2) "
+            "RETURNING id", owner_id, name,
+        )
+        return await c.fetchrow("SELECT * FROM workspaces WHERE id=$1", wid)
+
+
+async def get_workspace(workspace_id: int) -> asyncpg.Record | None:
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM workspaces WHERE id=$1", workspace_id)
+
+
+async def get_workspace_by_group(chat_id: int) -> asyncpg.Record | None:
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM workspaces WHERE group_chat_id=$1", chat_id)
+
+
+async def get_group_workspace_by_owner(owner_id: int) -> asyncpg.Record | None:
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1", owner_id)
+
+
+async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET group_topic_id=$2 WHERE id=$1", workspace_id, topic_id)
+
+
+# ─────────────────────────── Signallar ───────────────────────────
+
+async def create_signal(workspace_id: int, d: dict) -> int:
     q = """
-    INSERT INTO signals (symbol, side, entry, sl, sl_initial, tps,
+    INSERT INTO signals (workspace_id, symbol, side, entry, sl, sl_initial, tps,
                          chart_file_id, author_id, note)
-    VALUES ($1,$2,$3,$4,$4,$5,$6,$7,$8) RETURNING id
+    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9) RETURNING id
     """
     async with pool().acquire() as c:
         return await c.fetchval(
-            q, d["symbol"], d["side"], _d(d["entry"]), _d(d["sl"]),
+            q, workspace_id, d["symbol"], d["side"], _d(d["entry"]), _d(d["sl"]),
             [_d(t) for t in d["tps"]],
             d.get("chart_file_id"), d.get("author_id"), d.get("note"),
         )
@@ -77,11 +157,16 @@ async def set_group_msg(sig_id: int, msg_id: int) -> None:
         await c.execute("UPDATE signals SET group_msg_id=$2 WHERE id=$1", sig_id, msg_id)
 
 
-async def live_signals() -> list[asyncpg.Record]:
+async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
+    """workspace_id berilmasa — BARCHA workspace'lardagi ochiq signallar (kuzatuv
+    sikli uchun; u har birini o'z workspace_id'si bilan qaytaradi)."""
     async with pool().acquire() as c:
+        if workspace_id is None:
+            return await c.fetch(
+                "SELECT * FROM signals WHERE status IN ('PENDING','ACTIVE') ORDER BY id")
         return await c.fetch(
-            "SELECT * FROM signals WHERE status IN ('PENDING','ACTIVE') ORDER BY id"
-        )
+            "SELECT * FROM signals WHERE workspace_id=$1 "
+            "AND status IN ('PENDING','ACTIVE') ORDER BY id", workspace_id)
 
 
 async def get_signal(sig_id: int) -> asyncpg.Record | None:
@@ -118,7 +203,7 @@ async def cancel_signal(sig_id: int, status: str = "CANCELLED") -> bool:
 CLOSED = "('TP','SL','BREAKEVEN')"
 
 
-async def period_stats(since=None, until=None) -> asyncpg.Record:
+async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Record:
     q = f"""
     SELECT
         COUNT(*)                                            AS total,
@@ -131,43 +216,45 @@ async def period_stats(since=None, until=None) -> asyncpg.Record:
         COALESCE(AVG(r_multiple), 0)                         AS avg_r,
         COALESCE(SUM(r_multiple), 0)                         AS sum_r
     FROM signals
-    WHERE status IN {CLOSED}
-      AND ($1::timestamptz IS NULL OR closed_at >= $1)
-      AND ($2::timestamptz IS NULL OR closed_at <  $2)
+    WHERE workspace_id = $1 AND status IN {CLOSED}
+      AND ($2::timestamptz IS NULL OR closed_at >= $2)
+      AND ($3::timestamptz IS NULL OR closed_at <  $3)
     """
     async with pool().acquire() as c:
-        return await c.fetchrow(q, since, until)
+        return await c.fetchrow(q, workspace_id, since, until)
 
 
-async def monthly_breakdown(limit: int = 12) -> list[asyncpg.Record]:
+async def monthly_breakdown(workspace_id: int, limit: int = 12) -> list[asyncpg.Record]:
     q = f"""
     SELECT date_trunc('month', closed_at AT TIME ZONE '{config.TZ}') AS month,
            COUNT(*) AS total,
            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
            ROUND(COALESCE(SUM(pnl_pct),0), 2) AS sum_pct,
            ROUND(COALESCE(AVG(r_multiple),0), 2) AS avg_r
-    FROM signals WHERE status IN {CLOSED}
-    GROUP BY 1 ORDER BY 1 DESC LIMIT $1
+    FROM signals WHERE workspace_id=$1 AND status IN {CLOSED}
+    GROUP BY 1 ORDER BY 1 DESC LIMIT $2
     """
     async with pool().acquire() as c:
-        return await c.fetch(q, limit)
+        return await c.fetch(q, workspace_id, limit)
 
 
-async def equity_series() -> list[asyncpg.Record]:
+async def equity_series(workspace_id: int) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch(
             f"SELECT closed_at, pnl_pct FROM signals "
-            f"WHERE status IN {CLOSED} ORDER BY closed_at"
+            f"WHERE workspace_id=$1 AND status IN {CLOSED} ORDER BY closed_at",
+            workspace_id,
         )
 
 
-async def top_symbols(since=None, until=None, limit: int | None = None) -> list[asyncpg.Record]:
+async def top_symbols(workspace_id: int, since=None, until=None,
+                       limit: int | None = None) -> list[asyncpg.Record]:
     """Juftlik bo'yicha yopilgan (TP/SL/BREAKEVEN) signallar kesimi.
     since/until berilsa — faqat shu oraliqda YOPILGAN signallar (closed_at bo'yicha).
     Hali ochiq (PENDING/ACTIVE) signal hech qaysi oraliqqa tushmaydi — u yopilgan
     paytidagi oyga avtomatik o'tadi."""
-    where = f"status IN {CLOSED}"
-    params = []
+    where = f"workspace_id = $1 AND status IN {CLOSED}"
+    params = [workspace_id]
     if since is not None:
         params.append(since)
         where += f" AND closed_at >= ${len(params)}"
@@ -189,11 +276,12 @@ async def top_symbols(since=None, until=None, limit: int | None = None) -> list[
         return await c.fetch(q, *params)
 
 
-async def open_symbols_count() -> dict[str, int]:
+async def open_symbols_count(workspace_id: int) -> dict[str, int]:
     """Har bir juftlik bo'yicha hozir ochiq (PENDING/ACTIVE) signallar soni."""
     async with pool().acquire() as c:
         rows = await c.fetch(
             "SELECT symbol, COUNT(*) AS n FROM signals "
-            "WHERE status IN ('PENDING','ACTIVE') GROUP BY symbol"
+            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE') GROUP BY symbol",
+            workspace_id,
         )
     return {r["symbol"]: r["n"] for r in rows}

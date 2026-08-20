@@ -3,17 +3,29 @@
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
 yurituvchi bot. Narx manbasi — **MEXC Spot**, hisob-kitob esa **spot (1x)**.
 
+Multi-tenant: bitta bot bir nechta mustaqil **workspace**ga xizmat qiladi — istalgan
+yopiq guruh o'zini `/setup` bilan ro'yxatdan o'tkazib, o'z admini boshqaradigan alohida
+statistika olishi mumkin; istalgan odam esa shaxsiy (hech qayerga post bo'lmaydigan)
+savdo jurnali sifatida foydalanishi mumkin. Workspace'lar bir-birining ma'lumotini
+ko'rmaydi.
+
 ---
 
 ## Qanday ishlaydi
 
-1. Adminlar botga shaxsiy chatda grafik rasmini tashlaydi.
-2. Caption bo'lsa — undan o'qiladi. Bo'lmasa — Claude vision grafikdan darajalarni topadi.
-3. Bot parse qilingan darajalarni **tasdiqlash tugmasi** bilan ko'rsatadi. Bir bosish —
-   signal bazaga tushadi va guruhga post bo'ladi.
-4. Har 45 soniyada worker MEXC'dan 1 daqiqalik shamlarni oladi va TP/SL teginishini
+1. Guruh admini guruh ichida `/setup` yozadi — shu guruh uchun workspace ochiladi
+   (bitta admin — bitta guruh). Shaxsiy foydalanish uchun alohida sozlash kerak emas —
+   birinchi murojaatda avtomatik shaxsiy workspace ochiladi.
+2. Workspace admini botga shaxsiy chatda grafik rasmini tashlaydi (yoki `/new` — bosqichma-
+   bosqich sehrgar).
+3. Caption bo'lsa — undan o'qiladi. Bo'lmasa — Claude vision grafikdan darajalarni topadi.
+4. Bot parse qilingan darajalarni **tasdiqlash tugmasi** bilan ko'rsatadi. Bir bosish —
+   signal bazaga tushadi; guruh workspace bo'lsa — guruhga ham post bo'ladi (shaxsiy
+   workspace'da post bo'lmaydi, faqat jurnalga yoziladi).
+5. Har 45 soniyada worker MEXC'dan 1 daqiqalik shamlarni oladi va TP/SL teginishini
    tekshiradi. Yopilgan signal guruhdagi asl postga **reply** qilib e'lon qilinadi.
-5. `/stats`, `/month`, `/year`, `/equity` — statistika.
+6. `/stats`, `/month`, `/year`, `/symbols`, `/equity` — statistika. Guruh workspace'da
+   shu guruh a'zolariga ochiq, shaxsiy workspace'da faqat egasiga.
 
 ---
 
@@ -61,12 +73,13 @@ oshirgan bo'lish mumkin.
 |---|---|
 | `BOT_TOKEN` | @BotFather'dan |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
-| `ADMIN_IDS` | vergul bilan, masalan `1101182189` |
-| `CHANNEL_ID` | guruh/kanal id, `-100...` bilan boshlanadi |
+| `ADMIN_IDS` | vergul bilan, masalan `1101182189` — super-adminlar (barcha workspace'ga kirish) |
 | `ANTHROPIC_API_KEY` | ixtiyoriy — bo'sh bo'lsa vision o'chadi |
 
 5. Start command: `python bot.py`
-6. Botni guruhga admin qilib qo'shing (post yuborish va reply uchun).
+6. Botni guruhga admin qilib qo'shing (post yuborish va reply uchun), so'ngra guruh
+   ichida `/setup` yozing — `CHANNEL_ID` kabi env o'zgaruvchi endi kerak emas, har bir
+   guruh o'zini shu buyruq bilan ro'yxatdan o'tkazadi.
 
 > **Diqqat:** `run_polling(drop_pending_updates=False)` — ataylab shunday.
 > `True` qilinsa restart paytida kelgan xabarlar jimgina yo'qoladi.
@@ -111,6 +124,8 @@ ogohlantiradi.
 | `/equity` | equity curve + drawdown grafigi |
 | `/open` | ochiq signallar, joriy foiz bilan |
 | `/cancel <id>` | signalni qo'lda bekor qilish |
+| `/setup` | (faqat guruhda, admin) shu guruh uchun workspace ochish |
+| `/new` | signal kiritish sehrgari (bosqichma-bosqich) |
 
 ---
 

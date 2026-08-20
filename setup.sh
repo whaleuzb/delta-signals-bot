@@ -8,6 +8,6 @@ pip install -r requirements.txt
 [ -f .env ] || cp .env.example .env
 echo ""
 echo "Tayyor. Endi:"
-echo "  1) .env faylini to'ldiring (BOT_TOKEN, DATABASE_URL, CHANNEL_ID)"
+echo "  1) .env faylini to'ldiring (BOT_TOKEN, DATABASE_URL)"
 echo "  2) python test_tracker.py   — dvigatel testi"
 echo "  3) python bot.py            — ishga tushirish"
