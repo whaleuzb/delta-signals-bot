@@ -294,6 +294,26 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       va `cmd_link()` da guruh nomi va havola HTML'ga chiqarilishdan oldin
       har doim escape qilinadi.
 
+20. **Ochiq pozitsiya foizi bosqichma-bosqich (±5%) bildirishnomasi (`milestone_job`).**
+    - Alohida job (`poll_job` bilan bir xil `POLL_SECONDS` intervalda, lekin
+      20 soniya siljigan boshlanish bilan — ikkalasi bir vaqtda urilib
+      ketmasin uchun) — `poll_job`dan mustaqil, TP/SL kuzatuviga tegmaydi,
+      faqat `db.live_signals()` orqali barcha ACTIVE signallarni olib, joriy
+      narxni so'raydi va `tracker.pnl_at()` bilan joriy foizni hisoblaydi.
+    - `signals.milestone_pct` (INT, ishorali, 5 ga karrali) — oxirgi xabar
+      qilingan bosqich. `bot.milestone_band(pnl)` joriy foizni bosqichga
+      aylantiradi (masalan +12.3% → 10, -7.1% → -5, |pnl|<5% → 0). Bosqich
+      o'zgarsa (ikki tomonga ham — foyda oshsa/kamaysa, zarar chuqurlashsa/
+      kamaysa) va nolga teng bo'lmasa — xabar yuboriladi (📈/📉) va
+      `db.set_milestone()` yangilanadi. `band == 0` ham saqlanadi (bosqichdan
+      chiqib ketgan holat) — shu tufayli keyinroq xuddi shu bosqichga qaytib
+      kirilsa, qayta xabar beriladi (faqat "rekord"ni emas, har bir bosqich
+      chegarasini kuzatadi — retracement/qayta o'sish ham bildirishnoma
+      oladi, chunki bu foydalanuvchiga pozitsiyani "nazorat qilishga" ko'proq
+      yordam beradi).
+    - Xabar yo'nalishi `poll_job` bilan bir xil: guruh workspace bo'lsa signal
+      postiga reply, shaxsiy workspace bo'lsa egasiga DM.
+
 ---
 
 ## Buyruqlar

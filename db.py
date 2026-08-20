@@ -119,6 +119,11 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS public BOOLEAN NOT NULL DEFAULT 
 -- Guruh admini belgilaydi (/havola) — /top reytingida guruh nomi shu havolaga
 -- link qilib ko'rsatiladi ("qo'shilmoqchi bo'lganlar shu yerga bossin").
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_link TEXT;
+
+-- Ochiq pozitsiya +5%/-5% qadamlarda joriy foizni bosib o'tganda bildirishnoma
+-- yuborilishi uchun oxirgi xabar qilingan bosqich (ishorali, 5 ga karrali:
+-- 0, 5, 10, -5, -10, ...). milestone_job() shu ustunni yangilaydi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS milestone_pct INT NOT NULL DEFAULT 0;
 """
 
 
@@ -321,6 +326,12 @@ async def save_progress(sig_id: int, f: dict) -> None:
             f["status"], f.get("opened_at"), f.get("closed_at"), _d(f.get("exit_price")),
             _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"], f["ambiguous"],
         )
+
+
+async def set_milestone(sig_id: int, milestone: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET milestone_pct=$2 WHERE id=$1", sig_id, milestone)
 
 
 async def cancel_signal(sig_id: int, status: str = "CANCELLED") -> bool:

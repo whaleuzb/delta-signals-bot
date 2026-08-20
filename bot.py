@@ -1135,6 +1135,85 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 pass
 
 
+MILESTONE_STEP = 5
+
+
+def milestone_band(pnl: float) -> int:
+    """pnl foizini MILESTONE_STEP'ga karrali bosqichga aylantiradi:
+    +12.3% -> 10, -7.1% -> -5. |pnl| < STEP bo'lsa 0 (hali bosqichga yetmagan —
+    bosqichdan chiqib ketgan holat ham shu, keyinroq qaytib kirsa qayta xabar
+    beriladi)."""
+    mag = int(abs(pnl) // MILESTONE_STEP) * MILESTONE_STEP
+    return mag if pnl >= 0 else -mag
+
+
+async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ochiq (ACTIVE) pozitsiyalar joriy foizi har ±5% bosqichni bosib
+    o'tganda (foydada ham, zararda ham) bildirishnoma yuboradi — pozitsiyani
+    kuzatib borishga yordam beradi. TP/SL kuzatuvidan (poll_job) mustaqil —
+    faqat joriy narxdan hisoblanadi, signal holatini o'zgartirmaydi."""
+    try:
+        rows = await db.live_signals()
+    except Exception:
+        log.exception("Milestone siklida xato (bazadan o'qishda)")
+        return
+
+    active = [s for s in rows if s["status"] == "ACTIVE"]
+    if not active:
+        return
+
+    price_cache: dict[tuple[str, str], float | None] = {}
+    ws_cache: dict[int, object] = {}
+
+    async def get_price(market: str, symbol: str):
+        key = (market, symbol)
+        if key not in price_cache:
+            try:
+                price_cache[key] = await provider_for(market).last_price(symbol)
+            except Exception:
+                price_cache[key] = None
+        return price_cache[key]
+
+    async def get_ws(wid: int):
+        if wid not in ws_cache:
+            ws_cache[wid] = await db.get_workspace(wid)
+        return ws_cache[wid]
+
+    for s in active:
+        price = await get_price(s["market"], s["symbol"])
+        if price is None:
+            continue
+        pnl = tracker.pnl_at(s["side"], float(s["entry"]), price)
+        band = milestone_band(pnl)
+        if band == s["milestone_pct"]:
+            continue
+        await db.set_milestone(s["id"], band)
+        if band == 0:
+            continue
+
+        ws = await get_ws(s["workspace_id"])
+        if not ws:
+            continue
+
+        mark = "📈" if band > 0 else "📉"
+        txt = (f"{mark} <b>#{s['id']} {s['symbol']}</b> — joriy natija: "
+               f"<b>{pnl:+.2f}%</b> ({band:+d}% bosqichi)")
+
+        if ws["type"] == "group" and ws["group_chat_id"]:
+            try:
+                await ctx.bot.send_message(
+                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                    reply_to_message_id=s["group_msg_id"], allow_sending_without_reply=True,
+                    message_thread_id=ws["group_topic_id"])
+            except Exception:
+                log.exception("Milestone xabari yuborilmadi")
+        elif ws["type"] == "personal":
+            try:
+                await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
+            except Exception:
+                log.exception("Milestone shaxsiy xabar yuborilmadi")
+
+
 # ─────────────────────────── Komandalar ───────────────────────────
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1537,6 +1616,7 @@ def main() -> None:
     app.add_error_handler(on_error)
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
+    app.job_queue.run_repeating(milestone_job, interval=config.POLL_SECONDS, first=25)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

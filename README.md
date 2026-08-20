@@ -27,6 +27,8 @@ ko'rmaydi.
    workspace'da post bo'lmaydi, faqat jurnalga yoziladi).
 5. Har 45 soniyada worker MEXC'dan 1 daqiqalik shamlarni oladi va TP/SL teginishini
    tekshiradi. Yopilgan signal guruhdagi asl postga **reply** qilib e'lon qilinadi.
+   Alohida job ochiq pozitsiyalar joriy foizini har ±5% bosqichda (foydada ham,
+   zararda ham) kuzatib, bosqich o'zgarganda bildirishnoma yuboradi.
 6. `/stats`, `/month`, `/year`, `/symbols`, `/equity` — statistika. Guruh workspace'da
    shu guruh a'zolariga ochiq, shaxsiy workspace'da faqat egasiga.
 
