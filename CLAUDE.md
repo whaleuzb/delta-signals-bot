@@ -224,6 +224,11 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       ikkalasi ham ko'rinadi: yopilganlar yig'indisi (qalin) + jarayondagi live
       foiz (kursiv, alohida). Saralash hamon faqat yopilgan `sum_pct` bo'yicha
       (o'zgarmadi) — live foiz saralashga ta'sir qilmaydi.
+    - `/open` (`open_signals_view()`, `bot.py`) shu bilan bir xil `🕐`ni PENDING
+      uchun ishlatadi (avval ⏳ edi — ikki joyda ikki xil ma'noni oldini olish
+      uchun birlashtirildi). ACTIVE uchun esa endi bitta statik belgi emas —
+      joriy live foizga qarab `📈` (foydada) yoki `📉` (zararda) ko'rsatiladi;
+      narx olinmasa (kamdan-kam) `▶️` bilan orqaga qaytadi.
 
 ---
 

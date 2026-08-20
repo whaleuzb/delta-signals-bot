@@ -279,10 +279,16 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
     for s in rows:
         price = await provider_for(s["market"]).last_price(s["symbol"])
         cur = ""
+        p = None
         if price:
             p = tracker.pnl_at(s["side"], float(s["entry"]), price)
             cur = f"  ({p:+.2f}%)"
-        mark = "▶️" if s["status"] == "ACTIVE" else "⏳"
+        if s["status"] != "ACTIVE":
+            mark = "🕐"  # hali entry/limitga tegmagan (kutilmoqda)
+        elif p is None:
+            mark = "▶️"  # narx olinmadi — yo'nalishni bilib bo'lmadi
+        else:
+            mark = "📈" if p >= 0 else "📉"  # joriy foyda/zararga qarab
         lines.append(
             f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
             f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
