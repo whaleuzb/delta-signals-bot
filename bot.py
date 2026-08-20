@@ -5,6 +5,7 @@ har bir yopiq Telegram guruhi o'z workspace'ini (/setup orqali) ochishi,
 yoki istalgan odam shaxsiy jurnal sifatida foydalanishi mumkin. Workspace'lar
 bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 """
+import html
 import logging
 import secrets
 from datetime import datetime, timezone
@@ -1288,7 +1289,7 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         cur = ws["deposit"]
         txt = f"{float(cur):,.2f}" if cur is not None else "belgilanmagan"
         await update.message.reply_text(
-            f"Joriy depozit ({ws['name']}): <b>{txt}</b>\n\n"
+            f"Joriy depozit ({html.escape(ws['name'])}): <b>{txt}</b>\n\n"
             "Yangilash uchun: <code>/depozit 1000</code>\n\n"
             "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
             "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
@@ -1320,7 +1321,8 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ctx.args:
         cur = "yoqilgan ✅" if ws["public"] else "o'chirilgan 🔒"
         await update.message.reply_text(
-            f"\"{ws['name']}\" guruhingizning <code>/top</code> reytingida ko'rinishi: <b>{cur}</b>\n\n"
+            f"\"{html.escape(ws['name'])}\" guruhingizning <code>/top</code> reytingida "
+            f"ko'rinishi: <b>{cur}</b>\n\n"
             "Yoqish: <code>/public on</code>\nO'chirish: <code>/public off</code>",
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
@@ -1336,6 +1338,44 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text(
             "🔒 Guruhingiz reytingdan olib tashlandi.", reply_markup=MENU_BACK_KB)
+
+
+async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = update.effective_user.id
+    if not can_manage(uid, ws):
+        await update.message.reply_text("Ruxsat yo'q.")
+        return
+    if ws["type"] != "group":
+        await update.message.reply_text("Bu buyruq faqat guruh workspace uchun ishlaydi.")
+        return
+
+    if not ctx.args:
+        cur = ws["invite_link"] or "belgilanmagan"
+        await update.message.reply_text(
+            f"\"{html.escape(ws['name'])}\" guruhingizning taklif havolasi: "
+            f"<b>{html.escape(cur)}</b>\n\n"
+            "<code>/top</code> reytingida guruh nomi shu havolaga link qilinadi.\n\n"
+            "Belgilash: <code>/havola https://t.me/+abc123</code>\n"
+            "O'chirish: <code>/havola off</code>",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+
+    arg = ctx.args[0].strip()
+    if arg.lower() == "off":
+        await db.set_invite_link(ws["id"], None)
+        await update.message.reply_text(
+            "🔒 Taklif havolasi o'chirildi.", reply_markup=MENU_BACK_KB)
+        return
+
+    if not arg.startswith(("http://", "https://")):
+        arg = "https://" + arg
+    await db.set_invite_link(ws["id"], arg)
+    await update.message.reply_text(
+        f"✅ Taklif havolasi saqlandi:\n<code>{html.escape(arg)}</code>",
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
 async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1355,10 +1395,16 @@ async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     for i, r in enumerate(rows):
         medal = medals[i] if i < 3 else f"{i + 1}."
         wr = r["wins"] / r["total"] * 100 if r["total"] else 0
+        name = html.escape(r["name"])
+        if r["invite_link"]:
+            name_txt = f'<a href="{html.escape(r["invite_link"], quote=True)}">{name}</a>'
+        else:
+            name_txt = name
         lines.append(
-            f"{medal} <b>{r['name']}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
+            f"{medal} <b>{name_txt}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
             f"({r['total']} savdo, {wr:.0f}% WR)")
-    lines += ["", "Guruhingizni shu reytingda ko'rsatish uchun admin <code>/public on</code> yozsin."]
+    lines += ["", "Guruhingizni shu reytingda ko'rsatish uchun admin <code>/public on</code> yozsin.",
+              "Guruh nomini bosilganda o'z guruhingizga yo'naltirish uchun: <code>/havola &lt;link&gt;</code>"]
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML,
                                      reply_markup=MENU_BACK_KB)
 
@@ -1395,6 +1441,7 @@ async def post_init(app: Application) -> None:
         ("setup", "Guruhni ro'yxatdan o'tkazish (faqat guruhda)"),
         ("top", "Eng yaxshi guruhlar reytingi"),
         ("public", "Guruhni /top reytingida ko'rsatish (admin)"),
+        ("havola", "Guruhning taklif havolasini belgilash (admin)"),
         ("taklif", "Do'stlaringizni taklif qilish havolasi"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
@@ -1440,6 +1487,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("depozit", cmd_deposit))
     app.add_handler(CommandHandler("public", cmd_public))
+    app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))

@@ -276,6 +276,24 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       hozircha yoqib/o'chirib bo'lmaydigan qatiy standart (opt-out yo'q, kerak
       bo'lsa keyinroq qo'shiladi).
 
+19. **`/top` reytingidagi guruh nomlari — bosiladigan havola (`/havola`).**
+    - `workspaces.invite_link` (nullable TEXT) — guruh admini/egasi `/havola
+      <link>` bilan belgilaydi, `/havola off` bilan o'chiradi. `/depozit` va
+      `/public` bilan bir xil naqsh: `get_ws_or_prompt()` → `can_manage()` →
+      faqat `type='group'` → argumentsiz joriy qiymatni ko'rsatadi.
+      `https://`/`http://` bo'lmasa avtomatik `https://` qo'shiladi.
+    - `cmd_top()` endi har bir qatorda `r["invite_link"]` bo'lsa guruh nomini
+      `<a href="...">` bilan o'raydi — bosilsa botga qo'shiladigan havolaga
+      olib boradi. Bo'lmasa oddiy qalin matn (eski xatti-harakat).
+    - **HTML-escaping tuzatildi.** Guruh nomi (`workspaces.name`) Telegram
+      guruh sarlavhasidan (`chat.title`) kelgan — ixtiyoriy foydalanuvchi
+      matni, `parse_mode=ParseMode.HTML` bilan chop etilganda maxsus belgilar
+      (`<`, `>`, `&`) Telegram HTML parserini buzishi yoki (ayniqsa yangi
+      `<a href>` holatida) link/markup in'ektsiyasiga olib kelishi mumkin
+      edi. Endi `html.escape()` — `cmd_top()`, `cmd_public()`, `cmd_deposit()`
+      va `cmd_link()` da guruh nomi va havola HTML'ga chiqarilishdan oldin
+      har doim escape qilinadi.
+
 ---
 
 ## Buyruqlar

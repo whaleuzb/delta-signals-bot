@@ -115,6 +115,10 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS entry_mode TEXT NOT NULL DEFAULT 'l
 -- Guruh admini o'zi yoqsagina /top reytingida ko'rinadi (standart — YASHIRIN).
 -- Shaxsiy workspace'lar reytingga umuman kirmaydi (faqat type='group' hisobga olinadi).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS public BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Guruh admini belgilaydi (/havola) — /top reytingida guruh nomi shu havolaga
+-- link qilib ko'rsatiladi ("qo'shilmoqchi bo'lganlar shu yerga bossin").
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_link TEXT;
 """
 
 
@@ -223,6 +227,12 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
 async def set_public(workspace_id: int, public: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE workspaces SET public=$2 WHERE id=$1", workspace_id, public)
+
+
+async def set_invite_link(workspace_id: int, link: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET invite_link=$2 WHERE id=$1", workspace_id, link)
 
 
 # ─────────────────────────── Referrallar ───────────────────────────
@@ -405,14 +415,14 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     """/top reytingi uchun — faqat public=TRUE guruh workspace'lari, shu davrda
     yopilgan signallar bo'yicha. Shaxsiy workspace'lar reytingga kirmaydi."""
     q = f"""
-    SELECT w.id, w.name, COUNT(*) AS total,
+    SELECT w.id, w.name, w.invite_link, COUNT(*) AS total,
            COUNT(*) FILTER (WHERE s.pnl_pct > 0) AS wins,
            COALESCE(SUM(s.pnl_pct), 0) AS sum_pct
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE w.type = 'group' AND w.public = TRUE AND s.status IN {CLOSED}
       AND s.closed_at >= $1 AND s.closed_at < $2
-    GROUP BY w.id, w.name
+    GROUP BY w.id, w.name, w.invite_link
     ORDER BY sum_pct DESC
     LIMIT $3
     """
