@@ -230,6 +230,30 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       joriy live foizga qarab `📈` (foydada) yoki `📉` (zararda) ko'rsatiladi;
       narx olinmasa (kamdan-kam) `▶️` bilan orqaga qaytadi.
 
+17. **Guruh a'zosi (egasi emas) ham DM'da statistikani ko'ra oladi — `group_viewers`
+    jadvali orqali, `can_manage`/`can_view` modeliga hech narsa qo'shmasdan.**
+    Onboarding'dagi "🏘 Menda yopiq guruh bor" endi ikkiga bo'linadi
+    (`GROUP_ROLE_KB`): "👥 Men a'zoman" va "👑 Men egaman". Muammo: Telegram Bot
+    API foydalanuvchi qaysi guruhlarga a'zoligini o'zi bilib bo'lmaydi — shuning
+    uchun "a'zoman" tanlansa `send_group_picker()` barcha RO'YXATDAN O'TGAN
+    guruh workspace'larini (`db.list_group_workspaces()`) tugma qilib ko'rsatadi,
+    foydalanuvchi o'zinikini tanlaydi, `on_view_join()` shu guruhda haqiqatan
+    (jonli) a'zoligini `get_chat_member()` bilan tekshiradi — aks holda rad etadi.
+    - `group_viewers (user_id, workspace_id)` — faqat DM'da qaysi workspace'ni
+      ko'rsatishni ESLAB QOLISH uchun (marshrutlash keshi, restart'dan keyin ham
+      qolishi uchun DB'da, `ctx.user_data` kabi vaqtinchalik emas). Bu HAQIQIY
+      ruxsat EMAS — `can_view()` har safar guruh a'zoligini jonli qayta
+      tekshiradi, shuning uchun a'zolikdan chiqib ketsa yozuv qolsa ham ko'rish
+      avtomatik yopiladi.
+    - `resolve_workspace()` endi 2 emas N-way: owned_group + personal +
+      barcha viewer_links yig'ilib, aynan bitta bo'lsa avtomatik, ko'p bo'lsa
+      switcher (`send_workspace_switcher()` endi 👑 egasi / 👥 a'zo bo'lgan
+      guruhlar / 🧑 shaxsiy / ➕ yana guruhga qo'shilish — barchasini ko'rsatadi).
+    - Viewer sifatida kirgan workspace'da `can_manage()` avtomatik `False`
+      (egasi ham, super-admin ham emas) — shuning uchun "➕ Yangi signal",
+      "💰 Depozit" tugmalari va pul miqdorlari ko'rinmaydi, faqat statistika —
+      qo'shimcha tekshiruv yozish shart bo'lmadi, mavjud modeldan bepul keldi.
+
 ---
 
 ## Buyruqlar

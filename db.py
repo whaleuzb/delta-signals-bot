@@ -63,6 +63,18 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
 CREATE INDEX IF NOT EXISTS idx_signals_closed ON signals(closed_at);
+
+-- Guruh a'zosi (egasi emas) DM'da shu guruhni oddiy ko'ruvchi sifatida tanlagan
+-- bo'lsa shu yerda saqlanadi — faqat DM'da qaysi workspace'ni ko'rsatishni
+-- ESLAB QOLISH uchun (marshrutlash), haqiqiy ruxsat emas: har safar can_view()
+-- baribir guruh a'zoligini jonli tekshiradi, shuning uchun a'zolikdan chiqib
+-- ketsa bu yozuv bo'lsa ham ko'rish avtomatik yopiladi.
+CREATE TABLE IF NOT EXISTS group_viewers (
+    user_id      BIGINT      NOT NULL,
+    workspace_id INT         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, workspace_id)
+);
 """
 
 # signals.workspace_id — ALTER orqali qo'shiladi (yangi ustun eski jadvalga ham,
@@ -160,6 +172,34 @@ async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:
     async with pool().acquire() as c:
         await c.execute(
             "UPDATE workspaces SET group_topic_id=$2 WHERE id=$1", workspace_id, topic_id)
+
+
+async def list_group_workspaces() -> list[asyncpg.Record]:
+    """Barcha ro'yxatdan o'tgan guruh workspace'lari — "men a'zoman" tanlovi uchun."""
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT * FROM workspaces WHERE type='group' ORDER BY name")
+
+
+async def add_group_viewer(user_id: int, workspace_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO group_viewers (user_id, workspace_id) VALUES ($1,$2) "
+            "ON CONFLICT DO NOTHING", user_id, workspace_id)
+
+
+async def get_group_viewer_workspaces(user_id: int) -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT w.* FROM group_viewers v JOIN workspaces w ON w.id = v.workspace_id "
+            "WHERE v.user_id=$1 ORDER BY w.name", user_id)
+
+
+async def is_group_viewer(user_id: int, workspace_id: int) -> bool:
+    async with pool().acquire() as c:
+        row = await c.fetchval(
+            "SELECT 1 FROM group_viewers WHERE user_id=$1 AND workspace_id=$2",
+            user_id, workspace_id)
+    return row is not None
 
 
 async def set_deposit(workspace_id: int, amount: float) -> None:

@@ -88,10 +88,10 @@ def access_denied(ws) -> tuple[str, InlineKeyboardMarkup | None]:
 async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Joriy update qaysi workspace'ga tegishli ekanini aniqlaydi.
     Guruh ichida — o'sha guruhning workspace'i (agar /setup qilingan bo'lsa, aks
-    holda None). Shaxsiy chatda — avval tanlab keshlangan workspace; agar bo'lmasa
-    va foydalanuvchida faqat bitta variant bo'lsa (o'z guruhi YOKI shaxsiy jurnal,
-    ikkalasi ham emas) — avtomatik shu; agar ikkalasi ham bor — None (switcher);
-    agar birortasi ham yo'q (birinchi murojaat) — None (onboarding ko'rsatiladi)."""
+    holda None). Shaxsiy chatda — avval tanlab keshlangan workspace; agar bo'lmasa,
+    foydalanuvchining barcha variantlari (o'z guruhi, shaxsiy jurnal, a'zo sifatida
+    ulangan guruhlar) yig'iladi: aynan bitta bo'lsa avtomatik shu; ikki yoki undan
+    ko'p bo'lsa — None (switcher); birortasi ham yo'q bo'lsa — None (onboarding)."""
     chat = update.effective_chat
     uid = update.effective_user.id
 
@@ -106,32 +106,41 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     owned_group = await db.get_group_workspace_by_owner(uid)
     personal = await db.get_personal_workspace(uid)
+    viewer_links = await db.get_group_viewer_workspaces(uid)
 
-    if owned_group and not personal:
-        ctx.user_data["workspace_id"] = owned_group["id"]
-        return owned_group
-    if personal and not owned_group:
-        ctx.user_data["workspace_id"] = personal["id"]
-        return personal
+    candidates = ([owned_group] if owned_group else []) + ([personal] if personal else []) + list(viewer_links)
+    if len(candidates) == 1:
+        ws = candidates[0]
+        ctx.user_data["workspace_id"] = ws["id"]
+        return ws
 
-    return None  # ikkalasi ham bor (tanlash kerak) yoki ikkalasi ham yo'q (onboarding)
+    return None  # 0 ta — onboarding; 2+ ta — switcher (tanlash kerak)
 
 
 async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     owned_group = await db.get_group_workspace_by_owner(uid)
     personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+    viewer_links = await db.get_group_viewer_workspaces(uid)
     rows = []
     if owned_group:
         rows.append([InlineKeyboardButton(
-            f"🏘 {owned_group['name']}", callback_data=f"ws:{owned_group['id']}")])
+            f"👑 {owned_group['name']}", callback_data=f"ws:{owned_group['id']}")])
+    for vws in viewer_links:
+        rows.append([InlineKeyboardButton(
+            f"👥 {vws['name']}", callback_data=f"ws:{vws['id']}")])
     rows.append([InlineKeyboardButton("🧑 Shaxsiy jurnal", callback_data=f"ws:{personal['id']}")])
+    rows.append([InlineKeyboardButton("➕ Boshqa guruhga a'zo bo'lish", callback_data="joingroup")])
     await update.effective_message.reply_text("Qaysi joy uchun?", reply_markup=InlineKeyboardMarkup(rows))
 
 
 ONBOARD_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("🧑 Shaxsiy jurnal ochish", callback_data="onboard:personal")],
     [InlineKeyboardButton("🏘 Menda yopiq guruh bor", callback_data="onboard:group")],
+])
+GROUP_ROLE_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("👥 Men guruh a'zosiman", callback_data="onboard:group_member")],
+    [InlineKeyboardButton("👑 Men guruh egasiman", callback_data="onboard:group_owner")],
 ])
 
 
@@ -140,10 +149,22 @@ async def send_onboarding(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         "👋 Xush kelibsiz! Botni qanday ishlatmoqchisiz?\n\n"
         "🧑 <b>Shaxsiy jurnal</b> — o'z savdo signallaringizni yozib, statistikangizni "
         "kuzatib borasiz. Faqat sizga ko'rinadi, hech kimga post bo'lmaydi.\n\n"
-        "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa, uni ham shu bot "
-        "bilan boshqarishingiz mumkin: signallar guruhga post bo'ladi, a'zolaringiz "
-        "statistikani ko'radi.",
+        "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa (yoki allaqachon "
+        "biror guruhga a'zo bo'lsangiz), shu bot orqali statistikani ko'rishingiz mumkin.",
         parse_mode=ParseMode.HTML, reply_markup=ONBOARD_KB)
+
+
+async def send_group_picker(q) -> None:
+    """q — CallbackQuery; joriy xabarni tahrirlab guruhlar ro'yxatini ko'rsatadi."""
+    groups = await db.list_group_workspaces()
+    if not groups:
+        await q.edit_message_text("Hozircha hech qanday guruh ro'yxatdan o'tmagan.",
+                                   reply_markup=MENU_BACK_KB)
+        return
+    rows = [[InlineKeyboardButton(f"👥 {g['name']}", callback_data=f"viewjoin:{g['id']}")]
+            for g in groups]
+    await q.edit_message_text("Qaysi guruh a'zosisiz? Tanlang:",
+                               reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -159,16 +180,57 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
         return
 
+    if choice == "group":
+        await q.edit_message_text(
+            "🏘 Shu guruh bilan bog'liq siz kimsiz?", reply_markup=GROUP_ROLE_KB)
+        return
+
+    if choice == "group_member":
+        await send_group_picker(q)
+        return
+
+    # choice == "group_owner"
     bot_username = ctx.bot.username
     mention = f"@{bot_username}" if bot_username else "botni"
     await q.edit_message_text(
-        f"🏘 Guruhingizni ulash uchun:\n\n"
+        f"👑 Guruhingizni ulash uchun:\n\n"
         f"1. {mention} o'z guruhingizga qo'shing.\n"
         "2. Botga guruhda <b>admin</b> huquqini bering (xabar yuborish uchun kerak).\n"
         "3. Guruh ichida <code>/setup</code> buyrug'ini yozing.\n\n"
         "Shundan so'ng guruhingiz mustaqil workspace sifatida ishlay boshlaydi va "
         "botga shaxsiy yozganingizda avtomatik o'shani boshqarasiz.",
         parse_mode=ParseMode.HTML)
+
+
+async def on_join_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    await send_group_picker(q)
+
+
+async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    wid = int(q.data.split(":", 1)[1])
+    uid = q.from_user.id
+    ws = await db.get_workspace(wid)
+    if not ws or ws["type"] != "group" or not ws["group_chat_id"]:
+        await q.edit_message_text("Bu guruh topilmadi.", reply_markup=MENU_BACK_KB)
+        return
+    try:
+        member = await ctx.bot.get_chat_member(ws["group_chat_id"], uid)
+        is_member = member.status not in ("left", "kicked")
+    except Exception:
+        is_member = False
+    if not is_member:
+        await q.edit_message_text(
+            f"🔒 Siz \"{ws['name']}\" guruhi a'zosi emassiz (yoki bot tekshira olmadi).",
+            reply_markup=MENU_BACK_KB)
+        return
+    await db.add_group_viewer(uid, wid)
+    ctx.user_data["workspace_id"] = wid
+    await q.edit_message_text(f"✅ \"{ws['name']}\" ulandi — endi statistikasini ko'ra olasiz.")
+    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
 
 
 async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -186,7 +248,8 @@ async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     owned_group = await db.get_group_workspace_by_owner(uid)
     personal = await db.get_personal_workspace(uid)
-    if owned_group or personal:
+    viewer_links = await db.get_group_viewer_workspaces(uid)
+    if owned_group or personal or viewer_links:
         await send_workspace_switcher(update, ctx)
     else:
         await send_onboarding(update, ctx)
@@ -197,13 +260,15 @@ async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     q = update.callback_query
     await q.answer()
     wid = int(q.data.split(":", 1)[1])
+    uid = q.from_user.id
     ws = await db.get_workspace(wid)
-    if not ws or (ws["owner_id"] != q.from_user.id and not is_admin(q.from_user.id)):
+    allowed = ws and (is_admin(uid) or ws["owner_id"] == uid or await db.is_group_viewer(uid, wid))
+    if not allowed:
         await q.edit_message_text("Ruxsat yo'q.")
         return
     ctx.user_data["workspace_id"] = wid
     await q.edit_message_text(f"✅ Tanlandi: {ws['name']}")
-    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(q.from_user.id, ws))
+    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
 
 
 async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1292,6 +1357,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
     app.add_handler(CallbackQueryHandler(on_onboard, pattern=r"^onboard:"))
+    app.add_handler(CallbackQueryHandler(on_join_group, pattern=r"^joingroup$"))
+    app.add_handler(CallbackQueryHandler(on_view_join, pattern=r"^viewjoin:"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
