@@ -295,7 +295,7 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
         )
         if manage:
             kb_rows.append([InlineKeyboardButton(
-                f"🔻 #{s['id']} {s['symbol']} — vaqtidan oldin yopish",
+                f"{mark} #{s['id']} {s['symbol']} — vaqtidan oldin yopish",
                 callback_data=f"close:{s['id']}")])
     kb = InlineKeyboardMarkup(kb_rows) if kb_rows else None
     return "\n".join(lines), kb
