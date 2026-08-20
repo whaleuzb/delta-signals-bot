@@ -151,7 +151,8 @@ async def monthly_table(workspace_id: int, limit: int = 12) -> str:
     t.append(f"{'Oy':<12}{'N':>4}{'WR':>7}{'Foiz':>9}{'R':>7}")
     for r in rows:
         m = r["month"]
-        name = f"{MONTHS_UZ[m.month - 1][:3]} {m.year}"
+        # [:4] — [:3] bo'lsa "Iyun" va "Iyul" ikkalasi ham "Iyu" bo'lib qolardi.
+        name = f"{MONTHS_UZ[m.month - 1][:4]} {m.year}"
         wr = r["wins"] / r["total"] * 100 if r["total"] else 0
         t.append(f"{name:<12}{r['total']:>4}{wr:>6.0f}%{float(r['sum_pct']):>+9.2f}{float(r['avg_r']):>+7.2f}")
     t.append("</pre>")
@@ -219,6 +220,36 @@ async def symbols_table(workspace_id: int, since=None, until=None,
     return "\n".join(t)
 
 
+def _equity_curve(rows, deposit):
+    """equity_series() qatorlaridan balans egri chizig'ini hisoblaydi.
+    equity_chart() va pdf_report() ikkalasi ham shu yerdan foydalanadi —
+    hisob ikki joyda takrorlanib, keyin bir-biridan ajralib ketmasligi uchun.
+
+    Qaytaradi: (weighted, base, eq, deltas)
+      weighted — deposit berilganmi (ya'ni REAL pulda hisoblanganmi)
+      base     — boshlang'ich balans, eq — har savdodan keyingi balans
+      deltas   — har savdoning hissasi (weighted bo'lsa pulda, aks holda %)"""
+    weighted = deposit is not None
+    eq, deltas = [], []
+    if weighted:
+        deposit = float(deposit)
+        deltas = [float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
+                  if r["alloc_amount"] is not None else 0.0
+                  for r in rows]
+        # Boshlang'ich balans joriy depozitdan orqaga qarab topiladi.
+        cur = base = deposit - sum(deltas)
+        for d in deltas:
+            cur += d
+            eq.append(cur)
+    else:
+        cur = base = 100.0
+        for r in rows:
+            deltas.append(float(r["pnl_pct"]))
+            cur *= (1 + float(r["pnl_pct"]) / 100)
+            eq.append(cur)
+    return weighted, base, eq, deltas
+
+
 async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
     """Ikki panelli grafik — YUQORIDA kumulyativ balans, PASTDA har bir savdoning
     alohida hissasi. Ikkalasi bir xil x o'qini (savdo tartibi) bo'lishadi, lekin
@@ -236,28 +267,8 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
     rows = await db.equity_series(workspace_id)
     if len(rows) < 2:
         return None
-
-    weighted = deposit is not None
+    weighted, base, eq, deltas = _equity_curve(rows, deposit)
     n = len(rows)
-    deltas, eq = [], []
-
-    if weighted:
-        deposit = float(deposit)
-        deltas = [float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
-                  if r["alloc_amount"] is not None else 0.0
-                  for r in rows]
-        cur = deposit - sum(deltas)
-        base = cur
-        for d in deltas:
-            cur += d
-            eq.append(cur)
-    else:
-        base = 100.0
-        cur = base
-        for r in rows:
-            deltas.append(float(r["pnl_pct"]))
-            cur *= (1 + float(r["pnl_pct"]) / 100)
-            eq.append(cur)
 
     peak, dd = base, []
     for v in eq:
@@ -354,6 +365,153 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+# ─────────────────────────── PDF hisobot ───────────────────────────
+# Chop etish/ulashish uchun ataylab OQ fon: bot grafiklaridagi qorong'i mavzu
+# hujjatda siyohni yeydi va bosmada yomon chiqadi.
+P_TXT, P_MUTED, P_GRID = "#1a1a1a", "#666666", "#dddddd"
+P_GREEN, P_RED = "#12805c", "#c0392b"
+
+
+def _pdf_metrics(s, rows, deposit, show_money):
+    """PDF ning 1-sahifasidagi ko'rsatkichlar: (yorliq, qiymat, rang) ro'yxati."""
+    total = s["total"]
+    wr = s["wins"] / total * 100 if total else 0.0
+    out = [
+        ("Signallar", f"{total}", P_TXT),
+        ("Winrate", f"{wr:.1f}%", P_GREEN if wr >= 50 else P_RED),
+        ("Foydali / Zararli", f"{s['wins']} / {s['losses']}", P_TXT),
+    ]
+
+    weighted = None
+    if deposit:
+        weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
+                    for r in rows
+                    if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
+    if weighted:
+        tot = sum(weighted)
+        out.append(("Jami natija (depozitdan)", f"{tot:+.2f}%", P_GREEN if tot >= 0 else P_RED))
+        comp = _compound(weighted)
+        out.append(("Kompaund", f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
+        if show_money and s["real_pnl_money"] is not None:
+            m = float(s["real_pnl_money"])
+            out.append(("Real natija", f"{m:+,.2f}", P_GREEN if m >= 0 else P_RED))
+    else:
+        sp = float(s["sum_pct"])
+        out.append(("Jami foiz (hajmsiz)", f"{sp:+.2f}%", P_GREEN if sp >= 0 else P_RED))
+        pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
+        comp = _compound(pcts)
+        out.append(("Kompaund", f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
+
+    out.append(("O'rtacha R", f"{float(s['avg_r']):+.2f}R", P_TXT))
+    out.append(("O'rt. foyda / zarar",
+                f"{float(s['avg_win']):+.2f}% / {float(s['avg_loss']):+.2f}%", P_TXT))
+    if s["avg_loss"] and s["losses"]:
+        gl = abs(float(s["avg_loss"])) * s["losses"]
+        if gl:
+            pf = float(s["avg_win"]) * s["wins"] / gl
+            out.append(("Profit factor", f"{pf:.2f}", P_GREEN if pf >= 1 else P_RED))
+    return out
+
+
+async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
+                      show_money: bool = True) -> io.BytesIO | None:
+    """Butun davr bo'yicha PDF hisobot: 1-sahifa — ko'rsatkichlar + balans
+    egri chizig'i, 2-sahifa — juftliklar va oylar kesimi. Yopilgan signal
+    bo'lmasa None qaytaradi."""
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    s = await db.period_stats(workspace_id)
+    if not s or s["total"] == 0:
+        return None
+    rows = await db.equity_series(workspace_id)
+    syms = await db.top_symbols(workspace_id)
+    months = await db.monthly_breakdown(workspace_id, 12)
+    now = datetime.now(TZ)
+
+    buf = io.BytesIO()
+    with PdfPages(buf) as pdf:
+        # ── 1-sahifa ──
+        fig = plt.figure(figsize=(8.27, 11.69))  # A4
+        fig.patch.set_facecolor("white")
+        fig.text(0.06, 0.955, "Trade Controller", fontsize=20, fontweight="bold", color=P_TXT)
+        fig.text(0.06, 0.932, ws_name, fontsize=13, color=P_MUTED)
+        fig.text(0.94, 0.955, f"{now:%d.%m.%Y %H:%M}", fontsize=9, color=P_MUTED, ha="right")
+        fig.add_artist(plt.Line2D([0.06, 0.94], [0.921, 0.921], color=P_GRID, lw=1))
+
+        y = 0.885
+        for label, value, color in _pdf_metrics(s, rows, deposit, show_money):
+            fig.text(0.06, y, label, fontsize=11, color=P_MUTED)
+            fig.text(0.94, y, value, fontsize=11, fontweight="bold", color=color, ha="right")
+            y -= 0.030
+
+        if len(rows) >= 2:
+            weighted, base, eq, _ = _equity_curve(rows, deposit)
+            ax = fig.add_axes([0.10, 0.06, 0.84, max(0.25, y - 0.11)])
+            ax.set_facecolor("white")
+            ax.grid(color=P_GRID, lw=0.6)
+            ax.tick_params(colors=P_MUTED, labelsize=9)
+            for sp_ in ax.spines.values():
+                sp_.set_color(P_GRID)
+            col = P_GREEN if eq[-1] >= base else P_RED
+            x = range(1, len(eq) + 1)
+            ax.plot(x, eq, color=col, lw=2)
+            ax.fill_between(x, base, eq, color=col, alpha=0.12)
+            ax.axhline(base, color=P_MUTED, lw=0.9, ls="--")
+            ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+            ax.set_xlabel("Savdo tartibi", color=P_MUTED, fontsize=9)
+            ax.set_ylabel("Balans" if weighted else "Balans (boshlanish = 100)",
+                          color=P_MUTED, fontsize=9)
+            ax.set_title("Balans o'zgarishi", color=P_TXT, fontsize=12,
+                         fontweight="bold", pad=8)
+        pdf.savefig(fig, facecolor="white")
+        plt.close(fig)
+
+        # ── 2-sahifa: jadvallar ──
+        fig = plt.figure(figsize=(8.27, 11.69))
+        fig.patch.set_facecolor("white")
+        fig.text(0.06, 0.955, "Juftliklar kesimi", fontsize=16, fontweight="bold", color=P_TXT)
+        hdr = f"{'Juftlik':<16}{'N':>6}{'WR':>9}{'Foiz':>13}"
+        y = 0.925
+        fig.text(0.06, y, hdr, fontsize=11, fontweight="bold",
+                 color=P_MUTED, family="monospace")
+        y -= 0.022
+        for r in syms[:26]:
+            wr = r["wins"] / r["closed"] * 100 if r["closed"] else 0
+            sp_ = float(r["sum_pct"])
+            fig.text(0.06, y,
+                     f"{r['symbol'][:16]:<16}{r['closed']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
+                     fontsize=11, color=P_GREEN if sp_ >= 0 else P_RED, family="monospace")
+            y -= 0.021
+            if y < 0.34:
+                break
+
+        # Ro'yxat kalta bo'lsa darhol ostidan boshlanadi; uzun bo'lsa pastki
+        # chegaraga tiraladi (avval doim 0.30 ga qadalib, katta bo'sh joy qolardi).
+        y = min(y - 0.045, 0.86)
+        fig.text(0.06, y, "Oylik natijalar", fontsize=16, fontweight="bold", color=P_TXT)
+        y -= 0.034
+        fig.text(0.06, y, f"{'Oy':<16}{'N':>6}{'WR':>9}{'Foiz':>13}",
+                 fontsize=11, fontweight="bold", color=P_MUTED, family="monospace")
+        y -= 0.022
+        for r in months:
+            m = r["month"]
+            # To'liq oy nomi: 3 harfga qisqartirilsa "Iyun" va "Iyul" ikkalasi
+            # ham "Iyu" bo'lib, qaysi oy ekani bilinmay qolardi.
+            name = f"{MONTHS_UZ[m.month - 1]} {m.year}"
+            wr = r["wins"] / r["total"] * 100 if r["total"] else 0
+            sp_ = float(r["sum_pct"])
+            fig.text(0.06, y, f"{name:<16}{r['total']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
+                     fontsize=11, color=P_GREEN if sp_ >= 0 else P_RED, family="monospace")
+            y -= 0.021
+            if y < 0.04:
+                break
+        pdf.savefig(fig, facecolor="white")
+        plt.close(fig)
+
     buf.seek(0)
     return buf
 

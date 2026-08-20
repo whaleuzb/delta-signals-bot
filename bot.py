@@ -590,8 +590,48 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> Inlin
             nav.append(InlineKeyboardButton(f"{y + 1} ▶", callback_data=f"st:y:{y + 1}"))
         rows.append(nav)
 
+    rows.append([InlineKeyboardButton("📄 PDF hisobot", callback_data="pdfrep")])
     rows.append(list(MENU_BACK_KB.inline_keyboard[0]))
     return InlineKeyboardMarkup(rows)
+
+
+async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """PDF — har doim BUTUN davr bo'yicha (davr tugmalari faqat ekrandagi
+    matnga tegishli; hisobot to'liq tarixni beradi)."""
+    msg = update.effective_message
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = update.effective_user.id
+    if not await can_view(ctx.bot, uid, ws):
+        text, kb = access_denied(ws)
+        await msg.reply_text(text, reply_markup=kb)
+        return
+
+    note = await msg.reply_text("📄 Hisobot tayyorlanmoqda…")
+    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    try:
+        buf = await stats.pdf_report(ws["id"], ws["name"], deposit, can_manage(uid, ws))
+    finally:
+        try:
+            await note.delete()
+        except Exception:
+            pass
+    if buf is None:
+        await msg.reply_text("Hali yopilgan signal yo'q — hisobot bo'sh bo'lardi.",
+                              reply_markup=MENU_BACK_KB)
+        return
+    fname = f"hisobot-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
+    await msg.reply_document(InputFile(buf, fname), reply_markup=MENU_BACK_KB)
+
+
+async def cmd_pdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await send_pdf_report(update, ctx)
+
+
+async def on_pdf_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.callback_query.answer()
+    await send_pdf_report(update, ctx)
 
 
 async def stats_view_text(ws, uid: int, mode: str, y: int | None = None, m: int | None = None) -> str:
@@ -1906,6 +1946,7 @@ async def post_init(app: Application) -> None:
         ("symbols", "Juftliklar"),
         ("open", "Ochiq signallar"),
         ("equity", "Equity grafigi"),
+        ("pdf", "Statistikani PDF hisobot sifatida olish"),
         ("month", "Oylik natijalar"),
         ("year", "Yillik natijalar"),
         ("depozit", "Depozitni ko'rish/belgilash"),
@@ -1967,6 +2008,7 @@ def main() -> None:
     app.add_handler(CommandHandler("public", cmd_public))
     app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("tasdiq", cmd_pending))
+    app.add_handler(CommandHandler("pdf", cmd_pdf))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
@@ -1984,6 +2026,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
     app.add_handler(CallbackQueryHandler(on_stats_nav, pattern=r"^st:"))
+    app.add_handler(CallbackQueryHandler(on_pdf_button, pattern=r"^pdfrep$"))
 
     app.add_handler(ConversationHandler(
         entry_points=[

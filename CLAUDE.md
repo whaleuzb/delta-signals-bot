@@ -505,6 +505,26 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       va `on_photo` ikkalasida ham bor — aks holda forward qilingan post
       signal deb o'qilib ketardi.
 
+26. **PDF hisobot (`stats.pdf_report()`, `/pdf` va statistika ostidagi tugma).**
+    - `matplotlib`ning `PdfPages` backend'i ishlatiladi — reportlab/weasyprint
+      kabi YANGI KUTUBXONA QO'SHILMADI (matplotlib allaqachon equity grafigi
+      uchun bor edi; weasyprint bo'lsa Railway'ga og'ir tizim bog'liqliklari
+      kerak bo'lardi).
+    - 2 sahifa: 1) ko'rsatkichlar + balans egri chizig'i, 2) juftliklar va
+      oylar kesimi. Fon ataylab OQ (bot grafiklari qorong'i) — hujjat chop
+      etiladi/ulashiladi, qorong'i fon siyohni yeydi va bosmada yomon chiqadi.
+    - Ruxsat: `can_view()` tekshiriladi, `show_money` esa `can_manage()`dan
+      keladi — guruh a'zosi olgan PDF'da real pul summasi ko'rinmaydi, faqat
+      foiz (bot ichidagi statistika bilan bir xil qoida).
+    - PDF doim BUTUN davrni oladi (ekrandagi Oy/Yil tugmalari faqat matnga
+      tegishli).
+    - `_equity_curve()` — `equity_chart()` va `pdf_report()` uchun umumiy
+      hisob; balans mantig'i ikki joyda takrorlanib, keyin bir-biridan
+      ajralib ketmasligi uchun ajratildi.
+    - **Yo'l-yo'lakay tuzatildi:** oy nomlari `[:3]` bilan qisqartirilganda
+      "Iyun" va "Iyul" IKKALASI HAM "Iyu" bo'lib qolar edi (`monthly_table()`
+      dagi eski xato). Endi matnli jadvalda `[:4]`, PDF'da to'liq nom.
+
 ---
 
 ## Buyruqlar

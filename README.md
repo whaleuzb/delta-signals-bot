@@ -144,6 +144,7 @@ tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
 | `/year` | joriy yil natijalari |
 | `/symbols` | juftliklar kesimida natija |
 | `/equity` | equity curve + drawdown grafigi |
+| `/pdf` | statistikani PDF hisobot sifatida yuklab olish |
 | `/open` | ochiq signallar, joriy foiz bilan |
 | `/cancel <id>` | signalni qo'lda bekor qilish |
 | `/setup` | (faqat guruhda, admin) shu guruh uchun workspace ochish |
