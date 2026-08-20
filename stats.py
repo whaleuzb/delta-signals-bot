@@ -10,8 +10,16 @@ import matplotlib.dates as mdates
 
 import config
 import db
+import exchange
+import forex
+import tracker
 
 TZ = ZoneInfo(config.TZ)
+
+
+def _provider(market: str):
+    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
+    return forex if market == "forex" else exchange
 MONTHS_UZ = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
              "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
 
@@ -85,11 +93,12 @@ async def symbols_table(workspace_id: int, since=None, until=None,
     """since/until berilmasa — butun davr. Berilsa — shu oraliqda yopilganlar
     (o'tgan, tugagan oylarda ochiq pozitsiya ko'rinmaydi — yopilganda avtomatik
     o'z oyiga tushadi). Joriy (hali davom etayotgan) davrda — hozir ochiq
-    pozitsiyalar ham ⏳ bilan ko'rinadi."""
+    pozitsiyalar ham ko'rinadi: ⏳ allaqachon ochilgan (joriy foizi bilan),
+    🕐 hali entry/limitga tegmagan (foizsiz — hisoblash uchun asos yo'q)."""
     show_open = since is None or until is None or until > datetime.now(timezone.utc)
     rows = await db.top_symbols(workspace_id, since, until)
-    opens = await db.open_symbols_count(workspace_id) if show_open else {}
-    symbols = {r["symbol"] for r in rows} | set(opens)
+    open_data = await db.open_signals_summary(workspace_id) if show_open else {}
+    symbols = {r["symbol"] for r in rows} | set(open_data)
     if not symbols:
         return f"<b>Juftliklar — {title}</b>\n\nMa'lumot yo'q."
 
@@ -106,17 +115,35 @@ async def symbols_table(workspace_id: int, since=None, until=None,
         wins = r["wins"] if r else 0
         losses = closed - wins
         sum_pct = float(r["sum_pct"]) if r else 0.0
-        op = opens.get(sym, 0)
+        od = open_data.get(sym, {"pending": 0, "active": []})
+        pending_n = od["pending"]
+        active_list = od["active"]
+
+        live_sum = 0.0
+        live_count = 0
+        for pos in active_list:
+            price = await _provider(pos["market"]).last_price(sym)
+            if price:
+                live_sum += tracker.pnl_at(pos["side"], pos["entry"], price)
+                live_count += 1
 
         badges = []
         if wins:
             badges.append(badge("🟢", wins))
         if losses:
             badges.append(badge("🔴", losses))
-        if op:
-            badges.append(badge("⏳", op))
+        if active_list:
+            badges.append(badge("⏳", len(active_list)))
+        if pending_n:
+            badges.append(badge("🕐", pending_n))
         badge_txt = " ".join(badges) if badges else "—"
-        pct_txt = f"<b>{sum_pct:+.2f}%</b>" if closed else "<i>ochiq</i>"
+
+        parts = []
+        if closed:
+            parts.append(f"<b>{sum_pct:+.2f}%</b>")
+        if live_count:
+            parts.append(f"<i>{live_sum:+.2f}% jarayonda</i>")
+        pct_txt = "  ".join(parts) if parts else "<i>ochiq</i>"
 
         t.append(f"{badge_txt} <b>{sym}</b>  {pct_txt}")
     return "\n".join(t)

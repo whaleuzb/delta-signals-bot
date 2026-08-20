@@ -329,12 +329,22 @@ async def top_symbols(workspace_id: int, since=None, until=None,
         return await c.fetch(q, *params)
 
 
-async def open_symbols_count(workspace_id: int) -> dict[str, int]:
-    """Har bir juftlik bo'yicha hozir ochiq (PENDING/ACTIVE) signallar soni."""
+async def open_signals_summary(workspace_id: int) -> dict[str, dict]:
+    """Har bir juftlik bo'yicha ochiq signallar: 'pending' (hali entry/limitga
+    bormagan, kutilmoqda) soni va 'active' (allaqachon ochilgan, ishlayotgan)
+    ro'yxati — side/entry/market bilan, chaqiruvchi shundan joriy (live) foizni
+    hisoblay olishi uchun."""
     async with pool().acquire() as c:
         rows = await c.fetch(
-            "SELECT symbol, COUNT(*) AS n FROM signals "
-            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE') GROUP BY symbol",
+            "SELECT symbol, status, side, entry, market FROM signals "
+            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE')",
             workspace_id,
         )
-    return {r["symbol"]: r["n"] for r in rows}
+    out: dict[str, dict] = {}
+    for r in rows:
+        d = out.setdefault(r["symbol"], {"pending": 0, "active": []})
+        if r["status"] == "PENDING":
+            d["pending"] += 1
+        else:
+            d["active"].append({"side": r["side"], "entry": float(r["entry"]), "market": r["market"]})
+    return out

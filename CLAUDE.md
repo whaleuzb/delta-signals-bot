@@ -28,7 +28,7 @@ ajratish mumkin, lekin hozirgi hajmda kerak emas.
 | `parsing.py` | caption matnidan darajalarni o'qish + validatsiya |
 | `vision.py` | caption bo'lmasa grafik rasmidan o'qish (Claude tool use) |
 | `tracker.py` | **asosiy dvigatel** — shamlarni qayta o'ynatib TP/SL aniqlaydi |
-| `stats.py` | hisobotlar, equity curve + drawdown |
+| `stats.py` | hisobotlar, equity curve + drawdown, `/symbols` uchun ochiq pozitsiyalarning joriy (live) foizi |
 | `bot.py` | handlerlar, asosiy menyu, signal kiritish sehrgari (wizard), tasdiqlash oqimi, guruhga e'lonlar |
 | `test_tracker.py` | sintetik shamlarda dvigatel testi (baza/internet kerak emas) |
 
@@ -208,6 +208,22 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       status hech qachon PENDING→ACTIVE o'tmaydi), shuning uchun guruhga "▶️
       pozitsiya ochildi" xabari `poll_job` orqali emas — `on_button()`'ning o'zida,
       signal yaratilgan zahoti, sinxron yuboriladi.
+
+16. **`/symbols` — ⏳ (ochilgan, live foiz bilan) va 🕐 (hali limitga bormagan,
+    foizsiz) ikkita ALOHIDA stiker.**
+    Avval ikkalasi ham bitta ⏳ badge ostida "ochiq" deb ko'rsatilardi, foizsiz.
+    Endi `db.open_signals_summary()` PENDING va ACTIVE'ni ajratib qaytaradi:
+    - **ACTIVE** (⏳) — allaqachon ochilgan, ishlayotgan pozitsiya. `stats.py`
+      o'zi `exchange`/`forex`'dan joriy narxni so'rab, `tracker.pnl_at()` bilan
+      LIVE (realizatsiya qilinmagan) foizni hisoblab ko'rsatadi — shu sabab
+      `stats.py` endi narx manbalariga bog'liq (avval faqat `db` + formatlash edi,
+      bu `bot.py`'dagi `open_signals_view()` bilan bir xil naqsh).
+    - **PENDING** (🕐) — hali entry/limit darajasiga tegmagan, kutilmoqda. Foiz
+      KO'RSATILMAYDI (hisoblash uchun asos yo'q — pozitsiya hali ochilmagan).
+    - Bitta juftlikda ham yopilgan tarix, ham joriy ochiq pozitsiya bo'lsa —
+      ikkalasi ham ko'rinadi: yopilganlar yig'indisi (qalin) + jarayondagi live
+      foiz (kursiv, alohida). Saralash hamon faqat yopilgan `sum_pct` bo'yicha
+      (o'zgarmadi) — live foiz saralashga ta'sir qilmaydi.
 
 ---
 
