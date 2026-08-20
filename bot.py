@@ -425,6 +425,12 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     pnl, r = ev["pnl"], ev["r"]
+
+    # poll_job() avtomatik yopilganda depozitni yangilaydi — qo'lda yopish ham
+    # xuddi shunday qilishi SHART, aks holda depozit jimgina haqiqatdan uzoqlashadi.
+    if sig["alloc_amount"] is not None:
+        await db.apply_deposit_delta(ws["id"], pnl / 100 * float(sig["alloc_amount"]))
+
     icon = "✅" if pnl >= 0 else "❌"
     rtxt = f" ({r:+.2f}R)" if r is not None else ""
     await q.edit_message_text(

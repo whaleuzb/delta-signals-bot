@@ -78,11 +78,30 @@ async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
     return out
 
 
-async def last_price(symbol: str) -> float | None:
+_PRICE_TTL = 5.0
+_price_cache: dict[str, tuple[float, float]] = {}
+
+
+async def last_price(symbol: str, fresh: bool = False) -> float | None:
+    """Qisqa muddatli (5 s) kesh. Sabab: /stats, /symbols, /open kabi buyruqlar
+    HAR ochiq signal uchun alohida so'rov yuboradi — 20 ta ochiq signal bo'lsa
+    bitta tugma bosilishi 20 ta so'rov demak. Foydalanuvchi buyruqni tez-tez
+    bossa MEXC IP bo'yicha rate-limit qo'yadi va bu kuzatuv siklini
+    (poll_job → klines) ham buzadi. Kesh shu portlashni bitta so'rovga
+    yig'adi, ko'rsatiladigan narx esa eng ko'pi bilan 5 s eskiradi.
+
+    fresh=True — keshni chetlab o'tish; qo'lda yopishda (tracker.close_now)
+    ishlatiladi, chunki u yerda narx savdoning YAKUNIY natijasiga yoziladi."""
+    if not fresh:
+        hit = _price_cache.get(symbol)
+        if hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
+            return hit[1]
     r = await _client.get("/api/v3/ticker/price", params={"symbol": symbol})
     if r.status_code != 200:
         return None
-    return float(r.json()["price"])
+    price = float(r.json()["price"])
+    _price_cache[symbol] = (time.monotonic(), price)
+    return price
 
 
 async def close() -> None:

@@ -176,7 +176,9 @@ async def close_now(sig_id: int) -> dict | None:
                 "symbol": sig["symbol"], "status": "CANCELLED", "pnl": None, "r": None,
                 "price": None}
 
-    price = await provider(sig["market"]).last_price(sig["symbol"])
+    # fresh=True — bu narx savdoning YAKUNIY natijasi sifatida bazaga yoziladi,
+    # shuning uchun ko'rsatuv uchun mo'ljallangan qisqa keshdan olinmaydi.
+    price = await provider(sig["market"]).last_price(sig["symbol"], fresh=True)
     if not price:
         return None
 

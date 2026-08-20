@@ -94,7 +94,19 @@ async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
     return out
 
 
-async def last_price(symbol: str) -> float | None:
+_PRICE_TTL = 5.0
+_price_cache: dict[str, tuple[float, float]] = {}
+
+
+async def last_price(symbol: str, fresh: bool = False) -> float | None:
+    """exchange.last_price() bilan bir xil qisqa muddatli kesh — bu yerda undan
+    ham muhimroq, chunki Twelve Data bepul rejasi DAQIQASIGA 8 so'rov beradi:
+    keshsiz bitta /stats bosilishi limitni yeb qo'yishi va forex signallari
+    kuzatuvini to'xtatishi mumkin."""
+    if not fresh:
+        hit = _price_cache.get(symbol)
+        if hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
+            return hit[1]
     r = await _client.get("/price", params={
         "symbol": _api_symbol(symbol), "apikey": config.TWELVE_DATA_API_KEY})
     if r.status_code != 200:
@@ -102,7 +114,9 @@ async def last_price(symbol: str) -> float | None:
     data = r.json()
     if "price" not in data:
         return None
-    return float(data["price"])
+    price = float(data["price"])
+    _price_cache[symbol] = (time.monotonic(), price)
+    return price
 
 
 async def close() -> None:

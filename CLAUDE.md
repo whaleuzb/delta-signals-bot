@@ -413,6 +413,48 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       **max DD sarlavha ostidagi xulosa qatorida saqlanib qoldi**, ma'lumot
       yo'qolmasin uchun.
 
+24. **Xavfsizlik ko'rigi natijalari (foydalanuvchi so'rovi bilan).**
+    - **Qo'lda yopishda depozit yangilanmasdi (tuzatildi).** `poll_job()`
+      avtomatik yopilganda `apply_deposit_delta()` chaqirardi, lekin
+      `on_close_confirm()` ("vaqtidan oldin yopish" tugmasi) chaqirmasdi —
+      depozit jimgina haqiqatdan uzoqlashardi. Endi ikkala yo'l ham
+      yangilaydi. **Yangi yopish yo'li qo'shilsa, depozitni yangilashni
+      unutmang.**
+    - **Narx so'rovlari portlashi (tuzatildi).** `/stats`, `/symbols`, `/open`
+      HAR ochiq signal uchun alohida `last_price()` chaqirardi — 20 ta ochiq
+      signalda bitta tugma bosilishi 20 ta so'rov. Kesh ham, rate-limit ham
+      yo'q edi, ya'ni istalgan guruh a'zosi buyruqni tez-tez bosib bot IP'sini
+      birja limitiga uchratishi va shu bilan **kuzatuv siklini ham** (poll_job
+      → klines) buzishi mumkin edi. Twelve Data'da bu ayniqsa xavfli —
+      bepul reja daqiqasiga atigi 8 so'rov. Yechim: `exchange.last_price()` va
+      `forex.last_price()` ga 5 soniyalik kesh. `tracker.close_now()` esa
+      `fresh=True` bilan chaqiradi — u yerdagi narx savdoning YAKUNIY natijasi
+      sifatida bazaga yoziladi, shuning uchun keshdan olinmasligi kerak.
+    - **Eski bir martalik skriptlar o'chirildi.** `delete_test_signal.py` da
+      `DELETE FROM signals WHERE symbol='BTCUSDT'` — workspace bo'yicha
+      CHEKLANMAGAN, ya'ni ishga tushsa BARCHA tenant'larning ma'lumotini
+      o'chirardi. Botdan chaqirilmasdi, lekin biz bir martalik skriptlarni
+      aynan `startCommand`ni almashtirib ishga tushiramiz — shuning uchun
+      bunday skriptni repoda qoldirish xavfli. `add_signal_manual.py`,
+      `backfill_manual.py`, `fix_signal16.py`, `migrate_multitenant.py` ham
+      birga olib tashlandi. **Bir martalik skript ishlatilgach darhol
+      o'chirilsin.**
+    - **Toza chiqqan joylar** (qayta tekshirishga hojat yo'q, lekin buzmang):
+      SQL — barcha foydalanuvchi qiymatlari `$N` parametr orqali, f-string
+      ichida faqat konstantalar (`CLOSED`, `config.TZ`); signal ustidan amal
+      qiluvchi callback'lar (`close:`, `closeok:`, `/cancel`) signalning O'Z
+      workspace'ini olib `can_manage()` tekshiradi (cached workspace'ga
+      ishonmaydi) — IDOR yo'q; `on_button` tokeni `secrets` bilan generatsiya
+      qilinadi va egasi tekshiriladi; `can_view()` xatolikda `False` qaytaradi
+      (fail-closed); `/havola` `http(s)://` bo'lmagan sxemani majburan
+      `https://` bilan almashtiradi (`javascript:` zararsizlanadi); repoda
+      hardcoded sir yo'q, `.env` gitignore'da.
+    - **Tuzatilmagan, siyosat qarori kutilayotgan** (kod xatosi emas):
+      `/top` global reyting — guruh egasi `/havola` orqali ISTALGAN URL
+      qo'ya oladi va u barcha bot foydalanuvchilariga bosiladigan havola
+      bo'lib ko'rinadi (fishing uchun ishlatilishi mumkin); guruh nomi ham
+      global ko'rinadi. Hozircha moderatsiya yo'q.
+
 ---
 
 ## Buyruqlar
