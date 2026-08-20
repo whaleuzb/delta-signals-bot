@@ -78,6 +78,25 @@ CREATE TABLE IF NOT EXISTS group_viewers (
 
 -- /start ref_<uid> deep-link orqali kim kimni taklif qilganini saqlaydi. Bitta
 -- odam faqat bitta marta "taklif qilingan" bo'la oladi (birinchi havola g'olib).
+-- Botga murojaat qilgan har bir odam (admin panelidagi statistika uchun).
+-- Har update'da upsert qilinadi — last_seen shundan yangilanadi.
+CREATE TABLE IF NOT EXISTS users (
+    user_id    BIGINT      PRIMARY KEY,
+    username   TEXT,
+    first_name TEXT,
+    first_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Majburiy obuna kanallari (/admin → Kanallar). Bo'sh bo'lsa tekshiruv umuman
+-- ishlamaydi — ya'ni standart holat "majburiy obuna yo'q".
+CREATE TABLE IF NOT EXISTS required_channels (
+    chat_id  BIGINT      PRIMARY KEY,
+    title    TEXT,
+    username TEXT,                      -- '@kanal' bo'lsa havola shundan quriladi
+    added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS referrals (
     referrer_id BIGINT      NOT NULL,
     referred_id BIGINT      NOT NULL UNIQUE,
@@ -290,6 +309,65 @@ async def list_pending_public() -> list[asyncpg.Record]:
             "AND public_approved = FALSE ORDER BY id")
 
 
+# ─────────────────── Foydalanuvchilar va majburiy obuna ───────────────────
+
+async def upsert_user(user_id: int, username: str | None, first_name: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO users (user_id, username, first_name) VALUES ($1,$2,$3) "
+            "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), "
+            "username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+            user_id, username, first_name)
+
+
+async def user_stats() -> asyncpg.Record:
+    async with pool().acquire() as c:
+        return await c.fetchrow("""
+            SELECT COUNT(*)                                                  AS total,
+                   COUNT(*) FILTER (WHERE first_seen >= now() - interval '1 day')  AS new_1d,
+                   COUNT(*) FILTER (WHERE first_seen >= now() - interval '7 days') AS new_7d,
+                   COUNT(*) FILTER (WHERE last_seen  >= now() - interval '1 day')  AS act_1d,
+                   COUNT(*) FILTER (WHERE last_seen  >= now() - interval '7 days') AS act_7d
+            FROM users
+        """)
+
+
+async def platform_stats() -> asyncpg.Record:
+    """Admin paneli uchun umumiy ko'rsatkichlar (barcha workspace'lar bo'yicha)."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(f"""
+            SELECT
+              (SELECT COUNT(*) FROM workspaces WHERE type='group')                  AS groups,
+              (SELECT COUNT(*) FROM workspaces WHERE type='personal')               AS personals,
+              (SELECT COUNT(*) FROM workspaces WHERE type='group' AND public)       AS public_req,
+              (SELECT COUNT(*) FROM workspaces
+                 WHERE type='group' AND public AND public_approved)                 AS public_ok,
+              (SELECT COUNT(*) FROM signals)                                        AS signals_all,
+              (SELECT COUNT(*) FROM signals WHERE status IN ('PENDING','ACTIVE'))   AS signals_open,
+              (SELECT COUNT(*) FROM signals WHERE status IN {CLOSED})               AS signals_closed,
+              (SELECT COUNT(*) FROM group_viewers)                                  AS viewers
+        """)
+
+
+async def list_required_channels() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT * FROM required_channels ORDER BY added_at")
+
+
+async def add_required_channel(chat_id: int, title: str | None, username: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO required_channels (chat_id, title, username) VALUES ($1,$2,$3) "
+            "ON CONFLICT (chat_id) DO UPDATE SET title=EXCLUDED.title, "
+            "username=EXCLUDED.username", chat_id, title, username)
+
+
+async def remove_required_channel(chat_id: int) -> bool:
+    async with pool().acquire() as c:
+        r = await c.execute("DELETE FROM required_channels WHERE chat_id=$1", chat_id)
+    return r.endswith("1")
+
+
 # ─────────────────────────── Referrallar ───────────────────────────
 
 async def add_referral(referrer_id: int, referred_id: int) -> None:
@@ -297,6 +375,22 @@ async def add_referral(referrer_id: int, referred_id: int) -> None:
         await c.execute(
             "INSERT INTO referrals (referrer_id, referred_id) VALUES ($1,$2) "
             "ON CONFLICT (referred_id) DO NOTHING", referrer_id, referred_id)
+
+
+async def referral_stats(limit: int = 10) -> tuple[int, list[asyncpg.Record]]:
+    """(jami referral soni, eng ko'p taklif qilganlar) — ism/username bilan."""
+    async with pool().acquire() as c:
+        total = await c.fetchval("SELECT COUNT(*) FROM referrals")
+        top = await c.fetch("""
+            SELECT r.referrer_id, COUNT(*) AS n,
+                   u.username, u.first_name
+            FROM referrals r
+            LEFT JOIN users u ON u.user_id = r.referrer_id
+            GROUP BY r.referrer_id, u.username, u.first_name
+            ORDER BY n DESC, r.referrer_id
+            LIMIT $1
+        """, limit)
+    return total, top
 
 
 async def count_referrals(referrer_id: int) -> int:

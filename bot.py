@@ -8,6 +8,7 @@ bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 import html
 import logging
 import secrets
+import time
 from datetime import datetime, timezone
 
 from telegram import (
@@ -15,8 +16,8 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ConversationHandler, ContextTypes, filters,
+    Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
 )
 
 import config
@@ -40,6 +41,8 @@ PENDING: dict[str, dict] = {}
 AWAITING_EDIT: dict[int, str] = {}
 # admin id -> signal_id (yangi yaratilgan signalga pul miqdori kutilmoqda)
 AWAITING_ALLOC: dict[int, int] = {}
+# super-admin id -> True (majburiy obuna uchun kanal kutilmoqda)
+AWAITING_CHANNEL: dict[int, bool] = {}
 
 
 def is_admin(uid: int) -> bool:
@@ -76,6 +79,107 @@ async def can_view(bot, uid: int, ws) -> bool:
     except Exception:
         log.exception("Obuna tekshiruvida xato (uid=%s ws=%s)", uid, ws["id"])
         return False
+
+
+# ─────────────────────── Majburiy obuna (kanallar) ───────────────────────
+
+_SUB_TTL = 300.0                       # to'liq obuna bo'lganlar shuncha soniya keshlanadi
+_sub_ok_until: dict[int, float] = {}   # uid -> monotonic deadline
+
+
+async def missing_subscriptions(bot, uid: int) -> list:
+    """Foydalanuvchi obuna BO'LMAGAN majburiy kanallar ro'yxati.
+
+    MUHIM — xatolikda OCHIQ qoladi (kanal o'chirilgan, bot u yerda admin emas
+    va h.k.): aks holda bitta noto'g'ri sozlama butun botni hamma uchun
+    qulflab qo'yardi. Obuna talabini majburlash foydalanuvchini yo'qotishdan
+    ko'ra muhimroq emas."""
+    if is_admin(uid):
+        return []
+    channels = await db.list_required_channels()
+    if not channels:
+        return []
+
+    deadline = _sub_ok_until.get(uid)
+    if deadline and time.monotonic() < deadline:
+        return []
+
+    missing = []
+    for ch in channels:
+        try:
+            member = await bot.get_chat_member(ch["chat_id"], uid)
+            if member.status in ("left", "kicked"):
+                missing.append(ch)
+        except Exception:
+            # Tekshirib bo'lmadi — bu foydalanuvchining aybi emas, o'tkazamiz.
+            log.warning("Obuna tekshirilmadi (kanal=%s uid=%s) — o'tkazib yuborildi",
+                         ch["chat_id"], uid)
+    if not missing:
+        _sub_ok_until[uid] = time.monotonic() + _SUB_TTL
+    else:
+        _sub_ok_until.pop(uid, None)
+    return missing
+
+
+def _channel_url(ch) -> str | None:
+    if ch["username"]:
+        return f"https://t.me/{ch['username'].lstrip('@')}"
+    return None
+
+
+async def send_subscribe_prompt(update: Update, missing: list) -> None:
+    rows = []
+    for ch in missing:
+        url = _channel_url(ch)
+        label = f"📢 {ch['title'] or ch['username'] or ch['chat_id']}"
+        if url:
+            rows.append([InlineKeyboardButton(label, url=url)])
+    rows.append([InlineKeyboardButton("✅ Obuna bo'ldim, tekshirish",
+                                       callback_data="subcheck")])
+    txt = ("👋 Botdan foydalanish uchun quyidagi kanal(lar)ga obuna bo'ling, "
+           "so'ng <b>“✅ Obuna bo'ldim”</b> tugmasini bosing.")
+    msg = update.effective_message
+    if msg:
+        await msg.reply_text(txt, parse_mode=ParseMode.HTML,
+                             reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Har bir update'dan OLDIN ishlaydi (group=-1): foydalanuvchini yozib
+    qo'yadi va majburiy obunani tekshiradi. Faqat SHAXSIY chat gate qilinadi —
+    guruh ichidagi oqimlar (/setup, signal postlari) to'sib qo'yilmaydi."""
+    user = update.effective_user
+    if not user or user.is_bot:
+        return
+    try:
+        await db.upsert_user(user.id, user.username, user.first_name)
+    except Exception:
+        log.exception("Foydalanuvchini yozib bo'lmadi (uid=%s)", user.id)
+
+    chat = update.effective_chat
+    if not chat or chat.type != "private" or is_admin(user.id):
+        return
+    q = update.callback_query
+    if q and q.data == "subcheck":
+        return                      # tekshirish tugmasi doim o'tishi kerak
+
+    missing = await missing_subscriptions(ctx.bot, user.id)
+    if missing:
+        if q:
+            await q.answer("Avval kanalga obuna bo'ling", show_alert=True)
+        await send_subscribe_prompt(update, missing)
+        raise ApplicationHandlerStop
+
+
+async def on_subcheck(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    missing = await missing_subscriptions(ctx.bot, q.from_user.id)
+    if missing:
+        await q.answer("Hali obuna bo'lmagansiz.", show_alert=True)
+        return
+    await q.answer("Rahmat! ✅")
+    await q.edit_message_text("✅ Obuna tasdiqlandi. Botdan foydalanishingiz mumkin.")
+    await show_menu(update, ctx)
 
 
 def access_denied(ws) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -832,6 +936,12 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
+    uid = update.effective_user.id
+    # Kanaldan forward qilingan post rasm bo'lishi mumkin — signal deb
+    # o'qilmasin, kanal qo'shish oqimiga yo'naltiramiz.
+    if AWAITING_CHANNEL.pop(uid, None) and is_admin(uid):
+        await handle_channel_add(update, ctx)
+        return
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -865,6 +975,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     uid = update.effective_user.id
     msg = update.effective_message
     text = msg.text or ""
+
+    if AWAITING_CHANNEL.pop(uid, None) and is_admin(uid):
+        await handle_channel_add(update, ctx)
+        return
 
     alloc_sig_id = AWAITING_ALLOC.get(uid)
     if alloc_sig_id:
@@ -1522,6 +1636,173 @@ async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await request_public_approval(ctx, ws["id"])
 
 
+# ─────────────────────────── Admin panel ───────────────────────────
+
+ADMIN_BACK_KB = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")]])
+
+
+def admin_home_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Statistika", callback_data="adm:stats"),
+         InlineKeyboardButton("🎁 Referrallar", callback_data="adm:refs")],
+        [InlineKeyboardButton("📢 Majburiy obuna", callback_data="adm:ch"),
+         InlineKeyboardButton("🛡 Tasdiqlar", callback_data="adm:pend")],
+    ])
+
+
+async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(update.effective_user.id):
+        return
+    await update.message.reply_text("🛠 <b>Admin panel</b>", parse_mode=ParseMode.HTML,
+                                     reply_markup=admin_home_kb())
+
+
+async def _admin_stats_text() -> str:
+    u = await db.user_stats()
+    p = await db.platform_stats()
+    return (
+        "📊 <b>Statistika</b>\n\n"
+        "<b>Foydalanuvchilar</b>\n"
+        f"Jami: <b>{u['total']}</b>\n"
+        f"Yangi: {u['new_1d']} (24s)  •  {u['new_7d']} (7 kun)\n"
+        f"Faol: {u['act_1d']} (24s)  •  {u['act_7d']} (7 kun)\n\n"
+        "<b>Workspace'lar</b>\n"
+        f"Guruhlar: <b>{p['groups']}</b>  •  Shaxsiy: <b>{p['personals']}</b>\n"
+        f"Guruh kuzatuvchilari: {p['viewers']}\n"
+        f"Reytingda: {p['public_ok']} ta (so'rov: {p['public_req']})\n\n"
+        "<b>Signallar</b>\n"
+        f"Jami: <b>{p['signals_all']}</b>\n"
+        f"Ochiq: {p['signals_open']}  •  Yopilgan: {p['signals_closed']}"
+    )
+
+
+async def _admin_refs_text() -> str:
+    total, top = await db.referral_stats()
+    lines = ["🎁 <b>Referrallar</b>", "", f"Jami taklif qilinganlar: <b>{total}</b>", ""]
+    if not top:
+        lines.append("Hali hech kim taklif qilmagan.")
+    else:
+        lines.append("<b>Eng faol takliflovchilar:</b>")
+        for i, r in enumerate(top, 1):
+            who = r["username"] and f"@{r['username']}" or (r["first_name"] or str(r["referrer_id"]))
+            lines.append(f"{i}. {html.escape(str(who))} — <b>{r['n']}</b> ta")
+    return "\n".join(lines)
+
+
+async def _admin_channels_view() -> tuple[str, InlineKeyboardMarkup]:
+    chans = await db.list_required_channels()
+    if chans:
+        lines = ["📢 <b>Majburiy obuna kanallari</b>", "",
+                 "Botga /start bosgan har bir foydalanuvchi shu kanallarga "
+                 "obuna bo'lishi shart (adminlar bundan mustasno).", ""]
+        for ch in chans:
+            name = ch["title"] or ch["username"] or str(ch["chat_id"])
+            lines.append(f"• {html.escape(str(name))}")
+    else:
+        lines = ["📢 <b>Majburiy obuna kanallari</b>", "",
+                 "Hozircha kanal yo'q — majburiy obuna <b>o'chirilgan</b>."]
+    rows = [[InlineKeyboardButton(
+        f"❌ {(ch['title'] or ch['username'] or ch['chat_id'])}"[:40],
+        callback_data=f"adm:chdel:{ch['chat_id']}")] for ch in chans]
+    rows.append([InlineKeyboardButton("➕ Kanal qo'shish", callback_data="adm:chadd")])
+    rows.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    if not is_admin(q.from_user.id):
+        await q.answer()
+        return
+    await q.answer()
+    action = q.data.split(":", 1)[1]
+
+    if action == "home":
+        await q.edit_message_text("🛠 <b>Admin panel</b>", parse_mode=ParseMode.HTML,
+                                   reply_markup=admin_home_kb())
+    elif action == "stats":
+        await q.edit_message_text(await _admin_stats_text(), parse_mode=ParseMode.HTML,
+                                   reply_markup=ADMIN_BACK_KB)
+    elif action == "refs":
+        await q.edit_message_text(await _admin_refs_text(), parse_mode=ParseMode.HTML,
+                                   reply_markup=ADMIN_BACK_KB)
+    elif action == "ch":
+        txt, kb = await _admin_channels_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "chadd":
+        AWAITING_CHANNEL[q.from_user.id] = True
+        await q.edit_message_text(
+            "➕ <b>Kanal qo'shish</b>\n\n"
+            "Kanal <code>@usernameni</code> yuboring, yoki o'sha kanaldan "
+            "istalgan postni shu yerga <b>forward</b> qiling.\n\n"
+            "⚠️ Bot o'sha kanalda <b>admin</b> bo'lishi shart — aks holda "
+            "obunani tekshirib bo'lmaydi.",
+            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+    elif action.startswith("chdel:"):
+        await db.remove_required_channel(int(action.split(":", 1)[1]))
+        _sub_ok_until.clear()
+        txt, kb = await _admin_channels_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "pend":
+        rows = await db.list_pending_public()
+        if not rows:
+            await q.edit_message_text("🛡 Tasdiq kutayotgan guruh yo'q. ✅",
+                                       reply_markup=ADMIN_BACK_KB)
+            return
+        await q.edit_message_text(f"🛡 Tasdiq kutmoqda: <b>{len(rows)}</b> ta",
+                                   parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        for ws in rows:
+            await request_public_approval(ctx, ws["id"])
+
+
+async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin @username yuborgan yoki kanaldan post forward qilgan holat."""
+    msg = update.effective_message
+    target = None
+    origin = getattr(msg, "forward_origin", None)
+    origin_chat = getattr(origin, "chat", None) if origin else None
+    if origin_chat is not None:
+        target = origin_chat.id
+    else:
+        raw = (msg.text or msg.caption or "").strip().split()
+        if raw:
+            target = raw[0]
+
+    if not target:
+        await msg.reply_text("Kanalni aniqlab bo'lmadi. @username yuboring yoki "
+                             "kanaldan post forward qiling.", reply_markup=ADMIN_BACK_KB)
+        return
+
+    try:
+        chat = await ctx.bot.get_chat(target)
+    except Exception:
+        await msg.reply_text(
+            "❌ Kanal topilmadi. @username to'g'riligini va botning o'sha kanalda "
+            "admin ekanini tekshiring.", reply_markup=ADMIN_BACK_KB)
+        return
+
+    # Bot kanalda admin bo'lmasa obunani tekshirib bo'lmaydi va tekshiruv
+    # (ataylab) OCHIQ qoladi — ya'ni talab jimgina ishlamaydi. Admin buni
+    # bilishi shart, shuning uchun ochiq ogohlantiramiz.
+    warn = ""
+    try:
+        me = await ctx.bot.get_me()
+        m = await ctx.bot.get_chat_member(chat.id, me.id)
+        if m.status not in ("administrator", "creator"):
+            warn = ("\n\n⚠️ <b>Diqqat:</b> bot bu kanalda admin emas — obuna "
+                    "tekshiruvi ishlamaydi. Botni kanalga admin qilib qo'shing.")
+    except Exception:
+        warn = ("\n\n⚠️ <b>Diqqat:</b> botning kanaldagi holatini tekshirib "
+                "bo'lmadi. Bot kanalda admin ekaniga ishonch hosil qiling.")
+
+    await db.add_required_channel(chat.id, chat.title, chat.username)
+    _sub_ok_until.clear()
+    await msg.reply_text(
+        f"✅ Qo'shildi: <b>{html.escape(chat.title or str(chat.id))}</b>{warn}",
+        parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+
+
 async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
@@ -1664,6 +1945,12 @@ def main() -> None:
         .build()
     )
 
+    # group=-1 — hamma narsadan OLDIN: foydalanuvchini yozadi va majburiy
+    # obunani tekshiradi (obuna bo'lmasa ApplicationHandlerStop bilan to'xtatadi).
+    app.add_handler(TypeHandler(Update, gate), group=-1)
+    app.add_handler(CallbackQueryHandler(on_subcheck, pattern=r"^subcheck$"))
+    app.add_handler(CommandHandler("admin", cmd_admin))
+    app.add_handler(CallbackQueryHandler(on_admin, pattern=r"^adm:"))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("menu", cmd_start))

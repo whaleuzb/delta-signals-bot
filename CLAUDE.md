@@ -474,6 +474,37 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       restartda bajarilgani uchun RAD ETILGAN guruhlarni qayta tasdiqlab
       yuborardi — bu ham haqiqiy bazada test qilingan.
 
+26. **Majburiy obuna + `/admin` paneli (super-admin uchun).**
+    - Yangi jadvallar: `users` (har update'da upsert — statistika uchun; avval
+      foydalanuvchilar HECH QAYERDA yozilmasdi) va `required_channels`.
+    - **Gate `TypeHandler(Update, gate)` da, `group=-1`** — hamma
+      handlerlardan oldin ishlaydi, shuning uchun birorta yo'l ochiq qolib
+      ketmaydi. Obuna bo'lmasa `ApplicationHandlerStop`. Faqat SHAXSIY chat
+      gate qilinadi: guruh ichidagi oqimlar (`/setup`, signal postlari,
+      `poll_job` xabarlari) to'sib qo'yilmaydi.
+    - **`missing_subscriptions()` XATOLIKDA OCHIQ QOLADI (fail-open).** Bot
+      kanalda admin bo'lmasa yoki kanal o'chirilgan bo'lsa `get_chat_member`
+      xato beradi — bunda foydalanuvchi O'TKAZILADI. Aks holda bitta noto'g'ri
+      sozlama butun botni hamma uchun qulflab qo'yardi. Shuning uchun kanal
+      qo'shilayotganda botning o'sha kanalda admin ekani tekshiriladi va
+      admin emas bo'lsa ochiq OGOHLANTIRISH beriladi (aks holda talab
+      jimgina ishlamay turaverardi).
+    - Adminlar hech qachon gate qilinmaydi — o'zini qulflab qo'yish xavfi.
+    - `_sub_ok_until` — to'liq obuna bo'lganlar 5 daqiqa keshlanadi (har
+      update'da N ta `get_chat_member` bo'lmasin). Obuna BO'LMAGAN holat
+      ataylab keshlanmaydi — "✅ Obuna bo'ldim" tugmasi darhol ishlashi kerak.
+      Kanal qo'shilganda/o'chirilganda kesh butunlay tozalanadi.
+    - `/admin` — tugmali panel: 📊 statistika (foydalanuvchi/workspace/signal),
+      🎁 referrallar (eng faol takliflovchilar), 📢 majburiy obuna kanallari
+      (qo'shish/o'chirish), 🛡 `/top` tasdiqlari. `/admin` ham `/tasdiq` ham
+      `set_my_commands()` ga QO'SHILMAGAN — oddiy foydalanuvchilarga
+      ko'rinmasin uchun (`is_admin()` bilan himoyalangan, ko'rinmasligi
+      qo'shimcha qatlam).
+    - Kanal qo'shish: `@username` yoki kanaldan forward. Forward rasm bo'lishi
+      mumkin, shuning uchun `AWAITING_CHANNEL` tekshiruvi `on_text_signal`
+      va `on_photo` ikkalasida ham bor — aks holda forward qilingan post
+      signal deb o'qilib ketardi.
+
 ---
 
 ## Buyruqlar
