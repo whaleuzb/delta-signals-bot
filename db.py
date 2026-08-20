@@ -229,6 +229,18 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
             "UPDATE workspaces SET deposit=$2 WHERE id=$1", workspace_id, _d(amount))
 
 
+async def apply_deposit_delta(workspace_id: int, delta: float) -> None:
+    """Signal (alloc_amount bilan) yopilganda uning real puldagi natijasini
+    joriy depozitga qo'shadi/ayiradi — shu tufayli depozit vaqt o'tishi bilan
+    haqiqiy hisob balansini aks ettiradi. Faqat deposit allaqachon
+    belgilangan workspace'larda ishlaydi (WHERE deposit IS NOT NULL) —
+    depozit ishlatmaydigan workspace'larga tegilmaydi."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET deposit = deposit + $2 "
+            "WHERE id=$1 AND deposit IS NOT NULL", workspace_id, _d(delta))
+
+
 async def set_public(workspace_id: int, public: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE workspaces SET public=$2 WHERE id=$1", workspace_id, public)

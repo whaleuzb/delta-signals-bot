@@ -1108,6 +1108,15 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
         sig = await db.get_signal(sid)
 
+        closed_pnl = None
+        if e["type"] == "STOP":
+            closed_pnl = e.get("final_pnl")
+        elif e["type"] == "TP" and e.get("closes"):
+            closed_pnl = e.get("final_pnl")
+        if closed_pnl is not None and sig and sig["alloc_amount"] is not None:
+            money_delta = float(closed_pnl) / 100 * float(sig["alloc_amount"])
+            await db.apply_deposit_delta(ws["id"], money_delta)
+
         if ws["type"] == "group" and ws["group_chat_id"]:
             reply_to = sig["group_msg_id"] if sig else None
             try:
