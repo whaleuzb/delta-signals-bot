@@ -36,6 +36,8 @@ log = logging.getLogger("bot")
 PENDING: dict[str, dict] = {}
 # admin id -> token (tahrir kutilmoqda)
 AWAITING_EDIT: dict[int, str] = {}
+# admin id -> signal_id (yangi yaratilgan signalga pul miqdori kutilmoqda)
+AWAITING_ALLOC: dict[int, int] = {}
 
 
 def is_admin(uid: int) -> bool:
@@ -244,7 +246,8 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
 def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
     rows = []
     if can_manage(uid, ws):
-        rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig")])
+        rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig"),
+                     InlineKeyboardButton("💰 Depozit", callback_data="m:deposit")])
     rows += [
         [InlineKeyboardButton("📊 Statistika", callback_data="m:stats"),
          InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
@@ -398,14 +401,18 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> Inlin
     return InlineKeyboardMarkup(rows)
 
 
-async def stats_view_text(ws_id: int, mode: str, y: int | None = None, m: int | None = None) -> str:
+async def stats_view_text(ws, uid: int, mode: str, y: int | None = None, m: int | None = None) -> str:
+    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    show_money = can_manage(uid, ws)
     if mode == "m":
         a, b = stats.month_bounds(y, m)
-        return await stats.summary(ws_id, a, b, f"{stats.MONTHS_UZ[m - 1]} {y}")
+        return await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[m - 1]} {y}",
+                                    deposit=deposit, show_money=show_money)
     if mode == "y":
         a, b = stats.year_bounds(y)
-        return await stats.summary(ws_id, a, b, f"{y}-yil natijalari")
-    return await stats.summary(ws_id)
+        return await stats.summary(ws["id"], a, b, f"{y}-yil natijalari",
+                                    deposit=deposit, show_money=show_money)
+    return await stats.summary(ws["id"], deposit=deposit, show_money=show_money)
 
 
 async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -422,7 +429,7 @@ async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     mode = parts[1]
     y = int(parts[2]) if mode in ("m", "y") else None
     m = int(parts[3]) if mode == "m" else None
-    text = await stats_view_text(ws["id"], mode, y, m)
+    text = await stats_view_text(ws, q.from_user.id, mode, y, m)
     await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb(mode, y, m))
 
 
@@ -480,7 +487,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     action = q.data.split(":", 1)[1]
 
     if action == "stats":
-        await q.message.reply_text(await stats_view_text(ws["id"], "all"), parse_mode=ParseMode.HTML,
+        await q.message.reply_text(await stats_view_text(ws, q.from_user.id, "all"), parse_mode=ParseMode.HTML,
                                     reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
         now = datetime.now(stats.TZ)
@@ -492,6 +499,15 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
+    elif action == "deposit":
+        if not can_manage(q.from_user.id, ws):
+            return
+        cur = ws["deposit"]
+        txt = f"{float(cur):,.2f}" if cur is not None else "belgilanmagan"
+        await q.message.reply_text(
+            f"Joriy depozit ({ws['name']}): <b>{txt}</b>\n\n"
+            "Yangilash uchun: <code>/depozit 1000</code>", parse_mode=ParseMode.HTML,
+            reply_markup=MENU_BACK_KB)
     elif action == "equity":
         buf = await stats.equity_chart(ws["id"])
         if buf is None:
@@ -733,6 +749,22 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     msg = update.effective_message
     text = msg.text or ""
 
+    alloc_sig_id = AWAITING_ALLOC.get(uid)
+    if alloc_sig_id:
+        amount = _parse_price(text)
+        if amount is None or amount <= 0:
+            await msg.reply_text("Noto'g'ri summa. Qayta kiriting yoki ⏭ tugmasini bosing.")
+            return
+        AWAITING_ALLOC.pop(uid, None)
+        sig = await db.get_signal(alloc_sig_id)
+        ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+        if sig and ws and ws["deposit"] is not None:
+            await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
+            await msg.reply_text(
+                f"✅ Belgilandi: <b>{amount:,.2f}</b> (depozit: {float(ws['deposit']):,.2f})",
+                parse_mode=ParseMode.HTML)
+        return
+
     token = AWAITING_EDIT.get(uid)
     if token and token in PENDING:
         AWAITING_EDIT.pop(uid, None)
@@ -873,6 +905,21 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
 
+    if ws["deposit"] is not None:
+        AWAITING_ALLOC[q.from_user.id] = sig_id
+        kb2 = InlineKeyboardMarkup([[
+            InlineKeyboardButton("⏭ O'tkazib yuborish", callback_data=f"allocskip:{sig_id}")]])
+        await q.message.reply_text(
+            f"💰 #{sig_id} {d['symbol']} uchun necha pul ishlatasiz? (masalan 100)",
+            reply_markup=kb2)
+
+
+async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    AWAITING_ALLOC.pop(q.from_user.id, None)
+    await q.edit_message_text("⏭ O'tkazib yuborildi.")
+
 
 # ─────────────────────────── Kuzatuv sikli ───────────────────────────
 
@@ -976,21 +1023,25 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    await update.message.reply_text(await stats_view_text(ws["id"], "all"), parse_mode=ParseMode.HTML,
-                                     reply_markup=stats_nav_kb("all"))
+    await update.message.reply_text(await stats_view_text(ws, update.effective_user.id, "all"),
+                                     parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb("all"))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
-    if not await can_view(ctx.bot, update.effective_user.id, ws):
+    uid = update.effective_user.id
+    if not await can_view(ctx.bot, uid, ws):
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
     now = datetime.now(stats.TZ)
+    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    show_money = can_manage(uid, ws)
     a, b = stats.month_bounds(now.year, now.month)
-    cur = await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}")
+    cur = await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}",
+                               deposit=deposit, show_money=show_money)
     await update.message.reply_text(
         cur + "\n\n" + await stats.monthly_table(ws["id"]), parse_mode=ParseMode.HTML)
 
@@ -999,14 +1050,19 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
-    if not await can_view(ctx.bot, update.effective_user.id, ws):
+    uid = update.effective_user.id
+    if not await can_view(ctx.bot, uid, ws):
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
     y = datetime.now(stats.TZ).year
+    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    show_money = can_manage(uid, ws)
     a, b = stats.year_bounds(y)
     await update.message.reply_text(
-        await stats.summary(ws["id"], a, b, f"{y}-yil natijalari"), parse_mode=ParseMode.HTML)
+        await stats.summary(ws["id"], a, b, f"{y}-yil natijalari",
+                             deposit=deposit, show_money=show_money),
+        parse_mode=ParseMode.HTML)
 
 
 async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1065,6 +1121,36 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("✅ Bekor qilindi." if ok else "Topilmadi yoki allaqachon yopilgan.")
 
 
+async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = update.effective_user.id
+    if not can_manage(uid, ws):
+        await update.message.reply_text("Ruxsat yo'q.")
+        return
+
+    if not ctx.args:
+        cur = ws["deposit"]
+        txt = f"{float(cur):,.2f}" if cur is not None else "belgilanmagan"
+        await update.message.reply_text(
+            f"Joriy depozit ({ws['name']}): <b>{txt}</b>\n\n"
+            "Yangilash uchun: <code>/depozit 1000</code>\n\n"
+            "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
+            "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
+            "foyda/zarar hisoblanadi.",
+            parse_mode=ParseMode.HTML)
+        return
+
+    amount = _parse_price(ctx.args[0])
+    if amount is None or amount <= 0:
+        await update.message.reply_text("Noto'g'ri summa. Masalan: /depozit 1000")
+        return
+    await db.set_deposit(ws["id"], amount)
+    await update.message.reply_text(f"✅ Depozit yangilandi: <b>{amount:,.2f}</b>",
+                                     parse_mode=ParseMode.HTML)
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -1113,7 +1199,9 @@ def main() -> None:
     app.add_handler(CommandHandler("equity", cmd_equity))
     app.add_handler(CommandHandler("open", cmd_open))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
+    app.add_handler(CommandHandler("depozit", cmd_deposit))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
+    app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))

@@ -24,7 +24,11 @@ def _compound(pcts: list[float]) -> float:
     return (eq - 1) * 100
 
 
-async def summary(workspace_id: int, since=None, until=None, title="Umumiy statistika") -> str:
+async def summary(workspace_id: int, since=None, until=None, title="Umumiy statistika",
+                   deposit=None, show_money: bool = True) -> str:
+    """deposit — workspace'ning joriy umumiy depoziti (bo'lsa, real pul/pozitsiya
+    hajmiga bog'liq natija ham chiqadi). show_money — real summani ko'rsatish
+    kerakmi (guruh a'zolariga faqat foiz, admin/shaxsiy egasiga pul ham)."""
     s = await db.period_stats(workspace_id, since, until)
     if not s or s["total"] == 0:
         return f"<b>{title}</b>\n\nHali yopilgan signal yo'q."
@@ -49,6 +53,15 @@ async def summary(workspace_id: int, since=None, until=None, title="Umumiy stati
     t.append(f"O'rt. foyda: {float(s['avg_win']):+.2f}%   |   O'rt. zarar: {float(s['avg_loss']):+.2f}%")
     if pf:
         t.append(f"Profit factor: <b>{pf:.2f}</b>")
+
+    if deposit and s["real_pnl_money"] is not None:
+        real_money = float(s["real_pnl_money"])
+        real_pct = real_money / float(deposit) * 100
+        if show_money:
+            t.append(f"💰 Real natija: <b>{real_money:+,.2f}</b>  ({real_pct:+.2f}% depozitdan)")
+        else:
+            t.append(f"💰 Real natija: <b>{real_pct:+.2f}%</b> depozitdan")
+
     return "\n".join(t)
 
 

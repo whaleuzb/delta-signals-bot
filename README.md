@@ -127,6 +127,7 @@ ogohlantiradi.
 | `/cancel <id>` | signalni qo'lda bekor qilish |
 | `/setup` | (faqat guruhda, admin) shu guruh uchun workspace ochish |
 | `/new` | signal kiritish sehrgari (bosqichma-bosqich) |
+| `/depozit [summa]` | (admin/egasi) umumiy kapitalni ko'rish yoki belgilash — real pul/pozitsiya hajmiga bog'liq natija shundan hisoblanadi |
 
 ---
 

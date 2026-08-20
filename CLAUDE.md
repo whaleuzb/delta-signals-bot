@@ -130,6 +130,33 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       "Whales Uzb" workspace'iga bog'landi (startCommand vaqtincha
       `python migrate_multitenant.py; python bot.py` qilingan holda ishga tushirildi).
 
+13. **Real (kapitalga bog'liq) PnL — `workspaces.deposit` + `signals.alloc_amount`.**
+    Hozirgacha barcha foiz "signal narxi qancha harakatlandi" degani edi (masalan
+    "TP1'da +4%") — bu HAQIQIY portfel natijasi emas, chunki har bir savdoga qancha
+    pul qo'yilgani hisobga olinmagan. Endi ixtiyoriy qo'shimcha qatlam bor:
+    - `workspaces.deposit` — workspace egasining umumiy kapitali (`/depozit 1000`
+      yoki "💰 Depozit" tugmasi bilan belgilanadi). `can_manage()` bo'lganlargagina
+      ko'rinadi/o'zgartiriladi (guruhda — faqat admin, guruh a'zolari admin qancha
+      pul bilan savdo qilayotganini bilmasligi kerak; shaxsiy workspace'da — faqat
+      egasi, u yerda bu muammo emas).
+    - `signals.alloc_amount` + `signals.deposit_snapshot` — har bir signal
+      tasdiqlangach (`on_button`), agar workspace'da depozit belgilangan bo'lsa,
+      bot ixtiyoriy ravishda "necha pul ishlatasiz?" deb so'raydi (`AWAITING_ALLOC`,
+      `⏭ O'tkazib yuborish` tugmasi bilan bekor qilsa bo'ladi). `deposit_snapshot`
+      — o'sha ONDAGI depozit qiymati, keyinchalik depozit o'zgarsa ham bu signalning
+      real hisobi o'zgarmasin uchun saqlanadi (`sl_initial` R-hisobda saqlanganidek).
+    - Real natija = `pnl_pct/100 * alloc_amount` (pulda), foizi esa shu summani
+      workspace'ning JORIY depozitiga nisbatan hisoblanadi (`stats.summary`'dagi
+      `deposit` parametri) — davr ichida deposit o'zgargan bo'lsa taxminiy, lekin
+      amaliy jihatdan yetarli.
+    - `stats.summary(..., deposit=..., show_money=...)` — `show_money` guruhda
+      `can_manage(uid, ws)` orqali aniqlanadi: admin pul miqdorini ham ko'radi,
+      oddiy a'zo faqat foizni. Shaxsiy workspace'da egasi doim `can_manage`, shuning
+      uchun avtomatik ikkalasini ham ko'radi.
+    - Depozit belgilanmagan workspace'larda bu qator umuman chiqmaydi (`deposit`
+      yoki `real_pnl_money` `None` bo'lsa) — eski, faqat-foizli statistika ishlayveradi,
+      hech narsa buzilmaydi. To'liq ixtiyoriy, orqaga mos (backward-compatible) qatlam.
+
 ---
 
 ## Buyruqlar

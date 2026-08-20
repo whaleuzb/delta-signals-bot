@@ -72,6 +72,14 @@ CREATE INDEX IF NOT EXISTS idx_signals_closed ON signals(closed_at);
 MIGRATE = """
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS workspace_id INT REFERENCES workspaces(id);
 CREATE INDEX IF NOT EXISTS idx_signals_workspace ON signals(workspace_id);
+
+-- Real (kapitalga bog'liq) PnL: workspace o'z umumiy depozitini belgilaydi,
+-- har bir signalga necha pul ishlatilgani alohida yoziladi. Ikkalasi ham
+-- ixtiyoriy (NULL) — depozit belgilanmagan workspace'larda eski, sof foizli
+-- statistika ishlayveradi, hech narsa buzilmaydi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS deposit NUMERIC;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS alloc_amount NUMERIC;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS deposit_snapshot NUMERIC;
 """
 
 
@@ -143,6 +151,12 @@ async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:
             "UPDATE workspaces SET group_topic_id=$2 WHERE id=$1", workspace_id, topic_id)
 
 
+async def set_deposit(workspace_id: int, amount: float) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET deposit=$2 WHERE id=$1", workspace_id, _d(amount))
+
+
 # ─────────────────────────── Signallar ───────────────────────────
 
 async def create_signal(workspace_id: int, d: dict) -> int:
@@ -162,6 +176,16 @@ async def create_signal(workspace_id: int, d: dict) -> int:
 async def set_group_msg(sig_id: int, msg_id: int) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET group_msg_id=$2 WHERE id=$1", sig_id, msg_id)
+
+
+async def set_signal_allocation(sig_id: int, alloc_amount: float, deposit_snapshot: float) -> None:
+    """Signal tasdiqlangach, unga necha pul ishlatilganini yozadi. deposit_snapshot —
+    o'sha paytdagi umumiy depozit (keyinchalik depozit o'zgarsa ham bu signal real
+    hisobi o'zgarmasin uchun)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET alloc_amount=$2, deposit_snapshot=$3 WHERE id=$1",
+            sig_id, _d(alloc_amount), _d(deposit_snapshot))
 
 
 async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
@@ -221,7 +245,9 @@ async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Rec
         COALESCE(AVG(pnl_pct) FILTER (WHERE pnl_pct > 0), 0) AS avg_win,
         COALESCE(AVG(pnl_pct) FILTER (WHERE pnl_pct < 0), 0) AS avg_loss,
         COALESCE(AVG(r_multiple), 0)                         AS avg_r,
-        COALESCE(SUM(r_multiple), 0)                         AS sum_r
+        COALESCE(SUM(r_multiple), 0)                         AS sum_r,
+        SUM(pnl_pct / 100 * alloc_amount) FILTER (WHERE alloc_amount IS NOT NULL)
+                                                              AS real_pnl_money
     FROM signals
     WHERE workspace_id = $1 AND status IN {CLOSED}
       AND ($2::timestamptz IS NULL OR closed_at >= $2)
