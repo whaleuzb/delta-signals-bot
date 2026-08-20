@@ -1,4 +1,4 @@
-"""Delta Signals Bot — asosiy fayl.
+"""Trade Controller — asosiy fayl.
 
 Multi-tenant: bitta bot bir nechta mustaqil "workspace"ga xizmat qiladi —
 har bir yopiq Telegram guruhi o'z workspace'ini (/setup orqali) ochishi,
@@ -959,7 +959,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     await update.message.reply_text(
-        f"Delta Signals Bot — {ws['name']} 👇", reply_markup=main_menu_kb(uid, ws))
+        f"Trade Controller — {ws['name']} 👇", reply_markup=main_menu_kb(uid, ws))
 
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1070,6 +1070,10 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    try:
+        await app.bot.set_my_name("Trade Controller")
+    except Exception:
+        log.exception("Bot nomini o'rnatib bo'lmadi")
 
 
 async def post_shutdown(app: Application) -> None:

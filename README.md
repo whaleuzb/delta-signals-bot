@@ -1,4 +1,4 @@
-# Delta Signals Bot
+# Trade Controller
 
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
 yurituvchi bot. Narx manbasi — **MEXC Spot**, hisob-kitob esa **spot (1x)**.

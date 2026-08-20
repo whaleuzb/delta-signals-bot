@@ -1,4 +1,4 @@
-# Delta Signals Bot — loyiha konteksti
+# Trade Controller — loyiha konteksti
 
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
 yurituvchi bot. Delta Community uchun.
