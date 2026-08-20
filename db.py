@@ -75,6 +75,14 @@ CREATE TABLE IF NOT EXISTS group_viewers (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, workspace_id)
 );
+
+-- /start ref_<uid> deep-link orqali kim kimni taklif qilganini saqlaydi. Bitta
+-- odam faqat bitta marta "taklif qilingan" bo'la oladi (birinchi havola g'olib).
+CREATE TABLE IF NOT EXISTS referrals (
+    referrer_id BIGINT      NOT NULL,
+    referred_id BIGINT      NOT NULL UNIQUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 # signals.workspace_id — ALTER orqali qo'shiladi (yangi ustun eski jadvalga ham,
@@ -103,6 +111,10 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'crypt
 -- opened_at pastda create_signal() ichida to'g'ridan-to'g'ri o'rnatiladi) — tracker.py
 -- ga tegilmaydi, u faqat SL/TP'ni kuzatishda davom etadi.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS entry_mode TEXT NOT NULL DEFAULT 'limit';
+
+-- Guruh admini o'zi yoqsagina /top reytingida ko'rinadi (standart — YASHIRIN).
+-- Shaxsiy workspace'lar reytingga umuman kirmaydi (faqat type='group' hisobga olinadi).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS public BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -206,6 +218,26 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
     async with pool().acquire() as c:
         await c.execute(
             "UPDATE workspaces SET deposit=$2 WHERE id=$1", workspace_id, _d(amount))
+
+
+async def set_public(workspace_id: int, public: bool) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET public=$2 WHERE id=$1", workspace_id, public)
+
+
+# ─────────────────────────── Referrallar ───────────────────────────
+
+async def add_referral(referrer_id: int, referred_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO referrals (referrer_id, referred_id) VALUES ($1,$2) "
+            "ON CONFLICT (referred_id) DO NOTHING", referrer_id, referred_id)
+
+
+async def count_referrals(referrer_id: int) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "SELECT COUNT(*) FROM referrals WHERE referrer_id=$1", referrer_id)
 
 
 # ─────────────────────────── Signallar ───────────────────────────
@@ -367,6 +399,25 @@ async def top_symbols(workspace_id: int, since=None, until=None,
     """
     async with pool().acquire() as c:
         return await c.fetch(q, *params)
+
+
+async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
+    """/top reytingi uchun — faqat public=TRUE guruh workspace'lari, shu davrda
+    yopilgan signallar bo'yicha. Shaxsiy workspace'lar reytingga kirmaydi."""
+    q = f"""
+    SELECT w.id, w.name, COUNT(*) AS total,
+           COUNT(*) FILTER (WHERE s.pnl_pct > 0) AS wins,
+           COALESCE(SUM(s.pnl_pct), 0) AS sum_pct
+    FROM signals s
+    JOIN workspaces w ON w.id = s.workspace_id
+    WHERE w.type = 'group' AND w.public = TRUE AND s.status IN {CLOSED}
+      AND s.closed_at >= $1 AND s.closed_at < $2
+    GROUP BY w.id, w.name
+    ORDER BY sum_pct DESC
+    LIMIT $3
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q, since, until, limit)
 
 
 async def open_signals_summary(workspace_id: int) -> dict[str, dict]:

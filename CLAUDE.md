@@ -254,6 +254,28 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       "💰 Depozit" tugmalari va pul miqdorlari ko'rinmaydi, faqat statistika —
       qo'shimcha tekshiruv yozish shart bo'lmadi, mavjud modeldan bepul keldi.
 
+18. **O'sish uchun 3 ta funksiya: `/top` reyting, `/taklif` referral, shaxsiy
+    workspace'ga DM bildirishnoma.**
+    - `/top` — joriy oy bo'yicha eng yaxshi GURUH workspace'lari reytingi
+      (`db.top_workspaces()`, faqat `type='group' AND public=TRUE`). Shaxsiy
+      workspace'lar reytingga umuman kirmaydi. Standart holat — `public=FALSE`
+      (YASHIRIN): guruh admini o'zi `/public on` yozmaguncha hech kim ko'rmaydi.
+      `/top` o'zi workspace talab qilmaydi — istalgan joyda, istalgan
+      foydalanuvchi ishlata oladi (kirish nazoratisiz, ataylab — kashfiyot/o'sish
+      uchun ochiq).
+    - `/taklif` — har bir foydalanuvchiga shaxsiy deep-link beradi
+      (`t.me/<bot>?start=ref_<uid>`). `cmd_start()` `ref_` prefiksini o'qib
+      `db.add_referral()` chaqiradi (`referred_id` UNIQUE — bitta odam faqat bir
+      marta "taklif qilingan" bo'ladi, birinchi havola g'olib). Hozircha faqat
+      hisoblagich (`db.count_referrals()`) — mukofot mexanizmi yo'q, chunki bu
+      botda to'lov tizimi yo'q (obuna whale-payment-bot'da, alohida).
+    - **Shaxsiy workspace endi jim emas.** `poll_job()` avval faqat
+      `type='group'` uchun xabar yuborardi, shaxsiy uchun butunlay `continue`
+      qilardi. Endi `type='personal'` bo'lsa xuddi guruhdagidek barcha
+      hodisalar (OPEN/TP/BE/STOP/EXPIRED) `ws["owner_id"]`ga DM qilinadi —
+      hozircha yoqib/o'chirib bo'lmaydigan qatiy standart (opt-out yo'q, kerak
+      bo'lsa keyinroq qo'shiladi).
+
 ---
 
 ## Buyruqlar

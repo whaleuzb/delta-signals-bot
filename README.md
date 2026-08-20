@@ -136,6 +136,9 @@ tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
 | `/setup` | (faqat guruhda, admin) shu guruh uchun workspace ochish |
 | `/new` | signal kiritish sehrgari (bosqichma-bosqich) |
 | `/depozit [summa]` | (admin/egasi) umumiy kapitalni ko'rish yoki belgilash — real pul/pozitsiya hajmiga bog'liq natija shundan hisoblanadi |
+| `/top` | joriy oydagi eng yaxshi (ochiq) guruhlar reytingi |
+| `/public on\|off` | (admin/egasi) guruhni /top reytingida ko'rsatish/yashirish |
+| `/taklif` | do'stlaringizni taklif qilish uchun shaxsiy havola |
 
 ---
 

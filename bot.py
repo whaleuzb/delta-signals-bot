@@ -1103,18 +1103,25 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not txt:
             continue
 
-        if not ws or ws["type"] != "group" or not ws["group_chat_id"]:
-            continue  # shaxsiy workspace — guruhga hech narsa yuborilmaydi
+        if not ws:
+            continue
 
         sig = await db.get_signal(sid)
-        reply_to = sig["group_msg_id"] if sig else None
-        try:
-            await ctx.bot.send_message(
-                ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
-                reply_to_message_id=reply_to, allow_sending_without_reply=True,
-                message_thread_id=ws["group_topic_id"])
-        except Exception:
-            log.exception("Xabar yuborilmadi")
+
+        if ws["type"] == "group" and ws["group_chat_id"]:
+            reply_to = sig["group_msg_id"] if sig else None
+            try:
+                await ctx.bot.send_message(
+                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                    reply_to_message_id=reply_to, allow_sending_without_reply=True,
+                    message_thread_id=ws["group_topic_id"])
+            except Exception:
+                log.exception("Xabar yuborilmadi")
+        elif ws["type"] == "personal":
+            try:
+                await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
+            except Exception:
+                log.exception("Shaxsiy xabar yuborilmadi")
 
         if sig and sig["ambiguous"] and e["type"] == "STOP":
             try:
@@ -1130,10 +1137,18 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ─────────────────────────── Komandalar ───────────────────────────
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    if ctx.args and ctx.args[0].startswith("ref_"):
+        try:
+            referrer_id = int(ctx.args[0][4:])
+            if referrer_id != uid:
+                await db.add_referral(referrer_id, uid)
+        except ValueError:
+            pass
+
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
-    uid = update.effective_user.id
     if not await can_view(ctx.bot, uid, ws):
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
@@ -1290,6 +1305,77 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                      parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
+async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = update.effective_user.id
+    if not can_manage(uid, ws):
+        await update.message.reply_text("Ruxsat yo'q.")
+        return
+    if ws["type"] != "group":
+        await update.message.reply_text("Bu buyruq faqat guruh workspace uchun ishlaydi.")
+        return
+
+    if not ctx.args:
+        cur = "yoqilgan ✅" if ws["public"] else "o'chirilgan 🔒"
+        await update.message.reply_text(
+            f"\"{ws['name']}\" guruhingizning <code>/top</code> reytingida ko'rinishi: <b>{cur}</b>\n\n"
+            "Yoqish: <code>/public on</code>\nO'chirish: <code>/public off</code>",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+
+    arg = ctx.args[0].lower()
+    if arg not in ("on", "off"):
+        await update.message.reply_text("Foydalanish: /public on  yoki  /public off")
+        return
+    await db.set_public(ws["id"], arg == "on")
+    if arg == "on":
+        await update.message.reply_text(
+            "✅ Guruhingiz endi /top reytingida ko'rinadi.", reply_markup=MENU_BACK_KB)
+    else:
+        await update.message.reply_text(
+            "🔒 Guruhingiz reytingdan olib tashlandi.", reply_markup=MENU_BACK_KB)
+
+
+async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    now = datetime.now(stats.TZ)
+    a, b = stats.month_bounds(now.year, now.month)
+    rows = await db.top_workspaces(a, b, limit=10)
+    if not rows:
+        await update.message.reply_text(
+            "Hali hech qanday ochiq guruh reytingda yo'q.\n\n"
+            "Guruh admini bo'lsangiz, guruhingizni ko'rsatish uchun "
+            "<code>/public on</code> yozing.",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+    lines = [f"🏆 <b>Eng yaxshi guruhlar — {stats.MONTHS_UZ[now.month - 1]} {now.year}</b>", ""]
+    for i, r in enumerate(rows):
+        medal = medals[i] if i < 3 else f"{i + 1}."
+        wr = r["wins"] / r["total"] * 100 if r["total"] else 0
+        lines.append(
+            f"{medal} <b>{r['name']}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
+            f"({r['total']} savdo, {wr:.0f}% WR)")
+    lines += ["", "Guruhingizni shu reytingda ko'rsatish uchun admin <code>/public on</code> yozsin."]
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML,
+                                     reply_markup=MENU_BACK_KB)
+
+
+async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = update.effective_user.id
+    bot_username = ctx.bot.username
+    count = await db.count_referrals(uid)
+    link = f"https://t.me/{bot_username}?start=ref_{uid}" if bot_username else None
+    link_txt = f"<code>{link}</code>" if link else "(havola olinmadi, birozdan so'ng qayta urining)"
+    await update.message.reply_text(
+        f"🎁 Do'stlaringizni taklif qiling!\n\n"
+        f"Sizning shaxsiy havolangiz:\n{link_txt}\n\n"
+        f"Siz orqali botga kelganlar: <b>{count}</b>",
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -1307,6 +1393,9 @@ async def post_init(app: Application) -> None:
         ("depozit", "Depozitni ko'rish/belgilash"),
         ("cancel", "Signalni bekor qilish (masalan: /cancel 12)"),
         ("setup", "Guruhni ro'yxatdan o'tkazish (faqat guruhda)"),
+        ("top", "Eng yaxshi guruhlar reytingi"),
+        ("public", "Guruhni /top reytingida ko'rsatish (admin)"),
+        ("taklif", "Do'stlaringizni taklif qilish havolasi"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
 
@@ -1350,6 +1439,9 @@ def main() -> None:
     app.add_handler(CommandHandler("open", cmd_open))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("depozit", cmd_deposit))
+    app.add_handler(CommandHandler("public", cmd_public))
+    app.add_handler(CommandHandler("top", cmd_top))
+    app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
