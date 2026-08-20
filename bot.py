@@ -300,7 +300,8 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     sig_id = int(q.data.split(":", 1)[1])
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.")
+        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.",
+                                   reply_markup=MENU_BACK_KB)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -333,7 +334,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     sig_id = int(q.data.split(":", 1)[1])
     sig = await db.get_signal(sig_id)
     if not sig:
-        await q.edit_message_text("Topilmadi.")
+        await q.edit_message_text("Topilmadi.", reply_markup=MENU_BACK_KB)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -341,11 +342,13 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
     ev = await tracker.close_now(sig_id)
     if not ev:
-        await q.edit_message_text("Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).")
+        await q.edit_message_text("Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).",
+                                   reply_markup=MENU_BACK_KB)
         return
 
     if ev["status"] == "CANCELLED":
-        await q.edit_message_text(f"🗑 #{sig_id} {ev['symbol']} bekor qilindi (entryga tegmagan edi).")
+        await q.edit_message_text(f"🗑 #{sig_id} {ev['symbol']} bekor qilindi (entryga tegmagan edi).",
+                                   reply_markup=MENU_BACK_KB)
         return
 
     pnl, r = ev["pnl"], ev["r"]
@@ -353,7 +356,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     rtxt = f" ({r:+.2f}R)" if r is not None else ""
     await q.edit_message_text(
         f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
-        f"Yakuniy: {pnl:+.2f}%{rtxt}")
+        f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
 
     if ws["type"] == "group" and ws["group_chat_id"]:
         try:
@@ -370,7 +373,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.")
+    await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.", reply_markup=MENU_BACK_KB)
 
 
 def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
@@ -718,9 +721,9 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ctx.user_data.pop("wiz", None)
     if q:
         await q.answer()
-        await q.edit_message_text("❌ Bekor qilindi.")
+        await q.edit_message_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
     else:
-        await update.effective_message.reply_text("❌ Bekor qilindi.")
+        await update.effective_message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
     return ConversationHandler.END
 
 
@@ -749,7 +752,7 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await msg.reply_text(
                 "Darajalarni o'qiy olmadim. Rasm ostiga yozib yuboring, masalan:\n"
                 "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
-                parse_mode=ParseMode.HTML,
+                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
             )
             return
 
@@ -775,7 +778,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
             await msg.reply_text(
                 f"✅ Belgilandi: <b>{amount:,.2f}</b> (depozit: {float(ws['deposit']):,.2f})",
-                parse_mode=ParseMode.HTML)
+                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
     token = AWAITING_EDIT.get(uid)
@@ -827,7 +830,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     if not sym:
         await msg.reply_text(
             f"❌ <code>{draft['symbol']}</code> topilmadi (kripto yoki forex).",
-            parse_mode=ParseMode.HTML,
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
         )
         return
     draft["symbol"] = sym
@@ -835,7 +838,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
 
     err = parsing.validate(draft)
     if err:
-        await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML)
+        await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
     warn = []
@@ -874,14 +877,14 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     action, _, token = q.data.partition(":")
     item = PENDING.get(token)
     if not item:
-        await q.edit_message_text("Bu so'rov eskirgan.")
+        await q.edit_message_text("Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
         return
     if q.from_user.id != item["user"]:
         return
 
     if action == "no":
         PENDING.pop(token, None)
-        await q.edit_message_text("🗑 Bekor qilindi.")
+        await q.edit_message_text("🗑 Bekor qilindi.", reply_markup=MENU_BACK_KB)
         return
 
     if action == "ed":
@@ -908,7 +911,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     })
     PENDING.pop(token, None)
     await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
-                              parse_mode=ParseMode.HTML)
+                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
     if ws["type"] == "group" and ws["group_chat_id"]:
         body = draft_text(d, sig_id)
@@ -938,7 +941,7 @@ async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
     AWAITING_ALLOC.pop(q.from_user.id, None)
-    await q.edit_message_text("⏭ O'tkazib yuborildi.")
+    await q.edit_message_text("⏭ O'tkazib yuborildi.", reply_markup=MENU_BACK_KB)
 
 
 # ─────────────────────────── Kuzatuv sikli ───────────────────────────
@@ -1031,8 +1034,9 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_EDIT.pop(update.effective_user.id, None)
+    AWAITING_ALLOC.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
-    await update.message.reply_text("❌ Bekor qilindi.")
+    await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1109,9 +1113,10 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     buf = await stats.equity_chart(ws["id"])
     if buf is None:
-        await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.")
+        await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
+                                         reply_markup=MENU_BACK_KB)
         return
-    await update.message.reply_photo(InputFile(buf, "equity.png"))
+    await update.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=MENU_BACK_KB)
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1123,7 +1128,9 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     text, kb = await open_signals_view(ws, update.effective_user.id)
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+    rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML,
+                                     reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1132,13 +1139,15 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     sig = await db.get_signal(int(ctx.args[0]))
     if not sig:
-        await update.message.reply_text("Topilmadi.")
+        await update.message.reply_text("Topilmadi.", reply_markup=MENU_BACK_KB)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(update.effective_user.id, ws):
         return
     ok = await db.cancel_signal(sig["id"])
-    await update.message.reply_text("✅ Bekor qilindi." if ok else "Topilmadi yoki allaqachon yopilgan.")
+    await update.message.reply_text(
+        "✅ Bekor qilindi." if ok else "Topilmadi yoki allaqachon yopilgan.",
+        reply_markup=MENU_BACK_KB)
 
 
 async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1159,7 +1168,7 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
             "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
             "foyda/zarar hisoblanadi.",
-            parse_mode=ParseMode.HTML)
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
     amount = _parse_price(ctx.args[0])
@@ -1168,7 +1177,7 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await db.set_deposit(ws["id"], amount)
     await update.message.reply_text(f"✅ Depozit yangilandi: <b>{amount:,.2f}</b>",
-                                     parse_mode=ParseMode.HTML)
+                                     parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────
@@ -1176,6 +1185,20 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    await app.bot.set_my_commands([
+        ("start", "Bosh menyu"),
+        ("new", "Yangi signal (sehrgar)"),
+        ("stats", "Statistika"),
+        ("symbols", "Juftliklar"),
+        ("open", "Ochiq signallar"),
+        ("equity", "Equity grafigi"),
+        ("month", "Oylik natijalar"),
+        ("year", "Yillik natijalar"),
+        ("depozit", "Depozitni ko'rish/belgilash"),
+        ("cancel", "Signalni bekor qilish (masalan: /cancel 12)"),
+        ("setup", "Guruhni ro'yxatdan o'tkazish (faqat guruhda)"),
+        ("bekor", "Joriy amalni bekor qilish"),
+    ])
 
 
 async def post_shutdown(app: Application) -> None:
