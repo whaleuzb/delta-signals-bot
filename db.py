@@ -80,6 +80,10 @@ CREATE INDEX IF NOT EXISTS idx_signals_workspace ON signals(workspace_id);
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS deposit NUMERIC;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS alloc_amount NUMERIC;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS deposit_snapshot NUMERIC;
+
+-- 'crypto' (MEXC, exchange.py) | 'forex' (Twelve Data, forex.py) — tracker.py
+-- shunga qarab qaysi narx manbasidan shamlarni olishni tanlaydi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'crypto';
 """
 
 
@@ -162,14 +166,15 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
 async def create_signal(workspace_id: int, d: dict) -> int:
     q = """
     INSERT INTO signals (workspace_id, symbol, side, entry, sl, sl_initial, tps,
-                         chart_file_id, author_id, note)
-    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9) RETURNING id
+                         chart_file_id, author_id, note, market)
+    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10) RETURNING id
     """
     async with pool().acquire() as c:
         return await c.fetchval(
             q, workspace_id, d["symbol"], d["side"], _d(d["entry"]), _d(d["sl"]),
             [_d(t) for t in d["tps"]],
             d.get("chart_file_id"), d.get("author_id"), d.get("note"),
+            d.get("market", "crypto"),
         )
 
 

@@ -10,8 +10,14 @@ from datetime import datetime, timedelta, timezone
 import config
 import db
 import exchange
+import forex
 
 log = logging.getLogger(__name__)
+
+
+def provider(market: str):
+    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
+    return forex if market == "forex" else exchange
 
 
 def allocation(n: int) -> list[float]:
@@ -47,7 +53,7 @@ async def process(sig) -> list[dict]:
     ambiguous = sig["ambiguous"]
 
     start_ms = sig["last_checked_ms"] or int(sig["created_at"].timestamp() * 1000)
-    candles = await exchange.klines(symbol, start_ms + 1)
+    candles = await provider(sig["market"]).klines(symbol, start_ms + 1)
     if not candles:
         return []
 
@@ -170,7 +176,7 @@ async def close_now(sig_id: int) -> dict | None:
                 "symbol": sig["symbol"], "status": "CANCELLED", "pnl": None, "r": None,
                 "price": None}
 
-    price = await exchange.last_price(sig["symbol"])
+    price = await provider(sig["market"]).last_price(sig["symbol"])
     if not price:
         return None
 

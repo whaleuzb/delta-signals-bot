@@ -4,7 +4,8 @@ Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasi
 yurituvchi bot. Delta Community uchun.
 
 **Stack:** Python 3.11+ · python-telegram-bot 21 · asyncpg + Railway PostgreSQL ·
-MEXC Spot public API · matplotlib · Claude vision (ixtiyoriy)
+MEXC Spot public API (kripto) · Twelve Data (forex, ixtiyoriy) · matplotlib ·
+Claude vision (ixtiyoriy)
 
 > Avval Binance USDⓈ-M Futures ishlatilgan, lekin Railway serveri joylashgan
 > hududni Binance 451 (huquqiy sabab) bilan bloklagani uchun MEXC Spot'ga
@@ -22,7 +23,8 @@ ajratish mumkin, lekin hozirgi hajmda kerak emas.
 |---|---|
 | `config.py` | barcha env o'zgaruvchilar va savdo qoidalari |
 | `db.py` | schema, pool, so'rovlar, statistika SQL |
-| `exchange.py` | MEXC klines/exchangeInfo, symbol normalizatsiya |
+| `exchange.py` | MEXC klines/exchangeInfo, symbol normalizatsiya (kripto) |
+| `forex.py` | Twelve Data klines/forex_pairs, symbol normalizatsiya (forex, ixtiyoriy) |
 | `parsing.py` | caption matnidan darajalarni o'qish + validatsiya |
 | `vision.py` | caption bo'lmasa grafik rasmidan o'qish (Claude tool use) |
 | `tracker.py` | **asosiy dvigatel** — shamlarni qayta o'ynatib TP/SL aniqlaydi |
@@ -157,6 +159,33 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       yoki `real_pnl_money` `None` bo'lsa) — eski, faqat-foizli statistika ishlayveradi,
       hech narsa buzilmaydi. To'liq ixtiyoriy, orqaga mos (backward-compatible) qatlam.
 
+14. **Forex — `forex.py` (Twelve Data), `signals.market` orqali kripto'dan ajratiladi.**
+    `exchange.py` (MEXC) faqat kripto beradi — forex/metallar (EURUSD, XAUUSD va h.k.)
+    uchun butunlay boshqa manba kerak bo'ldi.
+    - `tracker.py`'dagi `provider(market)` / `bot.py`'dagi `provider_for(market)` —
+      `market == 'forex'` bo'lsa `forex` modulini, aks holda `exchange` (MEXC) ni
+      qaytaradi. Ikkala modul bir xil interfeys beradi: `resolve()`, `klines()`,
+      `last_price()`, `close()`, bir xil `Candle` shakli — shu sabab `process()`,
+      `close_now()` va bot.py'dagi barcha narx so'rovlari faqat provider tanlashni
+      almashtirdi, ichki mantiq (shamlarni qayta o'ynatish, TP/SL, R) O'ZGARMADI.
+    - **Bozor avtomatik aniqlanadi, admin tanlamaydi**: avval `exchange.resolve()`
+      (kripto, MEXC/USDT juftlik) sinaladi, topilmasa `forex.resolve()` (Twelve
+      Data'ning `/forex_pairs` ro'yxati) sinaladi. Kripto juftliklar doim `USDT` bilan
+      tugagani uchun (`config.QUOTE`) va forex kodlari (EURUSD, XAUUSD) undan farqli
+      bo'lgani uchun to'qnashuv ehtimoli past. Bitta joyda — `show_preview()` —
+      hal qilinadi, `wizard_symbol()` ham xuddi shu tartibni ishlatadi (ikki marta
+      alohida yozilgan, lekin natija bir xil bo'lishi SHART).
+    - `TWELVE_DATA_API_KEY` bo'sh bo'lsa `forex.enabled()` `False` qaytaradi —
+      `forex.resolve()` har doim `None`, demak forex butunlay o'chadi, kripto
+      hech qanday o'zgarishsiz ishlayveradi (`ANTHROPIC_API_KEY` naqshi bilan bir xil).
+    - Forex'da SHORT ochiq savdo — `ALLOW_SHORT` ogohlantirishi faqat kripto uchun
+      (`draft.get("market") != "forex"` tekshiruvi), chunki forex/CFD tabiatan
+      ikki tomonlama, spot-emas cheklovi yo'q.
+    - **Bepul reja limiti**: Twelve Data bepul rejasi daqiqasiga ~8, kuniga ~800
+      so'rov bilan cheklangan. `POLL_SECONDS=45` bilan bir nechta ochiq forex
+      signal parallel bo'lsa bu limitga tez yetish mumkin — hozircha alohida
+      navbat/keshlash qilinmagan (MVP), kerak bo'lsa keyinroq qo'shiladi.
+
 ---
 
 ## Buyruqlar
@@ -176,6 +205,7 @@ Schema `db.init()` da avtomatik yaratiladi.
 
 `BOT_TOKEN` · `DATABASE_URL` · `ADMIN_IDS` — majburiy.
 `ANTHROPIC_API_KEY` — bo'sh bo'lsa vision jim o'chadi, bot ishlayveradi.
+`TWELVE_DATA_API_KEY` — bo'sh bo'lsa forex jim o'chadi, kripto ishlayveradi (#14).
 `CHANNEL_ID`/`CHANNEL_TOPIC_ID` endi YO'Q — har bir guruh o'zini `/setup` bilan
 ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 

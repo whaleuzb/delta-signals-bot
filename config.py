@@ -22,6 +22,10 @@ VISION_MODEL = os.getenv("VISION_MODEL", "claude-sonnet-5")
 EXCHANGE_BASE = os.getenv("EXCHANGE_BASE", "https://api.mexc.com")
 QUOTE = "USDT"
 
+# --- Forex (Twelve Data). Bo'sh bo'lsa forex signal kiritish o'chadi, kripto
+#     (yuqoridagi MEXC) ta'sirlanmaydi ---
+TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
+
 # --- Kuzatuv ---
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "45"))
 EXPIRE_DAYS = int(os.getenv("EXPIRE_DAYS", "7"))  # entryga tegmagan signal shuncha kundan keyin bekor

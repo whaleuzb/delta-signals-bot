@@ -21,6 +21,7 @@ from telegram.ext import (
 import config
 import db
 import exchange
+import forex
 import parsing
 import stats
 import tracker
@@ -212,6 +213,11 @@ async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await send_workspace_switcher(update, ctx)
 
 
+def provider_for(market: str):
+    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
+    return forex if market == "forex" else exchange
+
+
 def fmt_price(x: float) -> str:
     if x >= 1000:
         return f"{x:,.2f}".rstrip("0").rstrip(".")
@@ -226,7 +232,8 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
     reward = abs(tps[-1] - e) / e * 100
     rr = reward / risk if risk else 0
     arrow = "🟢 LONG" if d["side"] == "LONG" else "🔴 SHORT"
-    head = f"📊 <b>#{d['symbol']}</b>  {arrow}"
+    tag = "💱 " if d.get("market") == "forex" else ""
+    head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
     if sig_id:
         head += f"  <code>#{sig_id}</code>"
     lines = [head, "", f"Kirish: <b>{fmt_price(e)}</b>"]
@@ -269,7 +276,7 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
     kb_rows = []
     manage = can_manage(uid, ws)
     for s in rows:
-        price = await exchange.last_price(s["symbol"])
+        price = await provider_for(s["market"]).last_price(s["symbol"])
         cur = ""
         if price:
             p = tracker.pnl_at(s["side"], float(s["entry"]), price)
@@ -302,7 +309,7 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     if sig["status"] == "PENDING":
         text = f"#{sig_id} {sig['symbol']} hali entryga tegmagan. Bekor qilinsinmi?"
     else:
-        price = await exchange.last_price(sig["symbol"])
+        price = await provider_for(sig["market"]).last_price(sig["symbol"])
         est_txt = ""
         if price:
             entry = float(sig["entry"])
@@ -636,12 +643,18 @@ async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> i
 async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
     raw = (msg.text or "").strip()
+    market = "crypto"
     sym = await exchange.resolve(raw)
+    if not sym and forex.enabled():
+        sym = await forex.resolve(raw)
+        if sym:
+            market = "forex"
     if not sym:
-        await msg.reply_text(f"❌ <code>{raw}</code> MEXC'da topilmadi. Qayta yozing:",
+        await msg.reply_text(f"❌ <code>{raw}</code> topilmadi (kripto yoki forex). Qayta yozing:",
                              parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
         return WIZ_SYMBOL
     ctx.user_data["wiz"]["symbol"] = sym
+    ctx.user_data["wiz"]["market"] = market
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
          InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
@@ -695,7 +708,7 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return WIZ_SL
     wiz = ctx.user_data.pop("wiz")
     draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
-             "sl": sl, "tps": wiz["tps"]}
+             "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto")}
     await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard", wiz["workspace_id"])
     return ConversationHandler.END
 
@@ -805,14 +818,20 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
                         token: str | None = None) -> None:
+    market = "crypto"
     sym = await exchange.resolve(draft["symbol"])
+    if not sym and forex.enabled():
+        sym = await forex.resolve(draft["symbol"])
+        if sym:
+            market = "forex"
     if not sym:
         await msg.reply_text(
-            f"❌ <code>{draft['symbol']}</code> MEXC'da topilmadi.",
+            f"❌ <code>{draft['symbol']}</code> topilmadi (kripto yoki forex).",
             parse_mode=ParseMode.HTML,
         )
         return
     draft["symbol"] = sym
+    draft["market"] = market
 
     err = parsing.validate(draft)
     if err:
@@ -820,7 +839,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         return
 
     warn = []
-    if draft["side"] == "SHORT" and not config.ALLOW_SHORT:
+    if draft["side"] == "SHORT" and not config.ALLOW_SHORT and market != "forex":
         warn.append("⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.")
     if source == "vision":
         conf = draft.get("confidence", 0)
@@ -828,7 +847,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         if draft.get("reasoning"):
             warn.append(f"<i>{draft['reasoning']}</i>")
 
-    price = await exchange.last_price(sym)
+    price = await provider_for(market).last_price(sym)
     if price:
         d = (price - draft["entry"]) / draft["entry"] * 100
         warn.append(f"Joriy narx: <b>{fmt_price(price)}</b> (entrydan {d:+.2f}%)")
@@ -885,6 +904,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
         "sl": d["sl"], "tps": d["tps"], "chart_file_id": item["file_id"],
         "author_id": q.from_user.id, "note": d.get("reasoning"),
+        "market": d.get("market", "crypto"),
     })
     PENDING.pop(token, None)
     await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
@@ -1164,6 +1184,7 @@ async def post_init(app: Application) -> None:
 
 async def post_shutdown(app: Application) -> None:
     await exchange.close()
+    await forex.close()
 
 
 async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:

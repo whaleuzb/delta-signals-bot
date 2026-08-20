@@ -1,7 +1,9 @@
 # Trade Controller
 
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
-yurituvchi bot. Narx manbasi — **MEXC Spot**, hisob-kitob esa **spot (1x)**.
+yurituvchi bot. Narx manbasi — kripto uchun **MEXC Spot**, forex/metallar uchun
+**Twelve Data** (ixtiyoriy, `TWELVE_DATA_API_KEY` bo'lsa yoqiladi). Signal kiritishda
+qaysi bozor ekani avtomatik aniqlanadi — alohida tanlash shart emas.
 
 Multi-tenant: bitta bot bir nechta mustaqil **workspace**ga xizmat qiladi — istalgan
 yopiq guruh o'zini `/setup` bilan ro'yxatdan o'tkazib, o'z admini boshqaradigan alohida
