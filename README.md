@@ -65,6 +65,13 @@ Ikkalasi ham saqlanadi. Foiz obunachilarga tushunarli, R esa signal sifatini
 haqqoniy ko'rsatadi — 20 ta signalda +50% ko'rsatib, aslida riskni 3 barobar
 oshirgan bo'lish mumkin.
 
+**"Jami natija" pozitsiya hajmiga qarab hisoblanadi.**
+Depozit (`/depozit`) belgilangan bo'lsa, har bir signal necha pul bilan
+kirilgani (`alloc_amount`) bo'yicha depozitga nisbatan tortiladi — signal
++30% ko'rsatgani depozitning +30% o'sishini anglatmaydi, agar shu savdoga
+depozitning faqat bir qismi ishlatilgan bo'lsa. Depozit belgilanmagan
+workspace'larda — eski, pozitsiya hajmisiz narx-harakati foizi ko'rsatiladi.
+
 ---
 
 ## Railway'ga deploy

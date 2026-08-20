@@ -573,10 +573,9 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text(await stats_view_text(ws, q.from_user.id, "all"), parse_mode=ParseMode.HTML,
                                     reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
-        now = datetime.now(stats.TZ)
-        text = await symbols_view_text(ws["id"], now.year, now.month)
+        text = await symbols_view_text(ws["id"], None, None)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=symbols_nav_kb(now.year, now.month))
+                                    reply_markup=symbols_nav_kb(None, None))
     elif action == "open":
         text, kb = await open_signals_view(ws, q.from_user.id)
         rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
@@ -1302,10 +1301,9 @@ async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    now = datetime.now(stats.TZ)
-    text = await symbols_view_text(ws["id"], now.year, now.month)
+    text = await symbols_view_text(ws["id"], None, None)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                     reply_markup=symbols_nav_kb(now.year, now.month))
+                                     reply_markup=symbols_nav_kb(None, None))
 
 
 async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

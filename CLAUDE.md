@@ -314,6 +314,49 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - Xabar yo'nalishi `poll_job` bilan bir xil: guruh workspace bo'lsa signal
       postiga reply, shaxsiy workspace bo'lsa egasiga DM.
 
+21. **Statistika: pozitsiya hajmiga (real pul) qarab hisoblanadigan "Jami natija"/
+    "Kompaund" + jarayondagi pozitsiyalar hisobotda ko'rinishi.**
+    - **Muammo edi:** `/stats`dagi "Jami foiz"/"Kompaund" har bir yopilgan
+      signalni xuddi BUTUN depozit o'sha savdoga kirgandek hisoblar edi (raw
+      `pnl_pct`larni to'g'ridan-to'g'ri yig'ish/kompaundlash) — shuning uchun
+      +210%/+437% kabi haqiqatdan uzoq, shishirilgan raqamlar chiqardi.
+      Position sizing (`alloc_amount` — signalga necha pul ishlatilgani)
+      butunlay hisobga olinmas edi.
+    - **Yechim:** `deposit` belgilangan bo'lsa, har bir signal endi
+      `pnl_pct * alloc_amount / deposit` — ya'ni o'sha savdo DEPOZITNING necha
+      foizini harakatlantirgani bo'yicha tortiladi (`stats.summary()`).
+      "Jami natija" — shu tortilgan foizlar yig'indisi, "Kompaund" — shularni
+      ketma-ket kompaundlash (`_compound()` xuddi shu tortilgan ro'yxatga
+      qo'llanadi). `deposit` belgilanmagan workspace'larda eski (raw,
+      pozitsiya hajmisiz) hisob saqlanib qoladi — hech narsa buzilmaydi.
+      Winrate o'zgarmadi (g'alaba/mag'lubiyat belgisi pozitsiya hajmidan
+      qat'i nazar bir xil).
+    - `alloc_amount` yo'q signallar tortilgan ro'yxatdan chetda qoladi (lekin
+      Signallar/Winrate sonига kiraveradi). Mamurjonning "Whales Uzb"
+      guruhida (workspace id=1, 1101182189 egalik qiladi) 14 ta eski yopilgan
+      signalda `alloc_amount` yo'q edi — foydalanuvchining aniq so'rovi bilan
+      bir martalik skript orqali har biriga 2500 dan belgilandi (faqat shu
+      foydalanuvchining guruhiga tegdi, boshqa tenant'larga tegilmadi).
+    - `db.equity_series()` endi `since`/`until` qabul qiladi (avval doim
+      BUTUN tarixni qaytarardi — shuning uchun `/month`/`/yil`da "Jami foiz"
+      to'g'ri davrga mos kelsa ham "Kompaund" sirli ravishda har doim
+      ALL-TIME edi, alohida latent xato). `equity_chart()` esa hali ham
+      argumentsiz chaqiradi (grafik har doim to'liq tarixni ko'rsatishi
+      kerak — o'zgarmadi).
+    - **Yangi: jarayondagi (ochiq) pozitsiyalar `/stats`da ham ko'rinadi**
+      (`stats._open_summary()`) — foydalanuvchi "nega guruhda ko'proq signal
+      bor-ku, hisobotda faqat yopilganlar ko'rinadi" deb chalkashgani uchun.
+      🕐 kutilayotgan (PENDING) soni va ⏳ ochiq (ACTIVE) pozitsiyalarning
+      joriy (unrealized) foizi/puli — xuddi yopilganlar kabi `alloc_amount`ga
+      tortilgan holda. Faqat davr "joriy"ga tegishli bo'lsa ko'rinadi (o'tgan
+      oy/yil hisobotida yo'q — chunki ochiq pozitsiya hali qaysi davrga
+      tegishli ekani noaniq).
+    - **`/symbols` standart davri `/stats` bilan mos qilindi** — avval
+      `/symbols` standart holatda JORIY OYni, `/stats` esa BUTUN DAVRni
+      ko'rsatardi (`cmd_symbols()`/`on_menu()`'s "symbols" tarmog'i). Ikkala
+      bo'lim solishtirilganda "mos kelmayapti" degan taassurot shundan edi —
+      endi ikkalasi ham "Barchasi" bilan boshlanadi.
+
 ---
 
 ## Buyruqlar

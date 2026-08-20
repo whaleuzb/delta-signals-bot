@@ -384,13 +384,20 @@ async def monthly_breakdown(workspace_id: int, limit: int = 12) -> list[asyncpg.
         return await c.fetch(q, workspace_id, limit)
 
 
-async def equity_series(workspace_id: int) -> list[asyncpg.Record]:
+async def equity_series(workspace_id: int, since=None, until=None) -> list[asyncpg.Record]:
+    """since/until berilmasa — butun davr (equity_chart() shunday chaqiradi,
+    grafik har doim to'liq tarixni ko'rsatadi). summary() esa davrga mos
+    kesib beradi — shu tufayli Kompaund ham tanlangan davrga mos keladi.
+    alloc_amount ham qaytariladi — real (pul bilan tortilgan) kompaund uchun."""
+    q = f"""
+    SELECT closed_at, pnl_pct, alloc_amount FROM signals
+    WHERE workspace_id=$1 AND status IN {CLOSED}
+      AND ($2::timestamptz IS NULL OR closed_at >= $2)
+      AND ($3::timestamptz IS NULL OR closed_at <  $3)
+    ORDER BY closed_at
+    """
     async with pool().acquire() as c:
-        return await c.fetch(
-            f"SELECT closed_at, pnl_pct FROM signals "
-            f"WHERE workspace_id=$1 AND status IN {CLOSED} ORDER BY closed_at",
-            workspace_id,
-        )
+        return await c.fetch(q, workspace_id, since, until)
 
 
 async def top_symbols(workspace_id: int, since=None, until=None,

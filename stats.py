@@ -32,43 +32,104 @@ def _compound(pcts: list[float]) -> float:
     return (eq - 1) * 100
 
 
+async def _open_summary(workspace_id: int, deposit, show_money: bool) -> str | None:
+    """Hali yopilmagan (PENDING/ACTIVE) pozitsiyalar qisqacha holati — /symbols'dagi
+    kabi hisobot davri "joriy"ga tegishli bo'lsa summary() shuni ham qo'shadi,
+    aks holda foydalanuvchi "nega ochiq pozitsiyalar hisobotda yo'q" deb
+    chalkashishi mumkin edi."""
+    rows = await db.live_signals(workspace_id)
+    pending = [r for r in rows if r["status"] == "PENDING"]
+    active = [r for r in rows if r["status"] == "ACTIVE"]
+    if not pending and not active:
+        return None
+
+    lines = ["<b>Jarayondagi pozitsiyalar</b>"]
+    if pending:
+        lines.append(f"🕐 Kutilmoqda: <b>{len(pending)}</b> ta (hali limitga yetmagan)")
+
+    if active:
+        live_sum_pct = 0.0
+        live_money = 0.0
+        live_count = 0
+        for r in active:
+            price = await _provider(r["market"]).last_price(r["symbol"])
+            if price is None:
+                continue
+            pnl = tracker.pnl_at(r["side"], float(r["entry"]), price)
+            live_count += 1
+            if deposit and r["alloc_amount"] is not None:
+                live_money += pnl / 100 * float(r["alloc_amount"])
+                live_sum_pct += pnl * float(r["alloc_amount"]) / float(deposit)
+
+        if not live_count:
+            lines.append(f"⏳ Jarayonda: <b>{len(active)}</b> ta ochiq (narx olinmadi)")
+        elif deposit:
+            txt = f"⏳ Jarayonda: <b>{live_count}</b> ta ochiq — joriy: <b>{live_sum_pct:+.2f}%</b>"
+            if show_money:
+                txt += f"  ({live_money:+,.2f})"
+            lines.append(txt)
+        else:
+            lines.append(f"⏳ Jarayonda: <b>{live_count}</b> ta ochiq "
+                          f"(joriy foiz uchun /depozit belgilang)")
+
+    return "\n".join(lines)
+
+
 async def summary(workspace_id: int, since=None, until=None, title="Umumiy statistika",
                    deposit=None, show_money: bool = True) -> str:
-    """deposit — workspace'ning joriy umumiy depoziti (bo'lsa, real pul/pozitsiya
-    hajmiga bog'liq natija ham chiqadi). show_money — real summani ko'rsatish
-    kerakmi (guruh a'zolariga faqat foiz, admin/shaxsiy egasiga pul ham)."""
+    """deposit — workspace'ning joriy umumiy depoziti. Bo'lsa, "Jami natija"/
+    "Kompaund" har bir signalning haqiqiy pozitsiya hajmiga (alloc_amount)
+    qarab depozitga nisbatan hisoblanadi — narx harakati foizi emas, depozitning
+    necha foizga o'sgani ko'rsatiladi (aks holda har savdo butun depozit bilan
+    kirilgandek hisoblanib, natija sun'iy shishib ketardi). Deposit
+    belgilanmagan bo'lsa — eski, pozitsiya hajmisiz (raw) narx-harakati foizi
+    ko'rsatiladi. show_money — real summani ko'rsatish kerakmi (guruh
+    a'zolariga faqat foiz, admin/shaxsiy egasiga pul ham)."""
     s = await db.period_stats(workspace_id, since, until)
+    show_open = since is None or until is None or until > datetime.now(timezone.utc)
+
     if not s or s["total"] == 0:
-        return f"<b>{title}</b>\n\nHali yopilgan signal yo'q."
+        t = [f"<b>{title}</b>", "", "Hali yopilgan signal yo'q."]
+    else:
+        total = s["total"]
+        wr = s["wins"] / total * 100
+        pf = None
+        if s["avg_loss"] and s["losses"]:
+            gross_win = float(s["avg_win"]) * s["wins"]
+            gross_loss = abs(float(s["avg_loss"])) * s["losses"]
+            pf = gross_win / gross_loss if gross_loss else None
 
-    total = s["total"]
-    wr = s["wins"] / total * 100
-    pf = None
-    if s["avg_loss"] and s["losses"]:
-        gross_win = float(s["avg_win"]) * s["wins"]
-        gross_loss = abs(float(s["avg_loss"])) * s["losses"]
-        pf = gross_win / gross_loss if gross_loss else None
+        rows = await db.equity_series(workspace_id, since, until)
+        weighted = None
+        if deposit:
+            weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
+                        for r in rows
+                        if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
 
-    rows = await db.equity_series(workspace_id)
-    pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
+        t = [f"<b>{title}</b>", ""]
+        t.append(f"Signallar: <b>{total}</b>  ({s['wins']}✅ / {s['losses']}❌ / {s['be']}⚪)")
+        t.append(f"Winrate: <b>{wr:.1f}%</b>")
 
-    t = [f"<b>{title}</b>", ""]
-    t.append(f"Signallar: <b>{total}</b>  ({s['wins']}✅ / {s['losses']}❌ / {s['be']}⚪)")
-    t.append(f"Winrate: <b>{wr:.1f}%</b>")
-    t.append(f"Jami foiz: <b>{float(s['sum_pct']):+.2f}%</b>")
-    t.append(f"Kompaund: <b>{_compound(pcts):+.2f}%</b>")
-    t.append(f"O'rtacha R: <b>{float(s['avg_r']):+.2f}R</b>   |   Jami: <b>{float(s['sum_r']):+.1f}R</b>")
-    t.append(f"O'rt. foyda: {float(s['avg_win']):+.2f}%   |   O'rt. zarar: {float(s['avg_loss']):+.2f}%")
-    if pf:
-        t.append(f"Profit factor: <b>{pf:.2f}</b>")
-
-    if deposit and s["real_pnl_money"] is not None:
-        real_money = float(s["real_pnl_money"])
-        real_pct = real_money / float(deposit) * 100
-        if show_money:
-            t.append(f"💰 Real natija: <b>{real_money:+,.2f}</b>  ({real_pct:+.2f}% depozitdan)")
+        if weighted:
+            real_sum_pct = sum(weighted)
+            t.append(f"Jami natija (depozitga nisbatan): <b>{real_sum_pct:+.2f}%</b>")
+            t.append(f"Kompaund: <b>{_compound(weighted):+.2f}%</b>")
+            if show_money and s["real_pnl_money"] is not None:
+                t.append(f"💰 Real natija: <b>{float(s['real_pnl_money']):+,.2f}</b>")
         else:
-            t.append(f"💰 Real natija: <b>{real_pct:+.2f}%</b> depozitdan")
+            pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
+            t.append(f"Jami foiz (pozitsiya hajmisiz): <b>{float(s['sum_pct']):+.2f}%</b>")
+            t.append(f"Kompaund: <b>{_compound(pcts):+.2f}%</b>")
+
+        t.append(f"O'rtacha R: <b>{float(s['avg_r']):+.2f}R</b>   |   Jami: <b>{float(s['sum_r']):+.1f}R</b>")
+        t.append(f"O'rt. foyda: {float(s['avg_win']):+.2f}%   |   O'rt. zarar: {float(s['avg_loss']):+.2f}%")
+        if pf:
+            t.append(f"Profit factor: <b>{pf:.2f}</b>")
+
+    if show_open:
+        open_txt = await _open_summary(workspace_id, deposit, show_money)
+        if open_txt:
+            t += ["", open_txt]
 
     return "\n".join(t)
 
