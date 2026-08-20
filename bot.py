@@ -1176,10 +1176,6 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
-    try:
-        await app.bot.set_my_name("Trade Controller")
-    except Exception:
-        log.exception("Bot nomini o'rnatib bo'lmadi")
 
 
 async def post_shutdown(app: Application) -> None:
