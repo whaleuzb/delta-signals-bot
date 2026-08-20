@@ -124,6 +124,25 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_link TEXT;
 -- yuborilishi uchun oxirgi xabar qilingan bosqich (ishorali, 5 ga karrali:
 -- 0, 5, 10, -5, -10, ...). milestone_job() shu ustunni yangilaydi.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS milestone_pct INT NOT NULL DEFAULT 0;
+
+-- /top global reyting moderatsiyasi: guruh egasining `public=TRUE` xohishi
+-- yetarli emas, super-admin ham tasdiqlashi kerak (ikkalasi ham TRUE bo'lsagina
+-- reytingda ko'rinadi). Sabab: reytingdagi guruh nomi va /havola havolasi
+-- BARCHA bot foydalanuvchilariga ko'rinadi — moderatsiyasiz bu fishing uchun
+-- ishlatilishi mumkin edi.
+-- DO bloki ataylab: ustun BIRINCHI marta yaratilgandagina eski `public=TRUE`
+-- guruhlar avtomatik tasdiqlangan deb belgilanadi (ular allaqachon reytingda
+-- edi — migratsiya ularni jimgina yo'qotmasligi kerak). MIGRATE har ishga
+-- tushishda qayta bajariladi, shuning uchun oddiy UPDATE bo'lsa RAD ETILGAN
+-- guruhlarni har restartda qayta tasdiqlab yuborardi.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'workspaces' AND column_name = 'public_approved') THEN
+        ALTER TABLE workspaces ADD COLUMN public_approved BOOLEAN NOT NULL DEFAULT FALSE;
+        UPDATE workspaces SET public_approved = TRUE WHERE public = TRUE;
+    END IF;
+END $$;
 """
 
 
@@ -247,9 +266,28 @@ async def set_public(workspace_id: int, public: bool) -> None:
 
 
 async def set_invite_link(workspace_id: int, link: str | None) -> None:
+    """Havola o'zgarsa /top tasdig'i BEKOR qilinadi. Aks holda moderatsiya
+    ma'nosiz bo'lardi: guruh zararsiz havola bilan tasdiqlanib, keyin uni
+    fishing havolasiga almashtirib qo'yishi mumkin edi."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE workspaces SET invite_link=$2 WHERE id=$1", workspace_id, link)
+            "UPDATE workspaces SET invite_link=$2, "
+            "public_approved = (public_approved AND invite_link IS NOT DISTINCT FROM $2) "
+            "WHERE id=$1", workspace_id, link)
+
+
+async def set_public_approved(workspace_id: int, approved: bool) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET public_approved=$2 WHERE id=$1", workspace_id, approved)
+
+
+async def list_pending_public() -> list[asyncpg.Record]:
+    """Egasi /top ga chiqishni so'ragan, lekin hali tasdiqlanmagan guruhlar."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM workspaces WHERE type='group' AND public = TRUE "
+            "AND public_approved = FALSE ORDER BY id")
 
 
 # ─────────────────────────── Referrallar ───────────────────────────
@@ -450,7 +488,8 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
            COALESCE(SUM(s.pnl_pct), 0) AS sum_pct
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
-    WHERE w.type = 'group' AND w.public = TRUE AND s.status IN {CLOSED}
+    WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
+      AND s.status IN {CLOSED}
       AND s.closed_at >= $1 AND s.closed_at < $2
     GROUP BY w.id, w.name, w.invite_link
     ORDER BY sum_pct DESC

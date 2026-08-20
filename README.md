@@ -150,7 +150,7 @@ tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
 | `/new` | signal kiritish sehrgari (bosqichma-bosqich) |
 | `/depozit [summa]` | (admin/egasi) umumiy kapitalni ko'rish yoki belgilash — real pul/pozitsiya hajmiga bog'liq natija shundan hisoblanadi |
 | `/top` | joriy oydagi eng yaxshi (ochiq) guruhlar reytingi |
-| `/public on\|off` | (admin/egasi) guruhni /top reytingida ko'rsatish/yashirish |
+| `/public on\|off` | (admin/egasi) guruhni /top reytingiga so'rov yuborish/olib tashlash — moderator tasdig'idan keyin ko'rinadi |
 | `/havola <link>\|off` | (admin/egasi) guruhning taklif havolasi — /top da guruh nomi shunga link bo'ladi |
 | `/taklif` | do'stlaringizni taklif qilish uchun shaxsiy havola |
 

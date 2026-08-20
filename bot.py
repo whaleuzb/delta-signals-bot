@@ -1413,7 +1413,12 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if not ctx.args:
-        cur = "yoqilgan ✅" if ws["public"] else "o'chirilgan 🔒"
+        if not ws["public"]:
+            cur = "o'chirilgan 🔒"
+        elif ws["public_approved"]:
+            cur = "yoqilgan ✅"
+        else:
+            cur = "tasdiqlanishi kutilmoqda ⏳"
         await update.message.reply_text(
             f"\"{html.escape(ws['name'])}\" guruhingizning <code>/top</code> reytingida "
             f"ko'rinishi: <b>{cur}</b>\n\n"
@@ -1425,13 +1430,96 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if arg not in ("on", "off"):
         await update.message.reply_text("Foydalanish: /public on  yoki  /public off")
         return
-    await db.set_public(ws["id"], arg == "on")
-    if arg == "on":
-        await update.message.reply_text(
-            "✅ Guruhingiz endi /top reytingida ko'rinadi.", reply_markup=MENU_BACK_KB)
-    else:
+
+    if arg == "off":
+        await db.set_public(ws["id"], False)
         await update.message.reply_text(
             "🔒 Guruhingiz reytingdan olib tashlandi.", reply_markup=MENU_BACK_KB)
+        return
+
+    await db.set_public(ws["id"], True)
+    if ws["public_approved"]:
+        await update.message.reply_text(
+            "✅ Guruhingiz endi /top reytingida ko'rinadi.", reply_markup=MENU_BACK_KB)
+        return
+    await request_public_approval(ctx, ws["id"])
+    await update.message.reply_text(
+        "⏳ So'rov yuborildi. Guruhingiz moderator tasdig'idan keyin "
+        "<code>/top</code> reytingida ko'rinadi — tayyor bo'lganda xabar beramiz.",
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+
+
+# ── /top moderatsiyasi (reytingdagi guruh nomi va havolasi hammaga ko'rinadi) ──
+
+async def request_public_approval(ctx: ContextTypes.DEFAULT_TYPE, wid: int) -> None:
+    """Super-adminlarga tasdiq so'rovini yuboradi."""
+    ws = await db.get_workspace(wid)
+    if not ws:
+        return
+    link = ws["invite_link"] or "— (belgilanmagan)"
+    txt = ("🛡 <b>/top reytingiga so'rov</b>\n\n"
+           f"Guruh: <b>{html.escape(ws['name'])}</b>\n"
+           f"Havola: <code>{html.escape(link)}</code>\n\n"
+           "Tasdiqlansa, bu nom va havola BARCHA bot foydalanuvchilariga ko'rinadi.")
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"pubok:{wid}"),
+        InlineKeyboardButton("🚫 Rad etish", callback_data=f"pubno:{wid}"),
+    ]])
+    for admin_id in config.ADMIN_IDS:
+        try:
+            await ctx.bot.send_message(admin_id, txt, parse_mode=ParseMode.HTML,
+                                        reply_markup=kb)
+        except Exception:
+            log.exception("Tasdiq so'rovi yuborilmadi (admin=%s)", admin_id)
+
+
+async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    if not is_admin(q.from_user.id):
+        return
+    action, _, raw = q.data.partition(":")
+    ws = await db.get_workspace(int(raw))
+    if not ws:
+        await q.edit_message_text("Workspace topilmadi.")
+        return
+
+    approved = action == "pubok"
+    await db.set_public_approved(ws["id"], approved)
+    if not approved:
+        await db.set_public(ws["id"], False)
+
+    name = html.escape(ws["name"])
+    await q.edit_message_text(
+        (f"✅ <b>{name}</b> tasdiqlandi — reytingda ko'rinadi."
+         if approved else
+         f"🚫 <b>{name}</b> rad etildi — reytingga chiqmaydi."),
+        parse_mode=ParseMode.HTML)
+
+    try:
+        await ctx.bot.send_message(
+            ws["owner_id"],
+            ("✅ Guruhingiz <code>/top</code> reytingida ko'rina boshladi."
+             if approved else
+             "🚫 Guruhingiz <code>/top</code> reytingiga qo'shilmadi. "
+             "Guruh nomi yoki havolasini to'g'rilab, qayta urinib ko'ring."),
+            parse_mode=ParseMode.HTML)
+    except Exception:
+        log.exception("Egaga qaror yuborilmadi (ws=%s)", ws["id"])
+
+
+async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Super-admin: tasdiq kutayotgan guruhlar ro'yxati."""
+    if not is_admin(update.effective_user.id):
+        return
+    rows = await db.list_pending_public()
+    if not rows:
+        await update.message.reply_text("Tasdiq kutayotgan guruh yo'q. ✅",
+                                         reply_markup=MENU_BACK_KB)
+        return
+    await update.message.reply_text(f"Tasdiq kutmoqda: {len(rows)} ta")
+    for ws in rows:
+        await request_public_approval(ctx, ws["id"])
 
 
 async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1466,10 +1554,19 @@ async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not arg.startswith(("http://", "https://")):
         arg = "https://" + arg
+    changed = arg != ws["invite_link"]
     await db.set_invite_link(ws["id"], arg)
-    await update.message.reply_text(
-        f"✅ Taklif havolasi saqlandi:\n<code>{html.escape(arg)}</code>",
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    txt = f"✅ Taklif havolasi saqlandi:\n<code>{html.escape(arg)}</code>"
+
+    # Havola o'zgarsa db.set_invite_link() tasdiqni bekor qiladi — reytingda
+    # turgan guruh yangi havola bilan qayta tasdiqdan o'tishi kerak.
+    if changed and ws["public"] and ws["public_approved"]:
+        await request_public_approval(ctx, ws["id"])
+        txt += ("\n\n⏳ Havola o'zgargani uchun <code>/top</code> reytingidagi "
+                "tasdiq yangilanishi kerak — moderator ko'rib chiqmaguncha "
+                "guruhingiz reytingda ko'rinmaydi.")
+    await update.message.reply_text(txt, parse_mode=ParseMode.HTML,
+                                     reply_markup=MENU_BACK_KB)
 
 
 async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1582,6 +1679,7 @@ def main() -> None:
     app.add_handler(CommandHandler("depozit", cmd_deposit))
     app.add_handler(CommandHandler("public", cmd_public))
     app.add_handler(CommandHandler("havola", cmd_link))
+    app.add_handler(CommandHandler("tasdiq", cmd_pending))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
@@ -1593,6 +1691,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_onboard, pattern=r"^onboard:"))
     app.add_handler(CallbackQueryHandler(on_join_group, pattern=r"^joingroup$"))
     app.add_handler(CallbackQueryHandler(on_view_join, pattern=r"^viewjoin:"))
+    app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))

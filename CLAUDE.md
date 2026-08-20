@@ -449,11 +449,30 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       (fail-closed); `/havola` `http(s)://` bo'lmagan sxemani majburan
       `https://` bilan almashtiradi (`javascript:` zararsizlanadi); repoda
       hardcoded sir yo'q, `.env` gitignore'da.
-    - **Tuzatilmagan, siyosat qarori kutilayotgan** (kod xatosi emas):
-      `/top` global reyting — guruh egasi `/havola` orqali ISTALGAN URL
-      qo'ya oladi va u barcha bot foydalanuvchilariga bosiladigan havola
-      bo'lib ko'rinadi (fishing uchun ishlatilishi mumkin); guruh nomi ham
-      global ko'rinadi. Hozircha moderatsiya yo'q.
+    - `/top` moderatsiyasi — 25-bandda hal qilindi.
+
+25. **`/top` reytingi endi moderatsiyadan o'tadi (super-admin tasdig'i).**
+    - Sabab: reytingdagi guruh nomi va `/havola` havolasi BARCHA bot
+      foydalanuvchilariga ko'rinadi, ya'ni istalgan guruh egasi u yerga
+      fishing havolasini qo'yishi mumkin edi.
+    - `workspaces.public_approved` — egasining `public` xohishidan ALOHIDA
+      ustun. `top_workspaces()` ikkalasini ham talab qiladi. `/public on`
+      endi darhol chiqarmaydi, super-adminlarga tugmali so'rov yuboradi
+      (`pubok:`/`pubno:` — `is_admin()` bilan himoyalangan). Rad etilsa
+      `public` ham FALSE ga qaytariladi. Egaga qaror haqida DM boradi.
+      `/tasdiq` — super-admin uchun kutayotganlar ro'yxati (ataylab
+      `set_my_commands()` ga QO'SHILMAGAN — hammaga ko'rinmasin uchun).
+    - **Eng muhim qism: `db.set_invite_link()` havola o'zgarsa tasdiqni
+      BEKOR qiladi** (`public_approved AND invite_link IS NOT DISTINCT FROM $2`
+      — UPDATE'ning o'ng tomonida ustun ESKI qiymatni beradi). Busiz
+      moderatsiya ma'nosiz bo'lardi: zararsiz havola bilan tasdiqlanib,
+      keyin uni almashtirib qo'yish mumkin edi. Bu chetlab o'tish yo'li
+      haqiqiy Postgres'da test qilib yopilgani tasdiqlandi.
+    - Migratsiya `DO $$ ... $$` bloki ichida: ustun BIRINCHI yaratilganda
+      eski `public=TRUE` guruhlar avtomatik tasdiqlanadi (reytingdan jimgina
+      tushib qolmasliklari uchun). Oddiy `UPDATE` bo'lsa MIGRATE har
+      restartda bajarilgani uchun RAD ETILGAN guruhlarni qayta tasdiqlab
+      yuborardi — bu ham haqiqiy bazada test qilingan.
 
 ---
 
