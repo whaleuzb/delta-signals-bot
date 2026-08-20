@@ -385,6 +385,34 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       hisob — pul yoki indeks, farqi yo'q). `deposit` yo'q workspace'larda —
       eski 100-indeksli, pozitsiya hajmisiz egri chiziq (o'zgarmagan).
 
+23. **Equity grafigi qayta ishlangan: ikkita panel, `twinx` YO'Q.**
+    - Foydalanuvchi bir necha variantdan "har savdo ustunlari + kumulyativ
+      balans" ko'rinishini tanladi, lekin birinchi urinishda ustunlar va
+      balans chizig'i bitta panelda ikkita y o'qi bilan (`ax.twinx()`)
+      chizilgandi. **Bu chalkash edi va shunday qilmaslik kerak:** ikki o'qning
+      nol nuqtasi va masshtabi bir-biriga bog'liq emas, shuning uchun chiziq
+      ustunlar orasidan kesib o'tib, "+1,025 ustun turibdi-yu, chiziq nega
+      pastda?" degan yolg'on taassurot berardi (foydalanuvchi: "pnl nega
+      aralashib ketgan").
+    - Endi ikkita alohida panel, `sharex=True`: YUQORIDA kumulyativ balans
+      (o'z o'lchovida, boshlang'ich punktir chiziq bilan), PASTDA har savdo
+      hissasi (nol chizig'idan yuqori/past). Bir xil x o'qi tufayli qaysi savdo
+      balansni qayerga surgani baribir ko'rinadi, lekin o'lchovlar aralashmaydi.
+    - x o'qi — sana emas, **savdo tartibi** (1..N). Sana bo'lsa ustunlar
+      notekis joylashib bir-birining ustiga chiqib ketardi. Sana oralig'i
+      sarlavha ostidagi qatorda ko'rsatiladi. Yorliq "Signal #" emas, "Savdo
+      tartibi" — chunki bu ketma-ketlik raqami, `signals.id` emas.
+    - Ko'p signalga chidamli: `n > 25` bo'lsa ustun ustidagi raqamlar
+      chiqarilmaydi (ustma-ust tushardi), `n > 20` bo'lsa x belgilari
+      siyraklashtiriladi, kenglik `n`ga qarab o'sadi (maks. 20 dyuym).
+    - Ustma-ust tushishning oldini olish uchun: "cho'qqi" yozuvi faqat oxirgi
+      nuqtadan kamida 3 savdo uzoqda bo'lsa chiqadi, sarlavha va uning ostidagi
+      xulosa qatori `fig.suptitle()` + `fig.text()` bilan alohida y'da turadi
+      (avval bitta `set_title()` ichida bo'lib, matn ustma-ust tushardi).
+    - Drawdown paneli olib tashlandi (o'rniga savdo ustunlari) — lekin
+      **max DD sarlavha ostidagi xulosa qatorida saqlanib qoldi**, ma'lumot
+      yo'qolmasin uchun.
+
 ---
 
 ## Buyruqlar

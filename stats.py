@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
 
 import config
 import db
@@ -15,6 +16,14 @@ import forex
 import tracker
 
 TZ = ZoneInfo(config.TZ)
+
+# Grafik ranglari (bot xabarlaridagi qorong'i mavzuga mos)
+BG = "#0e1117"
+GRID = "#2a2f3a"
+TXT = "#9aa4b2"
+TITLE = "#e6e9ef"
+GREEN = "#26a69a"
+RED = "#ef5350"
 
 
 def _provider(market: str):
@@ -211,81 +220,136 @@ async def symbols_table(workspace_id: int, since=None, until=None,
 
 
 async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
-    """deposit berilsa — egri chiziq REAL pul balansida chiziladi: har savdo
-    xuddi summary()dagi kabi o'z alloc_amount'i bo'yicha depozitga qo'shiladi
-    (pnl_pct ni to'g'ridan-to'g'ri kompaundlash emas — u har savdoni butun
-    depozit bilan kirilgandek hisoblab, egri chiziqni sun'iy shishirar edi).
-    Boshlang'ich balans joriy depozitdan bu davrdagi real natijani ayirib
-    (orqaga qarab) hisoblanadi. deposit yo'q workspace'larda — eski,
-    pozitsiya hajmisiz 100-indeksli egri chiziq (o'zgarmagan)."""
+    """Ikki panelli grafik — YUQORIDA kumulyativ balans, PASTDA har bir savdoning
+    alohida hissasi. Ikkalasi bir xil x o'qini (savdo tartibi) bo'lishadi, lekin
+    har biri o'z o'lchovida — ataylab twinx (ikkita y o'qi bitta panelda)
+    ISHLATILMAYDI: unda ustunlar va chiziqning nol nuqtasi mos kelmay, chiziq
+    ustunlar orasidan kesib o'tib chalkash ko'rinish berardi.
+
+    deposit berilsa — hammasi REAL pulda: har savdo o'z `alloc_amount`i bo'yicha
+    depozitga qo'shiladi (`summary()` bilan bir xil mantiq — `pnl_pct`ni
+    to'g'ridan-to'g'ri kompaundlash emas, u har savdoni butun depozit bilan
+    kirilgandek hisoblab natijani sun'iy shishirardi). Boshlang'ich balans joriy
+    depozitdan shu davrdagi real natijani ayirib (orqaga qarab) topiladi.
+    deposit yo'q bo'lsa — eski, pozitsiya hajmisiz ko'rinish: balans 100 dan
+    boshlanadi, ustunlar esa sof `pnl_pct`."""
     rows = await db.equity_series(workspace_id)
     if len(rows) < 2:
         return None
 
     weighted = deposit is not None
-    dates, eq = [], []
+    n = len(rows)
+    deltas, eq = [], []
 
     if weighted:
         deposit = float(deposit)
-        total_real = sum(
-            float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
-            for r in rows if r["alloc_amount"] is not None)
-        cur = deposit - total_real
-        for r in rows:
-            if r["alloc_amount"] is not None:
-                cur += float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
-            dates.append(r["closed_at"].astimezone(TZ))
+        deltas = [float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
+                  if r["alloc_amount"] is not None else 0.0
+                  for r in rows]
+        cur = deposit - sum(deltas)
+        base = cur
+        for d in deltas:
+            cur += d
             eq.append(cur)
     else:
-        cur = 100.0
+        base = 100.0
+        cur = base
         for r in rows:
+            deltas.append(float(r["pnl_pct"]))
             cur *= (1 + float(r["pnl_pct"]) / 100)
-            dates.append(r["closed_at"].astimezone(TZ))
             eq.append(cur)
 
-    base = eq[0]
-    peak, dd = eq[0], []
+    peak, dd = base, []
     for v in eq:
         peak = max(peak, v)
         dd.append((v - peak) / peak * 100 if peak else 0.0)
-    max_dd = min(dd)
+    max_dd = min(dd + [0.0])
 
-    fig, (ax, ax2) = plt.subplots(
-        2, 1, figsize=(10, 6.5), sharex=True,
-        gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08},
+    x = list(range(1, n + 1))
+    width = max(11.0, min(20.0, 4.0 + 0.62 * n))
+    fig, (axb, axd) = plt.subplots(
+        2, 1, figsize=(width, 8.5), sharex=True,
+        gridspec_kw={"height_ratios": [2.1, 1], "hspace": 0.10},
     )
-    fig.patch.set_facecolor("#0e1117")
-    for a in (ax, ax2):
-        a.set_facecolor("#0e1117")
-        a.grid(color="#2a2f3a", lw=0.6)
-        a.tick_params(colors="#9aa4b2", labelsize=9)
+    fig.patch.set_facecolor(BG)
+    for a in (axb, axd):
+        a.set_facecolor(BG)
+        a.grid(color=GRID, lw=0.6)
+        a.tick_params(colors=TXT, labelsize=11)
         for sp in a.spines.values():
-            sp.set_color("#2a2f3a")
+            sp.set_color(GRID)
 
-    up = eq[-1] >= base
-    col = "#26a69a" if up else "#ef5350"
-    ax.plot(dates, eq, color=col, lw=2)
-    ax.fill_between(dates, base, eq, color=col, alpha=0.15)
-    ax.axhline(base, color="#5a6373", lw=0.8, ls="--")
+    line_col = GREEN if eq[-1] >= base else RED
 
-    if weighted:
-        change_pct = (eq[-1] / base - 1) * 100 if base else 0.0
-        ax.set_ylabel("Balans (depozit)", color="#9aa4b2", fontsize=9)
-        ax.set_title(
-            f"Equity curve  •  {len(eq)} signal  •  {eq[-1] - base:+,.2f}  "
-            f"({change_pct:+.1f}%)  •  max DD {max_dd:.1f}%",
-            color="#e6e9ef", fontsize=12, pad=12,
-        )
+    # ─── Yuqori panel: kumulyativ balans ───
+    axb.plot(x, eq, color=line_col, lw=2.8, marker="o", markersize=6,
+             markerfacecolor=BG, markeredgewidth=2, zorder=3)
+    axb.fill_between(x, base, eq, color=line_col, alpha=0.13, zorder=2)
+    axb.axhline(base, color="#5a6373", lw=1.2, ls="--", zorder=1)
+    axb.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    axb.set_ylabel("Depozit balansi" if weighted else "Balans (boshlanish = 100)",
+                   color=TXT, fontsize=12, labelpad=10)
+    axb.margins(y=0.26)
+
+    axb.annotate(f"boshlang'ich  {base:,.0f}", xy=(n, base),
+                 xytext=(-4, 8), textcoords="offset points",
+                 color=TXT, fontsize=11, ha="right", va="bottom")
+    axb.annotate(f"{eq[-1]:,.0f}", xy=(n, eq[-1]),
+                 xytext=(-6, 16), textcoords="offset points",
+                 color=line_col, fontsize=15, fontweight="bold", ha="right")
+
+    # Cho'qqi yozuvi faqat oxirgi nuqtadan yetarlicha uzoq bo'lsa — aks holda
+    # yakuniy balans yozuvi bilan ustma-ust tushadi.
+    pi = eq.index(max(eq))
+    if n - 1 - pi >= 3:
+        axb.annotate(f"cho'qqi {max(eq):,.0f}", xy=(pi + 1, eq[pi]),
+                     xytext=(0, 13), textcoords="offset points",
+                     color=TXT, fontsize=10, ha="center")
+
+    # ─── Pastki panel: har savdo hissasi ───
+    bars = axd.bar(x, deltas, color=[GREEN if d > 0 else RED for d in deltas],
+                   alpha=0.75, width=0.62, zorder=2)
+    span = (max(deltas) - min(deltas)) or 1.0
+    if n <= 25:  # ko'p bo'lsa yozuvlar bir-biriga tegib ketadi
+        for rect, d in zip(bars, deltas):
+            axd.text(rect.get_x() + rect.get_width() / 2,
+                     rect.get_height() + (span * 0.04 if d >= 0 else -span * 0.04),
+                     f"{d:+,.0f}" if weighted else f"{d:+.1f}%",
+                     ha="center", va="bottom" if d >= 0 else "top",
+                     color=GREEN if d > 0 else RED, fontsize=10.5, fontweight="bold")
+    axd.axhline(0, color="#5a6373", lw=1)
+    axd.set_ylabel("Har savdo (pul)" if weighted else "Har savdo (%)",
+                   color=TXT, fontsize=12, labelpad=10)
+    axd.set_xlabel("Savdo tartibi (eskidan → yangiga)", color=TXT, fontsize=12, labelpad=8)
+    axd.margins(y=0.26)
+    if n <= 20:
+        axd.set_xticks(x)
     else:
-        ax.set_ylabel("Balans (boshlanish = 100)", color="#9aa4b2", fontsize=9)
-        ax.set_title(
-            f"Equity curve  •  {len(eq)} signal  •  {eq[-1] - 100:+.1f}%  •  max DD {max_dd:.1f}%",
-            color="#e6e9ef", fontsize=12, pad=12,
-        )
+        axd.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=20))
 
-    ax2.fill_between(dates, dd, 0, color="#ef5350", alpha=0.4)
-    ax2.set_ylabel("Drawdown %", color="#9aa4b2", fontsize=9)
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+    leg = axb.legend(handles=[
+        Line2D([0], [0], color=line_col, lw=2.8, marker="o", markerfacecolor=BG,
+               markeredgewidth=2, label="Kumulyativ balans"),
+        Line2D([0], [0], color=GREEN, lw=9, alpha=0.75, label="Foydali savdo"),
+        Line2D([0], [0], color=RED, lw=9, alpha=0.75, label="Zararli savdo"),
+    ], loc="upper left", fontsize=10.5, facecolor=BG, edgecolor=GRID, framealpha=0.9)
+    for t in leg.get_texts():
+        t.set_color(TXT)
+
+    change = eq[-1] - base
+    change_pct = (eq[-1] / base - 1) * 100 if base else 0.0
+    period = (f"{rows[0]['closed_at'].astimezone(TZ):%d %b} — "
+              f"{rows[-1]['closed_at'].astimezone(TZ):%d %b %Y}")
+    fig.suptitle("Equity — " + ("depozit balansi" if weighted else "balans")
+                 + " va har savdo hissasi",
+                 color=TITLE, fontsize=17, fontweight="bold", y=0.975)
+    fig.text(0.5, 0.928,
+             f"{n} signal   •   {period}   •   "
+             + (f"{change:+,.0f}  ({change_pct:+.1f}%)" if weighted
+                else f"{change_pct:+.1f}%")
+             + f"   •   max DD {max_dd:.1f}%",
+             ha="center", va="top", color=GREEN if change >= 0 else RED,
+             fontsize=13, fontweight="bold")
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=130, bbox_inches="tight", facecolor=fig.get_facecolor())
