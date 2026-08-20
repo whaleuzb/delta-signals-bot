@@ -13,9 +13,10 @@ ko'rmaydi.
 
 ## Qanday ishlaydi
 
-1. Guruh admini guruh ichida `/setup` yozadi — shu guruh uchun workspace ochiladi
-   (bitta admin — bitta guruh). Shaxsiy foydalanish uchun alohida sozlash kerak emas —
-   birinchi murojaatda avtomatik shaxsiy workspace ochiladi.
+1. Botga birinchi marta shaxsiy yozganda, u "Shaxsiy jurnal" yoki "Menda guruh bor"
+   deb so'raydi. Guruh tanlansa — botni o'z guruhingizga admin qilib qo'shib, o'sha
+   yerda `/setup` yozish kerak (shu guruh uchun mustaqil workspace ochiladi, bitta
+   admin — bitta guruh). Shaxsiy tanlansa — darhol shaxsiy jurnal ochiladi.
 2. Workspace admini botga shaxsiy chatda grafik rasmini tashlaydi (yoki `/new` — bosqichma-
    bosqich sehrgar).
 3. Caption bo'lsa — undan o'qiladi. Bo'lmasa — Claude vision grafikdan darajalarni topadi.

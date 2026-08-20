@@ -109,9 +109,15 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       yoki super-admin) va `can_view()` (statistikani ko'ra oladi — yuqoridagi #11).
     - Shaxsiy chatda qaysi workspace ishlatilishini `resolve_workspace()` aniqlaydi:
       `ctx.user_data["workspace_id"]` keshi → agar bitta variant bo'lsa avtomatik →
-      bir nechta variant bo'lsa (o'z guruhi + shaxsiy) `send_workspace_switcher()`
-      tugmalarini ko'rsatadi (`switch` / `ws:<id>` callback'lar). Guruh ichida — doim
-      o'sha guruhning workspace'i, tanlov yo'q.
+      ikkalasi ham bo'lsa (o'z guruhi + shaxsiy) `send_workspace_switcher()` tugmalarini
+      ko'rsatadi (`switch` / `ws:<id>` callback'lar). Guruh ichida — doim o'sha
+      guruhning workspace'i, tanlov yo'q.
+    - **Birinchi murojaat (ikkalasi ham yo'q)** — hech narsa avtomatik yaratilmaydi.
+      `send_onboarding()` ikkita tugma ko'rsatadi: "Shaxsiy jurnal" (darhol yaratadi)
+      yoki "Menda guruh bor" (`on_onboard`, `onboard:` callback — botni guruhga
+      qo'shish va `/setup` yozish yo'riqnomasini beradi). Avval har doim shaxsiy
+      workspace sukut bo'yicha avtomatik ochilar edi — foydalanuvchi tanlamasdan;
+      bu endi noto'g'ri, chunki guruh egalari ham shu yo'l bilan kelishi kerak.
     - Signal kiritish (tezkor va sehrgar) endi FAQAT shaxsiy chatda ishlaydi (guruh
       ichida emas) — chunki bitta guruh xabaridan qaysi workspace'ga tegishli ekanini
       bilib bo'lmaydi (agar bitta admin bir nechta guruhni boshqarsa). Guruhga post

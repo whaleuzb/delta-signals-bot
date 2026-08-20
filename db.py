@@ -114,6 +114,13 @@ async def get_or_create_personal_workspace(owner_id: int, name: str) -> asyncpg.
         return await c.fetchrow("SELECT * FROM workspaces WHERE id=$1", wid)
 
 
+async def get_personal_workspace(owner_id: int) -> asyncpg.Record | None:
+    """Faqat tekshiradi, yaratmaydi — birinchi murojaatda onboarding ko'rsatish uchun."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT * FROM workspaces WHERE type='personal' AND owner_id=$1", owner_id)
+
+
 async def get_workspace(workspace_id: int) -> asyncpg.Record | None:
     async with pool().acquire() as c:
         return await c.fetchrow("SELECT * FROM workspaces WHERE id=$1", workspace_id)

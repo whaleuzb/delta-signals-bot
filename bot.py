@@ -86,9 +86,9 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Joriy update qaysi workspace'ga tegishli ekanini aniqlaydi.
     Guruh ichida — o'sha guruhning workspace'i (agar /setup qilingan bo'lsa, aks
     holda None). Shaxsiy chatda — avval tanlab keshlangan workspace; agar bo'lmasa
-    va foydalanuvchida faqat bitta variant (shaxsiy) bo'lsa — avtomatik shu; agar
-    bir nechta variant bo'lsa (o'z guruhi + shaxsiy) — None qaytaradi, chaqiruvchi
-    switcher ko'rsatishi kerak."""
+    va foydalanuvchida faqat bitta variant bo'lsa (o'z guruhi YOKI shaxsiy jurnal,
+    ikkalasi ham emas) — avtomatik shu; agar ikkalasi ham bor — None (switcher);
+    agar birortasi ham yo'q (birinchi murojaat) — None (onboarding ko'rsatiladi)."""
     chat = update.effective_chat
     uid = update.effective_user.id
 
@@ -102,12 +102,16 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return ws
 
     owned_group = await db.get_group_workspace_by_owner(uid)
-    if not owned_group:
-        ws = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
-        ctx.user_data["workspace_id"] = ws["id"]
-        return ws
+    personal = await db.get_personal_workspace(uid)
 
-    return None  # bir nechta variant bor — tanlash kerak
+    if owned_group and not personal:
+        ctx.user_data["workspace_id"] = owned_group["id"]
+        return owned_group
+    if personal and not owned_group:
+        ctx.user_data["workspace_id"] = personal["id"]
+        return personal
+
+    return None  # ikkalasi ham bor (tanlash kerak) yoki ikkalasi ham yo'q (onboarding)
 
 
 async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -122,9 +126,51 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
     await update.effective_message.reply_text("Qaysi joy uchun?", reply_markup=InlineKeyboardMarkup(rows))
 
 
+ONBOARD_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🧑 Shaxsiy jurnal ochish", callback_data="onboard:personal")],
+    [InlineKeyboardButton("🏘 Menda yopiq guruh bor", callback_data="onboard:group")],
+])
+
+
+async def send_onboarding(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.effective_message.reply_text(
+        "👋 Xush kelibsiz! Botni qanday ishlatmoqchisiz?\n\n"
+        "🧑 <b>Shaxsiy jurnal</b> — o'z savdo signallaringizni yozib, statistikangizni "
+        "kuzatib borasiz. Faqat sizga ko'rinadi, hech kimga post bo'lmaydi.\n\n"
+        "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa, uni ham shu bot "
+        "bilan boshqarishingiz mumkin: signallar guruhga post bo'ladi, a'zolaringiz "
+        "statistikani ko'radi.",
+        parse_mode=ParseMode.HTML, reply_markup=ONBOARD_KB)
+
+
+async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    choice = q.data.split(":", 1)[1]
+    uid = q.from_user.id
+
+    if choice == "personal":
+        ws = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+        ctx.user_data["workspace_id"] = ws["id"]
+        await q.edit_message_text("✅ Shaxsiy jurnal ochildi.")
+        await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+        return
+
+    bot_username = ctx.bot.username
+    mention = f"@{bot_username}" if bot_username else "botni"
+    await q.edit_message_text(
+        f"🏘 Guruhingizni ulash uchun:\n\n"
+        f"1. {mention} o'z guruhingizga qo'shing.\n"
+        "2. Botga guruhda <b>admin</b> huquqini bering (xabar yuborish uchun kerak).\n"
+        "3. Guruh ichida <code>/setup</code> buyrug'ini yozing.\n\n"
+        "Shundan so'ng guruhingiz mustaqil workspace sifatida ishlay boshlaydi va "
+        "botga shaxsiy yozganingizda avtomatik o'shani boshqarasiz.",
+        parse_mode=ParseMode.HTML)
+
+
 async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Workspace'ni aniqlaydi. Topilmasa mos xabar/tanlov ko'rsatadi va None
-    qaytaradi — chaqiruvchi shu holda darhol return qilishi kerak."""
+    """Workspace'ni aniqlaydi. Topilmasa mos xabar/tanlov/onboarding ko'rsatadi va
+    None qaytaradi — chaqiruvchi shu holda darhol return qilishi kerak."""
     ws = await resolve_workspace(update, ctx)
     if ws is not None:
         return ws
@@ -132,8 +178,15 @@ async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if chat.type in ("group", "supergroup"):
         await update.effective_message.reply_text(
             "Bu guruh hali ro'yxatdan o'tmagan. Guruh admini /setup buyrug'ini yozsin.")
-    else:
+        return None
+
+    uid = update.effective_user.id
+    owned_group = await db.get_group_workspace_by_owner(uid)
+    personal = await db.get_personal_workspace(uid)
+    if owned_group or personal:
         await send_workspace_switcher(update, ctx)
+    else:
+        await send_onboarding(update, ctx)
     return None
 
 
@@ -1061,6 +1114,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
+    app.add_handler(CallbackQueryHandler(on_onboard, pattern=r"^onboard:"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
