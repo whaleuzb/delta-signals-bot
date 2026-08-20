@@ -1,12 +1,10 @@
-"""Bir martalik: BTCUSDT va TNSRUSDT ni YOPILGAN signallar ro'yxatidan o'chirish.
-Foydalanuvchi so'rovi bo'yicha - qolganini o'zi qayta kiritadi. Ishga tushirilgach
-o'chiriladi."""
+"""Bir martalik: BTCUSDT va TNSRUSDT qidiruvi (barcha holatlarda), keyin
+faqat yopilganlarni o'chirish. Ishga tushirilgach o'chiriladi."""
 import asyncio
 
 import config
 import db
 
-SYMBOLS = ("BTCUSDT", "TNSRUSDT")
 CLOSED = "('TP','SL','BREAKEVEN')"
 
 
@@ -15,21 +13,20 @@ async def main():
     pool = db.pool()
     async with pool.acquire() as c:
         rows = await c.fetch(
-            f"SELECT id, workspace_id, symbol, status, pnl_pct, closed_at FROM signals "
-            f"WHERE symbol = ANY($1) AND status IN {CLOSED} ORDER BY id",
-            list(SYMBOLS),
+            "SELECT id, workspace_id, symbol, status, pnl_pct, closed_at FROM signals "
+            "WHERE symbol ILIKE '%BTC%' OR symbol ILIKE '%TNSR%' ORDER BY id"
         )
-        print(f"Topildi: {len(rows)} ta yopilgan signal")
+        print(f"Topildi (barcha holatlar): {len(rows)} ta")
         for r in rows:
             print(f"  #{r['id']} ws={r['workspace_id']} {r['symbol']} {r['status']} "
                   f"{r['pnl_pct']}% closed_at={r['closed_at']}")
 
-        if rows:
-            ids = [r["id"] for r in rows]
-            result = await c.execute("DELETE FROM signals WHERE id = ANY($1)", ids)
-            print(f"O'chirildi: {result}")
+        closed_ids = [r["id"] for r in rows if r["status"] in ("TP", "SL", "BREAKEVEN")]
+        if closed_ids:
+            result = await c.execute("DELETE FROM signals WHERE id = ANY($1)", closed_ids)
+            print(f"O'chirildi (faqat yopilganlar): {result}  ids={closed_ids}")
         else:
-            print("O'chiriladigan narsa topilmadi.")
+            print("Yopilgan holatda hech narsa topilmadi, hech narsa o'chirilmadi.")
 
 
 asyncio.run(main())
