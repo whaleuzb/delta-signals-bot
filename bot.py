@@ -6,6 +6,7 @@ yoki istalgan odam shaxsiy jurnal sifatida foydalanishi mumkin. Workspace'lar
 bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 """
 import html
+import io
 import logging
 import secrets
 import time
@@ -1686,9 +1687,177 @@ def admin_home_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📊 Statistika", callback_data="adm:stats"),
          InlineKeyboardButton("🎁 Referrallar", callback_data="adm:refs")],
+        [InlineKeyboardButton("👥 Guruhlar", callback_data="adm:groups"),
+         InlineKeyboardButton("🙍 Foydalanuvchilar", callback_data="adm:users:0")],
         [InlineKeyboardButton("📢 Majburiy obuna", callback_data="adm:ch"),
          InlineKeyboardButton("🛡 Tasdiqlar", callback_data="adm:pend")],
+        [InlineKeyboardButton("📄 Guruhlar PDF", callback_data="adm:pdfg"),
+         InlineKeyboardButton("📄 Userlar PDF", callback_data="adm:pdfu")],
     ])
+
+
+def _who(username, first_name, uid) -> str:
+    """Foydalanuvchini ko'rsatish uchun eng ma'lumotli nom."""
+    if username:
+        return f"@{username}"
+    return first_name or str(uid)
+
+
+async def group_health(bot, ws) -> tuple[str, str]:
+    """Bot guruhda hali bormi va admin'mi — "bloklash holati" shu yerda
+    ko'rinadi. Har bir chaqiruv Telegram'ga so'rov yuboradi, shuning uchun
+    faqat admin so'raganda (ro'yxat/karta ochilganda) bajariladi."""
+    cid = ws["group_chat_id"]
+    if not cid:
+        return "⚪", "guruh biriktirilmagan"
+    try:
+        me = await bot.get_chat_member(cid, bot.id)
+    except Exception as e:
+        return "🚫", f"bog'lanib bo'lmadi ({type(e).__name__})"
+    if me.status in ("left", "kicked"):
+        return "🚫", "bot guruhdan chiqarilgan"
+    if me.status != "administrator":
+        return "⚠️", "bot admin emas — post/reply ishlamaydi"
+    try:
+        n = await bot.get_chat_member_count(cid)
+        return "✅", f"admin • {n} a'zo"
+    except Exception:
+        return "✅", "admin"
+
+
+async def _admin_groups_view(bot) -> tuple[str, InlineKeyboardMarkup]:
+    rows = await db.admin_list_groups()
+    if not rows:
+        return "👥 Hali birorta guruh ulanmagan.", ADMIN_BACK_KB
+
+    lines = ["👥 <b>Ulangan guruhlar</b>", ""]
+    kb = []
+    for ws in rows:
+        icon, _ = await group_health(bot, ws)
+        arch = " 📦" if ws["archived"] else ""
+        name = html.escape(ws["name"])[:28]
+        lines.append(
+            f"{icon}{arch} <b>{name}</b> — {ws['n_signals']} signal, "
+            f"{ws['n_viewers']} kuzatuvchi")
+        kb.append([InlineKeyboardButton(f"{icon} {ws['name']}"[:40],
+                                         callback_data=f"adm:grp:{ws['id']}")])
+    lines += ["", "✅ ishlayapti · ⚠️ admin emas · 🚫 chiqarilgan · 📦 arxivlangan"]
+    kb.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    return "\n".join(lines), InlineKeyboardMarkup(kb)
+
+
+async def _admin_group_card(bot, wid: int) -> tuple[str, InlineKeyboardMarkup]:
+    rows = await db.admin_list_groups()
+    ws = next((r for r in rows if r["id"] == wid), None)
+    if not ws:
+        return "Topilmadi.", ADMIN_BACK_KB
+    icon, health = await group_health(bot, ws)
+    owner = _who(ws["owner_username"], ws["owner_name"], ws["owner_id"])
+    dep = f"{float(ws['deposit']):,.2f}" if ws["deposit"] is not None else "—"
+    pub = ("✅ reytingda" if ws["public"] and ws["public_approved"]
+           else "⏳ tasdiq kutmoqda" if ws["public"] else "🔒 yashirin")
+    txt = (
+        f"{icon} <b>{html.escape(ws['name'])}</b>\n\n"
+        f"Holat: <b>{health}</b>\n"
+        f"Egasi: {html.escape(owner)} (<code>{ws['owner_id']}</code>)\n"
+        f"Chat ID: <code>{ws['group_chat_id']}</code>\n"
+        f"Signallar: <b>{ws['n_signals']}</b> (yopilgan {ws['n_closed']})\n"
+        f"Kuzatuvchilar: {ws['n_viewers']}\n"
+        f"Depozit: {dep}\n"
+        f"Reyting: {pub}\n"
+        f"Ochilgan: {ws['created_at']:%d.%m.%Y}"
+        + ("\n\n📦 <b>Arxivlangan</b> — reytingda va tanlovda ko'rinmaydi."
+           if ws["archived"] else "")
+    )
+    act = ("♻️ Arxivdan chiqarish", f"adm:unarch:{wid}") if ws["archived"] \
+        else ("📦 Arxivlash", f"adm:arch:{wid}")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Holatni tekshirish", callback_data=f"adm:grp:{wid}")],
+        [InlineKeyboardButton(act[0], callback_data=act[1])],
+        [InlineKeyboardButton("◀️ Guruhlar", callback_data="adm:groups")],
+    ])
+    return txt, kb
+
+
+async def _admin_users_view(offset: int) -> tuple[str, InlineKeyboardMarkup]:
+    PER = 8
+    total = await db.count_users()
+    rows = await db.admin_list_users(PER, offset)
+    lines = [f"🙍 <b>Foydalanuvchilar</b> — jami {total} ta", ""]
+    kb = []
+    for u in rows:
+        badges = []
+        if u["has_personal"]:
+            badges.append("🧑")
+        if u["owned_groups"]:
+            badges.append(f"👑{u['owned_groups']}")
+        if u["viewer_links"]:
+            badges.append(f"👥{u['viewer_links']}")
+        if u["invited"]:
+            badges.append(f"🎁{u['invited']}")
+        who = _who(u["username"], u["first_name"], u["user_id"])
+        lines.append(f"{' '.join(badges) or '·'} {html.escape(who)}")
+        kb.append([InlineKeyboardButton(f"{who}"[:40],
+                                         callback_data=f"adm:usr:{u['user_id']}")])
+    lines += ["", "🧑 shaxsiy jurnal · 👑 guruh egasi · 👥 guruhga ulangan · 🎁 taklif qilgan"]
+
+    nav = []
+    if offset > 0:
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"adm:users:{max(0, offset - PER)}"))
+    if offset + PER < total:
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"adm:users:{offset + PER}"))
+    if nav:
+        kb.append(nav)
+    kb.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    return "\n".join(lines), InlineKeyboardMarkup(kb)
+
+
+async def _admin_user_card(bot, uid: int, live: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    d = await db.admin_user_detail(uid)
+    u = d["user"]
+    if not u:
+        return "Topilmadi.", ADMIN_BACK_KB
+    who = _who(u["username"], u["first_name"], uid)
+    t = [f"🙍 <b>{html.escape(who)}</b>", f"ID: <code>{uid}</code>", ""]
+
+    personal = [w for w in d["owned"] if w["type"] == "personal"]
+    groups = [w for w in d["owned"] if w["type"] == "group"]
+    t.append(f"Shaxsiy jurnal: {'bor 🧑' if personal else 'yo‘q'}")
+    if groups:
+        t.append("Egalik qiladigan guruhlar 👑:")
+        for w in groups:
+            t.append(f"  • {html.escape(w['name'])}" + (" 📦" if w["archived"] else ""))
+    else:
+        t.append("Guruh egasi: yo‘q")
+
+    if d["viewing"]:
+        t.append("")
+        t.append("Ulangan yopiq guruhlar 👥:")
+        for w in d["viewing"]:
+            mark = ""
+            if live:
+                # Jonli a'zolik tekshiruvi — group_viewers faqat "ulanган"ligini
+                # bildiradi, hozir haqiqatan a'zomi yo'qmi Telegram aytadi.
+                try:
+                    m = await bot.get_chat_member(w["group_chat_id"], uid)
+                    mark = " ✅" if m.status not in ("left", "kicked") else " 🚫 a'zo emas"
+                except Exception:
+                    mark = " ❔ tekshirib bo'lmadi"
+            t.append(f"  • {html.escape(w['name'])}{mark}")
+    else:
+        t.append("")
+        t.append("Ulangan yopiq guruhlar: yo‘q")
+
+    t += ["", f"Taklif qilgan: <b>{d['invited']}</b> ta"]
+    if d["invited_by"]:
+        t.append(f"Kim taklif qilgan: <code>{d['invited_by']}</code>")
+    t += [f"Birinchi: {u['first_seen']:%d.%m.%Y}",
+          f"Oxirgi faollik: {u['last_seen']:%d.%m.%Y %H:%M}"]
+
+    kb = [[InlineKeyboardButton("🔍 A'zolikni jonli tekshirish",
+                                 callback_data=f"adm:usrchk:{uid}")]] if d["viewing"] else []
+    kb.append([InlineKeyboardButton("◀️ Foydalanuvchilar", callback_data="adm:users:0")])
+    return "\n".join(t), InlineKeyboardMarkup(kb)
 
 
 async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1794,6 +1963,90 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                    parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
         for ws in rows:
             await request_public_approval(ctx, ws["id"])
+
+    # ── Guruhlar ──
+    elif action == "groups":
+        await q.edit_message_text("👥 Guruhlar holati tekshirilmoqda…")
+        txt, kb = await _admin_groups_view(ctx.bot)
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action.startswith("grp:"):
+        txt, kb = await _admin_group_card(ctx.bot, int(action.split(":", 1)[1]))
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action.startswith(("arch:", "unarch:")):
+        wid = int(action.split(":", 1)[1])
+        await db.set_archived(wid, action.startswith("arch:"))
+        txt, kb = await _admin_group_card(ctx.bot, wid)
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+    # ── Foydalanuvchilar ──
+    elif action.startswith("users:"):
+        txt, kb = await _admin_users_view(int(action.split(":", 1)[1]))
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action.startswith("usr:"):
+        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]))
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action.startswith("usrchk:"):
+        await q.edit_message_text("🔍 A'zolik tekshirilmoqda…")
+        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]), live=True)
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+    # ── PDF eksport ──
+    elif action in ("pdfg", "pdfu"):
+        await q.message.reply_text("📄 Tayyorlanmoqda…")
+        if action == "pdfg":
+            buf, fname = await _admin_groups_pdf(ctx.bot)
+        else:
+            buf, fname = await _admin_users_pdf()
+        await q.message.reply_document(InputFile(buf, fname), reply_markup=ADMIN_BACK_KB)
+
+
+async def _admin_groups_pdf(bot) -> tuple[io.BytesIO, str]:
+    rows = await db.admin_list_groups()
+    header = f"{'Guruh':<26}{'Signal':>8}{'Yopilgan':>10}{'Kuzatuv':>9}  {'Holat':<16}"
+    lines = []
+    n_bad = 0
+    for ws in rows:
+        # Har guruh uchun BIR marta so'raladi — natija ham qatorga, ham
+        # sarlavhadagi hisobga ishlatiladi (ikki marta chaqirilsa Telegram
+        # so'rovlari bekorga ikki barobar bo'lardi).
+        icon, health = await group_health(bot, ws)
+        if icon == "🚫":
+            n_bad += 1
+        state = {"✅": "ishlayapti", "⚠️": "admin emas",
+                 "🚫": "chiqarilgan", "⚪": "biriktirilmagan"}.get(icon, health)
+        if ws["archived"]:
+            state += " (arxiv)"
+        col = stats.P_GREEN if icon == "✅" and not ws["archived"] else (
+            stats.P_RED if icon == "🚫" else stats.P_TXT)
+        lines.append((
+            f"{ws['name'][:26]:<26}{ws['n_signals']:>8}{ws['n_closed']:>10}"
+            f"{ws['n_viewers']:>9}  {state:<16}", col))
+    buf = stats.pdf_table_report(
+        "Ulangan guruhlar", f"Jami {len(rows)} ta guruh · {n_bad} tasida muammo",
+        header, lines)
+    return buf, f"guruhlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
+
+
+async def _admin_users_pdf() -> tuple[io.BytesIO, str]:
+    total = await db.count_users()
+    rows = await db.admin_list_users(limit=10000, offset=0)
+    header = f"{'Foydalanuvchi':<24}{'ID':>12}  {'Rol':<20}{'Taklif':>7}  {'Oxirgi':<10}"
+    lines = []
+    for u in rows:
+        roles = []
+        if u["has_personal"]:
+            roles.append("shaxsiy")
+        if u["owned_groups"]:
+            roles.append(f"egasi×{u['owned_groups']}")
+        if u["viewer_links"]:
+            roles.append(f"a'zo×{u['viewer_links']}")
+        who = _who(u["username"], u["first_name"], u["user_id"])
+        lines.append((
+            f"{who[:24]:<24}{u['user_id']:>12}  {', '.join(roles)[:20]:<20}"
+            f"{u['invited']:>7}  {u['last_seen']:%d.%m.%y}", stats.P_TXT))
+    buf = stats.pdf_table_report(
+        "Foydalanuvchilar", f"Jami {total} ta", header, lines)
+    return buf, f"userlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
 
 
 async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

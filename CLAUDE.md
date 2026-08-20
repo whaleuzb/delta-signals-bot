@@ -525,6 +525,32 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       "Iyun" va "Iyul" IKKALASI HAM "Iyu" bo'lib qolar edi (`monthly_table()`
       dagi eski xato). Endi matnli jadvalda `[:4]`, PDF'da to'liq nom.
 
+27. **Admin panelida guruhlarni boshqarish, foydalanuvchilar kesimi va PDF eksport.**
+    - **Guruhlar** (`adm:groups`) — ulangan har bir guruh workspace'i, yonida
+      JONLI holat: `group_health()` `get_chat_member(chat_id, bot.id)` bilan
+      botning guruhda hali borligini va admin ekanini tekshiradi
+      (✅ ishlayapti · ⚠️ admin emas · 🚫 chiqarilgan · ⚪ biriktirilmagan).
+      "Bloklash holati" aynan shu — bot guruhdan chiqarib yuborilgan bo'lsa
+      darhol ko'rinadi. Tekshiruv faqat admin ro'yxatni ochganda bajariladi
+      (har guruh uchun 1-2 so'rov), fon jarayonida emas.
+    - **Arxivlash** (`workspaces.archived`) — o'chirish EMAS, ataylab
+      qaytariladigan: arxivlangan guruh `/top` reytingida, "men a'zoman"
+      ro'yxatida va kuzatuvchi ulanishlarida ko'rinmaydi, lekin signal tarixi
+      butunlay saqlanadi. O'chirish `signals.workspace_id` FK'si tufayli
+      baribir tarixni yo'q qilishni talab qilardi — arxiv xavfsizroq.
+    - **Foydalanuvchilar** (`adm:users:<offset>`) — sahifalangan ro'yxat,
+      har birida rol nishonlari: 🧑 shaxsiy jurnal · 👑 guruh egasi ·
+      👥 yopiq guruhga ulangan · 🎁 taklif qilgan. Karta ichida (`adm:usr:`)
+      egalik qiladigan va ulangan guruhlar ro'yxati chiqadi.
+    - **Jonli a'zolik tekshiruvi** (`adm:usrchk:`) — `group_viewers` faqat
+      foydalanuvchi guruhni TANLAGANINI bildiradi; hozir haqiqatan a'zomi
+      yo'qmi faqat Telegram aytadi. Shuning uchun bu alohida tugma ostida,
+      ataylab talab bo'yicha: barcha foydalanuvchi × guruh juftligini
+      avtomatik tekshirish juda ko'p so'rov bo'lardi.
+    - **PDF eksport** — `stats.pdf_table_report()` umumiy ko'p sahifali
+      monospace jadval generatori (guruhlar va userlar ro'yxati ikkalasi
+      shundan foydalanadi, sahifa to'lganda avtomatik yangisi ochiladi).
+
 ---
 
 ## Buyruqlar

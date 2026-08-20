@@ -516,6 +516,45 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
     return buf
 
 
+def pdf_table_report(title: str, subtitle: str, header: str,
+                      lines: list[tuple[str, str]]) -> io.BytesIO:
+    """Monospace jadvalli ko'p sahifali PDF (admin ro'yxatlari uchun).
+    lines — (matn, rang) juftliklari; sahifa to'lganda avtomatik yangisi
+    ochiladi, shuning uchun qatorlar soni cheklanmagan."""
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    buf = io.BytesIO()
+    with PdfPages(buf) as pdf:
+        i, page = 0, 1
+        while True:
+            fig = plt.figure(figsize=(8.27, 11.69))
+            fig.patch.set_facecolor("white")
+            fig.text(0.06, 0.955, title, fontsize=18, fontweight="bold", color=P_TXT)
+            if subtitle:
+                fig.text(0.06, 0.932, subtitle, fontsize=11, color=P_MUTED)
+            fig.text(0.94, 0.955, f"{datetime.now(TZ):%d.%m.%Y %H:%M}",
+                     fontsize=9, color=P_MUTED, ha="right")
+            fig.add_artist(plt.Line2D([0.06, 0.94], [0.921, 0.921], color=P_GRID, lw=1))
+
+            y = 0.895
+            fig.text(0.06, y, header, fontsize=10, fontweight="bold",
+                     color=P_MUTED, family="monospace")
+            y -= 0.023
+            while i < len(lines) and y > 0.04:
+                txt, col = lines[i]
+                fig.text(0.06, y, txt, fontsize=10, color=col, family="monospace")
+                y -= 0.020
+                i += 1
+            fig.text(0.94, 0.022, str(page), fontsize=9, color=P_MUTED, ha="right")
+            pdf.savefig(fig, facecolor="white")
+            plt.close(fig)
+            if i >= len(lines):
+                break
+            page += 1
+    buf.seek(0)
+    return buf
+
+
 def month_bounds(year: int, month: int):
     a = datetime(year, month, 1, tzinfo=TZ)
     b = datetime(year + (month == 12), (month % 12) + 1, 1, tzinfo=TZ)

@@ -162,6 +162,11 @@ BEGIN
         UPDATE workspaces SET public_approved = TRUE WHERE public = TRUE;
     END IF;
 END $$;
+
+-- Arxivlangan workspace: /top reytingida ko'rinmaydi va egasi uni tanlay
+-- olmaydi. Ataylab O'CHIRISH emas — signal tarixi saqlanib qoladi va admin
+-- xohlasa qaytara oladi (bot guruhdan chiqarib yuborilgan holatlar uchun).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -236,7 +241,7 @@ async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:
 async def list_group_workspaces() -> list[asyncpg.Record]:
     """Barcha ro'yxatdan o'tgan guruh workspace'lari — "men a'zoman" tanlovi uchun."""
     async with pool().acquire() as c:
-        return await c.fetch("SELECT * FROM workspaces WHERE type='group' ORDER BY name")
+        return await c.fetch("SELECT * FROM workspaces WHERE type='group' AND NOT archived ORDER BY name")
 
 
 async def add_group_viewer(user_id: int, workspace_id: int) -> None:
@@ -250,7 +255,7 @@ async def get_group_viewer_workspaces(user_id: int) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch(
             "SELECT w.* FROM group_viewers v JOIN workspaces w ON w.id = v.workspace_id "
-            "WHERE v.user_id=$1 ORDER BY w.name", user_id)
+            "WHERE v.user_id=$1 AND NOT w.archived ORDER BY w.name", user_id)
 
 
 async def is_group_viewer(user_id: int, workspace_id: int) -> bool:
@@ -347,6 +352,74 @@ async def platform_stats() -> asyncpg.Record:
               (SELECT COUNT(*) FROM signals WHERE status IN {CLOSED})               AS signals_closed,
               (SELECT COUNT(*) FROM group_viewers)                                  AS viewers
         """)
+
+
+async def admin_list_groups() -> list[asyncpg.Record]:
+    """Admin paneli: barcha guruh workspace'lari + egasi va signal soni."""
+    async with pool().acquire() as c:
+        return await c.fetch(f"""
+            SELECT w.*, u.username AS owner_username, u.first_name AS owner_name,
+                   (SELECT COUNT(*) FROM signals s WHERE s.workspace_id = w.id) AS n_signals,
+                   (SELECT COUNT(*) FROM signals s WHERE s.workspace_id = w.id
+                      AND s.status IN {CLOSED})                                 AS n_closed,
+                   (SELECT COUNT(*) FROM group_viewers g WHERE g.workspace_id = w.id) AS n_viewers
+            FROM workspaces w
+            LEFT JOIN users u ON u.user_id = w.owner_id
+            WHERE w.type = 'group'
+            ORDER BY w.archived, w.id
+        """)
+
+
+async def set_archived(workspace_id: int, archived: bool) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET archived=$2 WHERE id=$1",
+                        workspace_id, archived)
+
+
+async def admin_list_users(limit: int = 50, offset: int = 0) -> list[asyncpg.Record]:
+    """Har bir foydalanuvchi + roli: shaxsiy jurnali bormi, nechta guruh
+    egasi, nechta yopiq guruhga ulangan (kuzatuvchi sifatida), nechta odam
+    taklif qilgan."""
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            SELECT u.user_id, u.username, u.first_name, u.first_seen, u.last_seen,
+                   EXISTS(SELECT 1 FROM workspaces w
+                          WHERE w.type='personal' AND w.owner_id=u.user_id)      AS has_personal,
+                   (SELECT COUNT(*) FROM workspaces w
+                      WHERE w.type='group' AND w.owner_id=u.user_id)             AS owned_groups,
+                   (SELECT COUNT(*) FROM group_viewers g
+                      WHERE g.user_id=u.user_id)                                 AS viewer_links,
+                   (SELECT COUNT(*) FROM referrals r
+                      WHERE r.referrer_id=u.user_id)                             AS invited
+            FROM users u
+            ORDER BY u.last_seen DESC
+            LIMIT $1 OFFSET $2
+        """, limit, offset)
+
+
+async def count_users() -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT COUNT(*) FROM users")
+
+
+async def admin_user_detail(user_id: int) -> dict:
+    """Bitta foydalanuvchi: profili, egalik qiladigan workspace'lari va
+    kuzatuvchi sifatida ulangan guruhlari."""
+    async with pool().acquire() as c:
+        user = await c.fetchrow("SELECT * FROM users WHERE user_id=$1", user_id)
+        owned = await c.fetch(
+            "SELECT id, type, name, archived FROM workspaces WHERE owner_id=$1 ORDER BY type, id",
+            user_id)
+        viewing = await c.fetch(
+            "SELECT w.id, w.name, w.group_chat_id FROM group_viewers g "
+            "JOIN workspaces w ON w.id = g.workspace_id WHERE g.user_id=$1 ORDER BY w.name",
+            user_id)
+        invited = await c.fetchval(
+            "SELECT COUNT(*) FROM referrals WHERE referrer_id=$1", user_id)
+        invited_by = await c.fetchval(
+            "SELECT referrer_id FROM referrals WHERE referred_id=$1", user_id)
+    return {"user": user, "owned": owned, "viewing": viewing,
+            "invited": invited, "invited_by": invited_by}
 
 
 async def list_required_channels() -> list[asyncpg.Record]:
@@ -583,7 +656,7 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
-      AND s.status IN {CLOSED}
+      AND NOT w.archived AND s.status IN {CLOSED}
       AND s.closed_at >= $1 AND s.closed_at < $2
     GROUP BY w.id, w.name, w.invite_link
     ORDER BY sum_pct DESC
