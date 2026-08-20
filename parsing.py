@@ -6,6 +6,10 @@ Qo'llab-quvvatlanadigan ko'rinishlar (registr ahamiyatsiz):
     Entry: 65 000
     TP1 67000  TP2 68500
     Stop: 64000
+
+Matnda "market" yoki "bozor" so'zi bo'lsa — entry_mode='market' (signal darhol
+ACTIVE, narxni kutmaydi). Bo'lmasa standart — entry_mode='limit' (hozirgidek,
+narx kirish darajasiga tegguncha kutadi).
 """
 import re
 
@@ -45,13 +49,17 @@ def parse(text: str) -> dict | None:
     else:
         side = "LONG"
 
+    # --- kirish rejimi: market (darhol ACTIVE) yoki limit (standart — narxni kutadi) ---
+    entry_mode = "market" if re.search(r"\b(market|bozor)\b", low) else "limit"
+
     # --- juftlik ---
     m = re.search(r"\b([A-Za-z]{2,10})\s*[/\-:]?\s*(usdt|usd)?\b(?:\.p)?", t)
     symbol = None
     for cand in re.finditer(r"\b([A-Za-z]{2,12}(?:/|-)?(?:USDT|USD)?(?:\.P)?)\b", t, re.I):
         w = cand.group(1)
         if w.lower() in {"long", "short", "buy", "sell", "entry", "tp", "sl", "stop",
-                         "target", "kirish", "maqsad", "signal", "spot"}:
+                         "target", "kirish", "maqsad", "signal", "spot",
+                         "market", "bozor", "limit", "oddiy"}:
             continue
         symbol = w
         break
@@ -96,7 +104,8 @@ def parse(text: str) -> dict | None:
         return None
 
     tps = sorted(set(tps), reverse=(side == "SHORT"))
-    return {"symbol": symbol, "side": side, "entry": entry, "sl": sl, "tps": tps}
+    return {"symbol": symbol, "side": side, "entry": entry, "sl": sl, "tps": tps,
+            "entry_mode": entry_mode}
 
 
 def validate(d: dict) -> str | None:

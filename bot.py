@@ -236,7 +236,8 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
     head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
     if sig_id:
         head += f"  <code>#{sig_id}</code>"
-    lines = [head, "", f"Kirish: <b>{fmt_price(e)}</b>"]
+    entry_note = " <i>(🎯 darhol kirilgan)</i>" if d.get("entry_mode") == "market" else ""
+    lines = [head, "", f"Kirish: <b>{fmt_price(e)}</b>{entry_note}"]
     for i, t in enumerate(tps, 1):
         pct = abs(t - e) / e * 100
         lines.append(f"🎯 TP{i}: <b>{fmt_price(t)}</b>  <i>(+{pct:.2f}%)</i>")
@@ -586,12 +587,17 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
 
-WIZ_PHOTO, WIZ_SYMBOL, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
+WIZ_PHOTO, WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(7)
 
 WIZ_CANCEL_KB = InlineKeyboardMarkup(
     [[InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")]])
 WIZ_PHOTO_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("⏭ Rasmsiz davom etish", callback_data="wiz_skip_photo")],
+    [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+])
+WIZ_MODE_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🎯 Oddiy (darhol)", callback_data="wiz_mode:market"),
+     InlineKeyboardButton("⏳ Limit (narxni kutadi)", callback_data="wiz_mode:limit")],
     [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
 ])
 
@@ -621,14 +627,14 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     ctx.user_data["wiz"] = {"workspace_id": ws["id"]}
-    await target.reply_text("1/5 — 📈 Grafik rasmni yuboring.", reply_markup=WIZ_PHOTO_KB)
+    await target.reply_text("1/6 — 📈 Grafik rasmni yuboring.", reply_markup=WIZ_PHOTO_KB)
     return WIZ_PHOTO
 
 
 async def wizard_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
     ctx.user_data["wiz"]["file_id"] = msg.photo[-1].file_id
-    await msg.reply_text("2/5 — Juftlik nomini yozing (masalan BTCUSDT):",
+    await msg.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
                          reply_markup=WIZ_CANCEL_KB)
     return WIZ_SYMBOL
 
@@ -637,8 +643,8 @@ async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> i
     q = update.callback_query
     await q.answer()
     ctx.user_data["wiz"]["file_id"] = None
-    await q.edit_message_text("1/5 — Rasmsiz davom etilmoqda.")
-    await q.message.reply_text("2/5 — Juftlik nomini yozing (masalan BTCUSDT):",
+    await q.edit_message_text("1/6 — Rasmsiz davom etilmoqda.")
+    await q.message.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
                                reply_markup=WIZ_CANCEL_KB)
     return WIZ_SYMBOL
 
@@ -658,12 +664,28 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return WIZ_SYMBOL
     ctx.user_data["wiz"]["symbol"] = sym
     ctx.user_data["wiz"]["market"] = market
+    await msg.reply_text(
+        f"3/6 — {sym}: qanday kirasiz?\n\n"
+        "🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda "
+        "allaqachon kirgandek).\n"
+        "⏳ <b>Limit</b> — narx kirish darajasiga tegmaguncha kutadi (standart).",
+        parse_mode=ParseMode.HTML, reply_markup=WIZ_MODE_KB)
+    return WIZ_MODE
+
+
+async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    mode = q.data.split(":", 1)[1]
+    ctx.user_data["wiz"]["entry_mode"] = mode
+    label = "🎯 Oddiy" if mode == "market" else "⏳ Limit"
+    await q.edit_message_text(f"3/6 — Kirish rejimi: {label}")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
          InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
         [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
     ])
-    await msg.reply_text(f"3/5 — {sym}: yo'nalishni tanlang:", reply_markup=kb)
+    await q.message.reply_text("4/6 — Yo'nalishni tanlang:", reply_markup=kb)
     return WIZ_SIDE
 
 
@@ -672,8 +694,8 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     await q.answer()
     side = q.data.split(":", 1)[1]
     ctx.user_data["wiz"]["side"] = side
-    await q.edit_message_text(f"3/5 — Yo'nalish: {side}")
-    await q.message.reply_text("4/5 — Entry (kirish) narxini kiriting:",
+    await q.edit_message_text(f"4/6 — Yo'nalish: {side}")
+    await q.message.reply_text("5/6 — Entry (kirish) narxini kiriting:",
                                reply_markup=WIZ_CANCEL_KB)
     return WIZ_ENTRY
 
@@ -686,7 +708,7 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return WIZ_ENTRY
     ctx.user_data["wiz"]["entry"] = entry
     await msg.reply_text(
-        "5/5 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
+        "6/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
         "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
     return WIZ_TP
 
@@ -711,7 +733,8 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return WIZ_SL
     wiz = ctx.user_data.pop("wiz")
     draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
-             "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto")}
+             "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto"),
+             "entry_mode": wiz.get("entry_mode", "limit")}
     await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard", wiz["workspace_id"])
     return ConversationHandler.END
 
@@ -835,6 +858,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         return
     draft["symbol"] = sym
     draft["market"] = market
+    draft.setdefault("entry_mode", "limit")
 
     err = parsing.validate(draft)
     if err:
@@ -844,6 +868,8 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     warn = []
     if draft["side"] == "SHORT" and not config.ALLOW_SHORT and market != "forex":
         warn.append("⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.")
+    if draft.get("entry_mode") == "market":
+        warn.append("🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.")
     if source == "vision":
         conf = draft.get("confidence", 0)
         warn.append(f"🤖 Rasmdan o'qildi (ishonch {conf:.0%}) — darajalarni tekshiring.")
@@ -903,16 +929,18 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     d = item["draft"]
+    entry_mode = d.get("entry_mode", "limit")
     sig_id = await db.create_signal(ws["id"], {
         "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
         "sl": d["sl"], "tps": d["tps"], "chart_file_id": item["file_id"],
         "author_id": q.from_user.id, "note": d.get("reasoning"),
-        "market": d.get("market", "crypto"),
+        "market": d.get("market", "crypto"), "entry_mode": entry_mode,
     })
     PENDING.pop(token, None)
     await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
+    group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
         body = draft_text(d, sig_id)
         try:
@@ -924,9 +952,20 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 sent = await ctx.bot.send_message(
                     ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
                     message_thread_id=ws["group_topic_id"])
-            await db.set_group_msg(sig_id, sent.message_id)
+            group_msg_id = sent.message_id
+            await db.set_group_msg(sig_id, group_msg_id)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
+
+    if entry_mode == "market" and ws["type"] == "group" and ws["group_chat_id"]:
+        try:
+            await ctx.bot.send_message(
+                ws["group_chat_id"],
+                f"▶️ <b>#{sig_id} {d['symbol']}</b> — pozitsiya ochildi @ <b>{fmt_price(d['entry'])}</b>",
+                parse_mode=ParseMode.HTML, reply_to_message_id=group_msg_id,
+                allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+        except Exception:
+            log.exception("Guruhga yuborilmadi (oddiy rejim ochilish xabari)")
 
     if ws["deposit"] is not None:
         AWAITING_ALLOC[q.from_user.id] = sig_id
@@ -1265,6 +1304,7 @@ def main() -> None:
             ],
             WIZ_SYMBOL: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_symbol)],
+            WIZ_MODE: [CallbackQueryHandler(wizard_mode, pattern=r"^wiz_mode:")],
             WIZ_SIDE: [CallbackQueryHandler(wizard_side, pattern=r"^wiz_side:")],
             WIZ_ENTRY: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_entry)],

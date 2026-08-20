@@ -108,11 +108,17 @@ Stop: 64 000
 ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80
 
 eth long 3200 3400 3550 3100      ← kalit so'zsiz: entry, TP lar, SL
+
+BTCUSDT LONG market entry 65000 tp 67000 sl 64000   ← "market" — darhol ochiq
 ```
 
-Bot juftlikni MEXC Spot ro'yxati bilan tekshiradi, LONG/SHORT mantiqini
-validatsiya qiladi (SL entrydan past bo'lishi va h.k.) va risk 25% dan oshsa
-ogohlantiradi.
+Bot juftlikni MEXC Spot (yoki forex bo'lsa Twelve Data) ro'yxati bilan tekshiradi,
+LONG/SHORT mantiqini validatsiya qiladi (SL entrydan past bo'lishi va h.k.) va
+risk 25% dan oshsa ogohlantiradi.
+
+**Kirish rejimi:** standart holatda ("limit") signal narx `entry` darajasiga
+tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
+"🎯 Oddiy" tanlansa) — signal darhol "ochiq" deb hisoblanadi, kutmasdan.
 
 ---
 

@@ -186,6 +186,29 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       signal parallel bo'lsa bu limitga tez yetish mumkin — hozircha alohida
       navbat/keshlash qilinmagan (MVP), kerak bo'lsa keyinroq qo'shiladi.
 
+15. **`signals.entry_mode` — 'market' (oddiy) vs 'limit' (standart), `tracker.py`
+    ga UMUMAN TEGILMAGAN.**
+    Avval har bir signal PENDING'dan boshlanib, narx `entry` darajasiga tegmaguncha
+    kutar edi (limit-order mantig'i) — admin "allaqachon kirib bo'lgan" savdoni
+    yozganda ham shu tekshiruv ishlar edi, ba'zan chalkashlikka sabab bo'lardi.
+    - Yechim ataylab `tracker.py`'da EMAS, `db.create_signal()`'da: `entry_mode`
+      `'market'` bo'lsa, signal to'g'ridan-to'g'ri `status='ACTIVE'`,
+      `opened_at=now()` bilan yaratiladi (PENDING bosqichisiz). `tracker.process()`
+      buni PENDING deb hech qachon ko'rmaydi — shuning uchun uning BUZILMASIN
+      #1-4 dagi sinovdan o'tgan holat mashinasi bir qatorga ham tegilmadi
+      (`test_tracker.py` shu sababdan o'zgarishsiz qoladi).
+    - `'limit'` (standart, hozirgi xatti-harakat) — status PENDING, `tracker.py`
+      narx `entry`ga tegishini kutadi, xuddi avvalgidek.
+    - Tanlov ikki joyda: sehrgarda (`WIZ_MODE` bosqichi, symbol'dan keyin, side'dan
+      oldin — "🎯 Oddiy" / "⏳ Limit" tugmalari) va tezkor matn/caption'da
+      (`parsing.parse()` — matnda "market" yoki "bozor" so'zi bo'lsa market,
+      aks holda limit; shu so'zlar juftlik nomi deb noto'g'ri o'qilib qolmasligi
+      uchun symbol-exclusion ro'yxatiga ham qo'shilgan).
+    - Market rejimda `tracker.py` hech qachon "OPEN" hodisasini chiqarmaydi (chunki
+      status hech qachon PENDING→ACTIVE o'tmaydi), shuning uchun guruhga "▶️
+      pozitsiya ochildi" xabari `poll_job` orqali emas — `on_button()`'ning o'zida,
+      signal yaratilgan zahoti, sinxron yuboriladi.
+
 ---
 
 ## Buyruqlar
