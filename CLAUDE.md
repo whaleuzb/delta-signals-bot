@@ -340,9 +340,10 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - `db.equity_series()` endi `since`/`until` qabul qiladi (avval doim
       BUTUN tarixni qaytarardi — shuning uchun `/month`/`/yil`da "Jami foiz"
       to'g'ri davrga mos kelsa ham "Kompaund" sirli ravishda har doim
-      ALL-TIME edi, alohida latent xato). `equity_chart()` esa hali ham
-      argumentsiz chaqiradi (grafik har doim to'liq tarixni ko'rsatishi
-      kerak — o'zgarmadi).
+      ALL-TIME edi, alohida latent xato). `equity_chart()` argumentsiz
+      chaqiraveradi (grafik har doim to'liq tarixni ko'rsatadi — davr bilan
+      kesilmaydi), lekin #22'da o'zi ham pozitsiya hajmiga qarab hisoblanadigan
+      bo'ldi.
     - **Yangi: jarayondagi (ochiq) pozitsiyalar `/stats`da ham ko'rinadi**
       (`stats._open_summary()`) — foydalanuvchi "nega guruhda ko'proq signal
       bor-ku, hisobotda faqat yopilganlar ko'rinadi" deb chalkashgani uchun.
@@ -356,6 +357,33 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       ko'rsatardi (`cmd_symbols()`/`on_menu()`'s "symbols" tarmog'i). Ikkala
       bo'lim solishtirilganda "mos kelmayapti" degan taassurot shundan edi —
       endi ikkalasi ham "Barchasi" bilan boshlanadi.
+
+22. **Depozit endi signal yopilganda avtomatik yangilanadi + Equity grafigi
+    ham pozitsiya hajmiga qarab (real balans) chiziladi.**
+    - **Depozit avval statik son edi.** `/depozit` faqat qo'lda kiritilardi —
+      signal yopilganda hech qachon o'zgarmasdi, shuning uchun "joriy depozit"
+      haqiqiy hisob balansini aks ettirmasdi (foydalanuvchi buni to'g'ri
+      payqadi: "yopilgan pnl umumiy depozitga nega qo'shilmagan?").
+      `db.apply_deposit_delta()` — yangi funksiya, faqat `deposit IS NOT NULL`
+      workspace'larda ishlaydi. `bot.poll_job()` endi signal TO'LIQ yopilganda
+      (STOP hodisasi, yoki yakuniy TP — `e.get("closes")`) va unda
+      `alloc_amount` bo'lsa, real pul natijasini (`pnl_pct/100*alloc_amount`)
+      depozitga qo'shadi/ayiradi — bir marta, signal yopilgan zahoti.
+    - Bir martalik skript (`reconcile_deposit.py`, ishlatilib o'chirilgan) —
+      yangi avtomatik yangilanish yozilishidan OLDIN yopilgan signallarning
+      real natijasini joriy depozitga bir martalik qo'shib qo'ydi (Whales Uzb:
+      100 000 → 105 261.42, 14 ta signal).
+    - **Equity grafigi (`stats.equity_chart()`) xuddi shu sabab bilan
+      shishirilgan edi** — `pnl_pct`ni to'g'ridan-to'g'ri kompaundlab, 100'dan
+      boshlanuvchi indeks chizardi (har savdo xuddi butun depozit bilan
+      kirilgandek). Endi `deposit` parametri qo'shildi (`cmd_equity()`/
+      `on_menu()`'s "equity" tarmog'i ikkalasi ham `ws["deposit"]`ni
+      uzatadi): berilsa, egri chiziq REAL PUL balansida chiziladi — boshlang'ich
+      balans joriy depozitdan shu davrdagi jami real natijani ORQAGA AYIRIB
+      topiladi, keyin har savdo o'z `alloc_amount`i bilan ketma-ket qo'shiladi
+      (`summary()`dagi bilan bir xil mantiq). Drawdown %'i o'zgarmadi (nisbiy
+      hisob — pul yoki indeks, farqi yo'q). `deposit` yo'q workspace'larda —
+      eski 100-indeksli, pozitsiya hajmisiz egri chiziq (o'zgarmagan).
 
 ---
 

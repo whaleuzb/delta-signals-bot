@@ -591,7 +591,8 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             "Yangilash uchun: <code>/depozit 1000</code>", parse_mode=ParseMode.HTML,
             reply_markup=MENU_BACK_KB)
     elif action == "equity":
-        buf = await stats.equity_chart(ws["id"])
+        deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+        buf = await stats.equity_chart(ws["id"], deposit)
         if buf is None:
             await q.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
                                         reply_markup=MENU_BACK_KB)
@@ -1323,7 +1324,8 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    buf = await stats.equity_chart(ws["id"])
+    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    buf = await stats.equity_chart(ws["id"], deposit)
     if buf is None:
         await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
                                          reply_markup=MENU_BACK_KB)

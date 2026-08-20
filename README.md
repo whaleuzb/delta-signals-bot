@@ -71,6 +71,10 @@ kirilgani (`alloc_amount`) bo'yicha depozitga nisbatan tortiladi — signal
 +30% ko'rsatgani depozitning +30% o'sishini anglatmaydi, agar shu savdoga
 depozitning faqat bir qismi ishlatilgan bo'lsa. Depozit belgilanmagan
 workspace'larda — eski, pozitsiya hajmisiz narx-harakati foizi ko'rsatiladi.
+`/equity` grafigi ham xuddi shu mantiqda — deposit bo'lsa REAL pul balansida
+chiziladi, bo'lmasa eski 100-indeksli egri chiziq ko'rsatiladi. Signal
+yopilganda depozit o'zi ham avtomatik yangilanadi (real natija qo'shiladi/
+ayiriladi) — qo'lda hisoblash shart emas.
 
 ---
 

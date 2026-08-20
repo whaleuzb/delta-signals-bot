@@ -210,22 +210,44 @@ async def symbols_table(workspace_id: int, since=None, until=None,
     return "\n".join(t)
 
 
-async def equity_chart(workspace_id: int) -> io.BytesIO | None:
+async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
+    """deposit berilsa — egri chiziq REAL pul balansida chiziladi: har savdo
+    xuddi summary()dagi kabi o'z alloc_amount'i bo'yicha depozitga qo'shiladi
+    (pnl_pct ni to'g'ridan-to'g'ri kompaundlash emas — u har savdoni butun
+    depozit bilan kirilgandek hisoblab, egri chiziqni sun'iy shishirar edi).
+    Boshlang'ich balans joriy depozitdan bu davrdagi real natijani ayirib
+    (orqaga qarab) hisoblanadi. deposit yo'q workspace'larda — eski,
+    pozitsiya hajmisiz 100-indeksli egri chiziq (o'zgarmagan)."""
     rows = await db.equity_series(workspace_id)
     if len(rows) < 2:
         return None
 
+    weighted = deposit is not None
     dates, eq = [], []
-    cur = 100.0
-    for r in rows:
-        cur *= (1 + float(r["pnl_pct"]) / 100)
-        dates.append(r["closed_at"].astimezone(TZ))
-        eq.append(cur)
 
+    if weighted:
+        deposit = float(deposit)
+        total_real = sum(
+            float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
+            for r in rows if r["alloc_amount"] is not None)
+        cur = deposit - total_real
+        for r in rows:
+            if r["alloc_amount"] is not None:
+                cur += float(r["pnl_pct"]) / 100 * float(r["alloc_amount"])
+            dates.append(r["closed_at"].astimezone(TZ))
+            eq.append(cur)
+    else:
+        cur = 100.0
+        for r in rows:
+            cur *= (1 + float(r["pnl_pct"]) / 100)
+            dates.append(r["closed_at"].astimezone(TZ))
+            eq.append(cur)
+
+    base = eq[0]
     peak, dd = eq[0], []
     for v in eq:
         peak = max(peak, v)
-        dd.append((v - peak) / peak * 100)
+        dd.append((v - peak) / peak * 100 if peak else 0.0)
     max_dd = min(dd)
 
     fig, (ax, ax2) = plt.subplots(
@@ -240,16 +262,26 @@ async def equity_chart(workspace_id: int) -> io.BytesIO | None:
         for sp in a.spines.values():
             sp.set_color("#2a2f3a")
 
-    up = eq[-1] >= 100
+    up = eq[-1] >= base
     col = "#26a69a" if up else "#ef5350"
     ax.plot(dates, eq, color=col, lw=2)
-    ax.fill_between(dates, 100, eq, color=col, alpha=0.15)
-    ax.axhline(100, color="#5a6373", lw=0.8, ls="--")
-    ax.set_ylabel("Balans (boshlanish = 100)", color="#9aa4b2", fontsize=9)
-    ax.set_title(
-        f"Equity curve  •  {len(eq)} signal  •  {eq[-1] - 100:+.1f}%  •  max DD {max_dd:.1f}%",
-        color="#e6e9ef", fontsize=12, pad=12,
-    )
+    ax.fill_between(dates, base, eq, color=col, alpha=0.15)
+    ax.axhline(base, color="#5a6373", lw=0.8, ls="--")
+
+    if weighted:
+        change_pct = (eq[-1] / base - 1) * 100 if base else 0.0
+        ax.set_ylabel("Balans (depozit)", color="#9aa4b2", fontsize=9)
+        ax.set_title(
+            f"Equity curve  •  {len(eq)} signal  •  {eq[-1] - base:+,.2f}  "
+            f"({change_pct:+.1f}%)  •  max DD {max_dd:.1f}%",
+            color="#e6e9ef", fontsize=12, pad=12,
+        )
+    else:
+        ax.set_ylabel("Balans (boshlanish = 100)", color="#9aa4b2", fontsize=9)
+        ax.set_title(
+            f"Equity curve  •  {len(eq)} signal  •  {eq[-1] - 100:+.1f}%  •  max DD {max_dd:.1f}%",
+            color="#e6e9ef", fontsize=12, pad=12,
+        )
 
     ax2.fill_between(dates, dd, 0, color="#ef5350", alpha=0.4)
     ax2.set_ylabel("Drawdown %", color="#9aa4b2", fontsize=9)
