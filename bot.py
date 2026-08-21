@@ -726,13 +726,29 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
 
     if ws["type"] == "group" and ws["group_chat_id"]:
+        txt = (f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
+               f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}")
+        # close_now() endi natijani bazaga yozib bo'lgan — yangilangan yozuv
+        # (closed_at/exit_price/pnl_pct) bilan xuddi avtomatik TP/SL yopilishidagi
+        # kabi grafik chiziladi (chart.py — real shamlar + entry/TP/SL chiziqlari).
+        photo = None
+        sig2 = await db.get_signal(sig_id)
+        if sig2:
+            try:
+                photo = await chart.signal_chart(sig2, ws["name"], ctx.bot.username)
+            except Exception:
+                log.warning("Grafik yasalmadi (qo'lda yopish, #%s)", sig_id, exc_info=True)
         try:
-            await ctx.bot.send_message(
-                ws["group_chat_id"],
-                f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
-                f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}",
-                parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
-                allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+            if photo:
+                await ctx.bot.send_photo(
+                    ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
+                    parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
+                    allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+            else:
+                await ctx.bot.send_message(
+                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                    reply_to_message_id=sig["group_msg_id"],
+                    allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
         except Exception:
             log.exception("Guruhga yuborilmadi (qo'lda yopish)")
 

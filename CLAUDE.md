@@ -672,6 +672,15 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       aks holda (shamlar yetarli emas, birja javob bermadi va h.k.) jim
       tarzda avvalgi `send_message(txt)`ga qaytiladi — hech qachon
       natija xabarining o'zi yo'qolmaydi.
+    - Qo'lda yopish (`on_close_confirm` → `tracker.close_now()`, "vaqtidan
+      oldin yopish") ham xuddi shunday grafik oladi — foydalanuvchi savoli:
+      "vaqtidan oldin yopsam ham natijasi ko'rinadimi?". `close_now()`
+      bazaga yozib bo'lgach `db.get_signal()` bilan yangilangan yozuv qayta
+      o'qiladi (closed_at/exit_price/pnl_pct endi to'ldirilgan), keyin xuddi
+      avtomatik yopilishdagi bir xil `chart.signal_chart()` chaqiriladi.
+      CANCELLED holat (PENDING entryga tegmay bekor qilingan) bundan
+      mustasno — u yerda hech qachon narx harakati bo'lmagan, grafik
+      ma'nosiz.
     - `tracker.py`ga tegilmadi — faqat `tracker.provider()` funksiyasi
       qayta ishlatildi, shuning uchun `test_tracker.py` qayta ishga
       tushirilib (9/9 holat o'zgarishsiz), tracker buzilmagani tasdiqlandi.
