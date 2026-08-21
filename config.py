@@ -41,9 +41,11 @@ CONSERVATIVE_SAME_CANDLE = True
 
 TZ = os.getenv("TZ", "Asia/Tashkent")
 
-# /yordam bo'limidagi "to'liq qo'llanma" havolasi. Env orqali o'zgartiriladi —
-# qo'llanma boshqa joyga ko'chirilsa kodga tegish shart emas. Bo'sh qilinsa
-# tugma ko'rsatilmaydi (bot ichidagi yo'riqnoma baribir to'liq ishlaydi).
+# /yordam bo'limidagi "to'liq qo'llanma" havolasi — Telegraph maqolasi.
+# Telegraph tanlandi, chunki u Telegram ichida darhol ochiladi va LOGIN
+# TALAB QILMAYDI (oddiy veb-sahifa foydalanuvchidan login so'rab to'siq
+# bo'lgan edi). guide.py + publish_guide.py bilan qayta chop etiladi.
+# Bo'sh qilinsa tugma ko'rsatilmaydi (bot ichidagi yo'riqnoma baribir to'liq).
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
-    "https://claude.ai/code/artifact/dc1aa63e-69ed-4435-bfa9-e1b805f4dd97")
+    "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")

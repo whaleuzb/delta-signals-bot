@@ -575,6 +575,21 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       etilgan teglar, escape qilinmagan `<`/`>` yo'q, 4096 belgidan qisqa) —
       noto'g'ri teg butun xabarni yuborilmay qoldiradi.
 
+29. **Qo'llanma — Telegraph maqolasi, veb-sahifa emas.**
+    - Avval qo'llanma oddiy veb-sahifa (Claude artifact) edi — foydalanuvchidan
+      LOGIN so'rardi va bu to'siq bo'ldi. Telegraph esa Telegram ichida darhol
+      ochiladi, login talab qilmaydi va guruhga qadab qo'yish mumkin.
+    - `guide.py` — matn Telegraph node ko'rinishida. Telegraph faqat cheklangan
+      teglarni qabul qiladi (h3/h4, p, ul/ol/li, b, i, code, pre, blockquote,
+      aside, hr, a) — **h1/h2 va JADVAL yo'q**, shuning uchun kalit so'zlar
+      jadvali ro'yxatga aylantirilgan.
+    - `publish_guide.py` — chop etadi va `getPage` bilan tekshiradi.
+      `TELEGRAPH_TOKEN` + `TELEGRAPH_PATH` env bo'lsa `editPage` ishlatiladi:
+      YANGI sahifa yaratilmaydi, **havola o'zgarmaydi** — guruhga qadalgan
+      xabar eskirmaydi. Ikkalasi Railway env'ida saqlangan.
+    - Chop etish Railway'dan bajariladi: bu sandbox'dan `api.telegra.ph` ga
+      tarmoq ruxsati yo'q (tashkilot siyosati, 403).
+
 ---
 
 ## Buyruqlar
