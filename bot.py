@@ -7,6 +7,7 @@ bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 """
 import html
 import io
+import os
 import logging
 import secrets
 import time
@@ -508,15 +509,56 @@ HELP_TOPICS = {
 }
 
 
+# Mavzuga mos rasm. Telegraph rasm yuklashni qabul qilmagani uchun (upload
+# xizmati anonim yuklashni cheklagan) rasmlar botning O'ZI orqali yuboriladi —
+# tashqi hosting kerak emas va rasm foydalanuvchi chatida saqlanib qoladi.
+HELP_IMAGES = {
+    "setup": "guide_images/01-guruh-ulash.png",
+    "signal": "guide_images/02-signal-formati.png",
+    "errors": "guide_images/03-xatolar.png",
+    "after": "guide_images/04-keyin-nima-boladi.png",
+}
+# Telegram bir marta yuklangan faylni file_id bilan qayta ishlatadi — har
+# safar qaytadan yuklamaslik uchun keshlaymiz (rasm ~200 KB).
+_photo_ids: dict[str, str] = {}
+
+
+async def send_help_photo(bot, chat_id: int, key: str, caption: str | None = None) -> bool:
+    """Mavzuga mos rasmni yuboradi. Rasm topilmasa/yuborilmasa False —
+    chaqiruvchi yordam matnini baribir ko'rsatadi."""
+    path = HELP_IMAGES.get(key)
+    if not path:
+        return False
+    try:
+        if key in _photo_ids:
+            await bot.send_photo(chat_id, _photo_ids[key], caption=caption,
+                                  parse_mode=ParseMode.HTML if caption else None)
+            return True
+        if not os.path.exists(path):
+            log.warning("Yordam rasmi topilmadi: %s", path)
+            return False
+        with open(path, "rb") as f:
+            msg = await bot.send_photo(
+                chat_id, InputFile(f, os.path.basename(path)), caption=caption,
+                parse_mode=ParseMode.HTML if caption else None)
+        if msg.photo:
+            _photo_ids[key] = msg.photo[-1].file_id
+        return True
+    except Exception:
+        log.exception("Yordam rasmi yuborilmadi (%s)", key)
+        return False
+
+
 def help_menu_kb() -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton("👥 Guruhni ulash", callback_data="help:setup"),
          InlineKeyboardButton("📈 Signal kiritish", callback_data="help:signal")],
         [InlineKeyboardButton("⏳ Limit / Market", callback_data="help:mode"),
          InlineKeyboardButton("🔧 Xatolar", callback_data="help:errors")],
+        [InlineKeyboardButton("🖼 Rasmli yo'riqnoma", callback_data="help:rasm")],
     ]
     if config.GUIDE_URL:
-        rows.append([InlineKeyboardButton("📘 To'liq rasmli qo'llanma",
+        rows.append([InlineKeyboardButton("📘 To'liq qo'llanma (maqola)",
                                            url=config.GUIDE_URL)])
     rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
     return InlineKeyboardMarkup(rows)
@@ -535,19 +577,33 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
     topic = q.data.split(":", 1)[1]
+    chat_id = q.message.chat_id
+
     if topic == "home":
         await q.edit_message_text(HELP_INTRO, parse_mode=ParseMode.HTML,
                                    reply_markup=help_menu_kb())
         return
+
+    if topic == "rasm":
+        # Hamma rasm ketma-ket — yangi boshlovchi bittada ko'rib chiqadi.
+        for key in ("setup", "signal", "errors", "after"):
+            await send_help_photo(ctx.bot, chat_id, key)
+        await ctx.bot.send_message(
+            chat_id, "🖼 Yo'riqnoma rasmlari. Batafsil matn uchun bo'limni tanlang.",
+            reply_markup=help_menu_kb())
+        return
+
     txt = HELP_TOPICS.get(topic)
     if not txt:
         return
     kb = [[InlineKeyboardButton("◀️ Yordam", callback_data="help:home")]]
     if config.GUIDE_URL:
-        kb.insert(0, [InlineKeyboardButton("📘 To'liq rasmli qo'llanma",
+        kb.insert(0, [InlineKeyboardButton("📘 To'liq qo'llanma (maqola)",
                                             url=config.GUIDE_URL)])
-    await q.edit_message_text(txt, parse_mode=ParseMode.HTML,
-                               reply_markup=InlineKeyboardMarkup(kb))
+    # Rasm bo'lsa — avval rasm, keyin matn: rasm ko'zga birinchi tashlanadi.
+    await send_help_photo(ctx.bot, chat_id, topic)
+    await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML,
+                                reply_markup=InlineKeyboardMarkup(kb))
 
 
 async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | None]:

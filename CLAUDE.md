@@ -590,6 +590,25 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - Chop etish Railway'dan bajariladi: bu sandbox'dan `api.telegra.ph` ga
       tarmoq ruxsati yo'q (tashkilot siyosati, 403).
 
+30. **Yo'riqnoma rasmlari — botning o'zi yuboradi, tashqi hosting yo'q.**
+    - Rasmlar HTML/CSS dan **Chromium (Playwright) skrinshoti** bilan
+      yasalgan (`guide_images/_manba.html` — manba, tahrirlab qayta render
+      qilish mumkin). matplotlib bunday maket uchun yaroqsiz edi.
+    - **Telegraph rasm yuklashni QABUL QILMAYDI.** Ikki xato ketma-ket
+      chiqdi: avval `api.telegra.ph/upload` → `UNKNOWN_METHOD` (yuklash
+      `api.` prefiksisiz boshqa hostda), keyin to'g'ri manzilda ham
+      `Unknown error` — xizmat anonim yuklashni cheklab qo'ygan. Chetlab
+      o'tilmadi.
+    - Yechim: rasmlar **bot orqali** yuboriladi (`send_help_photo`).
+      Tashqi hosting kerak emas, login yo'q, rasm foydalanuvchi chatida
+      qolib ketadi. Telegram `file_id` keshlanadi (`_photo_ids`) — bir marta
+      yuklanadi, keyin qayta ishlatiladi.
+    - `guide.py` dagi `_fig()` baribir qoldirildi: rasm URL'i bo'lmasa figure
+      tashlab ketiladi, ya'ni maqola matn bilan buzilmasdan chop etiladi.
+      Kelajakda rasm hosting topilsa, faqat URL berish kifoya.
+    - `.gitignore` da `*.png` bor edi — `!guide_images/*.png` istisnosi
+      qo'shildi, aks holda rasmlar repoga tushmasdi.
+
 ---
 
 ## Buyruqlar
