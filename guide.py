@@ -14,6 +14,9 @@ import os
 import httpx
 
 API = "https://api.telegra.ph"
+# Rasm yuklash api. prefiksisiz boshqa hostda — api.telegra.ph/upload
+# UNKNOWN_METHOD qaytaradi.
+UPLOAD = "https://telegra.ph/upload"
 TITLE = "Trade Controller — guruh ulash va signal kiritish"
 AUTHOR = "Trade Controller"
 
@@ -74,7 +77,7 @@ async def upload_images(client) -> dict:
             continue
         try:
             with open(path, "rb") as f:
-                r = await client.post(f"{API}/upload",
+                r = await client.post(UPLOAD,
                                        files={"file": (os.path.basename(path), f, "image/png")})
             j = r.json()
             src = j[0]["src"] if isinstance(j, list) and j and "src" in j[0] else None
