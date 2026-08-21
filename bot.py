@@ -1310,11 +1310,28 @@ MILESTONE_STEP = 5
 
 def milestone_band(pnl: float) -> int:
     """pnl foizini MILESTONE_STEP'ga karrali bosqichga aylantiradi:
-    +12.3% -> 10, -7.1% -> -5. |pnl| < STEP bo'lsa 0 (hali bosqichga yetmagan —
-    bosqichdan chiqib ketgan holat ham shu, keyinroq qaytib kirsa qayta xabar
-    beriladi)."""
+    +12.3% -> 10, -7.1% -> -5. |pnl| < STEP bo'lsa 0."""
     mag = int(abs(pnl) // MILESTONE_STEP) * MILESTONE_STEP
     return mag if pnl >= 0 else -mag
+
+
+def milestone_should_notify(last: int, band: int) -> bool:
+    """Faqat NOLDAN UZOQROQ yangi bosqichga birinchi marta yetganda xabar
+    beriladi ("храповик"/ratchet).
+
+    Avval bosqich har o'zgarganda xabar ketardi va narx chegara atrofida
+    tebranganda (+5.35% → +4.98% → +5.01%) bir xil bosqich uchun cheksiz
+    takroriy xabar yuborilardi — jonli guruhda bu spam bo'lib chiqdi.
+
+    Endi: +5 e'lon qilingach, yana +5 e'lon qilinmaydi; faqat +10 (yoki
+    zararga o'tsa -5) yangi xabar beradi. Ishora almashsa hisob qaytadan
+    boshlanadi — bu haqiqiy katta o'zgarish (kamida 2 bosqichlik yurish),
+    shuning uchun xabar berishga arziydi."""
+    if band > 0:
+        return band > max(last, 0)
+    if band < 0:
+        return band < min(last, 0)
+    return False  # 0 — bosqich yo'q, xabar ham yo'q
 
 
 async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1355,11 +1372,12 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         pnl = tracker.pnl_at(s["side"], float(s["entry"]), price)
         band = milestone_band(pnl)
-        if band == s["milestone_pct"]:
+        if not milestone_should_notify(s["milestone_pct"], band):
             continue
+        # Faqat XABAR YUBORILGANDA saqlanadi. Avval bosqich har o'zgarganda
+        # (0 ga tushganda ham) yozilardi — aynan shu tebranish spamiga
+        # sabab bo'lgan edi.
         await db.set_milestone(s["id"], band)
-        if band == 0:
-            continue
 
         ws = await get_ws(s["workspace_id"])
         if not ws:

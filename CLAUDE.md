@@ -305,12 +305,19 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       aylantiradi (masalan +12.3% → 10, -7.1% → -5, |pnl|<5% → 0). Bosqich
       o'zgarsa (ikki tomonga ham — foyda oshsa/kamaysa, zarar chuqurlashsa/
       kamaysa) va nolga teng bo'lmasa — xabar yuboriladi (📈/📉) va
-      `db.set_milestone()` yangilanadi. `band == 0` ham saqlanadi (bosqichdan
-      chiqib ketgan holat) — shu tufayli keyinroq xuddi shu bosqichga qaytib
-      kirilsa, qayta xabar beriladi (faqat "rekord"ni emas, har bir bosqich
-      chegarasini kuzatadi — retracement/qayta o'sish ham bildirishnoma
-      oladi, chunki bu foydalanuvchiga pozitsiyani "nazorat qilishga" ko'proq
-      yordam beradi).
+      `db.set_milestone()` yangilanadi.
+    - **TUZATILDI (spam edi):** avval bosqich HAR o'zgarganda xabar ketardi va
+      `band == 0` ham saqlanardi. Narx chegara atrofida tebranganda
+      (+5.35% → +4.98% → +5.01%) har siklda bir xil "+5% bosqichi" xabari
+      qayta yuborilardi — jonli guruhda 3 ta signal uchun soatiga o'nlab
+      xabar. Mening dastlabki asosim ("qaytib kirsa qayta xabar berish
+      foydali") amalda noto'g'ri chiqdi.
+      Endi `milestone_should_notify(last, band)` — ratchet: xabar faqat
+      NOLDAN UZOQROQ yangi bosqichga birinchi marta yetganda beriladi
+      (+5 e'lon qilingach yana +5 emas, faqat +10; zararga o'tsa -5).
+      `milestone_pct` faqat XABAR YUBORILGANDA saqlanadi — 0 ga hech qachon
+      qaytarilmaydi. Ishora almashsa hisob qaytadan boshlanadi (bu kamida
+      2 bosqichlik haqiqiy yurish).
     - Xabar yo'nalishi `poll_job` bilan bir xil: guruh workspace bo'lsa signal
       postiga reply, shaxsiy workspace bo'lsa egasiga DM.
 
