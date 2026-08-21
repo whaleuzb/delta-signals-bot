@@ -609,6 +609,25 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - `.gitignore` da `*.png` bor edi — `!guide_images/*.png` istisnosi
       qo'shildi, aks holda rasmlar repoga tushmasdi.
 
+31. **Broadcast (`/admin` → 📣 Broadcast).**
+    - **`copy_message` ishlatiladi, `send_message` emas** — admin xabarni
+      qanday yozsa (matn, rasm, video, formatlash) shundayligicha ketadi va
+      "forwarded from" yozuvi chiqmaydi. Aks holda har bir tur uchun alohida
+      kod yozish kerak bo'lardi.
+    - **Tezlik ataylab cheklangan: 20 xabar/sekund** (`BROADCAST_PER_SEC`).
+      Telegram ~30/sek ruxsat beradi; undan oshsa flood-limit tushadi va bot
+      VAQTINCHA JAZOLANADI — ya'ni signal xabarlari ham yetmay qoladi.
+    - `RetryAfter` tutilganda kutiladi va **o'sha odamga qayta urinadi**
+      (tashlab ketilmaydi — aks holda xabar unga yetmasdi).
+    - `Forbidden` (bot bloklangan) → `users.blocked = TRUE`, keyingi
+      broadcast'da o'tkazib yuboriladi. Odam qaytib kelsa `upsert_user()`
+      uni avtomatik FALSE ga qaytaradi (u har update'da ishlaydi).
+    - **Job sifatida ishlaydi** (`job_queue.run_once`) — yuborish uzoq
+      davom etsa ham bot javob berishda davom etadi.
+    - Tasdiqlash bosqichi majburiy: hammaga ketgan xabarni qaytarib
+      bo'lmaydi, shuning uchun avval nechta odamga ketishi va taxminiy vaqt
+      ko'rsatiladi.
+
 ---
 
 ## Buyruqlar

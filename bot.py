@@ -5,6 +5,7 @@ har bir yopiq Telegram guruhi o'z workspace'ini (/setup orqali) ochishi,
 yoki istalgan odam shaxsiy jurnal sifatida foydalanishi mumkin. Workspace'lar
 bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 """
+import asyncio
 import html
 import io
 import os
@@ -17,6 +18,7 @@ from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile,
 )
 from telegram.constants import ParseMode
+from telegram.error import Forbidden, RetryAfter
 from telegram.ext import (
     Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
     CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
@@ -45,6 +47,9 @@ AWAITING_EDIT: dict[int, str] = {}
 AWAITING_ALLOC: dict[int, int] = {}
 # super-admin id -> True (majburiy obuna uchun kanal kutilmoqda)
 AWAITING_CHANNEL: dict[int, bool] = {}
+# Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
+AWAITING_BROADCAST: dict[int, bool] = {}
+PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
 
 
 def is_admin(uid: int) -> bool:
@@ -1149,6 +1154,9 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if AWAITING_CHANNEL.pop(uid, None) and is_admin(uid):
         await handle_channel_add(update, ctx)
         return
+    if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
+        await handle_broadcast_input(update, ctx)
+        return
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -1185,6 +1193,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
     if AWAITING_CHANNEL.pop(uid, None) and is_admin(uid):
         await handle_channel_add(update, ctx)
+        return
+
+    if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
+        await handle_broadcast_input(update, ctx)
         return
 
     alloc_sig_id = AWAITING_ALLOC.get(uid)
@@ -1594,6 +1606,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_EDIT.pop(update.effective_user.id, None)
     AWAITING_ALLOC.pop(update.effective_user.id, None)
+    AWAITING_BROADCAST.pop(update.effective_user.id, None)
+    PENDING_BROADCAST.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
     await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
 
@@ -1875,6 +1889,7 @@ def admin_home_kb() -> InlineKeyboardMarkup:
          InlineKeyboardButton("🙍 Foydalanuvchilar", callback_data="adm:users:0")],
         [InlineKeyboardButton("📢 Majburiy obuna", callback_data="adm:ch"),
          InlineKeyboardButton("🛡 Tasdiqlar", callback_data="adm:pend")],
+        [InlineKeyboardButton("📣 Broadcast", callback_data="adm:bc")],
         [InlineKeyboardButton("📄 Guruhlar PDF", callback_data="adm:pdfg"),
          InlineKeyboardButton("📄 Userlar PDF", callback_data="adm:pdfu")],
     ])
@@ -2174,6 +2189,23 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]), live=True)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
+    # ── Broadcast ──
+    elif action == "bc":
+        await _admin_broadcast_prompt(q)
+    elif action == "bcgo":
+        pend = PENDING_BROADCAST.pop(q.from_user.id, None)
+        AWAITING_BROADCAST.pop(q.from_user.id, None)
+        if not pend:
+            await q.edit_message_text("Yuboriladigan xabar topilmadi — qaytadan boshlang.",
+                                       reply_markup=ADMIN_BACK_KB)
+            return
+        from_chat, msg_id = pend
+        ctx.job_queue.run_once(
+            run_broadcast, when=0,
+            data={"admin": q.from_user.id, "from_chat": from_chat, "msg_id": msg_id})
+        await q.edit_message_text("📣 Yuborish boshlandi — tugagach hisobot keladi.",
+                                   reply_markup=ADMIN_BACK_KB)
+
     # ── PDF eksport ──
     elif action in ("pdfg", "pdfu"):
         await q.message.reply_text("📄 Tayyorlanmoqda…")
@@ -2231,6 +2263,95 @@ async def _admin_users_pdf() -> tuple[io.BytesIO, str]:
     buf = stats.pdf_table_report(
         "Foydalanuvchilar", f"Jami {total} ta", header, lines)
     return buf, f"userlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
+
+
+# ─────────────────────────── Broadcast ───────────────────────────
+# Telegram bir botdan turli odamlarga ~30 xabar/sekund ruxsat beradi. Undan
+# tez yuborilsa flood-limit tushadi va bot vaqtincha jazolanadi — shuning
+# uchun ataylab sekinroq (20/sek) yuboriladi.
+BROADCAST_PER_SEC = 20
+_BC_DELAY = 1.0 / BROADCAST_PER_SEC
+
+
+async def _admin_broadcast_prompt(q) -> None:
+    AWAITING_BROADCAST[q.from_user.id] = True
+    PENDING_BROADCAST.pop(q.from_user.id, None)
+    n = len(await db.broadcast_targets())
+    await q.edit_message_text(
+        "📣 <b>Broadcast</b>\n\n"
+        f"Xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n\n"
+        "Yubormoqchi bo'lgan xabaringizni shu yerga yuboring — matn, rasm, "
+        "video, nima bo'lsa ham. Qanday yuborsangiz, xuddi shundayligicha "
+        "yetkaziladi.\n\n"
+        "Bekor qilish uchun /bekor yozing.",
+        parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+
+
+async def handle_broadcast_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin yuborgan xabarni eslab qolib, tasdiqlashni so'raydi.
+
+    Xabar NUSXALANADI (copy_message) — shuning uchun matn ham, rasm ham,
+    formatlash ham o'zgarmasdan boradi va "forwarded from" yozuvi chiqmaydi.
+    Tasdiqlash bosqichi ataylab: hammaga yuborilgan xabarni qaytarib
+    bo'lmaydi."""
+    msg = update.effective_message
+    uid = update.effective_user.id
+    PENDING_BROADCAST[uid] = (msg.chat_id, msg.message_id)
+    n = len(await db.broadcast_targets())
+    await msg.reply_text(
+        f"⬆️ Shu xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n"
+        f"Taxminiy vaqt: ~{max(1, round(n * _BC_DELAY))} soniya.\n\n"
+        "Tasdiqlaysizmi?",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Ha, yuborilsin", callback_data="adm:bcgo")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="adm:home")],
+        ]))
+
+
+async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Job sifatida ishlaydi — yuborish uzoq davom etsa ham bot javob
+    berishda davom etadi."""
+    d = ctx.job.data
+    admin_id, from_chat, msg_id = d["admin"], d["from_chat"], d["msg_id"]
+    targets = await db.broadcast_targets()
+    sent = blocked = failed = 0
+
+    for uid in targets:
+        try:
+            await ctx.bot.copy_message(uid, from_chat, msg_id)
+            sent += 1
+        except Forbidden:
+            # Bot bloklangan yoki chat o'chirilgan — belgilab qo'yamiz, keyingi
+            # broadcast'da bekorga urinilmaydi.
+            blocked += 1
+            await db.mark_blocked(uid)
+        except RetryAfter as e:
+            # Flood-limit: kutamiz va SHU odamga qayta urinamiz (tashlab
+            # ketmaymiz — aks holda xabar unga yetmay qolardi).
+            log.warning("Broadcast flood-limit: %s s", e.retry_after)
+            await asyncio.sleep(e.retry_after + 1)
+            try:
+                await ctx.bot.copy_message(uid, from_chat, msg_id)
+                sent += 1
+            except Exception:
+                failed += 1
+        except Exception:
+            failed += 1
+            log.exception("Broadcast xatosi (uid=%s)", uid)
+        await asyncio.sleep(_BC_DELAY)
+
+    try:
+        await ctx.bot.send_message(
+            admin_id,
+            "📣 <b>Broadcast tugadi</b>\n\n"
+            f"✅ Yuborildi: <b>{sent}</b>\n"
+            f"🚫 Bloklaganlar: {blocked}\n"
+            f"⚠️ Xato: {failed}\n\n"
+            f"Jami: {len(targets)}",
+            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+    except Exception:
+        log.exception("Broadcast hisoboti yuborilmadi")
 
 
 async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

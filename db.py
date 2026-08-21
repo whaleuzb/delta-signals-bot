@@ -167,6 +167,11 @@ END $$;
 -- olmaydi. Ataylab O'CHIRISH emas — signal tarixi saqlanib qoladi va admin
 -- xohlasa qaytara oladi (bot guruhdan chiqarib yuborilgan holatlar uchun).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Botni bloklagan foydalanuvchi. Broadcast Forbidden xatosini olganda TRUE
+-- qilinadi va keyingi yuborishlarda o'tkazib yuboriladi (bekorga so'rov
+-- yubormaslik uchun). Odam qaytib kelsa upsert_user() uni FALSE ga qaytaradi.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -321,7 +326,8 @@ async def upsert_user(user_id: int, username: str | None, first_name: str | None
         await c.execute(
             "INSERT INTO users (user_id, username, first_name) VALUES ($1,$2,$3) "
             "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), "
-            "username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+            "username = EXCLUDED.username, first_name = EXCLUDED.first_name, "
+            "blocked = FALSE",
             user_id, username, first_name)
 
 
@@ -420,6 +426,19 @@ async def admin_user_detail(user_id: int) -> dict:
             "SELECT referrer_id FROM referrals WHERE referred_id=$1", user_id)
     return {"user": user, "owned": owned, "viewing": viewing,
             "invited": invited, "invited_by": invited_by}
+
+
+async def broadcast_targets() -> list[int]:
+    """Broadcast uchun user_id ro'yxati — bloklaganlar chiqarib tashlangan."""
+    async with pool().acquire() as c:
+        rows = await c.fetch(
+            "SELECT user_id FROM users WHERE NOT blocked ORDER BY user_id")
+    return [r["user_id"] for r in rows]
+
+
+async def mark_blocked(user_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE users SET blocked = TRUE WHERE user_id=$1", user_id)
 
 
 async def list_required_channels() -> list[asyncpg.Record]:
