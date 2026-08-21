@@ -44,12 +44,61 @@ def _h(t, level=3):
     return {"tag": f"h{level}", "children": [t]}
 
 
-def content() -> list:
+def _fig(url, caption=None):
+    """Rasm + izoh. url bo'lmasa bo'sh ro'yxat qaytaradi — rasm yuklanmay
+    qolsa ham maqola matni to'liq chiqaveradi."""
+    if not url:
+        return []
+    kids = [{"tag": "img", "attrs": {"src": url}}]
+    if caption:
+        kids.append({"tag": "figcaption", "children": [caption]})
+    return [{"tag": "figure", "children": kids}]
+
+
+# Rasm fayllari (guide_images/) — Telegraph'ga yuklanadi va maqolaga qo'yiladi.
+IMAGES = {
+    "setup": "guide_images/01-guruh-ulash.png",
+    "format": "guide_images/02-signal-formati.png",
+    "errors": "guide_images/03-xatolar.png",
+    "after": "guide_images/04-keyin-nima-boladi.png",
+}
+
+
+async def upload_images(client) -> dict:
+    """Rasmlarni telegra.ph ga yuklaydi va {kalit: url} qaytaradi.
+    Yuklanmagani jimgina tashlab ketiladi — maqola baribir chop etiladi."""
+    urls = {}
+    for key, path in IMAGES.items():
+        if not os.path.exists(path):
+            print(f"  rasm topilmadi, o'tkazib yuborildi: {path}")
+            continue
+        try:
+            with open(path, "rb") as f:
+                r = await client.post(f"{API}/upload",
+                                       files={"file": (os.path.basename(path), f, "image/png")})
+            j = r.json()
+            src = j[0]["src"] if isinstance(j, list) and j and "src" in j[0] else None
+            if src:
+                urls[key] = "https://telegra.ph" + src
+                print(f"  yuklandi: {key} -> {urls[key]}")
+            else:
+                print(f"  yuklanmadi ({key}): {j}")
+        except Exception as e:
+            print(f"  yuklashda xato ({key}): {e}")
+    return urls
+
+
+def content(img: dict | None = None) -> list:
     """Qo'llanma matni Telegraph tugunlari (node) ko'rinishida.
 
     Telegraph faqat cheklangan teglarni qabul qiladi (h3/h4, p, ul/ol/li, b, i,
     code, pre, blockquote, aside, hr, a, br) — h1/h2 va JADVAL yo'q, shuning
-    uchun kalit so'zlar jadvali ro'yxat sifatida berilgan."""
+    uchun kalit so'zlar jadvali ro'yxat sifatida berilgan.
+
+    img — {kalit: rasm_url}. Berilmasa yoki biror kalit yetishmasa, o'sha rasm
+    tashlab ketiladi va maqola faqat matn bilan chiqadi (rasm yuklanmay qolsa
+    ham chop etish buzilmasligi uchun)."""
+    img = img or {}
     return [
         _p("Botni ishga tushirishning to'liq yo'riqnomasi. Har bir qadam bot bilan "
            "haqiqiy suhbat ko'rinishida ko'rsatilgan."),
@@ -65,11 +114,7 @@ def content() -> list:
             ["Guruh ", _b("ichida"), " ", _code("/setup"), " yozing. Aynan guruhning "
              "o'zida, shaxsiy chatda emas."],
         ], ordered=True),
-        _pre("Siz:  /setup\n\n"
-             "Bot: ✅ \"Sizning guruhingiz\" workspace sifatida\n"
-             "     ro'yxatdan o'tdi!\n"
-             "     Endi botga shaxsiy xabar yozib (/start)\n"
-             "     signal kirita olasiz."),
+        *_fig(img.get("setup"), "Guruhni ulashning uch qadami"),
         {"tag": "blockquote", "children": [
             _b("Diqqat: "),
             "Faqat guruh admini /setup qila oladi. Bir admin — bitta guruh: "
@@ -98,6 +143,7 @@ def content() -> list:
 
         _h("Yo'l 2 — bitta xabar (tezkor)", 4),
         _p("Barcha darajalarni bitta xabarda yuboring:"),
+        *_fig(img.get("format"), "Signal qismlari: juftlik · yo'nalish · kirish · maqsadlar · stop"),
         _pre("BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000"),
         _p("Ko'p qatorli ko'rinish ham ishlaydi — odatda kanaldan nusxa olinadigan format:"),
         _pre("BTC/USDT\nLONG\nEntry: 65 000\nTP1 67 000\nTP2 68 500\nStop: 64 000"),
@@ -139,6 +185,7 @@ def content() -> list:
         # ── D ──
         _h("D. Ko'p uchraydigan xatolar"),
         _p("Botdan javob kelmasa yoki signal qabul qilinmasa, avval shularni tekshiring."),
+        *_fig(img.get("errors"), "Eng ko'p uchraydigan uchta xato"),
 
         _h("Bot javob bermayapti", 4),
         _p("Signalni guruhga yozgan bo'lishingiz mumkin. Signal faqat ", _b("shaxsiy chatda"),
@@ -164,12 +211,7 @@ def content() -> list:
         # ── E ──
         _h("E. Keyin nima bo'ladi"),
         _p("Signal tasdiqlangach bot uni o'zi kuzatadi — siz hech narsa qilishingiz shart emas:"),
-        _pre("▶️ #41 BTCUSDT — pozitsiya ochildi @ 65 000\n\n"
-             "📈 #41 BTCUSDT — joriy natija: +5.20%\n"
-             "   (+5% bosqichi)\n\n"
-             "✅ #41 BTCUSDT — TP1 bajarildi @ 67 000\n"
-             "   (50% sotildi) Joriy natija: +1.54%\n\n"
-             "🛡 #41 BTCUSDT — stop breakeven'ga ko'chirildi"),
+        *_fig(img.get("after"), "Bot signalni ochilishidan yopilishigacha o'zi kuzatadi"),
         _p("Natijalar asl signal postiga ", _b("javob"), " qilib yoziladi, shuning uchun "
            "guruhda hamma nima bo'layotganini kuzatib boradi. Barcha yopilgan signallar "
            "statistikaga o'zi tushadi."),
@@ -201,11 +243,13 @@ async def publish() -> tuple[str, str, str]:
             token = j["result"]["access_token"]
             path = ""
 
+        print("Rasmlar yuklanmoqda…")
+        img = await upload_images(c)
         payload = {
             "access_token": token,
             "title": TITLE,
             "author_name": AUTHOR,
-            "content": json.dumps(content(), ensure_ascii=False),
+            "content": json.dumps(content(img), ensure_ascii=False),
         }
         if path:
             payload["path"] = path

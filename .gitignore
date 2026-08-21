@@ -5,3 +5,6 @@ __pycache__/
 venv/
 *.png
 .DS_Store
+
+# Qo'llanma rasmlari repoda saqlanadi (Telegraph maqolasiga yuklanadi)
+!guide_images/*.png

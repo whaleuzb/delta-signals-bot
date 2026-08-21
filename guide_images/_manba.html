@@ -1,0 +1,206 @@
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --ink:#12161d; --ink2:#48526180; --mut:#5d6875; --line:#dde3ea; --line2:#eef1f5;
+    --acc:#2f7fd4; --long:#12805c; --short:#c0392b; --warn:#a8741a;
+    --chat:#141a22; --bot:#212b36; --me:#2b5a86; --cink:#eef2f7;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:#8892a0; font-family:"IBM Plex Sans",sans-serif; padding:24px}
+  .card{
+    width:1000px; background:#fff; color:var(--ink); padding:44px 48px 48px;
+    margin-bottom:24px; border-radius:0;
+  }
+  .tag{
+    font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:600;
+    letter-spacing:.16em; color:var(--acc); text-transform:uppercase; margin-bottom:10px;
+  }
+  h1{font-size:44px; font-weight:700; letter-spacing:-.02em; line-height:1.1; margin-bottom:8px}
+  .sub{font-size:20px; color:var(--mut); margin-bottom:34px; line-height:1.45}
+  .rule{height:3px; background:var(--ink); width:64px; margin-bottom:30px}
+
+  /* qadamlar */
+  .steps{display:flex; flex-direction:column; gap:22px; margin-bottom:34px}
+  .st{display:grid; grid-template-columns:52px 1fr; gap:20px; align-items:start}
+  .num{
+    width:52px; height:52px; border-radius:50%; background:var(--ink); color:#fff;
+    font-family:"IBM Plex Mono",monospace; font-size:22px; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .st h3{font-size:25px; font-weight:600; margin-bottom:4px; line-height:1.25}
+  .st p{font-size:19px; color:var(--mut); line-height:1.5}
+
+  /* telegram suhbat */
+  .chat{background:var(--chat); border-radius:16px; padding:20px; display:flex;
+        flex-direction:column; gap:12px}
+  .chat.narrow{max-width:620px}
+  .bub{max-width:82%; padding:13px 17px; border-radius:16px; font-size:19px;
+       line-height:1.5; color:var(--cink); white-space:pre-line}
+  .bub.bot{background:var(--bot); border-bottom-left-radius:5px; align-self:flex-start}
+  .bub.me{background:var(--me); border-bottom-right-radius:5px; align-self:flex-end;
+          font-family:"IBM Plex Mono",monospace; font-size:18px}
+  .bub b{font-weight:600}
+  .bub .g{color:#5fd3ae} .bub .r{color:#f08a82} .bub .bl{color:#7fc0ff}
+  .cap{font-size:17px; color:var(--mut); margin-top:14px; line-height:1.45}
+
+  /* signal formati */
+  .fmt{display:flex; gap:0; margin:8px 0 6px; flex-wrap:nowrap}
+  .tok{padding:0 4px; display:flex; flex-direction:column; align-items:center}
+  .tok .t{font-family:"IBM Plex Mono",monospace; font-size:30px; font-weight:600;
+          padding:8px 10px; white-space:nowrap}
+  .tok .bar{height:4px; width:100%; border-radius:2px; margin-top:2px}
+  .tok .lbl{font-size:16px; font-weight:600; margin-top:10px; text-align:center;
+            line-height:1.3; letter-spacing:.01em}
+  .c-sym{color:var(--ink)}   .b-sym{background:#c9d2dc}
+  .c-side{color:var(--long)} .b-side{background:var(--long)}
+  .c-ent{color:var(--acc)}   .b-ent{background:var(--acc)}
+  .c-tp{color:var(--long)}   .b-tp{background:var(--long)}
+  .c-sl{color:var(--short)}  .b-sl{background:var(--short)}
+
+  .alt{background:#f5f7f9; border-left:4px solid var(--acc); padding:18px 22px;
+       margin-top:26px; border-radius:0 8px 8px 0}
+  .alt h4{font-size:18px; font-weight:600; margin-bottom:10px}
+  .alt code{font-family:"IBM Plex Mono",monospace; font-size:19px; display:block;
+            padding:3px 0; color:var(--ink)}
+
+  /* xatolar */
+  .errs{display:flex; flex-direction:column; gap:26px}
+  .err h3{font-size:24px; font-weight:600; margin-bottom:14px}
+  .line{display:grid; grid-template-columns:38px 1fr; gap:14px; align-items:start;
+        margin-bottom:10px}
+  .mk{font-size:28px; font-weight:700; line-height:1.15; font-family:"IBM Plex Mono",monospace}
+  .bad .mk{color:var(--short)} .good .mk{color:var(--long)}
+  .line .txt{font-size:20px; line-height:1.45}
+  .line code{font-family:"IBM Plex Mono",monospace; font-size:20px;
+             background:var(--line2); padding:2px 8px; border-radius:5px}
+  .why{font-size:17px; color:var(--mut); margin-top:5px; line-height:1.45}
+
+  .foot{margin-top:36px; padding-top:20px; border-top:2px solid var(--line);
+        font-size:17px; color:var(--mut)}
+  .foot b{color:var(--ink)}
+</style>
+
+<!-- ═══════════ 1 ═══════════ -->
+<div class="card" id="c1">
+  <div class="tag">Trade Controller</div>
+  <h1>Guruhni ulash</h1>
+  <div class="rule"></div>
+  <div class="sub">Bir marta bajariladi. Shundan keyin guruhingiz mustaqil ishlay boshlaydi.</div>
+
+  <div class="steps">
+    <div class="st"><div class="num">1</div>
+      <div><h3>Botni guruhingizga qo‘shing</h3>
+        <p>Guruh sozlamalari → A’zo qo‘shish → botni qidiring</p></div></div>
+    <div class="st"><div class="num">2</div>
+      <div><h3>Admin huquqini bering</h3>
+        <p>Majburiy — admin huquqisiz bot guruhga hech narsa yubora olmaydi</p></div></div>
+    <div class="st"><div class="num">3</div>
+      <div><h3>Guruh ichida <span style="font-family:'IBM Plex Mono',monospace">/setup</span> yozing</h3>
+        <p>Aynan guruhning o‘zida — shaxsiy chatda emas</p></div></div>
+  </div>
+
+  <div class="chat narrow">
+    <div class="bub me">/setup</div>
+    <div class="bub bot"><span class="g">✓</span> <b>"Whales Uzb"</b> workspace sifatida ro‘yxatdan o‘tdi!
+Endi botga shaxsiy xabar yozib signal kirita olasiz.</div>
+  </div>
+
+  <div class="foot"><b>Faqat guruh admini</b> /setup qila oladi &nbsp;·&nbsp; Bir admin — bitta guruh</div>
+</div>
+
+<!-- ═══════════ 2 ═══════════ -->
+<div class="card" id="c2">
+  <div class="tag">Trade Controller</div>
+  <h1>Signal formati</h1>
+  <div class="rule"></div>
+  <div class="sub">Signal <b style="color:var(--ink)">botning shaxsiy chatiga</b> yoziladi — guruhga emas.
+    Bot uni tasdiqlaganingizdan keyin guruhga o‘zi chiqaradi.</div>
+
+  <div class="fmt">
+    <div class="tok"><div class="t c-sym">BTCUSDT</div><div class="bar b-sym"></div><div class="lbl">juftlik</div></div>
+    <div class="tok"><div class="t c-side">LONG</div><div class="bar b-side"></div><div class="lbl">yo‘nalish</div></div>
+    <div class="tok"><div class="t c-ent">entry 65000</div><div class="bar b-ent"></div><div class="lbl">kirish narxi</div></div>
+    <div class="tok"><div class="t c-tp">tp 67000 68500</div><div class="bar b-tp"></div><div class="lbl">maqsadlar</div></div>
+    <div class="tok"><div class="t c-sl">sl 64000</div><div class="bar b-sl"></div><div class="lbl">stop</div></div>
+  </div>
+
+  <div class="alt">
+    <h4>Bular ham ishlaydi</h4>
+    <code>ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80</code>
+    <code>eth long 3200 3400 3550 3100</code>
+    <code>BTCUSDT LONG <b style="color:#a8741a">market</b> entry 65000 tp 67000 sl 64000</code>
+  </div>
+
+  <div class="foot">
+    <b>eth long 3200 3400 3550 3100</b> — kalit so‘zsiz: birinchi raqam kirish,
+    oxirgisi stop, o‘rtadagilari TP<br>
+    <b style="color:#a8741a">market</b> — darhol ochiladi. Bu so‘zsiz signal narx kirish darajasiga
+    tegguncha <b>kutadi</b>
+  </div>
+</div>
+
+<!-- ═══════════ 3 ═══════════ -->
+<div class="card" id="c3">
+  <div class="tag">Trade Controller</div>
+  <h1>Ko‘p uchraydigan xatolar</h1>
+  <div class="rule"></div>
+  <div class="sub">Bot javob bermasa yoki signal qabul qilinmasa — avval shularni tekshiring.</div>
+
+  <div class="errs">
+    <div class="err">
+      <h3>Signalni guruhga yozish</h3>
+      <div class="line bad"><div class="mk">✗</div><div>
+        <div class="txt">Signal matni guruh ichiga yoziladi</div>
+        <div class="why">Bot guruhdagi signal matniga javob bermaydi</div></div></div>
+      <div class="line good"><div class="mk">✓</div><div>
+        <div class="txt">Botning <b>shaxsiy chatiga</b> yoziladi</div></div></div>
+    </div>
+
+    <div class="err">
+      <h3>Minglikni bo‘sh joy bilan yozish</h3>
+      <div class="line bad"><div class="mk">✗</div><div>
+        <div class="txt"><code>tp 172 168</code></div>
+        <div class="why">Bu <b>ikkita</b> TP deb o‘qiladi: 172 va 168</div></div></div>
+      <div class="line good"><div class="mk">✓</div><div>
+        <div class="txt"><code>tp 172168</code> &nbsp; yoki &nbsp; <code>TP1 172 168</code></div></div></div>
+    </div>
+
+    <div class="err">
+      <h3>Stop noto‘g‘ri tomonda</h3>
+      <div class="line bad"><div class="mk">✗</div><div>
+        <div class="txt">LONG uchun stop kirishdan <b>yuqorida</b></div>
+        <div class="why">Odatda LONG/SHORT adashtirilganini bildiradi</div></div></div>
+      <div class="line good"><div class="mk">✓</div><div>
+        <div class="txt">LONG: stop <b style="color:var(--short)">past</b>,
+          TP <b style="color:var(--long)">yuqori</b> &nbsp;·&nbsp; SHORT: teskarisi</div></div></div>
+    </div>
+  </div>
+
+  <div class="foot"><b>Bot guruhga yozmayaptimi?</b> &nbsp;Botda admin huquqi yo‘q —
+    guruh sozlamalaridan bering</div>
+</div>
+
+<!-- ═══════════ 4 ═══════════ -->
+<div class="card" id="c4">
+  <div class="tag">Trade Controller</div>
+  <h1>Keyin nima bo‘ladi</h1>
+  <div class="rule"></div>
+  <div class="sub">Signal tasdiqlangach bot uni o‘zi kuzatadi — siz hech narsa qilishingiz shart emas.</div>
+
+  <div class="chat">
+    <div class="bub bot"><span class="bl">▸</span> <b>#41 BTCUSDT</b> — pozitsiya ochildi @ <b>65 000</b></div>
+    <div class="bub bot"><span class="g">↑</span> <b>#41 BTCUSDT</b> — joriy natija: <b>+5.20%</b>  (+5% bosqichi)</div>
+    <div class="bub bot"><span class="g">✓</span> <b>#41 BTCUSDT</b> — TP1 bajarildi @ <b>67 000</b>  (50% sotildi)
+Joriy natija: <b>+1.54%</b></div>
+    <div class="bub bot"><span class="bl">⇄</span> <b>#41 BTCUSDT</b> — stop breakeven’ga ko‘chirildi</div>
+    <div class="bub bot"><span class="g">✓</span> <b>#41 BTCUSDT</b> — TP2 bajarildi @ <b>68 500</b>
+Yakuniy: <b>+3.46%</b>  (+1.7R)</div>
+  </div>
+
+  <div class="cap">Natijalar asl signal postiga <b>javob</b> qilib yoziladi — guruhda hamma
+    nima bo‘layotganini kuzatib boradi. Yopilgan signallar statistikaga o‘zi tushadi.</div>
+
+  <div class="foot"><b>Statistika:</b>
+    <span style="font-family:'IBM Plex Mono',monospace">/stats · /month · /symbols · /equity · /open · /pdf</span></div>
+</div>
