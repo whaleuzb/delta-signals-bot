@@ -649,6 +649,33 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       statistika to'liq chiqadi va faqat ochiq pozitsiya qatori
       "narx olinmadi" deb degradatsiya qiladi.
 
+33. **Yopilgan signal uchun real narx grafigi (`chart.py`, `stats.signal_chart` emas —
+    alohida modul).**
+    - Foydalanuvchi so'rovi: signal yopilganda faqat matn kelayotgan edi —
+      "tiker nomi va kirish/chiqish nuqtasini aniq yozsa o'zi grafik topib
+      rasmda ko'rsatib guruhga yubora oladimi" degan savolga javoban.
+    - Bannner-reklama emas, **haqiqiy dalil** yasashga qaror qilindi: signal
+      ochilgan-yopilgan oralig'idagi haqiqiy 1m shamlar (`tracker.provider(
+      market).klines()` — kuzatuvda ishlatilayotgan xuddi shu chaqiruv,
+      yangi so'rov turi yo'q) ustiga Entry/SL/TP chiziqlari va aniq chiqish
+      nuqtasi chizib beriladi. Forex tomonida Twelve Data bepul rejasi
+      daqiqasiga 8 so'rov bilan cheklangani uchun **pagination yo'q** —
+      bitta `klines(limit=...)` chaqiruvi, agar butun oraliqni qamrab
+      olmasa grafik shunchaki qisqaroq chiqadi (hech qachon qo'shimcha
+      so'rov otilmaydi).
+    - Rasm chetiga workspace nomi (pastki chap) va bot havolasi —
+      `t.me/{ctx.bot.username}` (pastki o'ng) — qo'yiladi: bunday natija
+      rasmlari ko'pincha guruhdan tashqarida qayta ulashiladi, shu payt ham
+      qaysi guruh va qaysi bot ekanligi ko'rinib tursin degan talab bilan.
+    - `poll_job()`dagi STOP va yakuniy TP hodisalarida ishlatiladi:
+      `chart.signal_chart()` muvaffaqiyatli bo'lsa `send_photo(caption=txt)`,
+      aks holda (shamlar yetarli emas, birja javob bermadi va h.k.) jim
+      tarzda avvalgi `send_message(txt)`ga qaytiladi — hech qachon
+      natija xabarining o'zi yo'qolmaydi.
+    - `tracker.py`ga tegilmadi — faqat `tracker.provider()` funksiyasi
+      qayta ishlatildi, shuning uchun `test_tracker.py` qayta ishga
+      tushirilib (9/9 holat o'zgarishsiz), tracker buzilmagani tasdiqlandi.
+
 ---
 
 ## Buyruqlar

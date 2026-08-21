@@ -24,6 +24,7 @@ from telegram.ext import (
     CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
 )
 
+import chart
 import config
 import db
 import exchange
@@ -1468,18 +1469,39 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             money_delta = float(closed_pnl) / 100 * float(sig["alloc_amount"])
             await db.apply_deposit_delta(ws["id"], money_delta)
 
+        # Signal shu hodisada yopilgan bo'lsa (STOP yoki yakuniy TP) — matn bilan
+        # birga real narx grafigi (entry/TP/SL chiziqlari + chiqish nuqtasi)
+        # yuboriladi. Grafik ishlab chiqarilmasa (birja javob bermasa va h.k.)
+        # jim tarzda oddiy matn xabariga qaytiladi — hech narsa buzilmaydi.
+        photo = None
+        if closed_pnl is not None and sig:
+            try:
+                photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username)
+            except Exception:
+                log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
+
         if ws["type"] == "group" and ws["group_chat_id"]:
             reply_to = sig["group_msg_id"] if sig else None
             try:
-                await ctx.bot.send_message(
-                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
-                    reply_to_message_id=reply_to, allow_sending_without_reply=True,
-                    message_thread_id=ws["group_topic_id"])
+                if photo:
+                    await ctx.bot.send_photo(
+                        ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
+                        parse_mode=ParseMode.HTML, reply_to_message_id=reply_to,
+                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+                else:
+                    await ctx.bot.send_message(
+                        ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                        reply_to_message_id=reply_to, allow_sending_without_reply=True,
+                        message_thread_id=ws["group_topic_id"])
             except Exception:
                 log.exception("Xabar yuborilmadi")
         elif ws["type"] == "personal":
             try:
-                await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
+                if photo:
+                    await ctx.bot.send_photo(ws["owner_id"], InputFile(photo, "signal.png"),
+                                              caption=txt, parse_mode=ParseMode.HTML)
+                else:
+                    await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
             except Exception:
                 log.exception("Shaxsiy xabar yuborilmadi")
 
