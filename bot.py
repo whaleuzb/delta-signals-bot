@@ -395,6 +395,17 @@ def provider_for(market: str):
     return forex if market == "forex" else exchange
 
 
+async def safe_last_price(market: str, symbol: str, fresh: bool = False):
+    """Narx manbasi javob bermasa None qaytaradi, xato ko'tarmaydi —
+    aks holda birjadagi bir soniyalik uzilish /open yoki signal ko'rinishini
+    butunlay yiqitardi."""
+    try:
+        return await provider_for(market).last_price(symbol, fresh=fresh)
+    except Exception:
+        log.warning("Narx olinmadi (%s %s)", market, symbol, exc_info=True)
+        return None
+
+
 def fmt_price(x: float) -> str:
     if x >= 1000:
         return f"{x:,.2f}".rstrip("0").rstrip(".")
@@ -619,7 +630,7 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
     kb_rows = []
     manage = can_manage(uid, ws)
     for s in rows:
-        price = await provider_for(s["market"]).last_price(s["symbol"])
+        price = await safe_last_price(s["market"], s["symbol"])
         cur = ""
         p = None
         if price:
@@ -659,7 +670,7 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     if sig["status"] == "PENDING":
         text = f"#{sig_id} {sig['symbol']} hali entryga tegmagan. Bekor qilinsinmi?"
     else:
-        price = await provider_for(sig["market"]).last_price(sig["symbol"])
+        price = await safe_last_price(sig["market"], sig["symbol"])
         est_txt = ""
         if price:
             entry = float(sig["entry"])
@@ -1287,7 +1298,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         if draft.get("reasoning"):
             warn.append(f"<i>{draft['reasoning']}</i>")
 
-    price = await provider_for(market).last_price(sym)
+    price = await safe_last_price(market, sym)
     if price:
         d = (price - draft["entry"]) / draft["entry"] * 100
         warn.append(f"Joriy narx: <b>{fmt_price(price)}</b> (entrydan {d:+.2f}%)")

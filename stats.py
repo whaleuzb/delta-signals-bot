@@ -1,5 +1,6 @@
 """Statistika hisobotlari va equity curve."""
 import io
+import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,7 @@ import forex
 import tracker
 
 TZ = ZoneInfo(config.TZ)
+log = logging.getLogger("stats")
 
 # Grafik ranglari (bot xabarlaridagi qorong'i mavzuga mos)
 BG = "#0e1117"
@@ -29,6 +31,20 @@ RED = "#ef5350"
 def _provider(market: str):
     """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
     return forex if market == "forex" else exchange
+
+
+async def _safe_price(market: str, symbol: str):
+    """Narx manbasi javob bermasa None qaytaradi, xato ko'tarmaydi.
+
+    Muhim: YOPILGAN signallar statistikasi jonli narxga umuman bog'liq emas.
+    Himoyasiz qoldirilsa, birjadagi bir soniyalik uzilish butun /stats yoki
+    /symbols hisobotini yiqitardi — foydalanuvchi ma'lumotini bekorga
+    yo'qotardi."""
+    try:
+        return await _provider(market).last_price(symbol)
+    except Exception:
+        log.warning("Narx olinmadi (%s %s)", market, symbol, exc_info=True)
+        return None
 MONTHS_UZ = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
              "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
 
@@ -61,7 +77,7 @@ async def _open_summary(workspace_id: int, deposit, show_money: bool) -> str | N
         live_money = 0.0
         live_count = 0
         for r in active:
-            price = await _provider(r["market"]).last_price(r["symbol"])
+            price = await _safe_price(r["market"], r["symbol"])
             if price is None:
                 continue
             pnl = tracker.pnl_at(r["side"], float(r["entry"]), price)
@@ -193,7 +209,7 @@ async def symbols_table(workspace_id: int, since=None, until=None,
         live_sum = 0.0
         live_count = 0
         for pos in active_list:
-            price = await _provider(pos["market"]).last_price(sym)
+            price = await _safe_price(pos["market"], sym)
             if price:
                 live_sum += tracker.pnl_at(pos["side"], pos["entry"], price)
                 live_count += 1

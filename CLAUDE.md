@@ -628,6 +628,27 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       bo'lmaydi, shuning uchun avval nechta odamga ketishi va taxminiy vaqt
       ko'rsatiladi.
 
+32. **Jonli narx chaqiruvlari himoyalandi (to'liq tekshiruvda topildi).**
+    - Muammo: `last_price()` faqat status != 200 bo'lsa None qaytarardi, lekin
+      TARMOQ XATOSI (timeout, connection reset) yuqoriga otilardi. Chaqiruv
+      joylarining 6 tadan 5 tasi himoyasiz edi — ya'ni birjadagi bir soniyalik
+      uzilish `/stats`, `/symbols`, `/open` va signal ko'rinishini BUTUNLAY
+      yiqitardi.
+    - Bu ayniqsa bema'ni edi, chunki **yopilgan signallar statistikasi jonli
+      narxga umuman bog'liq emas** — foydalanuvchi bekorga butun hisobotini
+      yo'qotardi.
+    - Yechim: `bot.safe_last_price()` va `stats._safe_price()` — xatoni
+      log qilib None qaytaradi. Chaqiruvchilar None'ni allaqachon to'g'ri
+      ishlatardi ("narx olinmadi" deb ko'rsatadi), shuning uchun degradatsiya
+      silliq.
+    - `tracker.close_now()` ham o'raldi: endi None qaytaradi va chaqiruvchi
+      "Yopib bo'lmadi (narx olinmadi)" degan ANIQ xabar beradi, umumiy xato
+      ekrani o'rniga. Signal ochiqligicha qoladi — hech narsa buzilmaydi.
+    - Tekshirish usuli: birja mavjud bo'lmagan muhitda (sandbox proksisi
+      bloklaydi) `/stats` chaqirildi — avval yiqilardi, endi yopilgan
+      statistika to'liq chiqadi va faqat ochiq pozitsiya qatori
+      "narx olinmadi" deb degradatsiya qiladi.
+
 ---
 
 ## Buyruqlar

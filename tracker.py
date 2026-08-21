@@ -178,7 +178,15 @@ async def close_now(sig_id: int) -> dict | None:
 
     # fresh=True — bu narx savdoning YAKUNIY natijasi sifatida bazaga yoziladi,
     # shuning uchun ko'rsatuv uchun mo'ljallangan qisqa keshdan olinmaydi.
-    price = await provider(sig["market"]).last_price(sig["symbol"], fresh=True)
+    # Xato bo'lsa None qaytaramiz: chaqiruvchi buni allaqachon "narx olinmadi"
+    # deb aniq xabar qiladi, umumiy xato ekranidan ko'ra tushunarliroq.
+    # Signal ochiqligicha qoladi — hech narsa buzilmaydi, qayta urinsa bo'ladi.
+    try:
+        price = await provider(sig["market"]).last_price(sig["symbol"], fresh=True)
+    except Exception:
+        log.warning("Qo'lda yopishda narx olinmadi (#%s %s)", sig_id, sig["symbol"],
+                     exc_info=True)
+        return None
     if not price:
         return None
 
