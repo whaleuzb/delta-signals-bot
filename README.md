@@ -154,6 +154,7 @@ tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
 | `/public on\|off` | (admin/egasi) guruhni /top reytingiga so'rov yuborish/olib tashlash — moderator tasdig'idan keyin ko'rinadi |
 | `/havola <link>\|off` | (admin/egasi) guruhning taklif havolasi — /top da guruh nomi shunga link bo'ladi |
 | `/taklif` | do'stlaringizni taklif qilish uchun shaxsiy havola |
+| `/yordam` | yo'riqnoma: guruh ulash, signal kiritish, xatolar |
 
 ---
 

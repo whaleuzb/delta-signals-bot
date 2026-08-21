@@ -432,12 +432,122 @@ def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
          InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
         [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
          InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
-        [InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")],
+        [InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
+         InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")],
     ]
     return InlineKeyboardMarkup(rows)
 
 
 MENU_BACK_KB = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]])
+
+
+# ─────────────────────────── Yordam / yo'riqnoma ───────────────────────────
+# Matn ataylab bot ICHIDA to'liq saqlanadi — foydalanuvchi havolani ochmasdan
+# ham javobini topishi kerak (ko'pchilik aynan qotib qolgan payt yordam
+# qidiradi va tashqi sahifaga o'tishga xohishi bo'lmaydi).
+
+HELP_TOPICS = {
+    "setup": (
+        "👥 <b>Guruhni ulash</b>\n\n"
+        "<b>1.</b> Botni guruhingizga qo'shing.\n"
+        "<b>2.</b> Botga guruhda <b>admin</b> huquqini bering.\n"
+        "<b>3.</b> Guruh ichida <code>/setup</code> yozing.\n\n"
+        "Bot javob bersa — ulanish tugadi.\n\n"
+        "⚠️ Diqqat qiling:\n"
+        "• <code>/setup</code> ni <b>guruh ichida</b> yozing, shaxsiy chatda emas.\n"
+        "• Faqat <b>guruh admini</b> qila oladi.\n"
+        "• Bir admin — bitta guruh.\n"
+        "• Admin huquqisiz bot guruhga post yubora olmaydi."
+    ),
+    "signal": (
+        "📈 <b>Signal kiritish</b>\n\n"
+        "Signal <b>botning shaxsiy chatiga</b> yoziladi — guruhga emas! "
+        "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.\n\n"
+        "<b>Yo'l 1 — sehrgar:</b> <code>/new</code> yozing, bot har bir darajani "
+        "navbat bilan so'raydi.\n\n"
+        "<b>Yo'l 2 — bitta xabar:</b>\n"
+        "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+        "Bular ham ishlaydi:\n"
+        "<code>ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80</code>\n"
+        "<code>eth long 3200 3400 3550 3100</code>\n"
+        "  ↳ kalit so'zsiz: birinchi raqam — kirish, oxirgisi — stop, "
+        "o'rtadagilari TP.\n\n"
+        "<b>Rasm bilan:</b> izoh (caption) bo'lsa undan o'qiydi, bo'lmasa "
+        "sun'iy intellekt grafikdan topishga urinadi.\n\n"
+        "✅ Hech narsa tasdiqsiz saqlanmaydi — bot avval o'qiganini ko'rsatadi."
+    ),
+    "mode": (
+        "⏳ <b>Limit va Market farqi</b>\n\n"
+        "<b>Standart holat — kutish (limit).</b> Signal darhol ochilmaydi: "
+        "narx kirish darajasiga <b>tegguncha kutadi</b>. Bu vaqtda "
+        "🕐 belgisi bilan turadi.\n\n"
+        "<b>Darhol ochish uchun</b> matnga <code>market</code> yoki "
+        "<code>bozor</code> so'zini qo'shing:\n"
+        "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
+        "Sehrgarda esa <b>🎯 Oddiy (darhol)</b> tugmasini tanlaysiz.\n\n"
+        "💡 Pozitsiyaga allaqachon kirgan bo'lsangiz — <code>market</code> "
+        "yozishni unutmang, aks holda bot narxni kutib turaveradi."
+    ),
+    "errors": (
+        "🔧 <b>Ko'p uchraydigan xatolar</b>\n\n"
+        "<b>Bot javob bermayapti?</b>\n"
+        "Signalni guruhga yozgan bo'lishingiz mumkin. Signal faqat "
+        "<b>shaxsiy chatda</b> qabul qilinadi.\n\n"
+        "<b>TP noto'g'ri o'qildi?</b>\n"
+        "<code>tp 172 168</code> — bu <b>ikkita</b> TP (172 va 168) deb o'qiladi. "
+        "Minglik uchun <code>tp 172168</code> yoki <code>TP1 172 168</code> yozing.\n\n"
+        "<b>\"SL entry dan past bo'lishi kerak\"?</b>\n"
+        "LONG uchun: stop <b>past</b>, TP <b>yuqori</b>. SHORT uchun teskarisi. "
+        "Odatda bu LONG/SHORT adashtirilganini bildiradi.\n\n"
+        "<b>\"Risk juda katta\"?</b>\n"
+        "Kirish bilan stop orasi 25% dan ko'p. Raqamlarni tekshiring — "
+        "ko'pincha verguldan adashish.\n\n"
+        "<b>Bot guruhga yozmayapti?</b>\n"
+        "Botda admin huquqi yo'qligidan. Guruh sozlamalaridan bering."
+    ),
+}
+
+
+def help_menu_kb() -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton("👥 Guruhni ulash", callback_data="help:setup"),
+         InlineKeyboardButton("📈 Signal kiritish", callback_data="help:signal")],
+        [InlineKeyboardButton("⏳ Limit / Market", callback_data="help:mode"),
+         InlineKeyboardButton("🔧 Xatolar", callback_data="help:errors")],
+    ]
+    if config.GUIDE_URL:
+        rows.append([InlineKeyboardButton("📘 To'liq rasmli qo'llanma",
+                                           url=config.GUIDE_URL)])
+    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    return InlineKeyboardMarkup(rows)
+
+
+HELP_INTRO = ("❓ <b>Yordam</b>\n\n"
+              "Qaysi bo'lim bo'yicha yordam kerak?")
+
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.effective_message.reply_text(
+        HELP_INTRO, parse_mode=ParseMode.HTML, reply_markup=help_menu_kb())
+
+
+async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    topic = q.data.split(":", 1)[1]
+    if topic == "home":
+        await q.edit_message_text(HELP_INTRO, parse_mode=ParseMode.HTML,
+                                   reply_markup=help_menu_kb())
+        return
+    txt = HELP_TOPICS.get(topic)
+    if not txt:
+        return
+    kb = [[InlineKeyboardButton("◀️ Yordam", callback_data="help:home")]]
+    if config.GUIDE_URL:
+        kb.insert(0, [InlineKeyboardButton("📘 To'liq rasmli qo'llanma",
+                                            url=config.GUIDE_URL)])
+    await q.edit_message_text(txt, parse_mode=ParseMode.HTML,
+                               reply_markup=InlineKeyboardMarkup(kb))
 
 
 async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | None]:
@@ -2218,6 +2328,7 @@ async def post_init(app: Application) -> None:
         ("open", "Ochiq signallar"),
         ("equity", "Equity grafigi"),
         ("pdf", "Statistikani PDF hisobot sifatida olish"),
+        ("yordam", "Yo'riqnoma: guruh ulash, signal kiritish"),
         ("month", "Oylik natijalar"),
         ("year", "Yillik natijalar"),
         ("depozit", "Depozitni ko'rish/belgilash"),
@@ -2264,7 +2375,7 @@ def main() -> None:
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CallbackQueryHandler(on_admin, pattern=r"^adm:"))
     app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("help", cmd_start))
+    app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("menu", cmd_start))
     app.add_handler(CommandHandler("setup", cmd_setup))
     app.add_handler(CommandHandler("bekor", cmd_bekor))
@@ -2280,6 +2391,7 @@ def main() -> None:
     app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("tasdiq", cmd_pending))
     app.add_handler(CommandHandler("pdf", cmd_pdf))
+    app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
@@ -2298,6 +2410,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
     app.add_handler(CallbackQueryHandler(on_stats_nav, pattern=r"^st:"))
     app.add_handler(CallbackQueryHandler(on_pdf_button, pattern=r"^pdfrep$"))
+    app.add_handler(CallbackQueryHandler(on_help, pattern=r"^help:"))
 
     app.add_handler(ConversationHandler(
         entry_points=[

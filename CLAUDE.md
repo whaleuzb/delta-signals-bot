@@ -558,6 +558,23 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       monospace jadval generatori (guruhlar va userlar ro'yxati ikkalasi
       shundan foydalanadi, sahifa to'lganda avtomatik yangisi ochiladi).
 
+28. **`/yordam` — bot ichidagi yo'riqnoma + tashqi rasmli qo'llanma.**
+    - Sabab: foydalanuvchilarning katta qismi guruh ulash va signal kiritishda
+      qotib qolardi. Eng ko'p uchraydigan xato — signalni GURUHGA yozish
+      (bot faqat shaxsiy chatda qabul qiladi).
+    - Yordam matni ataylab bot ICHIDA to'liq saqlanadi (`HELP_TOPICS`) —
+      odam qotib qolgan paytda tashqi sahifaga o'tishni xohlamaydi. Havola
+      qo'shimcha, almashtirish emas.
+    - 4 ta mavzu: guruh ulash · signal kiritish · limit/market farqi ·
+      ko'p uchraydigan xatolar. Bosh menyuda "❓ Yordam" tugmasi,
+      `/yordam` va `/help` buyruqlari (`/help` avval bosh menyuni ochardi).
+    - `config.GUIDE_URL` — rasmli qo'llanma havolasi, env orqali
+      o'zgartiriladi (qo'llanma ko'chirilsa kodga tegish shart emas).
+      Bo'sh qilinsa tugma ko'rsatilmaydi.
+    - Yordam matnlari Telegram HTML sifatida tekshirilgan (faqat ruxsat
+      etilgan teglar, escape qilinmagan `<`/`>` yo'q, 4096 belgidan qisqa) —
+      noto'g'ri teg butun xabarni yuborilmay qoldiradi.
+
 ---
 
 ## Buyruqlar

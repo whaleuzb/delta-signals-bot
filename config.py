@@ -40,3 +40,10 @@ MOVE_SL_TO_BE_AFTER_TP1 = os.getenv("MOVE_SL_TO_BE", "true").lower() == "true"
 CONSERVATIVE_SAME_CANDLE = True
 
 TZ = os.getenv("TZ", "Asia/Tashkent")
+
+# /yordam bo'limidagi "to'liq qo'llanma" havolasi. Env orqali o'zgartiriladi —
+# qo'llanma boshqa joyga ko'chirilsa kodga tegish shart emas. Bo'sh qilinsa
+# tugma ko'rsatilmaydi (bot ichidagi yo'riqnoma baribir to'liq ishlaydi).
+GUIDE_URL = os.getenv(
+    "GUIDE_URL",
+    "https://claude.ai/code/artifact/dc1aa63e-69ed-4435-bfa9-e1b805f4dd97")
