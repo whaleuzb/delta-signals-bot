@@ -156,8 +156,8 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     return buf
 
 
-async def setup_chart(draft: dict, sig_id: int, ws_name: str,
-                       bot_username: str | None, tf: str | None = None) -> io.BytesIO | None:
+async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
+                       tf: str | None = None) -> io.BytesIO | None:
     """Yangi e'lon qilinayotgan signal uchun grafik: oxirgi shamlar va
     rejalashtirilgan Entry/TP/SL darajalari. Hali hech narsa bo'lmagani uchun
     chiqish nuqtasi ham, PnL ham yo'q.
@@ -175,9 +175,12 @@ async def setup_chart(draft: dict, sig_id: int, ws_name: str,
     if not candles or len(candles) < 3:
         return None
 
+    # Sarlavhada signal raqami yo'q: grafik signal BAZAGA YOZILISHIDAN OLDIN,
+    # ko'rish uchun chiziladi — raqam hali mavjud emas. Raqam xabar matnida
+    # (draft_text) baribir ko'rinadi.
     mode = draft.get("entry_mode", "limit")
     return _render(
-        candles, header=f"#{sig_id} {symbol}", side=draft["side"],
+        candles, header=symbol, side=draft["side"],
         entry=float(draft["entry"]), sl=float(draft["sl"]),
         tps=[float(x) for x in draft["tps"]], tp_hit=0,
         exit_idx=None, exit_price=None, pnl=None, r=None,

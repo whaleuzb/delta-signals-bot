@@ -814,6 +814,32 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       (`newsig` → ConversationHandler), keyin ochiq suhbatda ISHLAMASLIGI
       isbotlandi.
 
+39. **Signal kiritish oqimi: 3 tugma → YAKUNIY KO'RISH → tasdiqlash.**
+    - Foydalanuvchi so'rovi: uchta tugma (rasm yuklash / bot grafigi /
+      rasmsiz) va "hammasi kiritilgandan keyin bot avval RASMNI o'ziga
+      yuborsin, tasdiqlash tugmasi chiqsin".
+    - 1-bosqich (`preview_kb`): `pic:` — 🖼 Rasm yuklash (rasm allaqachon
+      biriktirilgan bo'lsa "Yuborgan rasmim bilan" va to'g'ridan 2-bosqichga),
+      `okc:` — 📈 Bot grafikni aniqlasin (→ `tf_kb`), `nopic:` — 📝 Rasmsiz.
+    - 2-bosqich (`send_final_preview`): signal guruhga QANDAY chiqishi AYNAN
+      shu ko'rinishda avval muallifga yuboriladi, ostida ✅ Tasdiqlash.
+      `go:` bosilgandagina baza yozuvi yaratiladi va guruhga ketadi.
+    - **Rasm ikki marta yuklanmaydi**: ko'rish uchun yuborilgan rasmning
+      Telegram qaytargan `file_id` si (`ready_file_id`) saqlanadi va guruhga
+      o'sha yuboriladi. Ya'ni guruh AYNAN ko'rilgan rasmni oladi.
+    - `setup_chart()` dan `sig_id` OLIB TASHLANDI: grafik endi baza yozuvidan
+      OLDIN, ko'rish uchun chiziladi — raqam hali mavjud emas. Raqam xabar
+      matnida (`draft_text(d, sig_id)`) baribir ko'rinadi.
+    - Grafik chizilmasa oqim to'xtamaydi: ogohlantiradi va rasmsiz
+      tasdiqlashni taklif qiladi.
+    - `AWAITING_SIGNAL_PHOTO` — "Rasm yuklash" bosilgandan keyingi rasm
+      YANGI signal deb o'qilmasligi uchun (`on_photo` da eng oldin
+      tekshiriladi). `/bekor` uni ham tozalaydi.
+    - Handler patterni: `^(okc|nopic|pic|go|no|ed|tf|bk):` — eski `ok:`
+      olib tashlandi.
+    - 17 ta holatda tekshirildi (uchala yo'l, rasm biriktirish, file_id
+      qayta ishlatish, grafik chizilmagan holat).
+
 ---
 
 ## Buyruqlar

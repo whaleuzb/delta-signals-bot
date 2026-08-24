@@ -46,6 +46,8 @@ PENDING: dict[str, dict] = {}
 AWAITING_EDIT: dict[int, str] = {}
 # admin id -> signal_id (yangi yaratilgan signalga pul miqdori kutilmoqda)
 AWAITING_ALLOC: dict[int, int] = {}
+# admin id -> token ("🖼 Rasm yuklash" bosilgan, endi rasm kutilmoqda)
+AWAITING_SIGNAL_PHOTO: dict[int, str] = {}
 # super-admin id -> True (majburiy obuna uchun kanal kutilmoqda)
 AWAITING_CHANNEL: dict[int, bool] = {}
 # Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
@@ -1218,6 +1220,20 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
         await handle_broadcast_input(update, ctx)
         return
+
+    # "🖼 Rasm yuklash" bosilgandan keyingi rasm — yangi signal deb o'qilmaydi,
+    # tayyor qoralamaga biriktiriladi va yakuniy ko'rishga o'tiladi.
+    token = AWAITING_SIGNAL_PHOTO.pop(uid, None)
+    if token:
+        item = PENDING.get(token)
+        if not item:
+            await msg.reply_text("Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
+            return
+        item["file_id"] = msg.photo[-1].file_id
+        item["gen"] = None
+        await send_final_preview(msg, ctx, token)
+        return
+
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -1384,27 +1400,69 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
 
     token = token or secrets.token_urlsafe(8)
     PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id,
-                       "workspace_id": workspace_id}
+                       "workspace_id": workspace_id, "warn": warn,
+                       "chart_tf": None, "ready_file_id": None}
 
     body = draft_text(draft)
     if warn:
         body += "\n\n" + "\n".join(warn)
+    body += "\n\n<b>Rasm qanday bo'lsin?</b>"
 
-    # Ikki xil tasdiqlash: foydalanuvchining o'z rasmi (yoki rasmsiz) va
-    # botning o'zi chizadigan grafik. Rasm yuborish HECH QACHON majburiy emas —
-    # matnli signal ham, rasmli signal ham bir xil ishlaydi.
     await msg.reply_text(body, parse_mode=ParseMode.HTML,
                           reply_markup=preview_kb(token, file_id))
 
 
 def preview_kb(token: str, file_id) -> InlineKeyboardMarkup:
-    own = "🖼 Mening rasmim bilan" if file_id else "📝 Rasmsiz e'lon"
+    """Uchta tanlov. Rasm HECH QACHON majburiy emas — uchinchi tugma har doim bor."""
+    first = ("🖼 Yuborgan rasmim bilan" if file_id else "🖼 Rasm yuklash")
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(own, callback_data=f"ok:{token}"),
-         InlineKeyboardButton("📈 Bot grafigi bilan", callback_data=f"okc:{token}")],
+        [InlineKeyboardButton(first, callback_data=f"pic:{token}")],
+        [InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")],
+        [InlineKeyboardButton("📝 Rasmsiz davom etish", callback_data=f"nopic:{token}")],
         [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
          InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
     ])
+
+
+async def send_final_preview(target, ctx, token: str) -> None:
+    """Yakuniy tekshiruv: signal guruhga QANDAY chiqishini AYNAN shu ko'rinishda
+    avval foydalanuvchining o'ziga yuboradi. Tasdiqlansagina guruhga ketadi.
+
+    Rasm Telegram'ga shu yerda bir marta yuklanadi va qaytgan file_id saqlanadi —
+    guruhga o'sha file_id yuboriladi. Ya'ni guruh AYNAN ko'rilgan rasmni oladi
+    va fayl ikki marta yuklanmaydi."""
+    item = PENDING.get(token)
+    if not item:
+        return
+    d = item["draft"]
+    caption = draft_text(d)
+    if item["warn"]:
+        caption += "\n\n" + "\n".join(item["warn"])
+    caption += "\n\n✅ Tasdiqlasangiz guruhga shu ko'rinishda yuboriladi."
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Tasdiqlash va yuborish", callback_data=f"go:{token}")],
+        [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
+         InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
+    ])
+
+    photo = item.get("gen") or item.get("file_id")
+    if photo is None:
+        await target.reply_text(caption, parse_mode=ParseMode.HTML, reply_markup=kb)
+        return
+    try:
+        if item.get("gen"):
+            sent = await target.reply_photo(
+                InputFile(io.BytesIO(item["gen"]), "signal.png"), caption=caption,
+                parse_mode=ParseMode.HTML, reply_markup=kb)
+        else:
+            sent = await target.reply_photo(
+                item["file_id"], caption=caption, parse_mode=ParseMode.HTML,
+                reply_markup=kb)
+        item["ready_file_id"] = sent.photo[-1].file_id
+    except Exception:
+        log.exception("Ko'rish uchun rasm yuborilmadi")
+        await target.reply_text(caption, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 # Tanlov uchun timeframe'lar. chart.TF_MINUTES dagilarning ichidan eng ko'p
@@ -1460,6 +1518,48 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=preview_kb(token, item["file_id"]))
         return
 
+    if action == "pic":
+        # Rasm allaqachon biriktirilgan bo'lsa qayta so'ramaymiz.
+        if item["file_id"]:
+            await q.edit_message_reply_markup(reply_markup=None)
+            await send_final_preview(q.message, ctx, token)
+        else:
+            AWAITING_SIGNAL_PHOTO[q.from_user.id] = token
+            await q.edit_message_reply_markup(reply_markup=None)
+            await q.message.reply_text(
+                "🖼 Grafik rasmni yuboring.\n"
+                "Fikringizdan qaytsangiz /bekor yozing.")
+        return
+
+    if action == "nopic":
+        item["gen"] = None
+        await q.edit_message_reply_markup(reply_markup=None)
+        await send_final_preview(q.message, ctx, token)
+        return
+
+    if action == "tf":
+        item["chart_tf"] = chart_tf
+        await q.edit_message_reply_markup(reply_markup=None)
+        note = await q.message.reply_text(f"📈 {chart_tf} grafigi chizilmoqda…")
+        ws_row = await db.get_workspace(item["workspace_id"])
+        try:
+            buf = await chart.setup_chart(item["draft"], ws_row["name"] if ws_row else "",
+                                           ctx.bot.username, tf=chart_tf)
+        except Exception:
+            log.warning("Signal grafigi yasalmadi", exc_info=True)
+            buf = None
+        item["gen"] = buf.getvalue() if buf else None
+        try:
+            await note.delete()
+        except Exception:
+            pass
+        if not item["gen"]:
+            await q.message.reply_text(
+                "⚠️ Grafik chizilmadi (birja javob bermadi). "
+                "Signal rasmsiz yuboriladi.")
+        await send_final_preview(q.message, ctx, token)
+        return
+
     if action == "ed":
         AWAITING_EDIT[q.from_user.id] = token
         await q.edit_message_text(
@@ -1477,41 +1577,31 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     d = item["draft"]
     entry_mode = d.get("entry_mode", "limit")
+    # Guruhga yuboriladigan rasm — foydalanuvchi KO'RGANINING AYNI o'zi.
+    # send_final_preview() uni Telegram'ga yuklab, file_id'ni saqlab qo'ygan.
+    post_file_id = item.get("ready_file_id") or item.get("file_id")
     sig_id = await db.create_signal(ws["id"], {
         "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
-        "sl": d["sl"], "tps": d["tps"], "chart_file_id": item["file_id"],
+        "sl": d["sl"], "tps": d["tps"], "chart_file_id": post_file_id,
         "author_id": q.from_user.id, "note": d.get("reasoning"),
         "market": d.get("market", "crypto"), "entry_mode": entry_mode,
-        "chart_tf": chart_tf,
+        "chart_tf": item.get("chart_tf"),
     })
     PENDING.pop(token, None)
-    await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
-                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    try:
+        await q.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await q.message.reply_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
+                                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
         body = draft_text(d, sig_id)
-
-        # "📈 Bot grafigi bilan" tanlangan bo'lsa — oxirgi shamlar ustiga
-        # rejalashtirilgan darajalar chiziladi. Chizib bo'lmasa (birja javob
-        # bermadi va h.k.) foydalanuvchining rasmiga, u ham bo'lmasa oddiy
-        # matnga tushamiz — signal hech qachon yuborilmay qolmaydi.
-        gen = None
-        if chart_tf:
-            try:
-                gen = await chart.setup_chart(d, sig_id, ws["name"], ctx.bot.username,
-                                               tf=chart_tf)
-            except Exception:
-                log.warning("Signal grafigi yasalmadi (#%s)", sig_id, exc_info=True)
-
         try:
-            if gen:
+            if post_file_id:
                 sent = await ctx.bot.send_photo(
-                    ws["group_chat_id"], InputFile(gen, "signal.png"), caption=body,
-                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
-            elif item["file_id"]:
-                sent = await ctx.bot.send_photo(
-                    ws["group_chat_id"], item["file_id"], caption=body,
+                    ws["group_chat_id"], post_file_id, caption=body,
                     parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
             else:
                 sent = await ctx.bot.send_message(
@@ -1781,6 +1871,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_EDIT.pop(update.effective_user.id, None)
     AWAITING_ALLOC.pop(update.effective_user.id, None)
+    AWAITING_SIGNAL_PHOTO.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
@@ -2844,7 +2935,7 @@ def main() -> None:
     app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
-    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|ok|no|ed|tf|bk):"))
+    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
