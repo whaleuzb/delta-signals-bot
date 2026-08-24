@@ -1682,6 +1682,100 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
 
 
+FIX_LIMIT = 30
+
+
+def _fix_row(s) -> str:
+    """Tuzatish ro'yxatidagi bitta qator."""
+    mark = "🚫" if s["excluded"] else ("⏳" if s["status"] in ("PENDING", "ACTIVE") else "")
+    pnl = f"{float(s['pnl_pct']):+.2f}%" if s["pnl_pct"] is not None else s["status"].lower()
+    when = f"{s['closed_at'].astimezone(stats.TZ):%d.%m}" if s["closed_at"] else \
+           f"{s['created_at'].astimezone(stats.TZ):%d.%m}"
+    return f"{mark}#{s['id']} {s['symbol']} {pnl} · {when}"
+
+
+async def _fix_view(ws, symbol: str | None):
+    """Matn + tugmalar. Har bir signal uchun bitta tugma: bosilsa hisobdan
+    chiqariladi yoki qaytariladi."""
+    rows = await db.admin_list_signals(ws["id"], symbol, FIX_LIMIT)
+    if not rows:
+        what = f" <code>{html.escape(symbol)}</code> bo'yicha" if symbol else ""
+        return f"Signal topilmadi{what}.", MENU_BACK_KB
+
+    n_off = sum(1 for s in rows if s["excluded"])
+    head = (f"🛠 <b>Signallarni tuzatish</b> — {html.escape(ws['name'])}\n"
+            f"Oxirgi {len(rows)} ta"
+            + (f", <code>{html.escape(symbol)}</code>" if symbol else "")
+            + (f" · {n_off} tasi hisobdan chiqarilgan" if n_off else "") + "\n\n"
+            "Tugmani bosing — signal statistikadan olib tashlanadi. "
+            "Qayta bossangiz qaytariladi. Hech narsa o'chirilmaydi.")
+
+    kb = []
+    for s in rows:
+        icon = "↩️ qaytarish" if s["excluded"] else "🚫 chiqarish"
+        kb.append([InlineKeyboardButton(f"{_fix_row(s)}  →  {icon}",
+                                         callback_data=f"fix:{s['id']}:{symbol or '-'}")])
+    kb.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    return head, InlineKeyboardMarkup(kb)
+
+
+async def cmd_tuzat(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Xato kiritilgan signalni statistikadan olib tashlash (faqat super-admin).
+
+    Raqamlarni QO'LDA tahrirlash ataylab qilinmadi — u statistikani hech kim
+    tekshira olmaydigan qo'lyozmaga aylantirardi. Buning o'rniga noto'g'ri
+    signalning o'zi hisobdan chiqariladi: qolgan hamma raqam haqiqiy savdo
+    ma'lumotidan hisoblanaveradi."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    symbol = None
+    if ctx.args:
+        raw = ctx.args[0]
+        symbol = await exchange.resolve(raw) or (await forex.resolve(raw) if forex.enabled() else None) \
+            or raw.upper()
+    text, kb = await _fix_view(ws, symbol)
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+async def on_fix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    uid = q.from_user.id
+    if not is_admin(uid):
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    _, sid_s, sym = q.data.split(":", 2)
+    sig = await db.get_signal(int(sid_s))
+    if not sig:
+        await q.answer("Topilmadi.", show_alert=True)
+        return
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws:
+        await q.answer("Workspace topilmadi.", show_alert=True)
+        return
+
+    new_state = not sig["excluded"]
+    await db.set_signal_excluded(sig["id"], new_state)
+
+    # Depozit ham to'g'rilanadi: yopilganda unga qo'shilgan pul hisobdan
+    # chiqarilganda qaytarib olinadi (aks holda depozit jimgina noto'g'ri
+    # bo'lib qolardi), qaytarilganda esa yana qo'shiladi.
+    if sig["status"] in ("TP", "SL", "BREAKEVEN") and sig["alloc_amount"] is not None \
+            and sig["pnl_pct"] is not None:
+        money = float(sig["pnl_pct"]) / 100 * float(sig["alloc_amount"])
+        await db.apply_deposit_delta(ws["id"], -money if new_state else money)
+
+    await q.answer("Hisobdan chiqarildi." if new_state else "Qaytarildi.")
+    text, kb = await _fix_view(ws, None if sym == "-" else sym)
+    try:
+        await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception:
+        pass  # matn o'zgarmasa Telegram xato beradi — muhim emas
+
+
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
@@ -2627,6 +2721,10 @@ def main() -> None:
     app.add_handler(CommandHandler("setup", cmd_setup))
     app.add_handler(CommandHandler("bekor", cmd_bekor))
     app.add_handler(CommandHandler("stats", cmd_stats))
+    # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
+    # (oddiy foydalanuvchi menyusida ko'rinmasin).
+    app.add_handler(CommandHandler("tuzat", cmd_tuzat))
+    app.add_handler(CallbackQueryHandler(on_fix, pattern=r"^fix:"))
     app.add_handler(CommandHandler("month", cmd_month))
     app.add_handler(CommandHandler("year", cmd_year))
     app.add_handler(CommandHandler("symbols", cmd_symbols))

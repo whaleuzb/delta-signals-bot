@@ -707,6 +707,34 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - Grafik `db.create_signal()` dan KEYIN chiziladi, chunki sarlavhaga
       haqiqiy `#id` kerak.
 
+35. **Xato signalni hisobdan chiqarish (`signals.excluded`, `/tuzat`).**
+    - Foydalanuvchi so'rovi: "xato signal kiritsam yopilganidan keyin uni
+      o'chira olmayapman... umumiy statistikani tahrirlash imkonini ber".
+    - **Raqamlarni qo'lda tahrirlash ATAYLAB QILINMADI.** Agar `pnl_pct`
+      ni qo'ldan yozish mumkin bo'lsa, statistika hech kim tekshira
+      olmaydigan qo'lyozmaga aylanadi va `/top` reytingi ma'nosini
+      yo'qotadi. Buning o'rniga noto'g'ri signalning O'ZI hisobdan
+      chiqariladi — qolgan har bir raqam haqiqiy bozor ma'lumotidan
+      hisoblanaveradi.
+    - O'chirish emas, BAYROQ (`excluded`): qator saqlanadi, guruhdagi eski
+      xabar bilan bog'liqlik buzilmaydi va istalgan payt qaytarish mumkin.
+    - Filtrlangan joylar (hammasida `AND NOT excluded`): `period_stats`,
+      `monthly_breakdown`, `equity_series`, `top_symbols`, `top_workspaces`,
+      `platform_stats`, `admin_list_groups`, va **`live_signals` +
+      `open_signals_summary`** — oxirgi ikkisi muhim: chiqarilgan OCHIQ
+      signal kuzatuvdan ham chiqadi, ya'ni xato signal guruhga TP/SL
+      xabarlari yubormay qo'yadi.
+    - Depozit ham to'g'rilanadi: `alloc_amount` bilan yopilgan signal
+      chiqarilsa unga qo'shilgan pul qaytarib olinadi, qaytarilsa yana
+      qo'shiladi (`on_fix`). Aks holda depozit jimgina noto'g'ri bo'lardi.
+    - `/tuzat` — faqat super-admin, `set_my_commands` ro'yxatiga
+      qo'shilmagan. `/tuzat ARIAUSDT` — bitta juftlik bo'yicha filtr.
+      Ro'yxatda chiqarilganlar ham ko'rinadi (🚫 belgisi bilan) — qaytarish
+      uchun ular ham kerak.
+    - Haqiqiy Postgres'da tekshirildi: chiqarish/qaytarishda `period_stats`,
+      `top_symbols`, `equity_series`, `live_signals`, `platform_stats` va
+      depozit — hammasi to'g'ri o'zgardi.
+
 ---
 
 ## Buyruqlar

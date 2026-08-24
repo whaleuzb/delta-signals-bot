@@ -172,6 +172,13 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAUL
 -- qilinadi va keyingi yuborishlarda o'tkazib yuboriladi (bekorga so'rov
 -- yubormaslik uchun). Odam qaytib kelsa upsert_user() uni FALSE ga qaytaradi.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Hisobdan chiqarilgan signal. Xato kiritilgan (yoki takroriy) signalni
+-- O'CHIRMAY statistikadan olib tashlash uchun. Ataylab o'chirish emas:
+-- o'chirilgan qatorni qaytarib bo'lmaydi va guruhdagi eski xabar bilan
+-- bog'liqlik yo'qoladi; bayroqni esa istalgan payt qaytarish mumkin.
+-- BARCHA statistika so'rovlari "AND NOT excluded" bilan filtrlanadi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -353,9 +360,11 @@ async def platform_stats() -> asyncpg.Record:
               (SELECT COUNT(*) FROM workspaces WHERE type='group' AND public)       AS public_req,
               (SELECT COUNT(*) FROM workspaces
                  WHERE type='group' AND public AND public_approved)                 AS public_ok,
-              (SELECT COUNT(*) FROM signals)                                        AS signals_all,
-              (SELECT COUNT(*) FROM signals WHERE status IN ('PENDING','ACTIVE'))   AS signals_open,
-              (SELECT COUNT(*) FROM signals WHERE status IN {CLOSED})               AS signals_closed,
+              (SELECT COUNT(*) FROM signals WHERE NOT excluded)                     AS signals_all,
+              (SELECT COUNT(*) FROM signals WHERE status IN ('PENDING','ACTIVE')
+                 AND NOT excluded)                                                    AS signals_open,
+              (SELECT COUNT(*) FROM signals WHERE status IN {CLOSED}
+                 AND NOT excluded)                                                    AS signals_closed,
               (SELECT COUNT(*) FROM group_viewers)                                  AS viewers
         """)
 
@@ -365,9 +374,10 @@ async def admin_list_groups() -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch(f"""
             SELECT w.*, u.username AS owner_username, u.first_name AS owner_name,
-                   (SELECT COUNT(*) FROM signals s WHERE s.workspace_id = w.id) AS n_signals,
                    (SELECT COUNT(*) FROM signals s WHERE s.workspace_id = w.id
-                      AND s.status IN {CLOSED})                                 AS n_closed,
+                      AND NOT s.excluded)                                       AS n_signals,
+                   (SELECT COUNT(*) FROM signals s WHERE s.workspace_id = w.id
+                      AND s.status IN {CLOSED} AND NOT s.excluded)              AS n_closed,
                    (SELECT COUNT(*) FROM group_viewers g WHERE g.workspace_id = w.id) AS n_viewers
             FROM workspaces w
             LEFT JOIN users u ON u.user_id = w.owner_id
@@ -537,15 +547,36 @@ async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         if workspace_id is None:
             return await c.fetch(
-                "SELECT * FROM signals WHERE status IN ('PENDING','ACTIVE') ORDER BY id")
+                "SELECT * FROM signals WHERE status IN ('PENDING','ACTIVE') "
+                "AND NOT excluded ORDER BY id")
         return await c.fetch(
             "SELECT * FROM signals WHERE workspace_id=$1 "
-            "AND status IN ('PENDING','ACTIVE') ORDER BY id", workspace_id)
+            "AND status IN ('PENDING','ACTIVE') AND NOT excluded ORDER BY id", workspace_id)
 
 
 async def get_signal(sig_id: int) -> asyncpg.Record | None:
     async with pool().acquire() as c:
         return await c.fetchrow("SELECT * FROM signals WHERE id=$1", sig_id)
+
+
+async def admin_list_signals(workspace_id: int, symbol: str | None = None,
+                              limit: int = 30) -> list[asyncpg.Record]:
+    """Tuzatish oynasi uchun signallar ro'yxati — hisobdan chiqarilganlari ham
+    ko'rinadi (qaytarish uchun ular ham kerak). Eng yangisi birinchi."""
+    q = "SELECT * FROM signals WHERE workspace_id=$1"
+    params: list = [workspace_id]
+    if symbol:
+        params.append(symbol)
+        q += f" AND symbol = ${len(params)}"
+    params.append(limit)
+    q += f" ORDER BY id DESC LIMIT ${len(params)}"
+    async with pool().acquire() as c:
+        return await c.fetch(q, *params)
+
+
+async def set_signal_excluded(sig_id: int, excluded: bool) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET excluded=$2 WHERE id=$1", sig_id, excluded)
 
 
 async def save_progress(sig_id: int, f: dict) -> None:
@@ -598,7 +629,7 @@ async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Rec
         SUM(pnl_pct / 100 * alloc_amount) FILTER (WHERE alloc_amount IS NOT NULL)
                                                               AS real_pnl_money
     FROM signals
-    WHERE workspace_id = $1 AND status IN {CLOSED}
+    WHERE workspace_id = $1 AND status IN {CLOSED} AND NOT excluded
       AND ($2::timestamptz IS NULL OR closed_at >= $2)
       AND ($3::timestamptz IS NULL OR closed_at <  $3)
     """
@@ -613,7 +644,7 @@ async def monthly_breakdown(workspace_id: int, limit: int = 12) -> list[asyncpg.
            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
            ROUND(COALESCE(SUM(pnl_pct),0), 2) AS sum_pct,
            ROUND(COALESCE(AVG(r_multiple),0), 2) AS avg_r
-    FROM signals WHERE workspace_id=$1 AND status IN {CLOSED}
+    FROM signals WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
     GROUP BY 1 ORDER BY 1 DESC LIMIT $2
     """
     async with pool().acquire() as c:
@@ -627,7 +658,7 @@ async def equity_series(workspace_id: int, since=None, until=None) -> list[async
     alloc_amount ham qaytariladi — real (pul bilan tortilgan) kompaund uchun."""
     q = f"""
     SELECT closed_at, pnl_pct, alloc_amount FROM signals
-    WHERE workspace_id=$1 AND status IN {CLOSED}
+    WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
       AND ($2::timestamptz IS NULL OR closed_at >= $2)
       AND ($3::timestamptz IS NULL OR closed_at <  $3)
     ORDER BY closed_at
@@ -642,7 +673,7 @@ async def top_symbols(workspace_id: int, since=None, until=None,
     since/until berilsa — faqat shu oraliqda YOPILGAN signallar (closed_at bo'yicha).
     Hali ochiq (PENDING/ACTIVE) signal hech qaysi oraliqqa tushmaydi — u yopilgan
     paytidagi oyga avtomatik o'tadi."""
-    where = f"workspace_id = $1 AND status IN {CLOSED}"
+    where = f"workspace_id = $1 AND status IN {CLOSED} AND NOT excluded"
     params = [workspace_id]
     if since is not None:
         params.append(since)
@@ -675,7 +706,7 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
-      AND NOT w.archived AND s.status IN {CLOSED}
+      AND NOT w.archived AND s.status IN {CLOSED} AND NOT s.excluded
       AND s.closed_at >= $1 AND s.closed_at < $2
     GROUP BY w.id, w.name, w.invite_link
     ORDER BY sum_pct DESC
@@ -693,7 +724,7 @@ async def open_signals_summary(workspace_id: int) -> dict[str, dict]:
     async with pool().acquire() as c:
         rows = await c.fetch(
             "SELECT symbol, status, side, entry, market FROM signals "
-            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE')",
+            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE') AND NOT excluded",
             workspace_id,
         )
     out: dict[str, dict] = {}
