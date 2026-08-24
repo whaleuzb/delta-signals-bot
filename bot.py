@@ -1011,14 +1011,13 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
 
-WIZ_PHOTO, WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(7)
+# Rasm bosqichi ATAYLAB yo'q: rasm tanlovi (yuklash / bot grafigi / rasmsiz)
+# barcha darajalar kiritilgandan KEYIN, show_preview() da so'raladi — shunda
+# foydalanuvchi avval signalni ko'radi, keyin rasmni tanlaydi.
+WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
 
 WIZ_CANCEL_KB = InlineKeyboardMarkup(
     [[InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")]])
-WIZ_PHOTO_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("⏭ Rasmsiz davom etish", callback_data="wiz_skip_photo")],
-    [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
-])
 WIZ_MODE_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("🎯 Oddiy (darhol)", callback_data="wiz_mode:market"),
      InlineKeyboardButton("⏳ Limit (narxni kutadi)", callback_data="wiz_mode:limit")],
@@ -1050,9 +1049,10 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await target.reply_text("Sizda bu joy uchun signal kiritish huquqi yo'q.")
         return ConversationHandler.END
 
-    ctx.user_data["wiz"] = {"workspace_id": ws["id"]}
-    await target.reply_text("1/6 — 📈 Grafik rasmni yuboring.", reply_markup=WIZ_PHOTO_KB)
-    return WIZ_PHOTO
+    ctx.user_data["wiz"] = {"workspace_id": ws["id"], "file_id": None}
+    await target.reply_text("1/6 — Juftlik nomini yozing (masalan BTCUSDT):",
+                            reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SYMBOL
 
 
 async def _wiz_or_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1064,30 +1064,6 @@ async def _wiz_or_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "Sehrgar bekor qilingan. Qaytadan boshlash uchun /new yozing.",
             reply_markup=MENU_BACK_KB)
     return wiz
-
-
-async def wizard_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    msg = update.effective_message
-    wiz = await _wiz_or_end(update, ctx)
-    if wiz is None:
-        return ConversationHandler.END
-    wiz["file_id"] = msg.photo[-1].file_id
-    await msg.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
-                         reply_markup=WIZ_CANCEL_KB)
-    return WIZ_SYMBOL
-
-
-async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
-    q = update.callback_query
-    await q.answer()
-    wiz = await _wiz_or_end(update, ctx)
-    if wiz is None:
-        return ConversationHandler.END
-    wiz["file_id"] = None
-    await q.edit_message_text("1/6 — Rasmsiz davom etilmoqda.")
-    await q.message.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
-                               reply_markup=WIZ_CANCEL_KB)
-    return WIZ_SYMBOL
 
 
 async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1108,7 +1084,7 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz["symbol"] = sym
     wiz["market"] = market
     await msg.reply_text(
-        f"3/6 — {sym}: qanday kirasiz?\n\n"
+        f"2/6 — {sym}: qanday kirasiz?\n\n"
         "🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda "
         "allaqachon kirgandek).\n"
         "⏳ <b>Limit</b> — narx kirish darajasiga tegmaguncha kutadi (standart).",
@@ -1125,13 +1101,13 @@ async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["entry_mode"] = mode
     label = "🎯 Oddiy" if mode == "market" else "⏳ Limit"
-    await q.edit_message_text(f"3/6 — Kirish rejimi: {label}")
+    await q.edit_message_text(f"2/6 — Kirish rejimi: {label}")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
          InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
         [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
     ])
-    await q.message.reply_text("4/6 — Yo'nalishni tanlang:", reply_markup=kb)
+    await q.message.reply_text("3/6 — Yo'nalishni tanlang:", reply_markup=kb)
     return WIZ_SIDE
 
 
@@ -1143,8 +1119,8 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if wiz is None:
         return ConversationHandler.END
     wiz["side"] = side
-    await q.edit_message_text(f"4/6 — Yo'nalish: {side}")
-    await q.message.reply_text("5/6 — Entry (kirish) narxini kiriting:",
+    await q.edit_message_text(f"3/6 — Yo'nalish: {side}")
+    await q.message.reply_text("4/6 — Entry (kirish) narxini kiriting:",
                                reply_markup=WIZ_CANCEL_KB)
     return WIZ_ENTRY
 
@@ -1160,7 +1136,7 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["entry"] = entry
     await msg.reply_text(
-        "6/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
+        "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
         "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
     return WIZ_TP
 
@@ -1176,7 +1152,7 @@ async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     side = wiz["side"]
     wiz["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
-    await msg.reply_text("SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
+    await msg.reply_text("6/6 — SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
     return WIZ_SL
 
 
@@ -2959,10 +2935,6 @@ def main() -> None:
             CommandHandler("new", wizard_start),
         ],
         states={
-            WIZ_PHOTO: [
-                MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, wizard_photo),
-                CallbackQueryHandler(wizard_skip_photo, pattern=r"^wiz_skip_photo$"),
-            ],
             WIZ_SYMBOL: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_symbol)],
             WIZ_MODE: [CallbackQueryHandler(wizard_mode, pattern=r"^wiz_mode:")],

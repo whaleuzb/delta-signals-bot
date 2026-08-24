@@ -839,6 +839,13 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       olib tashlandi.
     - 17 ta holatda tekshirildi (uchala yo'l, rasm biriktirish, file_id
       qayta ishlatish, grafik chizilmagan holat).
+    - **Sehrgar (`/new`) ham shu oqimga keltirildi**: avval u BIRINCHI qadamda
+      rasm so'rardi ("1/6 — Grafik rasmni yuboring"), ya'ni 3 tugma umuman
+      chiqmasdi va foydalanuvchi "chiqmadiku?" deb yozdi. `WIZ_PHOTO` holati,
+      `wizard_photo`/`wizard_skip_photo` va `WIZ_PHOTO_KB` butunlay olib
+      tashlandi — endi sehrgar juftlikdan boshlanadi (1/6 … 6/6, raqamlar
+      nihoyat ketma-ket) va rasm tanlovi oxirida, `show_preview()` da
+      chiqadi. Ikkala yo'l (tez matnli va sehrgar) endi bir xil tugaydi.
 
 ---
 
