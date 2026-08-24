@@ -852,6 +852,12 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       kenglikning ~15% ini zaxiralab, shamlarni chapga siqardi. Endi ular
       o'ng chekkada, ichkarida, yarim shaffof fon (`bbox`) ostida —
       `right=0.985`, ya'ni shamlar deyarli butun kenglikni egallaydi.
+    - Keyin foydalanuvchi TradingView skrinshotini yubordi: oxirgi shamdan
+      KEYIN bo'sh joy qolishi kerak ("right offset"). Birinchi urinishda
+      shamlar o'ng chekkaga taqalib, yorliqlar ular USTIGA tushgan edi.
+      Endi `right_pad = max(8, len(candles) * 0.14)` va
+      `xlim = (-1.5, len(candles) - 1 + right_pad)` — yorliqlar aynan shu
+      bo'shliqqa tushadi va narx harakatini to'smaydi.
 
 ---
 

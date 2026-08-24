@@ -97,12 +97,15 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
         ax.add_patch(Rectangle((i - width / 2, body_lo), width, h, facecolor=col,
                                 edgecolor=col, lw=0, zorder=3))
 
+    # Oxirgi shamdan keyin bo'sh joy — savdo platformalaridagi kabi ("right
+    # offset"). Shamlar o'ng chekkaga taqalib qolmaydi va daraja yorliqlari
+    # aynan shu bo'sh joyga tushadi, ya'ni narx harakatini to'smaydi.
+    right_pad = max(8.0, len(candles) * 0.14)
+    x_max = len(candles) - 1 + right_pad
+
     def hline(y, color, label, ls="--", lw=1.3, alpha=1.0):
         ax.axhline(y, color=color, lw=lw, ls=ls, alpha=alpha, zorder=1)
-        # Yorliq grafik ICHIDA, o'ng chekkada. Avval u tashqarida turardi va
-        # o'zi uchun kengligning ~15% ini yeb, shamlarni chapga siqib qo'yardi.
-        # Yarim shaffof fon ostida u chiziq ustida ham bemalol o'qiladi.
-        ax.text(len(candles) - 1.5, y, label, color=color, fontsize=9,
+        ax.text(x_max - right_pad * 0.08, y, label, color=color, fontsize=9,
                 fontweight="bold", va="center", ha="right", zorder=6,
                 bbox=dict(facecolor=BG, edgecolor="none", alpha=0.72, pad=1.6))
 
@@ -124,7 +127,7 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
             color=exit_col, fontsize=10, fontweight="bold", ha="center",
         )
 
-    ax.set_xlim(-1.5, len(candles) - 0.5)
+    ax.set_xlim(-1.5, x_max)
     ax.set_ylim(lo, hi)
     ax.grid(True, color=GRID, lw=0.6, alpha=0.6)
     ax.set_xticks([])
