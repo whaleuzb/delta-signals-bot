@@ -591,6 +591,51 @@ async def admin_list_signals(workspace_id: int, symbol: str | None = None,
         return await c.fetch(q, *params)
 
 
+async def public_workspace(workspace_id: int) -> asyncpg.Record | None:
+    """Ochiq veb sahifada ko'rsatish MUMKIN bo'lgan workspace.
+
+    Shartlar `/top` reytingi bilan AYNAN bir xil: egasi o'zi yoqqan (`public`)
+    VA super-admin tasdiqlagan (`public_approved`) VA arxivlanmagan. Shu sabab
+    veb yangi ruxsat darvozasi ochmaydi — allaqachon ommaviy bo'lgan narsanigina
+    ko'rsatadi."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT * FROM workspaces WHERE id=$1 AND type='group' "
+            "AND public = TRUE AND public_approved = TRUE AND NOT archived",
+            workspace_id)
+
+
+async def public_workspaces() -> list[asyncpg.Record]:
+    """Ochiq sahifa bosh ro'yxati — yopilgan signali borlari, yangisi birinchi."""
+    q = f"""
+    SELECT w.id, w.name, w.invite_link,
+           COUNT(s.id)                                   AS total,
+           COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)      AS wins,
+           MAX(s.closed_at)                              AS last_closed
+    FROM workspaces w
+    LEFT JOIN signals s ON s.workspace_id = w.id
+         AND s.status IN {CLOSED} AND NOT s.excluded
+    WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
+      AND NOT w.archived
+    GROUP BY w.id, w.name, w.invite_link
+    ORDER BY last_closed DESC NULLS LAST
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q)
+
+
+async def recent_closed(workspace_id: int, limit: int = 25) -> list[asyncpg.Record]:
+    q = f"""
+    SELECT id, symbol, side, entry, exit_price, pnl_pct, r_multiple,
+           status, opened_at, closed_at
+    FROM signals
+    WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
+    ORDER BY closed_at DESC LIMIT $2
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q, workspace_id, limit)
+
+
 async def set_digest_hour(workspace_id: int, hour: int | None) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE workspaces SET digest_hour=$2 WHERE id=$1",

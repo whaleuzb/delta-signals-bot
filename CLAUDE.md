@@ -980,3 +980,23 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - Qo'lda summa yozish ham, o'tkazib yuborish ham avvalgidek qoladi.
     - `alloc:` va `allocskip:` patternlari to'qnashmaydi (`^alloc:` "allocskip:"
       ga mos kelmaydi — tekshirildi).
+
+43. **Ochiq natijalar sahifasi (`web.py`) — alohida veb servis.**
+    - Maqsad: guruh egasi skrinshot tashlash o'rniga JONLI havola beradi.
+      Skrinshotni tahrirlash mumkin, sahifani esa yo'q — u to'g'ridan-to'g'ri
+      bazadan o'qiladi. Bu botga qila olmaydigan ish.
+    - **Ruxsat darvozasi `/top` bilan AYNAN bir xil**: `public` (egasi yoqqan)
+      + `public_approved` (super-admin tasdiqlagan) + arxivlanmagan.
+      `db.public_workspace()` shu shartni bitta joyda ushlab turadi. Ya'ni veb
+      YANGI ruxsat ochmaydi — allaqachon ommaviy bo'lgan narsanigina ko'rsatadi.
+      Tekshirildi: tasdiqlanmagan guruh ham 404 beradi.
+    - **Faqat o'qish**: hech bir yo'l bazaga yozmaydi.
+    - **Bot bilan ALOHIDA servis** (`python web.py`): bot polling rejimida
+      ishlaydi va HTTP port ochmaydi. Bitta jarayonga qo'shilsa veb yiqilganda
+      signal kuzatuvi ham to'xtardi.
+    - Yo'llar: `/` (ochiq guruhlar ro'yxati), `/g/<id>` (statistika, equity,
+      juftliklar, oylik, oxirgi savdolar), `/g/<id>/equity.png`, `/healthz`.
+    - Kesh: sahifa va PNG 120 soniyaga keshlanadi (matplotlib qimmat), kesh
+      200 yozuvdan oshsa eng eskilari tashlanadi.
+    - Barcha matn (guruh nomi, juftlik) HTML uchun ekranlanadi.
+    - Yagona yangi bog'liqlik: `aiohttp`.
