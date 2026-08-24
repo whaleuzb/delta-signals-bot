@@ -846,6 +846,12 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       tashlandi — endi sehrgar juftlikdan boshlanadi (1/6 … 6/6, raqamlar
       nihoyat ketma-ket) va rasm tanlovi oxirida, `show_preview()` da
       chiqadi. Ikkala yo'l (tez matnli va sehrgar) endi bir xil tugaydi.
+    - **Daraja yorliqlari grafik ICHIGA ko'chirildi** (foydalanuvchi: "grafik
+      juda chetga tiqilib qolgan"). Avval "Entry 71,000" kabi yorliqlar
+      o'qlar TASHQARISIDA turardi va `right=0.86` bilan o'zi uchun
+      kenglikning ~15% ini zaxiralab, shamlarni chapga siqardi. Endi ular
+      o'ng chekkada, ichkarida, yarim shaffof fon (`bbox`) ostida —
+      `right=0.985`, ya'ni shamlar deyarli butun kenglikni egallaydi.
 
 ---
 

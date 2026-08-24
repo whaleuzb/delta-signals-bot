@@ -99,8 +99,12 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
 
     def hline(y, color, label, ls="--", lw=1.3, alpha=1.0):
         ax.axhline(y, color=color, lw=lw, ls=ls, alpha=alpha, zorder=1)
-        ax.text(len(candles) - 0.5, y, f"  {label}", color=color, fontsize=9.5,
-                fontweight="bold", va="center", ha="left", clip_on=False)
+        # Yorliq grafik ICHIDA, o'ng chekkada. Avval u tashqarida turardi va
+        # o'zi uchun kengligning ~15% ini yeb, shamlarni chapga siqib qo'yardi.
+        # Yarim shaffof fon ostida u chiziq ustida ham bemalol o'qiladi.
+        ax.text(len(candles) - 1.5, y, label, color=color, fontsize=9,
+                fontweight="bold", va="center", ha="right", zorder=6,
+                bbox=dict(facecolor=BG, edgecolor="none", alpha=0.72, pad=1.6))
 
     hline(entry, ACC, f"Entry {_fmt(entry)}")
     hline(sl, RED, f"SL {_fmt(sl)}", alpha=0.85)
@@ -147,7 +151,8 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     if bot_username:
         fig.text(0.97, 0.02, f"t.me/{bot_username}", fontsize=9.5, color=SILVER, ha="right")
 
-    fig.subplots_adjust(left=0.06, right=0.86, top=0.88, bottom=0.08)
+    # right=0.985 — yorliqlar endi ichkarida, tashqarida joy zaxiralash shart emas.
+    fig.subplots_adjust(left=0.062, right=0.985, top=0.88, bottom=0.08)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
