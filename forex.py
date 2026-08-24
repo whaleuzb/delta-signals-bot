@@ -48,7 +48,10 @@ async def valid_symbols() -> set[str]:
 
 
 def normalize(raw: str) -> str:
-    return raw.upper().strip().replace(" ", "").replace("-", "").replace(":", "").replace("/", "")
+    s = raw.upper().strip()
+    for ch in ("/", "-", ":", "_", " ", "\t", " "):
+        s = s.replace(ch, "")
+    return s
 
 
 async def resolve(raw: str) -> str | None:

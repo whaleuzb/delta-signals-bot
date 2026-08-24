@@ -36,8 +36,47 @@ def _nums(text: str) -> list[float]:
     return out
 
 
+# Juftlik bo'la olmaydigan so'zlar — nomzodlar ro'yxatini toza saqlaydi.
+# To'liq bo'lishi SHART EMAS: ro'yxatga tushmagan begona so'z baribir birjada
+# topilmaydi va chaqiruvchi keyingi nomzodga o'tadi.
+_NOT_SYMBOL = {
+    "long", "short", "buy", "sell", "entry", "enter", "tp", "sl", "stop",
+    "stoploss", "target", "take", "profit", "kirish", "chiqish", "maqsad",
+    "signal", "spot", "market", "bozor", "limit", "oddiy", "narx", "price",
+    "zarar", "yangi", "bugun", "hozir", "va", "ва",
+}
+
+# Juftlik: 2-12 harf, ixtiyoriy ajratgich + kotirovka (USDT/USD/PERP),
+# ixtiyoriy ".P". Ajratgich va kotirovka BIRGA ixtiyoriy — shu sabab
+# "btc long" da faqat "btc" olinadi, bo'sh joy yutib yuborilmaydi.
+_SYM_RE = re.compile(r"\b([A-Za-z]{2,12}(?:[/\-_ ]?(?:USDT|USD|PERP))?(?:\.P)?)\b", re.I)
+
+MAX_SYMBOL_CANDIDATES = 6
+
+
+def symbol_candidates(text: str) -> list[str]:
+    """Matndagi juftlikka o'xshash so'zlar — matnda uchrash tartibida.
+
+    Bittasini tanlab olmaydi: qaysi biri haqiqiy juftlik ekanini FAQAT birja
+    biladi. Avval faqat birinchi so'z olinardi va "Yangi signal: btc long..."
+    kabi oddiy xabarda juftlik "Yangi" bo'lib chiqardi."""
+    out: list[str] = []
+    for m in _SYM_RE.finditer(text or ""):
+        w = m.group(1).strip()
+        if w.lower().replace(" ", "") in _NOT_SYMBOL or w.lower() in _NOT_SYMBOL:
+            continue
+        if w not in out:
+            out.append(w)
+        if len(out) >= MAX_SYMBOL_CANDIDATES:
+            break
+    return out
+
+
 def parse(text: str) -> dict | None:
-    """Muvaffaqiyatli bo'lsa {symbol, side, entry, sl, tps} qaytaradi."""
+    """Muvaffaqiyatli bo'lsa {symbol, symbols, side, entry, sl, tps} qaytaradi.
+
+    `symbols` — juftlik nomzodlari (tartibda). Chaqiruvchi ularni birjada
+    birma-bir tekshiradi; `symbol` shunchaki birinchisi."""
     if not text:
         return None
     t = text.replace("\u00a0", " ")
@@ -53,18 +92,10 @@ def parse(text: str) -> dict | None:
     entry_mode = "market" if re.search(r"\b(market|bozor)\b", low) else "limit"
 
     # --- juftlik ---
-    m = re.search(r"\b([A-Za-z]{2,10})\s*[/\-:]?\s*(usdt|usd)?\b(?:\.p)?", t)
-    symbol = None
-    for cand in re.finditer(r"\b([A-Za-z]{2,12}(?:/|-)?(?:USDT|USD)?(?:\.P)?)\b", t, re.I):
-        w = cand.group(1)
-        if w.lower() in {"long", "short", "buy", "sell", "entry", "tp", "sl", "stop",
-                         "target", "kirish", "maqsad", "signal", "spot",
-                         "market", "bozor", "limit", "oddiy"}:
-            continue
-        symbol = w
-        break
-    if not symbol:
+    cands = symbol_candidates(t)
+    if not cands:
         return None
+    symbol = cands[0]
 
     # --- SL ---
     sl = None
@@ -104,8 +135,8 @@ def parse(text: str) -> dict | None:
         return None
 
     tps = sorted(set(tps), reverse=(side == "SHORT"))
-    return {"symbol": symbol, "side": side, "entry": entry, "sl": sl, "tps": tps,
-            "entry_mode": entry_mode}
+    return {"symbol": symbol, "symbols": cands, "side": side, "entry": entry,
+            "sl": sl, "tps": tps, "entry_mode": entry_mode}
 
 
 def validate(d: dict) -> str | None:

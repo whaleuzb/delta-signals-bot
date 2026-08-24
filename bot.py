@@ -1074,15 +1074,14 @@ async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> i
 async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
     raw = (msg.text or "").strip()
-    market = "crypto"
-    sym = await exchange.resolve(raw)
-    if not sym and forex.enabled():
-        sym = await forex.resolve(raw)
-        if sym:
-            market = "forex"
+    # Butun matn ham, undan ajratilgan nomzodlar ham sinaladi: odam "btc",
+    # "BTC/USDT" yoki "menga btc kerak" deb yozishi mumkin.
+    cands = [raw] + [c for c in parsing.symbol_candidates(raw) if c != raw]
+    sym, market = await resolve_symbol(cands)
     if not sym:
-        await msg.reply_text(f"❌ <code>{raw}</code> topilmadi (kripto yoki forex). Qayta yozing:",
-                             parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+        await msg.reply_text(
+            f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto yoki forex). Qayta yozing:",
+            parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
         return WIZ_SYMBOL
     ctx.user_data["wiz"]["symbol"] = sym
     ctx.user_data["wiz"]["market"] = market
@@ -1281,17 +1280,46 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
               chat.id, chat.title, chat.type, msg.message_thread_id)
 
 
+async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
+    """Juftlik nomzodlarini birjada birma-bir tekshiradi.
+
+    Matndan qaysi so'z juftlik ekanini aniq bilib bo'lmaydi ("Yangi signal:
+    btc long..." — qaysi biri?), shuning uchun tanlovni BIRJAGA qoldiramiz:
+    ro'yxatda topilgani — o'sha. Avval hamma nomzod kripto bo'yicha, keyin
+    forex bo'yicha tekshiriladi (kripto — keng tarqalgan holat).
+
+    Qimmat emas: ikkala manba ham juftliklar ro'yxatini 1 soatga keshlaydi,
+    ya'ni bu oddiy to'plamda qidiruv, tarmoq so'rovi emas."""
+    for raw in cands:
+        try:
+            sym = await exchange.resolve(raw)
+        except Exception:
+            log.warning("Kripto juftliklar ro'yxati olinmadi", exc_info=True)
+            break
+        if sym:
+            return sym, "crypto"
+    if forex.enabled():
+        for raw in cands:
+            try:
+                sym = await forex.resolve(raw)
+            except Exception:
+                log.warning("Forex juftliklar ro'yxati olinmadi", exc_info=True)
+                break
+            if sym:
+                return sym, "forex"
+    return None, "crypto"
+
+
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
                         token: str | None = None) -> None:
-    market = "crypto"
-    sym = await exchange.resolve(draft["symbol"])
-    if not sym and forex.enabled():
-        sym = await forex.resolve(draft["symbol"])
-        if sym:
-            market = "forex"
+    cands = draft.get("symbols") or [draft["symbol"]]
+    sym, market = await resolve_symbol(cands)
     if not sym:
+        shown = html.escape(", ".join(cands[:3]))
         await msg.reply_text(
-            f"❌ <code>{draft['symbol']}</code> topilmadi (kripto yoki forex).",
+            f"❌ <code>{shown}</code> topilmadi (kripto yoki forex).\n"
+            "Juftlikni tekshiring — masalan <code>BTCUSDT</code>, <code>btc</code>, "
+            "<code>ETH/USDT</code>.",
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
         )
         return
@@ -1735,8 +1763,8 @@ async def cmd_tuzat(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     symbol = None
     if ctx.args:
         raw = ctx.args[0]
-        symbol = await exchange.resolve(raw) or (await forex.resolve(raw) if forex.enabled() else None) \
-            or raw.upper()
+        found, _ = await resolve_symbol([raw])
+        symbol = found or raw.upper()
     text, kb = await _fix_view(ws, symbol)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 

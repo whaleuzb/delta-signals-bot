@@ -36,17 +36,27 @@ async def valid_symbols() -> set[str]:
         return _symbols
     r = await _client.get("/api/v3/exchangeInfo")
     r.raise_for_status()
+    # status: MEXC "1" qaytaradi, lekin hujjatlarda "ENABLED" ham uchraydi —
+    # ikkalasini ham qabul qilamiz. Agar bir kun yozilishi yana o'zgarsa,
+    # butun ro'yxat bo'shab qolib BARCHA signallar rad etilishi mumkin edi;
+    # asosiy shart baribir isSpotTradingAllowed.
     _symbols = {
         s["symbol"] for s in r.json()["symbols"]
-        if s.get("status") == "1" and s.get("isSpotTradingAllowed")
+        if s.get("isSpotTradingAllowed")
+        and str(s.get("status", "")).upper() in ("1", "ENABLED", "TRADING")
     }
     _symbols_ts = time.time()
     return _symbols
 
 
 def normalize(raw: str) -> str:
-    """btc, BTC/USDT, BTCUSDT.P -> BTCUSDT"""
-    s = raw.upper().strip().replace("/", "").replace("-", "").replace(":", "")
+    """btc, Btc, BTC/USDT, "BTC USDT", BTC_USDT, BTCUSDT.P -> BTCUSDT
+
+    Ajratgichlar (bo'sh joy, _, /, -, :) tashlanadi — odamlar juftlikni
+    juda xilma-xil yozadi va ularning hammasi bir xil narsani bildiradi."""
+    s = raw.upper().strip()
+    for ch in ("/", "-", ":", "_", " ", "\t", " "):
+        s = s.replace(ch, "")
     for suf in (".P", "PERP"):
         if s.endswith(suf):
             s = s[: -len(suf)]

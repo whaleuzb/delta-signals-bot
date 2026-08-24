@@ -735,6 +735,35 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       `top_symbols`, `equity_series`, `live_signals`, `platform_stats` va
       depozit — hammasi to'g'ri o'zgardi.
 
+36. **Juftlikni tanib olish — nomzodlar ro'yxati (`parsing.symbol_candidates`,
+    `bot.resolve_symbol`).**
+    - Shikoyat: "btcusdt, btc, Btc yozuvlarini o'qimayapti, faqat BTCUSDT
+      qabul qilyapti". Tekshirganda **registr aybdor emasligi** aniqlandi —
+      parser ham, `normalize()` ham hammasini katta harfga o'girardi.
+      Ikkita boshqa nuqson bor edi:
+      1. **Parser matndagi BIRINCHI so'zni juftlik deb olardi.** Shu sabab
+         "Yangi signal: btc long..." da juftlik `Yangi` bo'lib chiqar va
+         "❌ Yangi topilmadi" chiqardi. Foydalanuvchiga bu "faqat toza
+         BTCUSDT ishlaydi" bo'lib ko'rinadi, chunki toza qatorda birinchi
+         so'z chindan ham juftlik bo'ladi. Aynan shu asosiy sabab.
+      2. `exchange.normalize()` bo'sh joy va `_` ni tashlamasdi:
+         "BTC USDT" va "BTC_USDT" rad etilardi.
+    - Yechim: matndan bitta so'zni TAXMIN QILISH o'rniga nomzodlar ro'yxati
+      yig'iladi va tanlov BIRJAGA qoldiriladi — ro'yxatida bori o'sha.
+      Avval hamma nomzod kripto, keyin forex bo'yicha sinaladi. Qimmat emas:
+      ikkala manba juftliklar ro'yxatini 1 soatga keshlaydi, ya'ni bu
+      to'plamda qidiruv, tarmoq so'rovi emas.
+    - `_NOT_SYMBOL` ro'yxati endi faqat tezlik uchun — to'liq bo'lishi shart
+      emas, chunki begona so'z baribir birjada topilmaydi.
+    - `resolve_symbol()` uch joyda ishlatiladi: `show_preview`,
+      `wizard_symbol`, `/tuzat`. Birja ro'yxatini olishda xato bo'lsa
+      `try/except` bilan tutiladi (avval bu yerda himoya yo'q edi).
+    - `valid_symbols()` status filtri yumshatildi ("1" | "ENABLED" |
+      "TRADING"): MEXC bir kun yozilishni o'zgartirsa butun ro'yxat bo'shab
+      qolib BARCHA signallar rad etilishi mumkin edi.
+    - 23 ta holatda tekshirildi (registr, ajratgichlar, oldidagi begona
+      so'zlar, forex, topilmasligi kerak bo'lgani).
+
 ---
 
 ## Buyruqlar
