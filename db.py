@@ -584,6 +584,23 @@ async def admin_list_signals(workspace_id: int, symbol: str | None = None,
         return await c.fetch(q, *params)
 
 
+async def set_stop(sig_id: int, sl: float) -> None:
+    """Ochiq signalning JORIY stopini ko'chiradi. `sl_initial` ATAYLAB
+    tegilmaydi — R hisobi asl risk bo'yicha qolishi kerak, aks holda stopni
+    ko'chirish statistikani chiroyliroq ko'rsatib yuborardi."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET sl=$2 WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
+            sig_id, _d(sl))
+
+
+async def set_tps(sig_id: int, tps: list[float]) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET tps=$2 WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
+            sig_id, [_d(t) for t in tps])
+
+
 async def set_signal_excluded(sig_id: int, excluded: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET excluded=$2 WHERE id=$1", sig_id, excluded)

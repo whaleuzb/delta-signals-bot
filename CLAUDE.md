@@ -915,3 +915,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Bot xabarlarida HTML parse mode (`<b>`, `<code>`), Markdown emas.
 - Yangi funksiya qo'shilsa `test_tracker.py` ga tegishli holat qo'shilsin.
 - To'liq fayl qaytaring, qismli diff emas.
+
+---
+
+## Keyingi qo'shimchalar
+
+40. **Ochiq pozitsiyani boshqarish (`/open` → ⚙️ Boshqarish).**
+    - Bo'shliq: signal e'lon qilingandan keyin faqat "to'liq yopish" va
+      "bekor" bor edi. Savdoda esa stopni ko'chirish, maqsadni o'zgartirish
+      va qisman yopish kundalik amallar.
+    - `mng:` — boshqaruv oynasi (joriy holat, to'plangan foiz, jonli natija).
+      `mbe:` — stop breakeven'ga, `msl:` — stop yangi narxga,
+      `mtp:` — maqsadlarni almashtirish, `mpc:<id>:<25|50|75>` — qisman yopish.
+    - Har bir o'zgarish guruhga asl signal postiga JAVOB qilib yoziladi
+      (`notify_group`) — a'zolar nima o'zgarganini ko'rib turadi.
+    - `db.set_stop()` **`sl_initial` ga TEGMAYDI**: R hisobi asl risk bo'yicha
+      qolishi shart, aks holda stopni ko'chirish statistikani sun'iy
+      chiroyliroq ko'rsatib yuborardi.
+    - **`tracker.partial_close()`** — TP tegishi bilan bir xil hisob: ulush ×
+      joriy foiz `realized_pct` ga qo'shiladi, `filled_pct` oshadi, qolgan
+      qism odatdagidek kuzatilaveradi. Qolgan qism tugasa signal to'liq
+      yopiladi va depozit ham yangilanadi.
+    - **`tracker.process()` da bitta himoya qo'shildi** (yagona o'zgarish):
+      `share = min(alloc[tp_hit], 1 - filled)`. Qo'lda qisman yopilgandan
+      keyin TP tegsa `filled_pct` 1 dan oshib, foiz IKKI MARTA hisoblanardi.
+      Qo'lda aralashuv bo'lmasa `min()` hech narsani o'zgartirmaydi
+      (alloc yig'indisi aynan 1) — shu sabab `test_tracker.py` ning 9 ta
+      holati o'zgarishsiz qoldi.
+    - Himoyalar: stop kirish narxidan ±50% dan uzoq bo'lsa rad etiladi
+      (nol tushib qolgan yozuv signalni bejiz yopib yuborardi); maqsadlar
+      soni allaqachon bajarilganidan kam bo'lsa rad etiladi (`tp_hit`
+      indeksi ro'yxatdan chiqib ketardi).
+    - 15 ta holatda tekshirildi: qisman yopish hisobi, to'liq yopilishga
+      o'tish, R, qisman yopish + TP, qisman yopish + STOP.

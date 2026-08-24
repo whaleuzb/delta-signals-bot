@@ -105,7 +105,11 @@ async def process(sig) -> list[dict]:
         # --- 4. TP lar (bitta shamda bir nechtasi tegishi mumkin) ---
         while tp_touched:
             price = tps[tp_hit]
-            share = alloc[tp_hit]
+            # Ulush qolgan to'ldirilmagan qism bilan cheklanadi. Qo'lda QISMAN
+            # yopish qo'shilgach bu shart bo'ldi: aks holda filled_pct 1 dan
+            # oshib, foiz ikki marta hisoblanardi. Qo'lda aralashuv bo'lmasa
+            # min() hech narsani o'zgartirmaydi (alloc yig'indisi aynan 1).
+            share = min(alloc[tp_hit], max(0.0, 1.0 - filled))
             realized += share * pnl_at(side, entry, price)
             filled += share
             tp_hit += 1
@@ -209,6 +213,68 @@ async def close_now(sig_id: int) -> dict | None:
     })
     return {"type": "MANUAL_CLOSE", "signal_id": sig_id, "workspace_id": sig["workspace_id"],
             "symbol": sig["symbol"], "status": status, "pnl": pnl, "r": r, "price": price}
+
+
+async def partial_close(sig_id: int, portion: float) -> dict | None:
+    """Ochiq pozitsiyaning bir QISMINI joriy narxda yopadi (masalan 50%).
+
+    TP tegishi bilan bir xil hisob: ulush * shu narxdagi foiz `realized_pct` ga
+    qo'shiladi, `filled_pct` oshadi. Qolgan qism odatdagidek kuzatilaveradi —
+    TP/SL o'z ishini davom ettiradi.
+
+    Ulush qolgan qismdan oshib ketsa (yoki unga teng bo'lsa) signal to'liq
+    yopiladi, chunki yopilmagan hech narsa qolmaydi."""
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] != "ACTIVE":
+        return None
+
+    filled = float(sig["filled_pct"])
+    rest = max(0.0, 1.0 - filled)
+    share = min(max(0.0, portion), rest)
+    if share <= 1e-9:
+        return None
+
+    # fresh=True — bu narx natijaga yoziladi, ko'rsatuv keshidan olinmaydi.
+    try:
+        price = await provider(sig["market"]).last_price(sig["symbol"], fresh=True)
+    except Exception:
+        log.warning("Qisman yopishda narx olinmadi (#%s %s)", sig_id, sig["symbol"],
+                     exc_info=True)
+        return None
+    if not price:
+        return None
+
+    entry = float(sig["entry"])
+    sl_init = float(sig["sl_initial"])
+    realized = float(sig["realized_pct"]) + share * pnl_at(sig["side"], entry, price)
+    new_filled = filled + share
+    closes = new_filled >= 1.0 - 1e-9
+
+    pnl = r = None
+    status = sig["status"]
+    closed_at = None
+    exit_price = None
+    if closes:
+        new_filled = 1.0
+        pnl = round(realized, 4)
+        risk = abs(entry - sl_init) / entry * 100
+        r = round(pnl / risk, 3) if risk > 0 else None
+        status = "BREAKEVEN" if abs(pnl) < 1e-9 else ("TP" if pnl > 0 else "SL")
+        closed_at = datetime.now(timezone.utc)
+        exit_price = price
+
+    await db.save_progress(sig_id, {
+        "sl": float(sig["sl"]), "tp_hit": sig["tp_hit"],
+        "filled_pct": round(new_filled, 6), "realized_pct": round(realized, 4),
+        "status": status, "opened_at": sig["opened_at"], "closed_at": closed_at,
+        "exit_price": exit_price, "pnl_pct": pnl, "r_multiple": r,
+        "last_checked_ms": sig["last_checked_ms"], "ambiguous": sig["ambiguous"],
+    })
+    return {"type": "PARTIAL_CLOSE", "signal_id": sig_id,
+            "workspace_id": sig["workspace_id"], "symbol": sig["symbol"],
+            "share": share, "price": price, "running": round(realized, 4),
+            "filled": round(new_filled, 6), "closes": closes,
+            "status": status, "pnl": pnl, "r": r}
 
 
 async def run_once() -> list[dict]:

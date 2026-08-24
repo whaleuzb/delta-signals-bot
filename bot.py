@@ -653,10 +653,259 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
         )
         if manage:
             kb_rows.append([InlineKeyboardButton(
-                f"{mark} #{s['id']} {s['symbol']} — vaqtidan oldin yopish",
-                callback_data=f"close:{s['id']}")])
+                f"⚙️ #{s['id']} {s['symbol']} — boshqarish",
+                callback_data=f"mng:{s['id']}")])
     kb = InlineKeyboardMarkup(kb_rows) if kb_rows else None
     return "\n".join(lines), kb
+
+
+# ─────────────── Ochiq pozitsiyani boshqarish ───────────────
+# admin id -> signal_id (yangi stop / yangi maqsadlar kutilmoqda)
+AWAITING_SL: dict[int, int] = {}
+AWAITING_TPS: dict[int, int] = {}
+
+
+async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
+    entry = float(sig["entry"])
+    filled = float(sig["filled_pct"])
+    realized = float(sig["realized_pct"])
+    price = await safe_last_price(sig["market"], sig["symbol"])
+
+    lines = [f"⚙️ <b>#{sig['id']} {sig['symbol']} {sig['side']}</b>",
+             f"Kirish: <b>{fmt_price(entry)}</b> · "
+             f"Stop: <b>{fmt_price(float(sig['sl']))}</b>"]
+    tps = [float(t) for t in sig["tps"]]
+    lines.append("Maqsadlar: " + " · ".join(
+        f"{'✅' if i < sig['tp_hit'] else '◻️'}{fmt_price(t)}"
+        for i, t in enumerate(tps)))
+    if filled > 0:
+        lines.append(f"Yopilgan ulush: <b>{filled * 100:.0f}%</b> "
+                     f"(to'plangan {realized:+.2f}%)")
+    if price:
+        live = realized + max(0.0, 1.0 - filled) * tracker.pnl_at(
+            sig["side"], entry, price)
+        lines.append(f"Joriy narx: <b>{fmt_price(price)}</b> → <b>{live:+.2f}%</b>")
+    else:
+        lines.append("<i>Joriy narx olinmadi</i>")
+
+    sid = sig["id"]
+    be = " ✓" if abs(float(sig["sl"]) - entry) < 1e-12 else ""
+    rows = [
+        [InlineKeyboardButton(f"🛡 Stop → breakeven{be}", callback_data=f"mbe:{sid}"),
+         InlineKeyboardButton("✏️ Stop", callback_data=f"msl:{sid}")],
+        [InlineKeyboardButton("🎯 Maqsadlarni o'zgartirish", callback_data=f"mtp:{sid}")],
+    ]
+    if sig["status"] == "ACTIVE" and filled < 0.999:
+        rows.append([
+            InlineKeyboardButton("✂️ 25%", callback_data=f"mpc:{sid}:25"),
+            InlineKeyboardButton("✂️ 50%", callback_data=f"mpc:{sid}:50"),
+            InlineKeyboardButton("✂️ 75%", callback_data=f"mpc:{sid}:75"),
+        ])
+    rows.append([InlineKeyboardButton("🔒 To'liq yopish", callback_data=f"close:{sid}")])
+    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def _manage_guard(q):
+    """Signalni oladi va huquqni tekshiradi. Mos bo'lmasa (None, None)."""
+    sig = await db.get_signal(int(q.data.split(":")[1]))
+    if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.",
+                                   reply_markup=MENU_BACK_KB)
+        return None, None
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(q.from_user.id, ws):
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return None, None
+    return sig, ws
+
+
+async def notify_group(ctx, ws, sig, text: str) -> None:
+    """O'zgarishni guruhga — asl signal postiga javob qilib yozadi."""
+    if ws["type"] == "group" and ws["group_chat_id"]:
+        try:
+            await ctx.bot.send_message(
+                ws["group_chat_id"], text, parse_mode=ParseMode.HTML,
+                reply_to_message_id=sig["group_msg_id"],
+                allow_sending_without_reply=True,
+                message_thread_id=ws["group_topic_id"])
+        except Exception:
+            log.exception("Guruhga o'zgarish xabari yuborilmadi")
+
+
+async def _show_manage(q, sig_id: int) -> None:
+    sig = await db.get_signal(sig_id)
+    if not sig:
+        return
+    text, kb = await manage_view(sig)
+    try:
+        await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception:
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+async def on_manage(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _manage_guard(q)
+    if sig:
+        await _show_manage(q, sig["id"])
+
+
+async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Stopni kirish narxiga ko'chirish — eng ko'p ishlatiladigan amal,
+    shuning uchun alohida tugma."""
+    q = update.callback_query
+    await q.answer()
+    sig, ws = await _manage_guard(q)
+    if not sig:
+        return
+    entry = float(sig["entry"])
+    if abs(float(sig["sl"]) - entry) < 1e-12:
+        await q.answer("Stop allaqachon breakeven'da.", show_alert=True)
+        return
+    await db.set_stop(sig["id"], entry)
+    await notify_group(ctx, ws, sig,
+                        f"🛡 <b>#{sig['id']} {sig['symbol']}</b> — stop breakeven'ga "
+                        f"ko'chirildi (<b>{fmt_price(entry)}</b>)")
+    await _show_manage(q, sig["id"])
+
+
+async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _manage_guard(q)
+    if not sig:
+        return
+    AWAITING_SL[q.from_user.id] = sig["id"]
+    await q.edit_message_text(
+        f"✏️ #{sig['id']} {sig['symbol']} uchun <b>yangi stop</b> narxini yozing.\n"
+        f"Hozirgi: <code>{fmt_price(float(sig['sl']))}</code>\n\n"
+        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+
+
+async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _manage_guard(q)
+    if not sig:
+        return
+    AWAITING_TPS[q.from_user.id] = sig["id"]
+    cur = " ".join(fmt_price(float(t)) for t in sig["tps"])
+    await q.edit_message_text(
+        f"🎯 #{sig['id']} {sig['symbol']} uchun <b>yangi maqsadlar</b>ni yozing "
+        f"(bo'sh joy bilan ajrating).\nHozirgi: <code>{cur}</code>\n\n"
+        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+
+
+async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, ws = await _manage_guard(q)
+    if not sig:
+        return
+    pct = int(q.data.split(":")[2])
+    ev = await tracker.partial_close(sig["id"], pct / 100)
+    if not ev:
+        await q.answer("Yopib bo'lmadi (narx olinmadi yoki qism qolmagan).",
+                       show_alert=True)
+        return
+
+    if ev["closes"]:
+        # Depozit avtomatik yopilishdagidek yangilanadi, aks holda u jimgina
+        # haqiqatdan uzoqlashib ketardi.
+        if sig["alloc_amount"] is not None and ev["pnl"] is not None:
+            await db.apply_deposit_delta(
+                ws["id"], ev["pnl"] / 100 * float(sig["alloc_amount"]))
+        icon = "✅" if (ev["pnl"] or 0) >= 0 else "❌"
+        rtxt = f" ({ev['r']:+.2f}R)" if ev["r"] is not None else ""
+        await notify_group(ctx, ws, sig,
+                            f"{icon} <b>#{sig['id']} {sig['symbol']}</b> — qolgan qism "
+                            f"yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
+                            f"Yakuniy: <b>{ev['pnl']:+.2f}%</b>{rtxt}")
+        await q.edit_message_text(
+            f"{icon} #{sig['id']} {sig['symbol']} to'liq yopildi: "
+            f"<b>{ev['pnl']:+.2f}%</b>{rtxt}",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+
+    await notify_group(ctx, ws, sig,
+                        f"✂️ <b>#{sig['id']} {sig['symbol']}</b> — pozitsiyaning "
+                        f"<b>{pct}%</b> i yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
+                        f"Joriy natija: <b>{ev['running']:+.2f}%</b> "
+                        f"(qolgan {(1 - ev['filled']) * 100:.0f}%)")
+    await _show_manage(q, sig["id"])
+
+
+async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Yangi stop / yangi maqsadlar matni. Ishlov berilgan bo'lsa True."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    text = (msg.text or "").strip()
+
+    sig_id = AWAITING_SL.pop(uid, None)
+    if sig_id:
+        sig = await db.get_signal(sig_id)
+        if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+            await msg.reply_text("Signal allaqachon yopilgan.", reply_markup=MENU_BACK_KB)
+            return True
+        price = _parse_price(text)
+        if price is None or price <= 0:
+            AWAITING_SL[uid] = sig_id
+            await msg.reply_text("Noto'g'ri raqam. Qayta kiriting yoki /bekor.")
+            return True
+        entry = float(sig["entry"])
+        # Kirish narxidan juda uzoq qiymat deyarli doim xato yozuv (masalan
+        # nol tushib qolgan) — signalni bejiz yopib yubormaslik uchun to'xtatamiz.
+        if not (entry * 0.5 <= price <= entry * 1.5):
+            AWAITING_SL[uid] = sig_id
+            await msg.reply_text("Bu narx kirish narxidan juda uzoq. "
+                                  "Tekshiring yoki /bekor.")
+            return True
+        ws = await db.get_workspace(sig["workspace_id"])
+        if not ws or not can_manage(uid, ws):
+            return True
+        await db.set_stop(sig_id, price)
+        await notify_group(ctx, ws, sig,
+                            f"🛡 <b>#{sig_id} {sig['symbol']}</b> — stop "
+                            f"<b>{fmt_price(price)}</b> ga ko'chirildi")
+        await msg.reply_text(f"✅ Stop <b>{fmt_price(price)}</b> ga o'rnatildi.",
+                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return True
+
+    sig_id = AWAITING_TPS.pop(uid, None)
+    if sig_id:
+        sig = await db.get_signal(sig_id)
+        if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+            await msg.reply_text("Signal allaqachon yopilgan.", reply_markup=MENU_BACK_KB)
+            return True
+        tps = [x for x in (_parse_price(x) for x in text.split()) if x and x > 0]
+        if not tps:
+            AWAITING_TPS[uid] = sig_id
+            await msg.reply_text("Noto'g'ri format. Qayta kiriting yoki /bekor.")
+            return True
+        # Allaqachon bajarilgan maqsadlardan kam qoldirib bo'lmaydi — tp_hit
+        # indeksi ro'yxatdan chiqib ketib, kuzatuv chalkashib qolardi.
+        if len(tps) < sig["tp_hit"]:
+            AWAITING_TPS[uid] = sig_id
+            await msg.reply_text(
+                f"Kamida {sig['tp_hit']} ta maqsad kerak — {sig['tp_hit']} tasi "
+                "allaqachon bajarilgan. Qayta kiriting yoki /bekor.")
+            return True
+        ws = await db.get_workspace(sig["workspace_id"])
+        if not ws or not can_manage(uid, ws):
+            return True
+        tps = sorted(set(tps), reverse=(sig["side"] == "SHORT"))
+        await db.set_tps(sig_id, tps)
+        shown = " · ".join(fmt_price(t) for t in tps)
+        await notify_group(ctx, ws, sig,
+                            f"🎯 <b>#{sig_id} {sig['symbol']}</b> — maqsadlar "
+                            f"yangilandi: <b>{shown}</b>")
+        await msg.reply_text(f"✅ Maqsadlar: <b>{shown}</b>",
+                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return True
+
+    return False
 
 
 async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1252,6 +1501,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
     if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
         await handle_broadcast_input(update, ctx)
+        return
+
+    # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
+    if await handle_manage_input(update, ctx):
         return
 
     alloc_sig_id = AWAITING_ALLOC.get(uid)
@@ -1871,6 +2124,8 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_EDIT.pop(update.effective_user.id, None)
     AWAITING_ALLOC.pop(update.effective_user.id, None)
     AWAITING_SIGNAL_PHOTO.pop(update.effective_user.id, None)
+    AWAITING_SL.pop(update.effective_user.id, None)
+    AWAITING_TPS.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
@@ -2948,6 +3203,11 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_view_join, pattern=r"^viewjoin:"))
     app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
+    app.add_handler(CallbackQueryHandler(on_manage, pattern=r"^mng:"))
+    app.add_handler(CallbackQueryHandler(on_manage_be, pattern=r"^mbe:"))
+    app.add_handler(CallbackQueryHandler(on_manage_sl, pattern=r"^msl:"))
+    app.add_handler(CallbackQueryHandler(on_manage_tp, pattern=r"^mtp:"))
+    app.add_handler(CallbackQueryHandler(on_manage_partial, pattern=r"^mpc:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
