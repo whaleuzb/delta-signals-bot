@@ -3363,6 +3363,8 @@ async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def main() -> None:
+    if not config.BOT_TOKEN:
+        raise SystemExit("BOT_TOKEN o'rnatilmagan — bot ishga tusha olmaydi.")
     app = (
         Application.builder()
         .token(config.BOT_TOKEN)

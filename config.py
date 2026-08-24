@@ -7,7 +7,11 @@ def _ids(raw: str) -> set[int]:
 
 
 # --- Majburiy ---
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+# BOT_TOKEN ataylab os.getenv: veb servis (web.py) ham shu config'ni yuklaydi,
+# lekin Telegram'ga umuman murojaat qilmaydi — unga token kerak emas va soxta
+# qiymat berib qo'yish ham to'g'ri emas. Token bot ishga tushayotganda
+# tekshiriladi (bot.main), ya'ni bot baribir tokensiz ishga tushmaydi.
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 # --- Kim signal qo'sha oladi ---

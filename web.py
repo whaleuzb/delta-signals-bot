@@ -21,7 +21,6 @@ from datetime import datetime
 
 from aiohttp import web
 
-import config
 import db
 import stats
 
