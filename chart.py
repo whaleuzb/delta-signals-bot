@@ -1,13 +1,19 @@
-"""Yopilgan signal uchun narx grafigi.
+"""Signal grafiklari — narx shamlari ustiga entry/TP/SL darajalari.
 
-Har bir TP/SL yopilishida guruhga matn bilan birga real shamlar grafigi
-yuboriladi: entry/TP/SL chiziqlari va aniq chiqish nuqtasi bilan — bu
-reklama banneri emas, signalning haqiqiy natijasini ko'rsatadigan dalil.
-Rasm chetiga workspace nomi va bot havolasi qo'yiladi, chunki bunday
-rasmlar ko'pincha guruhdan tashqarida ham qayta ulashiladi.
+Ikki holatda ishlatiladi:
+  1. `setup_chart()` — signal E'LON QILINAYOTGANDA. Foydalanuvchi o'z rasmini
+     yubormasa (yoki yubormoqchi bo'lmasa) bot oxirgi shamlarni o'zi olib,
+     rejalashtirilgan darajalarni chizib beradi.
+  2. `signal_chart()` — signal YOPILGANDA. O'sha savdoning haqiqiy yo'li:
+     kirishdan chiqishgacha bo'lgan shamlar va aniq chiqish nuqtasi.
+
+Ikkalasi ham bitta `_render()` dan foydalanadi — guruhdagi rasmlar bir xil
+uslubda ko'rinsin uchun. Bu reklama banneri emas: raqamlar haqiqiy bozor
+ma'lumotidan olinadi.
 """
 import io
 import logging
+from datetime import datetime, timezone
 
 import matplotlib
 matplotlib.use("Agg")
@@ -27,54 +33,40 @@ RED = "#ef5350"
 ACC = "#4da3ff"
 SILVER = "#8a8f99"
 
-PAD_MIN = 10          # opened_at/closed_at atrofida necha daqiqalik shamcha qo'shiladi
-MAX_CANDLES = 1200    # bitta so'rovda so'raladigan eng ko'p shamlar soni
+PAD_MIN = 10           # yopilgan signalda kirish/chiqish atrofidagi zaxira daqiqalar
+SETUP_MIN = 150        # yangi signalda ko'rsatiladigan tarix (daqiqa)
+MAX_CANDLES = 1200     # bitta klines chaqiruvidagi eng ko'p sham
 
 
-async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesIO | None:
-    """sig — db.get_signal() natijasi (yopilgan holatda). Shamlar topilmasa yoki
-    ular yetarli bo'lmasa None qaytaradi — chaqiruvchi shu holda oddiy matn
-    xabariga qaytadi, hech narsa buzilmaydi."""
-    opened_at = sig["opened_at"]
-    closed_at = sig["closed_at"]
-    if not opened_at or not closed_at:
-        return None
-
-    span_min = max(1, int((closed_at - opened_at).total_seconds() // 60))
-    limit = min(MAX_CANDLES, span_min + 2 * PAD_MIN + 5)
-    start_ms = int(opened_at.timestamp() * 1000) - PAD_MIN * 60_000
-
+async def _fetch(market: str, symbol: str, start_ms: int, limit: int):
+    """Shamlarni olish. Xato bo'lsa None — grafik shunchaki chizilmaydi va
+    chaqiruvchi oddiy matn/rasm yo'liga qaytadi."""
     try:
-        candles = await tracker.provider(sig["market"]).klines(sig["symbol"], start_ms, limit=limit)
+        return await tracker.provider(market).klines(symbol, start_ms, limit=limit)
     except Exception:
-        log.warning("Grafik uchun shamlar olinmadi (#%s %s)", sig["id"], sig["symbol"], exc_info=True)
+        log.warning("Grafik uchun shamlar olinmadi (%s %s)", market, symbol, exc_info=True)
         return None
 
-    end_ms = int(closed_at.timestamp() * 1000) + PAD_MIN * 60_000
-    candles = [c for c in candles if c.open_ms <= end_ms]
-    if len(candles) < 3:
-        return None
 
-    entry = float(sig["entry"])
-    sl_initial = float(sig["sl_initial"])
-    tps = [float(x) for x in sig["tps"]]
-    tp_hit = sig["tp_hit"]
-    exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
-    side = sig["side"]
-    pnl = sig["pnl_pct"]
+def _fmt(p: float) -> str:
+    if p >= 100:
+        return f"{p:,.0f}"
+    if p >= 1:
+        return f"{p:,.4g}"
+    return f"{p:.6g}"
 
-    exit_idx = min(
-        range(len(candles)),
-        key=lambda i: abs(candles[i].close_ms - int(closed_at.timestamp() * 1000)),
-    )
 
+def _render(candles, *, header: str, side: str, entry: float, sl: float,
+            tps: list[float], tp_hit: int, exit_idx: int | None,
+            exit_price: float | None, pnl, r, ws_name: str,
+            bot_username: str | None, note: str | None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
 
     lo = min(c.low for c in candles)
     hi = max(c.high for c in candles)
-    levels = [entry, sl_initial, *tps]
+    levels = [entry, sl, *tps]
     if exit_price is not None:
         levels.append(exit_price)
     lo = min(lo, *levels)
@@ -99,13 +91,13 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
                 fontweight="bold", va="center", ha="left", clip_on=False)
 
     hline(entry, ACC, f"Entry {_fmt(entry)}")
-    hline(sl_initial, RED, f"SL {_fmt(sl_initial)}", alpha=0.85)
+    hline(sl, RED, f"SL {_fmt(sl)}", alpha=0.85)
     for n, tp in enumerate(tps, start=1):
         hit = n <= tp_hit
         hline(tp, GREEN, f"TP{n} {_fmt(tp)}", alpha=1.0 if hit else 0.4,
               ls="--" if hit else ":")
 
-    if exit_price is not None:
+    if exit_idx is not None and exit_price is not None:
         exit_col = GREEN if (pnl or 0) >= 0 else RED
         ax.scatter([exit_idx], [exit_price], color=exit_col, s=70, zorder=5,
                    edgecolor=BG, linewidth=1.5)
@@ -125,15 +117,15 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         spine.set_color(GRID)
 
     side_col = GREEN if side == "LONG" else RED
-    fig.text(0.045, 0.955, f"#{sig['id']} {sig['symbol']}", fontsize=16,
-              fontweight="bold", color=TITLE)
+    fig.text(0.045, 0.955, header, fontsize=16, fontweight="bold", color=TITLE)
     fig.text(0.045, 0.925, side, fontsize=11, fontweight="bold", color=side_col)
     if pnl is not None:
         fig.text(0.97, 0.955, f"{pnl:+.2f}%", fontsize=17, fontweight="bold",
                   color=GREEN if pnl >= 0 else RED, ha="right")
-        if sig["r_multiple"] is not None:
-            fig.text(0.97, 0.925, f"{float(sig['r_multiple']):+.2f}R", fontsize=10.5,
-                      color=TXT, ha="right")
+        if r is not None:
+            fig.text(0.97, 0.925, f"{float(r):+.2f}R", fontsize=10.5, color=TXT, ha="right")
+    elif note:
+        fig.text(0.97, 0.945, note, fontsize=11, color=TXT, ha="right")
 
     fig.text(0.045, 0.02, ws_name, fontsize=9.5, color=SILVER)
     if bot_username:
@@ -148,9 +140,67 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     return buf
 
 
-def _fmt(p: float) -> str:
-    if p >= 100:
-        return f"{p:,.0f}"
-    if p >= 1:
-        return f"{p:,.4g}"
-    return f"{p:.6g}"
+async def setup_chart(draft: dict, sig_id: int, ws_name: str,
+                       bot_username: str | None) -> io.BytesIO | None:
+    """Yangi e'lon qilinayotgan signal uchun grafik: oxirgi shamlar va
+    rejalashtirilgan Entry/TP/SL darajalari. Hali hech narsa bo'lmagani uchun
+    chiqish nuqtasi ham, PnL ham yo'q.
+
+    Bitta `klines` chaqiruvi qilinadi — forex tomonida Twelve Data bepul rejasi
+    daqiqasiga 8 so'rovga cheklangani uchun bu ataylab bitta so'rov bilan
+    chegaralangan (signal e'lon qilish kamdan-kam sodir bo'ladi, shu sabab
+    kuzatuv siklini siqib qo'ymaydi)."""
+    market = draft.get("market", "crypto")
+    symbol = draft["symbol"]
+    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - SETUP_MIN * 60_000
+    candles = await _fetch(market, symbol, start_ms, min(MAX_CANDLES, SETUP_MIN + 5))
+    if not candles or len(candles) < 3:
+        return None
+
+    mode = draft.get("entry_mode", "limit")
+    return _render(
+        candles, header=f"#{sig_id} {symbol}", side=draft["side"],
+        entry=float(draft["entry"]), sl=float(draft["sl"]),
+        tps=[float(x) for x in draft["tps"]], tp_hit=0,
+        exit_idx=None, exit_price=None, pnl=None, r=None,
+        ws_name=ws_name, bot_username=bot_username,
+        note="ochildi" if mode == "market" else "kutilmoqda",
+    )
+
+
+async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesIO | None:
+    """Yopilgan signal uchun grafik: kirishdan chiqishgacha bo'lgan haqiqiy
+    shamlar, darajalar va aniq chiqish nuqtasi. Shamlar topilmasa None —
+    chaqiruvchi oddiy matn xabariga qaytadi, hech narsa buzilmaydi."""
+    opened_at = sig["opened_at"]
+    closed_at = sig["closed_at"]
+    if not opened_at or not closed_at:
+        return None
+
+    span_min = max(1, int((closed_at - opened_at).total_seconds() // 60))
+    limit = min(MAX_CANDLES, span_min + 2 * PAD_MIN + 5)
+    start_ms = int(opened_at.timestamp() * 1000) - PAD_MIN * 60_000
+
+    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit)
+    if not candles:
+        return None
+
+    end_ms = int(closed_at.timestamp() * 1000) + PAD_MIN * 60_000
+    candles = [c for c in candles if c.open_ms <= end_ms]
+    if len(candles) < 3:
+        return None
+
+    exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
+    exit_idx = None
+    if exit_price is not None:
+        closed_ms = int(closed_at.timestamp() * 1000)
+        exit_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - closed_ms))
+
+    return _render(
+        candles, header=f"#{sig['id']} {sig['symbol']}", side=sig["side"],
+        entry=float(sig["entry"]), sl=float(sig["sl_initial"]),
+        tps=[float(x) for x in sig["tps"]], tp_hit=sig["tp_hit"],
+        exit_idx=exit_idx, exit_price=exit_price,
+        pnl=sig["pnl_pct"], r=sig["r_multiple"],
+        ws_name=ws_name, bot_username=bot_username, note=None,
+    )

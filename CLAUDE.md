@@ -685,6 +685,28 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       qayta ishlatildi, shuning uchun `test_tracker.py` qayta ishga
       tushirilib (9/9 holat o'zgarishsiz), tracker buzilmagani tasdiqlandi.
 
+34. **Signal e'lon qilishda ikki tugma: o'z rasming yoki bot grafigi
+    (`chart.setup_chart()`).**
+    - Foydalanuvchi savoli: "signal kiritayotganimda ham rasm yuborish shart
+      bo'lmasin? Yoki ikki tugma — biri rasm yuborish, ikkinchi bot o'zi
+      topishi". Rasm avval ham majburiy EMAS edi (matnli signal to'liq
+      ishlardi), lekin buni tugmadan ko'rish mumkin emasdi.
+    - Endi ko'rish oynasida (`show_preview`) ikki tasdiqlash tugmasi:
+      `ok:` — "🖼 Mening rasmim bilan" (rasm biriktirilgan bo'lsa) yoki
+      "📝 Rasmsiz e'lon"; `okc:` — "📈 Bot grafigi bilan". Handler patterni
+      `^(okc|ok|no|ed):` — `okc` birinchi turishi shart emas (regex `ok`
+      alternativi ":" ni talab qilgani uchun "okc:" ga mos kelmaydi), lekin
+      aniqlik uchun oldinga qo'yildi.
+    - `chart.py` ikkala holatga umumiy `_render()` atrofida qayta tuzildi:
+      `setup_chart()` — e'lon paytidagi oxirgi ~150 sham + rejalashtirilgan
+      darajalar (chiqish nuqtasi yo'q, o'ng yuqorida "kutilmoqda"/"ochildi"),
+      `signal_chart()` — yopilgandagi haqiqiy yo'l. Guruhda ikkala rasm bir
+      xil uslubda ko'rinadi.
+    - Zaxira zanjiri: bot grafigi chizilmasa → foydalanuvchi rasmi →
+      oddiy matn. Signal hech qachon yuborilmay qolmaydi.
+    - Grafik `db.create_signal()` dan KEYIN chiziladi, chunki sarlavhaga
+      haqiqiy `#id` kerak.
+
 ---
 
 ## Buyruqlar

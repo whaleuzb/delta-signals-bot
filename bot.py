@@ -1328,11 +1328,16 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     if warn:
         body += "\n\n" + "\n".join(warn)
 
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"ok:{token}"),
-        InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
-        InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}"),
-    ]])
+    # Ikki xil tasdiqlash: foydalanuvchining o'z rasmi (yoki rasmsiz) va
+    # botning o'zi chizadigan grafik. Rasm yuborish HECH QACHON majburiy emas —
+    # matnli signal ham, rasmli signal ham bir xil ishlaydi.
+    own = "🖼 Mening rasmim bilan" if file_id else "📝 Rasmsiz e'lon"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(own, callback_data=f"ok:{token}"),
+         InlineKeyboardButton("📈 Bot grafigi bilan", callback_data=f"okc:{token}")],
+        [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
+         InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
+    ])
     await msg.reply_text(body, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
@@ -1382,8 +1387,24 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
         body = draft_text(d, sig_id)
+
+        # "📈 Bot grafigi bilan" tanlangan bo'lsa — oxirgi shamlar ustiga
+        # rejalashtirilgan darajalar chiziladi. Chizib bo'lmasa (birja javob
+        # bermadi va h.k.) foydalanuvchining rasmiga, u ham bo'lmasa oddiy
+        # matnga tushamiz — signal hech qachon yuborilmay qolmaydi.
+        gen = None
+        if action == "okc":
+            try:
+                gen = await chart.setup_chart(d, sig_id, ws["name"], ctx.bot.username)
+            except Exception:
+                log.warning("Signal grafigi yasalmadi (#%s)", sig_id, exc_info=True)
+
         try:
-            if item["file_id"]:
+            if gen:
+                sent = await ctx.bot.send_photo(
+                    ws["group_chat_id"], InputFile(gen, "signal.png"), caption=body,
+                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
+            elif item["file_id"]:
                 sent = await ctx.bot.send_photo(
                     ws["group_chat_id"], item["file_id"], caption=body,
                     parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
@@ -2620,7 +2641,7 @@ def main() -> None:
     app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
-    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(ok|no|ed):"))
+    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|ok|no|ed):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
