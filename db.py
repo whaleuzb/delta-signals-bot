@@ -407,6 +407,7 @@ async def admin_list_users(limit: int = 50, offset: int = 0) -> list[asyncpg.Rec
     async with pool().acquire() as c:
         return await c.fetch("""
             SELECT u.user_id, u.username, u.first_name, u.first_seen, u.last_seen,
+                   u.blocked,
                    EXISTS(SELECT 1 FROM workspaces w
                           WHERE w.type='personal' AND w.owner_id=u.user_id)      AS has_personal,
                    (SELECT COUNT(*) FROM workspaces w

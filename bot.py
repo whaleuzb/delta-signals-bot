@@ -42,6 +42,8 @@ log = logging.getLogger("bot")
 
 # token -> {"draft": {...}, "file_id": str, "user": int, "workspace_id": int}
 PENDING: dict[str, dict] = {}
+# Tasdiqlanmagan qoralamalar chegarasi (xotira o'sib ketmasligi uchun).
+MAX_PENDING = 500
 # admin id -> token (tahrir kutilmoqda)
 AWAITING_EDIT: dict[int, str] = {}
 # admin id -> signal_id (yangi yaratilgan signalga pul miqdori kutilmoqda)
@@ -1375,6 +1377,11 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         warn.append(f"Joriy narx: <b>{fmt_price(price)}</b> (entrydan {d:+.2f}%)")
 
     token = token or secrets.token_urlsafe(8)
+    # Tasdiqlanmagan qoralamalar cheksiz to'planmasin: tasdiqlamay tashlab
+    # ketilgan yozuv PENDING'da abadiy qolardi. Eng eskisini chiqarib
+    # yuboramiz (dict Python'da qo'shilish tartibini saqlaydi).
+    while len(PENDING) >= MAX_PENDING:
+        PENDING.pop(next(iter(PENDING)), None)
     PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id,
                        "workspace_id": workspace_id, "warn": warn,
                        "chart_tf": None, "ready_file_id": None}
@@ -1415,6 +1422,11 @@ async def send_final_preview(target, ctx, token: str) -> None:
     if item["warn"]:
         caption += "\n\n" + "\n".join(item["warn"])
     caption += "\n\n✅ Tasdiqlasangiz guruhga shu ko'rinishda yuboriladi."
+    # Telegram rasm sarlavhasi 1024 belgi bilan cheklangan. Uzun bo'lsa
+    # send_photo YIQILADI va rasm butunlay yo'qolardi (bot grafigi ham) —
+    # shuning uchun oldindan qisqartiramiz.
+    if len(caption) > 1024:
+        caption = caption[:1000].rsplit("\n", 1)[0] + "\n…"
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Tasdiqlash va yuborish", callback_data=f"go:{token}")],
@@ -1436,6 +1448,9 @@ async def send_final_preview(target, ctx, token: str) -> None:
                 item["file_id"], caption=caption, parse_mode=ParseMode.HTML,
                 reply_markup=kb)
         item["ready_file_id"] = sent.photo[-1].file_id
+        # Baytlar endi kerak emas — Telegram'da file_id bor. Qoralama tasdiqsiz
+        # tashlab ketilsa ham yuzlab kilobayt osilib qolmaydi.
+        item["gen"] = None
     except Exception:
         log.exception("Ko'rish uchun rasm yuborilmadi")
         await target.reply_text(caption, parse_mode=ParseMode.HTML, reply_markup=kb)
@@ -1457,6 +1472,17 @@ def tf_kb(token: str) -> InlineKeyboardMarkup:
         rows.append(cur)
     rows.append([InlineKeyboardButton("↩️ Orqaga", callback_data=f"bk:{token}")])
     return InlineKeyboardMarkup(rows)
+
+
+async def _clear_kb(q) -> None:
+    """Tugmalarni olib tashlaydi. Telefonda tugma ikki marta bosilishi juda
+    tez-tez uchraydi: ikkinchi bosishda Telegram "message is not modified"
+    xatosini beradi va foydalanuvchi bekorga qo'rqinchli xato xabarini
+    ko'rardi. Bu yerda u jimgina yutiladi."""
+    try:
+        await q.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1497,11 +1523,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "pic":
         # Rasm allaqachon biriktirilgan bo'lsa qayta so'ramaymiz.
         if item["file_id"]:
-            await q.edit_message_reply_markup(reply_markup=None)
+            await _clear_kb(q)
             await send_final_preview(q.message, ctx, token)
         else:
             AWAITING_SIGNAL_PHOTO[q.from_user.id] = token
-            await q.edit_message_reply_markup(reply_markup=None)
+            await _clear_kb(q)
             await q.message.reply_text(
                 "🖼 Grafik rasmni yuboring.\n"
                 "Fikringizdan qaytsangiz /bekor yozing.")
@@ -1509,13 +1535,13 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "nopic":
         item["gen"] = None
-        await q.edit_message_reply_markup(reply_markup=None)
+        await _clear_kb(q)
         await send_final_preview(q.message, ctx, token)
         return
 
     if action == "tf":
         item["chart_tf"] = chart_tf
-        await q.edit_message_reply_markup(reply_markup=None)
+        await _clear_kb(q)
         note = await q.message.reply_text(f"📈 {chart_tf} grafigi chizilmoqda…")
         ws_row = await db.get_workspace(item["workspace_id"])
         try:
@@ -1564,10 +1590,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "chart_tf": item.get("chart_tf"),
     })
     PENDING.pop(token, None)
-    try:
-        await q.edit_message_reply_markup(reply_markup=None)
-    except Exception:
-        pass
+    await _clear_kb(q)
     await q.message.reply_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
                                 parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
@@ -2330,11 +2353,14 @@ async def _admin_users_view(offset: int) -> tuple[str, InlineKeyboardMarkup]:
             badges.append(f"👥{u['viewer_links']}")
         if u["invited"]:
             badges.append(f"🎁{u['invited']}")
+        if u["blocked"]:
+            badges.append("🚫")
         who = _who(u["username"], u["first_name"], u["user_id"])
         lines.append(f"{' '.join(badges) or '·'} {html.escape(who)}")
         kb.append([InlineKeyboardButton(f"{who}"[:40],
                                          callback_data=f"adm:usr:{u['user_id']}")])
-    lines += ["", "🧑 shaxsiy jurnal · 👑 guruh egasi · 👥 guruhga ulangan · 🎁 taklif qilgan"]
+    lines += ["", "🧑 shaxsiy jurnal · 👑 guruh egasi · 👥 guruhga ulangan · "
+              "🎁 taklif qilgan · 🚫 botni bloklagan"]
 
     nav = []
     if offset > 0:

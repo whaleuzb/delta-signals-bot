@@ -859,6 +859,31 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
       `xlim = (-1.5, len(candles) - 1 + right_pad)` — yorliqlar aynan shu
       bo'shliqqa tushadi va narx harakatini to'smaydi.
 
+
+40. **To'liq tekshiruv (foydalanuvchi so'rovi) — 4 ta kamchilik topildi va
+    tuzatildi.**
+    - Tekshiruv usuli: kompilyatsiya → o'lik havolalar → **har bir tugmani
+      ro'yxatdan o'tgan handler patternlari bilan solishtirish** (65 ta
+      `callback_data`, 24 ta pattern: o'lik tugma ham, to'qnashuv ham,
+      ishlatilmaydigan handler ham YO'Q) → haqiqiy Postgres'da 45 ta
+      funksional chaqiruv → tracker regressiyasi.
+    - **(a) Tugmani ikki marta bosish xato berardi.** Telefonda bu juda
+      tez-tez bo'ladi: ikkinchi bosishda Telegram "message is not modified"
+      deydi va foydalanuvchi bekorga qo'rqinchli xato xabarini ko'rardi.
+      `_clear_kb()` yordamchisi qo'shildi — barcha
+      `edit_message_reply_markup(None)` chaqiruvlari shu orqali ketadi.
+    - **(b) Uzun sarlavhada RASM butunlay yo'qolardi.** Telegram rasm
+      sarlavhasi 1024 belgi; ko'p TP + ogohlantirish + vision izohi bo'lsa
+      `send_photo` yiqilib, matnga tushardi — ya'ni bot chizgan grafik
+      guruhga umuman bormasdi. Endi sarlavha oldindan qisqartiriladi.
+    - **(c) Rasm baytlari xotirada osilib qolardi.** Tasdiqlanmagan qoralama
+      `PENDING` da PNG baytlari bilan abadiy qolardi. Endi Telegram'ga
+      yuklangach `gen` tozalanadi (file_id yetarli) va `MAX_PENDING = 500`
+      chegarasi qo'shildi — eng eski qoralama chiqarib yuboriladi.
+    - **(d) Admin ro'yxatida bloklaganlar ko'rinmasdi.** `users.blocked`
+      broadcast'da ishlatilardi, lekin `/admin → Foydalanuvchilar` uni
+      ko'rsatmasdi. Endi 🚫 belgisi bilan chiqadi.
+
 ---
 
 ## Buyruqlar
