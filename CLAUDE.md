@@ -764,6 +764,34 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - 23 ta holatda tekshirildi (registr, ajratgichlar, oldidagi begona
       so'zlar, forex, topilmasligi kerak bo'lgani).
 
+37. **Grafik timeframe'i (`signals.chart_tf`, `tf:` tugmalari).**
+    - Muammo: grafik doim 1m shamlarda chizilardi, holbuki signal 15m yoki
+      4h asosida berilgan bo'lishi mumkin — masshtab mos kelmasdi.
+    - "📈 Bot grafigi bilan" bosilganda endi timeframe so'raladi
+      (1m/5m/15m/1h/4h/1d). Tanlov `signals.chart_tf` ga yoziladi va
+      **yopilgandagi natija grafigi ham AYNAN shu tf'da** chiziladi.
+    - **`tracker.py` ga TEGILMADI va tegilmasligi ham kerak**: u
+      `klines()` ni `tf` bermasdan chaqiradi, ya'ni standart `1m` da qoladi.
+      Yirikroq shamda TP/SL teginishi sham ichida yashirinib qolardi —
+      timeframe faqat KO'RSATISH uchun, hisob uchun emas.
+    - `exchange`/`forex.klines()` ga `tf` parametri qo'shildi (standart
+      "1m", shuning uchun eski chaqiruvlar o'zgarmadi). MEXC 1 soatni
+      "60m", Twelve Data "1h" deb ataydi — moslashtirish jadvallari
+      har bir modulda. Twelve Data kunlik shamda faqat sanani qaytaradi
+      ("2026-08-24") — sana formati shunga qarab tanlanadi.
+    - `chart.py` daqiqa emas, **SHAM SONI** bo'yicha oyna hisoblaydi
+      (`SETUP_BARS=120`). Yopilgan signalda savdo tanlangan tf'da bir
+      necha shamgina davom etgan bo'lsa (4h grafikda 40 daqiqalik savdo)
+      oyna orqaga cho'ziladi — kamida ~40 sham (`MIN_BARS`), aks holda
+      grafik bo'm-bo'sh ko'rinardi.
+    - `chart_tf` NULL (eski signallar, yoki foydalanuvchi o'z rasmini
+      tanlagan holat) → `DEFAULT_TF = "15m"`.
+    - Oqim: `okc:` endi darhol e'lon qilmaydi, `tf_kb()` ni ko'rsatadi;
+      `tf:<token>:<tf>` tasdiqlaydi; `bk:<token>` orqaga qaytaradi.
+      Handler patterni `^(okc|ok|no|ed|tf|bk):`.
+    - 14 ta holatda tekshirildi (har bir tf, standartga tushish, natija
+      grafigi tf'i, eski signal, qisqa savdo yirik tf'da).
+
 ---
 
 ## Buyruqlar

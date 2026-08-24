@@ -66,12 +66,22 @@ def _api_symbol(symbol: str) -> str:
     return f"{symbol[:3]}/{symbol[3:]}" if len(symbol) == 6 else symbol
 
 
-async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
-    """1 daqiqalik shamlar. start_ms har doim aniq daqiqa chegarasi (tracker.py
-    last_checked_ms+1 orqali chaqiradi, bu doim :00.000 ga to'g'ri keladi)."""
+# Ichki timeframe kodi -> Twelve Data interval nomi.
+_INTERVALS = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
+              "1h": "1h", "4h": "4h", "1d": "1day"}
+_TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+
+
+async def klines(symbol: str, start_ms: int, limit: int = 500,
+                  tf: str = "1m") -> list[Candle]:
+    """Shamlar. Standart 1m — KUZATUV (tracker.py) aynan shuni ishlatadi.
+    tf faqat grafik ko'rsatish uchun (exchange.klines bilan bir xil shart)."""
+    interval = _INTERVALS.get(tf, "1min")
+    dur = _TF_MS.get(tf, 60_000)
     start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
     r = await _client.get("/time_series", params={
-        "symbol": _api_symbol(symbol), "interval": "1min", "outputsize": limit,
+        "symbol": _api_symbol(symbol), "interval": interval, "outputsize": limit,
         "start_date": start.strftime("%Y-%m-%d %H:%M:%S"), "order": "ASC",
         "timezone": "UTC", "apikey": config.TWELVE_DATA_API_KEY,
     })
@@ -87,12 +97,15 @@ async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
         return []
     out = []
     for row in data.get("values", []):
-        ts = datetime.strptime(row["datetime"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        raw = row["datetime"]
+        # Kunlik shamlarda Twelve Data faqat sanani qaytaradi ("2026-08-24").
+        fmt = "%Y-%m-%d %H:%M:%S" if len(raw) > 10 else "%Y-%m-%d"
+        ts = datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
         open_ms = int(ts.timestamp() * 1000)
         if open_ms < start_ms:
             continue
         out.append(Candle(open_ms, float(row["open"]), float(row["high"]),
-                           float(row["low"]), float(row["close"]), open_ms + 59_999))
+                           float(row["low"]), float(row["close"]), open_ms + dur - 1))
     out.sort(key=lambda c: c.open_ms)
     return out
 

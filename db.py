@@ -179,6 +179,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALS
 -- bog'liqlik yo'qoladi; bayroqni esa istalgan payt qaytarish mumkin.
 -- BARCHA statistika so'rovlari "AND NOT excluded" bilan filtrlanadi.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Signal e'lon qilinayotganda tanlangan grafik timeframe'i ('1m'|'5m'|'15m'|
+-- '1h'|'4h'|'1d'). Signal YOPILGANDA natija grafigi ham AYNAN shu timeframe'da
+-- chiziladi — savdo qaysi masshtabda rejalashtirilgan bo'lsa, natija ham
+-- shunda ko'rinsin. NULL — eski signallar (grafik standart tf bilan chiziladi).
+-- KUZATUVGA ta'sir qilmaydi: tracker.py doim 1m shamlarda ishlaydi, aks holda
+-- TP/SL teginishi yirik sham ichida yashirinib qolardi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS chart_tf TEXT;
 """
 
 
@@ -514,8 +522,8 @@ async def create_signal(workspace_id: int, d: dict) -> int:
     q = """
     INSERT INTO signals (workspace_id, symbol, side, entry, sl, sl_initial, tps,
                          chart_file_id, author_id, note, market, entry_mode,
-                         status, opened_at)
-    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id
+                         status, opened_at, chart_tf)
+    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id
     """
     async with pool().acquire() as c:
         return await c.fetchval(
@@ -523,6 +531,7 @@ async def create_signal(workspace_id: int, d: dict) -> int:
             [_d(t) for t in d["tps"]],
             d.get("chart_file_id"), d.get("author_id"), d.get("note"),
             d.get("market", "crypto"), entry_mode, status, opened_at,
+            d.get("chart_tf"),
         )
 
 

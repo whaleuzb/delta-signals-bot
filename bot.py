@@ -1359,20 +1359,48 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     # Ikki xil tasdiqlash: foydalanuvchining o'z rasmi (yoki rasmsiz) va
     # botning o'zi chizadigan grafik. Rasm yuborish HECH QACHON majburiy emas —
     # matnli signal ham, rasmli signal ham bir xil ishlaydi.
+    await msg.reply_text(body, parse_mode=ParseMode.HTML,
+                          reply_markup=preview_kb(token, file_id))
+
+
+def preview_kb(token: str, file_id) -> InlineKeyboardMarkup:
     own = "🖼 Mening rasmim bilan" if file_id else "📝 Rasmsiz e'lon"
-    kb = InlineKeyboardMarkup([
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton(own, callback_data=f"ok:{token}"),
          InlineKeyboardButton("📈 Bot grafigi bilan", callback_data=f"okc:{token}")],
         [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
          InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
     ])
-    await msg.reply_text(body, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+# Tanlov uchun timeframe'lar. chart.TF_MINUTES dagilarning ichidan eng ko'p
+# ishlatiladiganlari — ro'yxat uzun bo'lsa tugmalar o'qilmay qoladi.
+TF_CHOICES = ["1m", "5m", "15m", "1h", "4h", "1d"]
+
+
+def tf_kb(token: str) -> InlineKeyboardMarkup:
+    rows, cur = [], []
+    for tf in TF_CHOICES:
+        cur.append(InlineKeyboardButton(tf, callback_data=f"tf:{token}:{tf}"))
+        if len(cur) == 3:
+            rows.append(cur)
+            cur = []
+    if cur:
+        rows.append(cur)
+    rows.append([InlineKeyboardButton("↩️ Orqaga", callback_data=f"bk:{token}")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    action, _, token = q.data.partition(":")
+    action, _, rest = q.data.partition(":")
+    # "tf:<token>:<15m>" — timeframe tanlangan holat, qolganlarida faqat token.
+    chart_tf = None
+    if action == "tf":
+        token, _, chart_tf = rest.partition(":")
+    else:
+        token = rest
     item = PENDING.get(token)
     if not item:
         await q.edit_message_text("Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
@@ -1383,6 +1411,19 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "no":
         PENDING.pop(token, None)
         await q.edit_message_text("🗑 Bekor qilindi.", reply_markup=MENU_BACK_KB)
+        return
+
+    if action == "okc":
+        # Grafik qaysi masshtabda chizilishini so'raymiz. Tanlangan timeframe
+        # signalga saqlanadi va YOPILGANDAGI natija grafigi ham aynan shunda
+        # chiziladi — signal qaysi masshtabda rejalashtirilgan bo'lsa, natija
+        # ham shunda ko'rinsin.
+        await q.edit_message_reply_markup(reply_markup=tf_kb(token))
+        return
+
+    if action == "bk":
+        await q.edit_message_reply_markup(
+            reply_markup=preview_kb(token, item["file_id"]))
         return
 
     if action == "ed":
@@ -1407,6 +1448,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "sl": d["sl"], "tps": d["tps"], "chart_file_id": item["file_id"],
         "author_id": q.from_user.id, "note": d.get("reasoning"),
         "market": d.get("market", "crypto"), "entry_mode": entry_mode,
+        "chart_tf": chart_tf,
     })
     PENDING.pop(token, None)
     await q.edit_message_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
@@ -1421,9 +1463,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # bermadi va h.k.) foydalanuvchining rasmiga, u ham bo'lmasa oddiy
         # matnga tushamiz — signal hech qachon yuborilmay qolmaydi.
         gen = None
-        if action == "okc":
+        if chart_tf:
             try:
-                gen = await chart.setup_chart(d, sig_id, ws["name"], ctx.bot.username)
+                gen = await chart.setup_chart(d, sig_id, ws["name"], ctx.bot.username,
+                                               tf=chart_tf)
             except Exception:
                 log.warning("Signal grafigi yasalmadi (#%s)", sig_id, exc_info=True)
 
@@ -2767,7 +2810,7 @@ def main() -> None:
     app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
-    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|ok|no|ed):"))
+    app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|ok|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))

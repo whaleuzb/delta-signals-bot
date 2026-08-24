@@ -33,18 +33,30 @@ RED = "#ef5350"
 ACC = "#4da3ff"
 SILVER = "#8a8f99"
 
-PAD_MIN = 10           # yopilgan signalda kirish/chiqish atrofidagi zaxira daqiqalar
-SETUP_MIN = 150        # yangi signalda ko'rsatiladigan tarix (daqiqa)
-MAX_CANDLES = 1200     # bitta klines chaqiruvidagi eng ko'p sham
+# Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
+TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+TF_LABELS = {"1m": "1 daqiqa", "5m": "5 daqiqa", "15m": "15 daqiqa",
+             "30m": "30 daqiqa", "1h": "1 soat", "4h": "4 soat", "1d": "1 kun"}
+DEFAULT_TF = "15m"     # tf berilmagan (eski) signallar uchun
+
+SETUP_BARS = 120       # yangi signal grafigida ko'rsatiladigan sham soni
+PAD_BARS = 8           # yopilgan signalda kirish/chiqish atrofidagi zaxira shamlar
+MIN_BARS = 40          # natija grafigi juda "yalang'och" bo'lib qolmasligi uchun
+MAX_CANDLES = 1000     # bitta klines chaqiruvidagi eng ko'p sham
 
 
-async def _fetch(market: str, symbol: str, start_ms: int, limit: int):
+def norm_tf(tf: str | None) -> str:
+    return tf if tf in TF_MINUTES else DEFAULT_TF
+
+
+async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str):
     """Shamlarni olish. Xato bo'lsa None — grafik shunchaki chizilmaydi va
     chaqiruvchi oddiy matn/rasm yo'liga qaytadi."""
     try:
-        return await tracker.provider(market).klines(symbol, start_ms, limit=limit)
+        return await tracker.provider(market).klines(symbol, start_ms, limit=limit, tf=tf)
     except Exception:
-        log.warning("Grafik uchun shamlar olinmadi (%s %s)", market, symbol, exc_info=True)
+        log.warning("Grafik uchun shamlar olinmadi (%s %s %s)", market, symbol, tf,
+                    exc_info=True)
         return None
 
 
@@ -59,7 +71,7 @@ def _fmt(p: float) -> str:
 def _render(candles, *, header: str, side: str, entry: float, sl: float,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
-            bot_username: str | None, note: str | None) -> io.BytesIO:
+            bot_username: str | None, tf: str, note: str | None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
@@ -119,6 +131,10 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     side_col = GREEN if side == "LONG" else RED
     fig.text(0.045, 0.955, header, fontsize=16, fontweight="bold", color=TITLE)
     fig.text(0.045, 0.925, side, fontsize=11, fontweight="bold", color=side_col)
+    # Timeframe — grafik qaysi masshtabda chizilganini aniq bildiradi.
+    # Siljish yozuv uzunligiga bog'liq, aks holda SHORT bilan ustma-ust tushardi.
+    fig.text(0.045 + 0.0135 * len(side) + 0.012, 0.925, f"· {tf}",
+              fontsize=11, color=TXT)
     if pnl is not None:
         fig.text(0.97, 0.955, f"{pnl:+.2f}%", fontsize=17, fontweight="bold",
                   color=GREEN if pnl >= 0 else RED, ha="right")
@@ -141,7 +157,7 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
 
 
 async def setup_chart(draft: dict, sig_id: int, ws_name: str,
-                       bot_username: str | None) -> io.BytesIO | None:
+                       bot_username: str | None, tf: str | None = None) -> io.BytesIO | None:
     """Yangi e'lon qilinayotgan signal uchun grafik: oxirgi shamlar va
     rejalashtirilgan Entry/TP/SL darajalari. Hali hech narsa bo'lmagani uchun
     chiqish nuqtasi ham, PnL ham yo'q.
@@ -150,10 +166,12 @@ async def setup_chart(draft: dict, sig_id: int, ws_name: str,
     daqiqasiga 8 so'rovga cheklangani uchun bu ataylab bitta so'rov bilan
     chegaralangan (signal e'lon qilish kamdan-kam sodir bo'ladi, shu sabab
     kuzatuv siklini siqib qo'ymaydi)."""
+    tf = norm_tf(tf)
     market = draft.get("market", "crypto")
     symbol = draft["symbol"]
-    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - SETUP_MIN * 60_000
-    candles = await _fetch(market, symbol, start_ms, min(MAX_CANDLES, SETUP_MIN + 5))
+    span_ms = SETUP_BARS * TF_MINUTES[tf] * 60_000
+    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - span_ms
+    candles = await _fetch(market, symbol, start_ms, min(MAX_CANDLES, SETUP_BARS + 5), tf)
     if not candles or len(candles) < 3:
         return None
 
@@ -163,7 +181,7 @@ async def setup_chart(draft: dict, sig_id: int, ws_name: str,
         entry=float(draft["entry"]), sl=float(draft["sl"]),
         tps=[float(x) for x in draft["tps"]], tp_hit=0,
         exit_idx=None, exit_price=None, pnl=None, r=None,
-        ws_name=ws_name, bot_username=bot_username,
+        ws_name=ws_name, bot_username=bot_username, tf=tf,
         note="ochildi" if mode == "market" else "kutilmoqda",
     )
 
@@ -177,15 +195,23 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     if not opened_at or not closed_at:
         return None
 
-    span_min = max(1, int((closed_at - opened_at).total_seconds() // 60))
-    limit = min(MAX_CANDLES, span_min + 2 * PAD_MIN + 5)
-    start_ms = int(opened_at.timestamp() * 1000) - PAD_MIN * 60_000
+    # Signal qaysi timeframe'da e'lon qilingan bo'lsa, natija ham shunda.
+    tf = norm_tf(sig["chart_tf"] if "chart_tf" in sig.keys() else None)
+    tf_ms = TF_MINUTES[tf] * 60_000
 
-    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit)
+    span_bars = max(1, int((closed_at - opened_at).total_seconds() * 1000 // tf_ms))
+    # Savdo tanlangan timeframe'da bir necha shamgina davom etgan bo'lsa
+    # (masalan 4h grafikda 40 daqiqalik savdo) grafik bo'm-bo'sh ko'rinardi —
+    # shuning uchun oynani orqaga cho'zib, kamida MIN_BARS sham beramiz.
+    pad_bars = max(PAD_BARS, (MIN_BARS - span_bars) // 2)
+    limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
+    start_ms = int(opened_at.timestamp() * 1000) - pad_bars * tf_ms
+
+    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
     if not candles:
         return None
 
-    end_ms = int(closed_at.timestamp() * 1000) + PAD_MIN * 60_000
+    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
     candles = [c for c in candles if c.open_ms <= end_ms]
     if len(candles) < 3:
         return None
@@ -202,5 +228,5 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         tps=[float(x) for x in sig["tps"]], tp_hit=sig["tp_hit"],
         exit_idx=exit_idx, exit_price=exit_price,
         pnl=sig["pnl_pct"], r=sig["r_multiple"],
-        ws_name=ws_name, bot_username=bot_username, note=None,
+        ws_name=ws_name, bot_username=bot_username, tf=tf, note=None,
     )

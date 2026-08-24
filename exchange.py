@@ -70,11 +70,25 @@ async def resolve(raw: str) -> str | None:
     return s if s in await valid_symbols() else None
 
 
-async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
-    """1 daqiqalik shamlar. high/low bo'lgani uchun hech qanday teginish yo'qolmaydi."""
+# Ichki timeframe kodi -> MEXC interval nomi. MEXC 1 soatni "60m" deb ataydi.
+_INTERVALS = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+              "1h": "60m", "4h": "4h", "1d": "1d"}
+# Sham davomiyligi (ms) — close_ms ni hisoblash uchun.
+_TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+
+
+async def klines(symbol: str, start_ms: int, limit: int = 500,
+                  tf: str = "1m") -> list[Candle]:
+    """Shamlar. Standart 1m — KUZATUV (tracker.py) aynan shuni ishlatadi va
+    o'zgartirilmasligi kerak: 1m'dan yirikroq shamda TP/SL teginishi sham
+    ichida yashirinib qolishi mumkin. tf faqat KO'RSATISH (grafik) uchun."""
+    interval = _INTERVALS.get(tf, "1m")
+    dur = _TF_MS.get(tf, 60_000)
     r = await _client.get(
         "/api/v3/klines",
-        params={"symbol": symbol, "interval": "1m", "startTime": start_ms, "limit": limit},
+        params={"symbol": symbol, "interval": interval, "startTime": start_ms,
+                "limit": limit},
     )
     if r.status_code == 429:
         log.warning("MEXC rate limit — kutamiz")
@@ -84,7 +98,7 @@ async def klines(symbol: str, start_ms: int, limit: int = 500) -> list[Candle]:
     for k in r.json():
         open_ms = int(k[0])
         out.append(Candle(open_ms, float(k[1]), float(k[2]), float(k[3]), float(k[4]),
-                          open_ms + 59_999))
+                          open_ms + dur - 1))
     return out
 
 
