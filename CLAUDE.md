@@ -948,3 +948,35 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       indeksi ro'yxatdan chiqib ketardi).
     - 15 ta holatda tekshirildi: qisman yopish hisobi, to'liq yopilishga
       o'tish, R, qisman yopish + TP, qisman yopish + STOP.
+
+41. **Avtomatik kunlik hisobot (`/hisobot 21`).**
+    - Belgilangan mahalliy soatda guruhga kun yakuni chiqadi: nechta signal
+      yopildi, winrate, umumiy natija, eng yaxshi/yomon juftlik, ochiq
+      pozitsiyalar soni. Egasidan hech qanday harakat talab qilmaydi.
+    - `digest_job` har 15 daqiqada aylanadi (soatni o'tkazib yubormaslik
+      uchun), lekin `workspaces.digest_last` (DATE) tufayli har guruhga
+      kuniga FAQAT BIR MARTA yuboriladi — bot restart bo'lsa ham takrorlanmaydi.
+    - `mark_digest_sent()` yuborishdan OLDIN chaqiriladi: matn tayyorlash yoki
+      yuborish yiqilsa, keyingi aylanish qayta urinib guruhni bezovta qilmasin.
+    - Bugun yopilgan signal bo'lmasa post umuman yuborilmaydi (bo'sh
+      "bugun hech narsa yo'q" xabari spam bo'lardi).
+    - Natija `/stats` bilan AYNI usulda hisoblanadi: depozit belgilangan
+      bo'lsa har savdo `alloc_amount/deposit` bo'yicha tortiladi, aks holda
+      sof foizlar yig'indisi. Ikki joyda ikki xil raqam chiqmasligi uchun.
+    - Standart holat — O'CHIRILGAN (`digest_hour IS NULL`): hech kimga
+      bexosdan post ketmaydi.
+    - 14 ta holatda tekshirildi (bo'sh kun, sof foiz, tortilgan hisob,
+      kechagi signallar chetda, faqat belgilangan soatda, takrorlanmaslik).
+
+42. **Risk kalkulyatori (pozitsiya hajmi tugmalari).**
+    - Avval depozit belgilangan bo'lsa bot shunchaki "necha pul ishlatasiz?"
+      deb so'rardi va hisobni odam o'zi qilardi.
+    - Endi 1% / 2% / 3% tugmalari chiqadi va hajm o'zi hisoblanadi:
+      `hajm = depozit * risk% / (|entry - sl| / entry)`. Tasdiqlangach bot
+      "stop tegsa qancha yo'qotasiz" ni ham ko'rsatadi.
+    - **Hajm depozitdan oshmaydi**: spot rejimda leverage yo'q, juda tor
+      stopda formula depozitdan katta son berardi. Cheklanganda buni
+      ochiq yozadi, jimgina kesib qo'ymaydi.
+    - Qo'lda summa yozish ham, o'tkazib yuborish ham avvalgidek qoladi.
+    - `alloc:` va `allocskip:` patternlari to'qnashmaydi (`^alloc:` "allocskip:"
+      ga mos kelmaydi — tekshirildi).

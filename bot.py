@@ -1876,11 +1876,85 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if ws["deposit"] is not None:
         AWAITING_ALLOC[q.from_user.id] = sig_id
-        kb2 = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⏭ O'tkazib yuborish", callback_data=f"allocskip:{sig_id}")]])
-        await q.message.reply_text(
-            f"💰 #{sig_id} {d['symbol']} uchun necha pul ishlatasiz? (masalan 100)",
-            reply_markup=kb2)
+        text, kb2 = alloc_prompt(sig_id, d, float(ws["deposit"]))
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb2)
+
+
+# ─────────────── Risk kalkulyatori ───────────────
+RISK_CHOICES = (1, 2, 3)
+
+
+def risk_amount(deposit: float, entry: float, sl: float, risk_pct: float) -> float | None:
+    """Depozitning `risk_pct` foizini yo'qotish uchun kerak bo'ladigan hajm.
+
+    Stopgacha masofa: d = |entry - sl| / entry. Stop tegsa pozitsiyaning aynan
+    shu ulushi yo'qoladi, ya'ni kerakli hajm = (depozit * risk%) / d.
+
+    SPOT uchun hajm depozitdan oshmaydi (leverage yo'q) — juda tor stopda
+    formula depozitdan katta son berardi, shuning uchun cheklanadi."""
+    if entry <= 0:
+        return None
+    d = abs(entry - sl) / entry
+    if d <= 0:
+        return None
+    return min(deposit * (risk_pct / 100) / d, deposit)
+
+
+def alloc_prompt(sig_id: int, d: dict, deposit: float) -> tuple[str, InlineKeyboardMarkup]:
+    """Pozitsiya hajmini so'rash — risk bo'yicha tayyor variantlar bilan.
+    Avval faqat "necha pul ishlatasiz?" deb so'rardi va hisobni odam o'zi
+    qilishi kerak edi."""
+    entry, sl = float(d["entry"]), float(d["sl"])
+    dist = abs(entry - sl) / entry * 100 if entry > 0 else 0
+
+    t = [f"💰 <b>#{sig_id} {html.escape(str(d['symbol']))}</b> — pozitsiya hajmi",
+         f"Depozit: <b>{deposit:,.2f}</b> · Stopgacha: <b>{dist:.2f}%</b>"]
+    rows, capped = [], False
+    if dist > 0:
+        btns = []
+        for rp in RISK_CHOICES:
+            amt = risk_amount(deposit, entry, sl, rp)
+            if amt is None:
+                continue
+            if amt >= deposit - 1e-9:
+                capped = True
+            btns.append(InlineKeyboardButton(
+                f"{rp}% → {amt:,.0f}", callback_data=f"alloc:{sig_id}:{amt:.2f}"))
+        if btns:
+            t += ["", "Xavf darajasini tanlang — hajm o'zi hisoblanadi:"]
+            rows.append(btns)
+    if capped:
+        t.append("<i>Hajm depozitdan oshmaydi (spot, leverage yo'q) — cheklandi.</i>")
+    t += ["", "Yoki summani o'zingiz yozing (masalan <code>100</code>)."]
+    rows.append([InlineKeyboardButton("⏭ O'tkazib yuborish",
+                                       callback_data=f"allocskip:{sig_id}")])
+    return "\n".join(t), InlineKeyboardMarkup(rows)
+
+
+async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Risk tugmasi bosildi — hajm allaqachon hisoblangan, shuni saqlaymiz."""
+    q = update.callback_query
+    await q.answer()
+    _, sid_s, amt_s = q.data.split(":", 2)
+    sig_id, amount = int(sid_s), float(amt_s)
+    sig = await db.get_signal(sig_id)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not sig or not ws or not can_manage(q.from_user.id, ws):
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    if ws["deposit"] is None:
+        await q.answer("Depozit belgilanmagan.", show_alert=True)
+        return
+    AWAITING_ALLOC.pop(q.from_user.id, None)
+    dep = float(ws["deposit"])
+    await db.set_signal_allocation(sig_id, amount, dep)
+    entry, sl = float(sig["entry"]), float(sig["sl_initial"])
+    risk_money = amount * abs(entry - sl) / entry
+    await q.edit_message_text(
+        f"✅ #{sig_id} {html.escape(sig['symbol'])} — hajm: <b>{amount:,.2f}</b>\n"
+        f"Stop tegsa yo'qotish: <b>{risk_money:,.2f}</b> "
+        f"(depozitning {risk_money / dep * 100:.2f}%)",
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
 async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1998,6 +2072,140 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 )
             except Exception:
                 pass
+
+
+# ─────────────── Avtomatik kunlik hisobot ───────────────
+
+async def build_digest(ws) -> str | None:
+    """Bugun YOPILGAN signallar bo'yicha qisqa yakun. Yopilgani bo'lmasa None —
+    guruhga bo'sh post ketmasin (bu spam bo'lib qolardi)."""
+    now = datetime.now(stats.TZ)
+    since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = await db.equity_series(ws["id"], since, None)
+    if not rows:
+        return None
+
+    deposit = ws["deposit"]
+    pnls = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
+    if not pnls:
+        return None
+    wins = sum(1 for p in pnls if p > 0)
+    losses = sum(1 for p in pnls if p < 0)
+    be = len(pnls) - wins - losses
+
+    # /stats bilan AYNI hisob: depozit belgilangan bo'lsa har savdo o'z
+    # pozitsiya hajmiga qarab tortiladi, aks holda sof foizlar yig'indisi.
+    weighted = None
+    if deposit:
+        weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
+                    for r in rows
+                    if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
+    total = sum(weighted) if weighted else sum(pnls)
+    label = "depozitga nisbatan" if weighted else "yig'indi"
+
+    icon = "🟢" if total > 0 else ("🔴" if total < 0 else "⚪")
+    wr = wins / len(pnls) * 100
+    t = [f"📊 <b>Kun yakuni — {now:%d.%m.%Y}</b>", "",
+         f"Yopilgan signallar: <b>{len(pnls)}</b>  ({wins}✅ / {losses}❌"
+         + (f" / {be}⚪" if be else "") + ")",
+         f"Winrate: <b>{wr:.0f}%</b>",
+         f"{icon} Natija ({label}): <b>{total:+.2f}%</b>"]
+
+    syms = await db.top_symbols(ws["id"], since, None)
+    if syms:
+        best = syms[0]
+        if float(best["sum_pct"]) > 0:
+            t.append(f"Eng yaxshi: <b>{html.escape(best['symbol'])}</b> "
+                     f"{float(best['sum_pct']):+.2f}%")
+        worst = syms[-1]
+        if float(worst["sum_pct"]) < 0 and worst["symbol"] != best["symbol"]:
+            t.append(f"Eng yomon: <b>{html.escape(worst['symbol'])}</b> "
+                     f"{float(worst['sum_pct']):+.2f}%")
+
+    live = await db.live_signals(ws["id"])
+    if live:
+        act = sum(1 for s in live if s["status"] == "ACTIVE")
+        pend = len(live) - act
+        parts = ([f"{act} ta ochiq"] if act else []) + \
+                ([f"{pend} ta kutilmoqda"] if pend else [])
+        t += ["", "⏳ " + ", ".join(parts)]
+    return "\n".join(t)
+
+
+async def digest_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Har 15 daqiqada aylanadi va belgilangan soat kelgan guruhlarga kun
+    yakunini yuboradi. `digest_last` kuniga bir marta yuborilishini
+    kafolatlaydi — bot qayta ishga tushsa ham takrorlanmaydi."""
+    try:
+        rows = await db.digest_workspaces()
+    except Exception:
+        log.exception("Kunlik hisobot: bazadan o'qishda xato")
+        return
+    now = datetime.now(stats.TZ)
+    today = now.date()
+    for ws in rows:
+        if ws["digest_hour"] != now.hour or ws["digest_last"] == today:
+            continue
+        # Kunni AVVAL belgilaymiz: matn tayyorlash yoki yuborish yiqilsa ham
+        # keyingi aylanishda qayta urinib guruhni bezovta qilmasin.
+        await db.mark_digest_sent(ws["id"], today)
+        try:
+            text = await build_digest(ws)
+            if not text:
+                continue
+            await ctx.bot.send_message(
+                ws["group_chat_id"], text, parse_mode=ParseMode.HTML,
+                message_thread_id=ws["group_topic_id"])
+        except Exception:
+            log.exception("Kunlik hisobot yuborilmadi (ws=%s)", ws["id"])
+
+
+async def cmd_digest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/hisobot 21 — har kuni 21:00 da guruhga kun yakuni. /hisobot off — o'chirish."""
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not can_manage(update.effective_user.id, ws):
+        await update.message.reply_text("Bu sozlamani faqat guruh admini o'zgartira oladi.")
+        return
+    if ws["type"] != "group":
+        await update.message.reply_text(
+            "Kunlik hisobot guruhga yuboriladi — shaxsiy jurnal uchun mavjud emas.",
+            reply_markup=MENU_BACK_KB)
+        return
+
+    if not ctx.args:
+        cur = ws["digest_hour"]
+        state = f"yoqilgan, har kuni <b>{cur:02d}:00</b>" if cur is not None else "o'chirilgan"
+        await update.message.reply_text(
+            f"📊 Kunlik hisobot: {state}\n\n"
+            "Yoqish: <code>/hisobot 21</code> (mahalliy vaqt, 0–23)\n"
+            "O'chirish: <code>/hisobot off</code>\n\n"
+            "Belgilangan soatda guruhga kun yakuni chiqadi: nechta signal "
+            "yopildi, winrate, umumiy natija, eng yaxshi juftlik.",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+
+    arg = ctx.args[0].lower()
+    if arg in ("off", "o'chir", "ochir"):
+        await db.set_digest_hour(ws["id"], None)
+        await update.message.reply_text("📊 Kunlik hisobot o'chirildi.",
+                                         reply_markup=MENU_BACK_KB)
+        return
+    try:
+        hour = int(arg)
+    except ValueError:
+        hour = -1
+    if not 0 <= hour <= 23:
+        await update.message.reply_text("Soat 0 dan 23 gacha bo'lishi kerak. "
+                                         "Masalan: /hisobot 21")
+        return
+    await db.set_digest_hour(ws["id"], hour)
+    await update.message.reply_text(
+        f"✅ Kunlik hisobot yoqildi — har kuni <b>{hour:02d}:00</b> da "
+        f"({config.TZ}) guruhga chiqadi.\n\n"
+        "<i>Bugun yopilgan signal bo'lmasa post yuborilmaydi.</i>",
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
 MILESTONE_STEP = 5
@@ -3132,6 +3340,7 @@ async def post_init(app: Application) -> None:
         ("public", "Guruhni /top reytingida ko'rsatish (admin)"),
         ("havola", "Guruhning taklif havolasini belgilash (admin)"),
         ("taklif", "Do'stlaringizni taklif qilish havolasi"),
+        ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
 
@@ -3177,6 +3386,7 @@ def main() -> None:
     # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
+    app.add_handler(CommandHandler("hisobot", cmd_digest))
     app.add_handler(CallbackQueryHandler(on_fix, pattern=r"^fix:"))
     app.add_handler(CommandHandler("month", cmd_month))
     app.add_handler(CommandHandler("year", cmd_year))
@@ -3194,6 +3404,7 @@ def main() -> None:
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
+    app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
@@ -3253,6 +3464,9 @@ def main() -> None:
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
     app.job_queue.run_repeating(milestone_job, interval=config.POLL_SECONDS, first=25)
+    # Kunlik hisobot: soatni o'tkazib yubormaslik uchun 15 daqiqada bir
+    # aylanadi, lekin har guruhga kuniga faqat BIR marta yuboriladi.
+    app.job_queue.run_repeating(digest_job, interval=900, first=60)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

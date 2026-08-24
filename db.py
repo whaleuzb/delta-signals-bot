@@ -187,6 +187,13 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT F
 -- KUZATUVGA ta'sir qilmaydi: tracker.py doim 1m shamlarda ishlaydi, aks holda
 -- TP/SL teginishi yirik sham ichida yashirinib qolardi.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS chart_tf TEXT;
+
+-- Avtomatik kunlik hisobot: guruh egasi belgilagan mahalliy soat (0-23).
+-- NULL — o'chirilgan (standart holat, hech kimga bexosdan post ketmaydi).
+-- digest_last — oxirgi yuborilgan KUN; bir kunda ikki marta yubormaslik uchun
+-- (job har 15 daqiqada aylanadi, restart ham bo'lishi mumkin).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_hour INT;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_last DATE;
 """
 
 
@@ -582,6 +589,26 @@ async def admin_list_signals(workspace_id: int, symbol: str | None = None,
     q += f" ORDER BY id DESC LIMIT ${len(params)}"
     async with pool().acquire() as c:
         return await c.fetch(q, *params)
+
+
+async def set_digest_hour(workspace_id: int, hour: int | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET digest_hour=$2 WHERE id=$1",
+                        workspace_id, hour)
+
+
+async def digest_workspaces() -> list[asyncpg.Record]:
+    """Kunlik hisobot yoqilgan, arxivlanmagan guruh workspace'lari."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM workspaces WHERE digest_hour IS NOT NULL "
+            "AND type='group' AND group_chat_id IS NOT NULL AND NOT archived")
+
+
+async def mark_digest_sent(workspace_id: int, day) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET digest_last=$2 WHERE id=$1",
+                        workspace_id, day)
 
 
 async def set_stop(sig_id: int, sl: float) -> None:
