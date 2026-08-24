@@ -792,6 +792,28 @@ Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ish
     - 14 ta holatda tekshirildi (har bir tf, standartga tushish, natija
       grafigi tf'i, eski signal, qisqa savdo yirik tf'da).
 
+38. **"Yangi signal" tugmasi o'lik qolib ketardi (`allow_reentry`).**
+    - Shikoyat: "yangi signal tugmasi ishlamayapti" — hech qanday xabar ham,
+      xato ham chiqmasdi.
+    - Sabab: `ConversationHandler(allow_reentry=False)` (standart). Sehrgar
+      YARIM YO'LDA tashlab ketilgan bo'lsa suhbat OCHIQ qoladi va PTB
+      entry_point'larni umuman tekshirmaydi — tugma bosilishi jimgina
+      yo'qoladi. `conversation_timeout=900` tufayli bu 15 daqiqa davom
+      etardi.
+    - Ayni holatga tushishning eng oson yo'li: `/bekor`. U global
+      `CommandHandler` edi, fallback EMAS — ya'ni `user_data["wiz"]` ni
+      tozalardi, lekin suhbatni tugatmasdi. Natijada suhbat ochiq qolar,
+      ustiga `wiz` yo'qolgani uchun keyingi bosqich `KeyError` berardi.
+    - Tuzatish: `allow_reentry=True`, `/bekor` fallback sifatida ham
+      qo'shildi, va har bir bosqichga `_wiz_or_end()` qo'riqchisi —
+      holat yo'qolgan bo'lsa KeyError o'rniga tushunarli xabar.
+    - Diagnostika usuli (kelajakda foydali): `main()` ni `run_polling`
+      patch qilib chaqirib, `ConversationHandler.check_update()` ni sun'iy
+      `Update` bilan sinash — tarmoqsiz, qaysi handler ushlashini aniq
+      ko'rsatadi. Shu bilan avval marshrutlash to'g'riligi tasdiqlandi
+      (`newsig` → ConversationHandler), keyin ochiq suhbatda ISHLAMASLIGI
+      isbotlandi.
+
 ---
 
 ## Buyruqlar

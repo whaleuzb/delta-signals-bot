@@ -1053,9 +1053,23 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     return WIZ_PHOTO
 
 
+async def _wiz_or_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Sehrgar holati yo'qolgan bo'lsa (masalan /bekor bosilgan, yoki bot qayta
+    ishga tushgan) — KeyError o'rniga tushunarli xabar va toza tugatish."""
+    wiz = ctx.user_data.get("wiz")
+    if wiz is None:
+        await update.effective_message.reply_text(
+            "Sehrgar bekor qilingan. Qaytadan boshlash uchun /new yozing.",
+            reply_markup=MENU_BACK_KB)
+    return wiz
+
+
 async def wizard_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
-    ctx.user_data["wiz"]["file_id"] = msg.photo[-1].file_id
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["file_id"] = msg.photo[-1].file_id
     await msg.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
                          reply_markup=WIZ_CANCEL_KB)
     return WIZ_SYMBOL
@@ -1064,7 +1078,10 @@ async def wizard_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 async def wizard_skip_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
-    ctx.user_data["wiz"]["file_id"] = None
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["file_id"] = None
     await q.edit_message_text("1/6 — Rasmsiz davom etilmoqda.")
     await q.message.reply_text("2/6 — Juftlik nomini yozing (masalan BTCUSDT):",
                                reply_markup=WIZ_CANCEL_KB)
@@ -1083,8 +1100,11 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
             f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto yoki forex). Qayta yozing:",
             parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
         return WIZ_SYMBOL
-    ctx.user_data["wiz"]["symbol"] = sym
-    ctx.user_data["wiz"]["market"] = market
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["symbol"] = sym
+    wiz["market"] = market
     await msg.reply_text(
         f"3/6 — {sym}: qanday kirasiz?\n\n"
         "🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda "
@@ -1098,7 +1118,10 @@ async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
     mode = q.data.split(":", 1)[1]
-    ctx.user_data["wiz"]["entry_mode"] = mode
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["entry_mode"] = mode
     label = "🎯 Oddiy" if mode == "market" else "⏳ Limit"
     await q.edit_message_text(f"3/6 — Kirish rejimi: {label}")
     kb = InlineKeyboardMarkup([
@@ -1114,7 +1137,10 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
     side = q.data.split(":", 1)[1]
-    ctx.user_data["wiz"]["side"] = side
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["side"] = side
     await q.edit_message_text(f"4/6 — Yo'nalish: {side}")
     await q.message.reply_text("5/6 — Entry (kirish) narxini kiriting:",
                                reply_markup=WIZ_CANCEL_KB)
@@ -1127,7 +1153,10 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if entry is None or entry <= 0:
         await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
         return WIZ_ENTRY
-    ctx.user_data["wiz"]["entry"] = entry
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["entry"] = entry
     await msg.reply_text(
         "6/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
         "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
@@ -1140,8 +1169,11 @@ async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if not tps:
         await msg.reply_text("Noto'g'ri format. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
         return WIZ_TP
-    side = ctx.user_data["wiz"]["side"]
-    ctx.user_data["wiz"]["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    side = wiz["side"]
+    wiz["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
     await msg.reply_text("SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
     return WIZ_SL
 
@@ -1152,6 +1184,8 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if sl is None or sl <= 0:
         await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
         return WIZ_SL
+    if await _wiz_or_end(update, ctx) is None:
+        return ConversationHandler.END
     wiz = ctx.user_data.pop("wiz")
     draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
              "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto"),
@@ -2849,7 +2883,16 @@ def main() -> None:
             WIZ_SL: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_sl)],
         },
-        fallbacks=[CallbackQueryHandler(wizard_cancel, pattern=r"^wiz_cancel$")],
+        fallbacks=[
+            CallbackQueryHandler(wizard_cancel, pattern=r"^wiz_cancel$"),
+            # /bekor MAJBURIY fallback: aks holda u faqat user_data ni tozalab,
+            # suhbatni OCHIQ qoldirardi — va allow_reentry yo'qligi sababli
+            # "Yangi signal" tugmasi 15 daqiqa davomida umuman ishlamasdi.
+            CommandHandler("bekor", wizard_cancel),
+        ],
+        # Sehrgar yarim yo'lda tashlab ketilgan bo'lsa ham "Yangi signal"
+        # bosilishi uni QAYTADAN boshlaydi (avval jimgina hech narsa bo'lmasdi).
+        allow_reentry=True,
         conversation_timeout=900,
     ))
 
