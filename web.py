@@ -93,11 +93,29 @@ CSS = """
       /* Tepadagi band joy. Oddiy brauzerda 0; Telegram'da skript aniq
          qiymatni qo'yadi (pastdagi TG_SCRIPT'ga qarang). */
       --tgtop:env(safe-area-inset-top,0px)}
-body{background:radial-gradient(ellipse 650px 380px at 50% -8%,var(--glow),transparent 60%),
-                var(--bg);
-     background-attachment:fixed;color:var(--ink);
+body{background:var(--bg);color:var(--ink);
      font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-     line-height:1.5;padding:0 20px 64px;min-height:100vh}
+     line-height:1.5;padding:0 20px 64px;min-height:100vh;position:relative}
+/* FON QATLAMLARI. Whale ilovasida fon jonli (3D to'lqin) — bu yerda uning
+   o'rniga ikkita sekin suzuvchi kumush yorug'lik ishlatiladi: JS ham,
+   670 KB kutubxona ham kerak emas, GPU faqat transform/opacity bilan
+   ishlaydi. Ikkalasi ham `pointer-events:none` — bosishga xalaqit bermaydi. */
+body::before{content:"";position:fixed;inset:-20% -10%;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(ellipse 620px 380px at 50% 6%,rgba(218,221,226,.13),transparent 62%),
+    radial-gradient(ellipse 520px 320px at 12% 42%,rgba(218,221,226,.06),transparent 66%),
+    radial-gradient(ellipse 560px 340px at 92% 78%,rgba(218,221,226,.05),transparent 66%);
+  animation:drift 26s ease-in-out infinite alternate}
+/* Donadorlik: tekis qora fonda gradient "chiziqlar" (banding) ko'rinadi;
+   juda mayin shovqin ularni yo'qotadi va sirtga "qog'oz" tuyg'usi beradi. */
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E")}
+@keyframes drift{
+  0%  {transform:translate3d(0,0,0) scale(1)}
+  50% {transform:translate3d(-2.5%,1.5%,0) scale(1.06)}
+  100%{transform:translate3d(2%,-1%,0) scale(1.02)}
+}
+@media (prefers-reduced-motion:reduce){body::before{animation:none}}
 .wrap{max-width:980px;margin:0 auto}
 header{padding:calc(34px + var(--tgtop,0px)) 0 26px;border-bottom:1px solid var(--line);
        margin-bottom:32px}
@@ -162,7 +180,8 @@ tbody tr:hover{background:#ffffff06}
 .gcard.pos-edge::before{background:var(--long)}
 .gcard.neg-edge::before{background:var(--short)}
 .gcard:hover{border-color:var(--silver-dim);text-decoration:none;transform:translateY(-2px)}
-.gcard:active{transform:scale(.985)}
+.gcard:active{transform:scale(.975);border-color:var(--silver-dim);
+              background:linear-gradient(155deg,rgba(30,30,35,.95),rgba(20,20,24,.95))}
 .gtop{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .gname{display:flex;align-items:center;gap:10px;min-width:0}
 .gcard .n{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:600;
@@ -189,10 +208,11 @@ tbody tr:hover{background:#ffffff06}
 /* "Batafsil" — havola emas, tugmaga o'xshasin: karta bosiladigan
    ekanligi bir qarashda tushunilsin. */
 .gbtn{margin-left:auto;display:inline-flex;align-items:center;
-      background:var(--card2);border:1px solid var(--line);color:var(--silver);
-      font-size:13px;font-weight:600;padding:7px 14px;border-radius:9px;
-      transition:background .18s,color .18s,border-color .18s}
+      background:rgba(218,221,226,.06);border:1px solid rgba(218,221,226,.20);
+      color:var(--silver);font-size:13px;font-weight:600;padding:7px 14px;
+      border-radius:9px;transition:background .18s,color .18s,border-color .18s}
 .gcard:hover .gbtn{background:var(--silver);border-color:var(--silver);color:#0A0A0C}
+.gcard:active .gbtn{background:rgba(218,221,226,.22)}
 
 /* hero */
 .hero{border-bottom:1px solid var(--line);padding-bottom:30px}
@@ -202,8 +222,22 @@ tbody tr:hover{background:#ffffff06}
      font-family:"Space Grotesk",Inter,sans-serif;font-weight:700;font-size:15px;
      padding:12px 24px;border-radius:12px;
      transition:transform .15s cubic-bezier(.22,.8,.32,1),filter .15s}
-.btn:hover{text-decoration:none;filter:brightness(1.05)}
-.btn:active{transform:scale(.98)}
+.btn:hover{text-decoration:none;filter:brightness(1.05);
+           box-shadow:0 8px 26px rgba(218,221,226,.18)}
+.btn:active{transform:scale(.955);filter:brightness(.96)}
+/* SHAFFOF (shishasimon) tugma — ikkilamchi harakatlar uchun: fon
+   ko'rinib turadi, chegara kumush. Asosiy kumush tugma bilan raqobat
+   qilmaydi, lekin baribir tugma ekanligi ko'rinadi. */
+.ghost{display:inline-flex;align-items:center;gap:6px;
+       background:rgba(218,221,226,.06);border:1px solid rgba(218,221,226,.20);
+       backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+       color:var(--silver);font-weight:600;font-size:13.5px;
+       padding:8px 15px;border-radius:10px;
+       transition:background .18s,border-color .18s,transform .12s cubic-bezier(.22,.8,.32,1)}
+.ghost:hover{background:rgba(218,221,226,.12);border-color:rgba(218,221,226,.34);
+             text-decoration:none}
+.ghost:active{transform:scale(.955);background:rgba(218,221,226,.18)}
+.back{margin-top:10px}
 /* Guruhga qo'shilish — sahifadagi eng muhim harakat, shuning uchun
    oddiy tugmadan kattaroq. */
 .join{margin-top:18px;font-size:16px;padding:14px 28px;
@@ -416,17 +450,16 @@ async def index(request):
             f"<div><span>{e(when)}</span></div></div>"
             f"<div class='gfoot'>{openb}<span class='gbtn'>Batafsil →</span></div></a>")
 
-    cta = (f"<a class='btn' href='https://t.me/{e(bot)}'>Botni ochish</a>"
-           if bot else "")
-
+    # "Botni ochish" faqat sahifa OXIRIDA (join_cta ichida). Avval u tepada
+    # ham bor edi — bir sahifada bitta asosiy harakat yetadi, ikkitasi
+    # e'tiborni bo'ladi.
     body = (
         "<header class='hero'><div class='brand'>Trade Controller</div>"
         "<h1>Ochiq natijalar</h1>"
         "<div class='sub'>Bu guruhlar o'z savdo statistikasini ommaga ochgan. "
         "Har bir raqam bazadan jonli o'qiladi — signal kiritilganda yoziladi, "
         "bozor TP yoki stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab "
-        "bo'lmaydi.</div>"
-        f"{cta}</header>"
+        "bo'lmaydi.</div></header>"
         + (f"<h2>Top daromad beruvchi guruhlar</h2>"
            f"<div class='cards'>{''.join(cards)}</div>" if cards else
            "<div class='empty'>Hozircha ochiq guruh yo'q.</div>")
@@ -523,7 +556,8 @@ async def group_page(request):
 
     body = (
         f"<header><div class='brand'>Trade Controller</div><h1>{e(ws['name'])}</h1>"
-        f"<div class='sub'><a href='/'>← Barcha guruhlar</a></div>{invite}</header>"
+        f"<div class='sub'><a class='ghost back' href='/'>← Barcha guruhlar</a></div>"
+        f"{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
         + (f"<h2>Balans o'zgarishi</h2>"
            f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"

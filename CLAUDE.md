@@ -1206,3 +1206,21 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       butunlay yashiriladi — narx va sana muhimroq.
     - O'lchandi: 390px va 360px — 10/10 grafik, kesilgan matn 0, hamma
       karta 67px, gorizontal siljish yo'q. 320px — matn to'liq, grafik yo'q.
+
+57. **Fon qatlamlari, shaffof tugmalar, bosilish sezgisi.**
+    - Tepadagi "Botni ochish" olib tashlandi — bitta sahifada bitta asosiy
+      harakat yetadi, u endi faqat sahifa oxiridagi CTA blokida.
+    - **Fon**: `body::before` — uchta kumush yorug'lik (tepada, chapda,
+      o'ngda), 26 soniyalik `drift` animatsiyasi bilan sekin suzadi.
+      `body::after` — mayin SVG shovqin (`feTurbulence`): tekis qora fonda
+      gradient "chiziqlari" (banding) ko'rinmay ketadi. Ikkalasi ham
+      `position:fixed`, `z-index:-1/-2`, `pointer-events:none`.
+      `prefers-reduced-motion` da animatsiya o'chadi.
+      Whale ilovasidagi 3D to'lqin JS+670 KB kutubxona talab qiladi;
+      bu yechim faqat CSS va GPU faqat transform/opacity bilan ishlaydi.
+    - **`.ghost`** — shaffof shishasimon tugma: `rgba(218,221,226,.06)` fon,
+      kumush chegara, blur. Ikkilamchi harakatlar uchun ("← Barcha guruhlar",
+      "Batafsil"). Asosiy kumush tugma bilan raqobat qilmaydi.
+    - **Bosilish sezgisi**: `.btn:active` → `scale(.955)` + yorug'lik pasayadi,
+      `.ghost:active` → `scale(.955)` + fon yorishadi, `.gcard:active` →
+      `scale(.975)` + chegara kumushga o'tadi va ichidagi "Batafsil" yorishadi.
