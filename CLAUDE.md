@@ -1325,3 +1325,19 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       XAUUSD/XAGUSD topiladi va API'ga `XAU/USD` shaklida ketadi; narx
       kelmaganda topilmaydi; EURUSD ikkala holatda ham ishlayveradi; probe
       ikkinchi chaqiruvda qayta so'ramaydi.
+
+64. **"Tahrirlash" va "Bekor qilish" rasmli ko'rikda ishlamasligi.**
+    Signal ko'rigi RASM bo'lib yuboriladi (`send_final_preview`). Rasmli
+    xabarda `edit_message_text` ni Telegram RAD ETADI ("there is no text in
+    the message to edit") — shu sabab ikkala tugma ham "Ishlov berishda xato"
+    berardi. (Ilgari ko'rik matn edi, shuning uchun ilgari ishlagan.)
+    - `_edit(q, text, ...)` yordamchisi qo'shildi: rasm bo'lsa IZOH
+      (`edit_message_caption`), matn bo'lsa matn tahrirlanadi; `BadRequest`
+      bo'lsa oxirgi chora — yangi xabar yoziladi.
+    - Ko'rik oqimidagi to'rtala joyga qo'llandi: "eskirgan", "Bekor qilindi",
+      "Tahrirlash", "Ruxsat yo'q".
+    - Tahrirdan keyin eski ko'rikning tugmalari olib tashlanadi: yangi ko'rik
+      yuboriladi, eskisidan "Tasdiqlash" bosilsa ekrandagi rasm bilan
+      yuboriladigan signal mos kelmasligi mumkin edi.
+    - Tekshirildi: rasmli xabar → caption tahrirlandi; matnli → matn;
+      Telegram rad etsa → yangi xabar yozildi.

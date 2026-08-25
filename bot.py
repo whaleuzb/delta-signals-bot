@@ -20,7 +20,7 @@ from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
 )
 from telegram.constants import ParseMode
-from telegram.error import Forbidden, RetryAfter
+from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
     Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
     CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
@@ -1887,6 +1887,29 @@ async def _clear_kb(q) -> None:
         pass
 
 
+async def _edit(q, text: str, reply_markup=None, parse_mode=None) -> None:
+    """Tugma bosilgan xabarni tahrirlaydi.
+
+    Signal ko'rigi RASM bo'lib yuboriladi (send_final_preview) — rasmli
+    xabarda `edit_message_text` Telegram tomonidan RAD ETILADI ("there is no
+    text in the message to edit") va foydalanuvchi "Ishlov berishda xato"
+    ko'radi. Aynan shu sabab "Tahrirlash" va "Bekor qilish" tugmalari
+    ishlamay qolgandi. Rasm bo'lsa izoh (caption) tahrirlanadi, matn bo'lsa —
+    matn. Ikkalasi ham bo'lmasa, oxirgi chora sifatida yangi xabar yoziladi."""
+    try:
+        if q.message is not None and q.message.photo:
+            await q.edit_message_caption(caption=text, reply_markup=reply_markup,
+                                          parse_mode=parse_mode)
+        else:
+            await q.edit_message_text(text, reply_markup=reply_markup,
+                                       parse_mode=parse_mode)
+    except BadRequest:
+        log.warning("Xabarni tahrirlab bo'lmadi, yangisini yozamiz", exc_info=True)
+        if q.message is not None:
+            await q.message.reply_text(text, reply_markup=reply_markup,
+                                        parse_mode=parse_mode)
+
+
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
@@ -1899,14 +1922,14 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         token = rest
     item = PENDING.get(token)
     if not item:
-        await q.edit_message_text("Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
+        await _edit(q, "Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
         return
     if q.from_user.id != item["user"]:
         return
 
     if action == "no":
         PENDING.pop(token, None)
-        await q.edit_message_text("🗑 Bekor qilindi.", reply_markup=MENU_BACK_KB)
+        await _edit(q, "🗑 Bekor qilindi.", reply_markup=MENU_BACK_KB)
         return
 
     if action == "okc":
@@ -1966,17 +1989,23 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "ed":
         AWAITING_EDIT[q.from_user.id] = token
-        await q.edit_message_text(
+        await _edit(
+            q,
             "✏️ To'g'ri darajalarni yuboring:\n"
             "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
             parse_mode=ParseMode.HTML,
         )
+        # Eski ko'rikning tugmalari olib tashlanadi: tahrirdan keyin YANGI
+        # ko'rik yuboriladi, eskisidan "Tasdiqlash" bosilsa foydalanuvchi
+        # ekranda ko'rib turgan narsa bilan yuboriladigan signal mos
+        # kelmasligi mumkin edi.
+        await _clear_kb(q)
         return
 
     # --- tasdiqlash ---
     ws = await db.get_workspace(item["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
-        await q.edit_message_text("Ruxsat yo'q.")
+        await _edit(q, "Ruxsat yo'q.")
         return
 
     d = item["draft"]
