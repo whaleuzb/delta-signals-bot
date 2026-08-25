@@ -127,6 +127,14 @@ tbody tr:hover{background:#ffffff06}
      font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
 .note{margin-top:26px;color:var(--mut);font-size:13px}
+.cta{margin-top:40px;background:linear-gradient(160deg,#161d27,#10151c);
+     border:1px solid var(--line);border-radius:16px;padding:28px 30px}
+.cta h3{font-size:21px;font-weight:600;margin-bottom:10px}
+.cta p{color:var(--mut);font-size:15px}
+.steps{margin:16px 0 4px;padding-left:20px;color:var(--mut);font-size:15px}
+.steps li{margin-bottom:9px}
+.steps li::marker{color:var(--acc);font-weight:600}
+.cta .btn{margin-top:18px}
 code{font-family:"IBM Plex Mono",ui-monospace,monospace;background:#ffffff0d;
      padding:2px 7px;border-radius:5px;font-size:13px}
 footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
@@ -154,6 +162,28 @@ def page(title: str, body: str, bot: str | None) -> str:
 
 def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
+
+
+def join_cta(bot: str | None) -> str:
+    """Guruhlar ostidagi chaqiruv: "o'z guruhingizni shu yerda ko'ring".
+
+    Sahifaga kelgan odamning aksari — signal beruvchi yoki guruh egasi. Ular
+    uchun keyingi qadam aniq bo'lishi kerak, aks holda sahifa shunchaki
+    ko'rilib yopiladi."""
+    btn = (f"<a class='btn' href='https://t.me/{e(bot)}'>Botni ochish</a>"
+           if bot else "")
+    return (
+        "<div class='cta'><h3>O'z guruhingizni shu yerda ko'rmoqchimisiz?</h3>"
+        "<p>Bot signallaringizni avtomatik kuzatadi va statistikani o'zi yig'adi. "
+        "Sahifani ochish uchun uch qadam:</p>"
+        "<ol class='steps'>"
+        "<li>Botni guruhingizga qo'shib, admin qiling va guruhda "
+        "<code>/setup</code> yozing</li>"
+        "<li>Signallaringizni bot orqali kiriting — u qolganini o'zi bajaradi</li>"
+        "<li>Tayyor bo'lgach <code>/public on</code> yozing; moderator "
+        "tasdiqlagach guruhingiz shu ro'yxatda paydo bo'ladi</li>"
+        "</ol>"
+        f"{btn}</div>")
 
 
 def net_result(r) -> float:
@@ -218,11 +248,10 @@ async def index(request):
         f"{'<div class=htiles>' + hero_tiles + '</div>' if n_signals else ''}"
         f"{cta}</header>"
         + (f"<h2>Guruhlar</h2><div class='cards'>{''.join(cards)}</div>" if cards else
-           "<div class='empty'>Hozircha ochiq guruh yo'q. Guruh egasi botda "
-           "<code>/public on</code> yozib, tasdiqdan o'tgach shu yerda "
-           "paydo bo'ladi.</div>")
+           "<div class='empty'>Hozircha ochiq guruh yo'q.</div>")
         + ("<div class='note'>Reyting joriy umumiy natija bo'yicha tartiblangan. "
-           "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else ""))
+           "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else "")
+        + join_cta(bot))
     cached = _put("index", page("Ochiq natijalar — Trade Controller", body, bot))
     return web.Response(text=cached, content_type="text/html")
 

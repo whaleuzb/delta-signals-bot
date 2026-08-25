@@ -1000,3 +1000,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       200 yozuvdan oshsa eng eskilari tashlanadi.
     - Barcha matn (guruh nomi, juftlik) HTML uchun ekranlanadi.
     - Yagona yangi bog'liqlik: `aiohttp`.
+
+44. **Veb sahifa botga ulandi (`/sahifa`, menyudagi 🌐 tugma).**
+    - `web_page_url(ws)` — havola FAQAT `/top` darvozasidan o'tgan guruhlarda
+      qaytariladi (`public` + `public_approved` + arxivlanmagan + guruh
+      turi). Aks holda None va tugma umuman ko'rsatilmaydi: bosilib 404
+      olishdan ko'ra tugmaning yo'qligi to'g'ri.
+    - `WebAppInfo` — sahifa Telegram ICHIDA (Mini App) ochiladi. Telegram
+      buni faqat SHAXSIY chatdagi inline tugmada qo'llaydi; bosh menyu doim
+      shaxsiy chatda ko'rsatilgani uchun bu yerda xavfsiz.
+    - Yonida "🔗 Havola" tugmasi — ulashish uchun manzil `<code>` ichida
+      alohida qatorda beriladi (ko'chirishga qulay).
+    - `config.WEB_URL` bo'sh bo'lsa tugma ham, buyruq ham havola bermaydi —
+      ya'ni veb servis o'chirilsa bot hech narsani buzmasdan ishlayveradi.
+    - Veb tomonda guruhlar ostiga chaqiruv bloki qo'shildi ("O'z guruhingizni
+      shu yerda ko'rmoqchimisiz?") — uch qadamli yo'riqnoma va botga tugma.
+      Sahifaga kelganlarning aksari guruh egasi, ular uchun keyingi qadam
+      aniq bo'lishi kerak.

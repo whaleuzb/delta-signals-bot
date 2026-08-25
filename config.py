@@ -50,6 +50,11 @@ TZ = os.getenv("TZ", "Asia/Tashkent")
 # TALAB QILMAYDI (oddiy veb-sahifa foydalanuvchidan login so'rab to'siq
 # bo'lgan edi). guide.py + publish_guide.py bilan qayta chop etiladi.
 # Bo'sh qilinsa tugma ko'rsatilmaydi (bot ichidagi yo'riqnoma baribir to'liq).
+# Ochiq natijalar sahifasi (web.py alohida servisda ishlaydi). Bo'sh bo'lsa
+# botdagi "Ochiq sahifa" tugmasi umuman ko'rsatilmaydi — ya'ni veb servis
+# o'chirilgan bo'lsa ham bot hech narsani buzmasdan ishlayveradi.
+WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rstrip("/")
+
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")

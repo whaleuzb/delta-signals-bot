@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timezone
 
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile,
+    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.error import Forbidden, RetryAfter
@@ -444,6 +444,17 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
 
 # ─────────────────────────── Asosiy menyu ───────────────────────────
 
+def web_page_url(ws) -> str | None:
+    """Guruhning ochiq sahifasi havolasi. Sahifa `/top` bilan AYNI darvozadan
+    o'tgan guruhlardagina mavjud — aks holda None qaytariladi va tugma umuman
+    ko'rsatilmaydi (bosilib 404 olishdan ko'ra shunisi to'g'ri)."""
+    if not config.WEB_URL or ws["type"] != "group":
+        return None
+    if not (ws["public"] and ws["public_approved"] and not ws["archived"]):
+        return None
+    return f"{config.WEB_URL}/g/{ws['id']}"
+
+
 def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
     rows = []
     if can_manage(uid, ws):
@@ -454,9 +465,16 @@ def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
          InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
         [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
          InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
-        [InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
-         InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")],
     ]
+    url = web_page_url(ws)
+    if url:
+        # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram buni
+        # faqat SHAXSIY chatdagi inline tugmada qo'llaydi; bosh menyu esa doim
+        # shaxsiy chatda ko'rsatiladi, shuning uchun bu yerda xavfsiz.
+        rows.append([InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url)),
+                     InlineKeyboardButton("🔗 Havola", callback_data="m:weblink")])
+    rows.append([InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
+                 InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -1160,6 +1178,44 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=symbols_nav_kb(y, m))
 
 
+async def send_web_link(target, ws) -> None:
+    """Ochiq sahifa havolasi — ulashish uchun. Havola ALOHIDA qatorda va
+    <code> ichida: shunda uzun manzil ko'chirishga qulay bo'ladi va Telegram
+    uni oldindan ko'rish rasmiga aylantirib yubormaydi."""
+    url = web_page_url(ws)
+    if not url:
+        await target.reply_text(
+            "🌐 Ochiq sahifa hali yoqilmagan.\n\n"
+            "Yoqish uchun: <code>/public on</code> yozing — so'rov moderatorga "
+            "boradi. Tasdiqlangach guruhingiz uchun jonli havola paydo bo'ladi: "
+            "unda statistika, equity grafigi va savdolar tarixi ko'rinadi.",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return
+    await target.reply_text(
+        f"🌐 <b>{html.escape(ws['name'])}</b> — ochiq natijalar sahifasi:\n\n"
+        f"<code>{html.escape(url)}</code>\n\n"
+        "Bu havolani guruhga pin qilib qo'ysangiz yoki reklamada ulashsangiz "
+        "bo'ladi. Sahifa bazadan jonli o'qiladi — har yangi natija o'zi "
+        "qo'shiladi, qo'lda yangilash shart emas.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 Sahifani ochish", web_app=WebAppInfo(url=url))],
+            [InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")],
+        ]))
+
+
+async def cmd_page(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/sahifa — guruhning ochiq natijalar havolasi."""
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, update.effective_user.id, ws):
+        text, kb = access_denied(ws)
+        await update.message.reply_text(text, reply_markup=kb)
+        return
+    await send_web_link(update.message, ws)
+
+
 async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
@@ -1172,7 +1228,9 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     action = q.data.split(":", 1)[1]
 
-    if action == "stats":
+    if action == "weblink":
+        await send_web_link(q.message, ws)
+    elif action == "stats":
         await q.message.reply_text(await stats_view_text(ws, q.from_user.id, "all"), parse_mode=ParseMode.HTML,
                                     reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
@@ -3340,6 +3398,7 @@ async def post_init(app: Application) -> None:
         ("public", "Guruhni /top reytingida ko'rsatish (admin)"),
         ("havola", "Guruhning taklif havolasini belgilash (admin)"),
         ("taklif", "Do'stlaringizni taklif qilish havolasi"),
+        ("sahifa", "Guruhning ochiq natijalar sahifasi"),
         ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
@@ -3389,6 +3448,7 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("hisobot", cmd_digest))
+    app.add_handler(CommandHandler("sahifa", cmd_page))
     app.add_handler(CallbackQueryHandler(on_fix, pattern=r"^fix:"))
     app.add_handler(CommandHandler("month", cmd_month))
     app.add_handler(CommandHandler("year", cmd_year))

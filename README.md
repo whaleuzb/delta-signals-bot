@@ -155,6 +155,7 @@ tegmaguncha kutadi. Matnda `market` yoki `bozor` so'zi bo'lsa (yoki sehrgarda
 | `/havola <link>\|off` | (admin/egasi) guruhning taklif havolasi — /top da guruh nomi shunga link bo'ladi |
 | `/taklif` | do'stlaringizni taklif qilish uchun shaxsiy havola |
 | `/yordam` | yo'riqnoma: guruh ulash, signal kiritish, xatolar |
+| `/sahifa` | guruhning ochiq natijalar sahifasi (veb havola) |
 | `/tuzat [JUFTLIK]` | (super-admin) xato kiritilgan signalni statistikadan chiqarish yoki qaytarish |
 
 ---
