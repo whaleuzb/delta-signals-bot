@@ -6,7 +6,7 @@ va `forex.price` ni ishlatadi. Farqi ikkitasi:
 
   1. Tiker API'ga O'ZGARISHSIZ ketadi. Forex tomonida "EURUSD" -> "EUR/USD"
      bo'lib bo'linadi; aksiyada bunday bo'lish 6 harfli tikerni buzardi.
-  2. Ro'yxat boshqa manbadan — `/stocks` (AQSh birjalari).
+  2. Tiker ro'yxatdan emas, BITTALAB tekshiriladi (pastdagi izohga qarang).
 
 TWELVE_DATA_API_KEY bo'lmasa modul jimgina o'chadi: `resolve()` doim None
 qaytaradi, kripto va forex ishlashda davom etadi.
@@ -14,52 +14,30 @@ qaytaradi, kripto va forex ishlashda davom etadi.
 import logging
 import time
 
-import config
 import forex
 
 log = logging.getLogger(__name__)
 
 Candle = forex.Candle
 
-# Tikerlar ro'yxati kuniga bir marta olinadi: u kamdan-kam o'zgaradi, javob
-# esa katta (AQSh bo'yicha bir necha ming qator). Soatiga bir marta tortish
-# bepul rejadagi kunlik so'rov chegarasini behuda yeb qo'yardi.
-_TTL = 86_400
-_symbols: set[str] = set()
-_symbols_ts: float = 0.0
-
-# Faqat asosiy AQSh birjalari. Boshqa mamlakat birjalarida bir xil tiker
-# butunlay boshqa kompaniyani bildirishi mumkin (masalan "AAPL" Meksikada) —
-# foydalanuvchi "AAPL" deb yozganda aynan NASDAQ'dagisi tushunilsin.
-_EXCHANGES = {"NASDAQ", "NYSE", "NYSE ARCA", "NYSE AMERICAN", "AMEX", "BATS"}
+# Tiker BITTALAB tekshiriladi, ro'yxat yuklab olinmaydi.
+#
+# Avval `/stocks?country=United States` chaqirilardi — javob bir necha
+# megabayt bo'lgani uchun 15 soniyalik chegaraga sig'may `ReadTimeout` bilan
+# uzilardi. Natijada ro'yxat DOIM bo'sh qolar, har bir tiker esa o'sha 15
+# soniyani kutib "qotib qolgandek" ko'rinardi.
+#
+# Endi `/price?symbol=TSLA` so'raladi: javob bir necha bayt va u bir yo'la
+# ikki savolga javob beradi — tiker bormi VA shu rejada narx keladimi.
+# Ikkinchisi muhim: narx kelmasa signal qabul qilinib, keyin PENDING'da
+# qotib qolardi.
+_OK_TTL = 86_400     # topilgan tiker — bir kun
+_FAIL_TTL = 3_600    # topilmagani — bir soat (ro'yxat o'zgarishi mumkin)
+_cache: dict[str, tuple[float, bool]] = {}
 
 
 def enabled() -> bool:
     return forex.enabled()
-
-
-async def valid_symbols() -> set[str]:
-    """AQSh aksiyalari tikerlari. Xato bo'lsa — bo'sh to'plam va ogohlantirish:
-    aksiya vaqtincha topilmaydi, lekin kripto/forex buzilmaydi."""
-    global _symbols, _symbols_ts
-    if _symbols and time.time() - _symbols_ts < _TTL:
-        return _symbols
-    try:
-        r = await forex._client.get("/stocks", params={
-            "country": "United States", "apikey": config.TWELVE_DATA_API_KEY})
-        r.raise_for_status()
-        data = r.json().get("data", [])
-    except Exception:
-        log.warning("Aksiyalar ro'yxati olinmadi", exc_info=True)
-        return _symbols          # eski kesh bo'lsa — o'shanda ishlaymiz
-    found = {
-        s["symbol"].upper() for s in data
-        if str(s.get("exchange", "")).upper() in _EXCHANGES
-        and s.get("symbol")
-    }
-    if found:
-        _symbols, _symbols_ts = found, time.time()
-    return _symbols
 
 
 def normalize(raw: str) -> str:
@@ -72,16 +50,30 @@ def normalize(raw: str) -> str:
     return "".join(ch for ch in s if ch.isalpha() or ch == ".")
 
 
+async def _probe(symbol: str) -> bool:
+    hit = _cache.get(symbol)
+    if hit:
+        ok = hit[1]
+        if time.time() - hit[0] < (_OK_TTL if ok else _FAIL_TTL):
+            return ok
+    try:
+        ok = await forex.price(symbol, fresh=True) is not None
+    except Exception:
+        log.warning("Aksiya tekshiruvi bajarilmadi: %s", symbol, exc_info=True)
+        return False                   # keshlamaymiz: tarmoq xatosi vaqtinchalik
+    _cache[symbol] = (time.time(), ok)
+    return ok
+
+
 async def resolve(raw: str) -> str | None:
     if not enabled():
         return None
     s = normalize(raw)
-    # Bo'sh yoki juda uzun bo'lsa umuman so'ramaymiz: AQSh tikerlari 1-5 belgi
-    # (nuqtali sinf bilan 6). Bu, ayniqsa, "SIGNAL", "ENTRY" kabi tasodifiy
-    # so'zlarni ro'yxatda qidirmaslik uchun.
+    # AQSh tikerlari 1-5 belgi (nuqtali sinf bilan 6). Bu chegara "SIGNAL",
+    # "ENTRY" kabi tasodifiy so'zlar uchun tarmoqqa chiqmaslik uchun ham.
     if not s or len(s) > 6:
         return None
-    return s if s in await valid_symbols() else None
+    return s if await _probe(s) else None
 
 
 async def klines(symbol: str, start_ms: int, limit: int = 500,

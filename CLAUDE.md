@@ -1290,10 +1290,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       gaplashadi. Forex xatti-harakati o'zgarmadi (tekshirildi).
     - **Tiker o'zgarishsiz uzatiladi.** Forexdagi `_api_symbol` 6 belgili
       nomni ikkiga bo'ladi — aksiyada bu tikerni buzardi.
-    - Ro'yxat `/stocks?country=United States` dan, **24 soatga** keshlanadi
-      (javob katta, tikerlar esa kamdan-kam o'zgaradi). Faqat asosiy AQSh
-      birjalari (`NASDAQ`, `NYSE`, ...) — boshqa mamlakatda bir xil tiker
-      boshqa kompaniya bo'lishi mumkin.
+    - Tiker BITTALAB tekshiriladi (68-bandga qarang) — ro'yxat yuklab
+      olinmaydi.
     - `resolve_symbol` tartibi: **kripto → forex → aksiya**. Aksiya oxirida,
       chunki bot asosan kripto uchun ishlatiladi va to'qnashuvda kripto
       ustun bo'lishi kerak. Tiker uzunligi 6 dan oshsa umuman qidirilmaydi —
@@ -1405,3 +1403,24 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     Tekshirildi: ikkala workspace ham ro'yxatga tushdi, hisobot ikkalasiga
     ham ketdi (guruh chatiga va shaxsiy chatga), ikkinchi aylanishda
     takrorlanmadi.
+
+68. **Aksiya ro'yxatini yuklab olish ISHLAMADI — bittalab tekshirishga o'tildi.**
+    Ishlab turgan serverda hech bir tiker topilmasdi va bot "qotib qolardi".
+    Log: `Aksiyalar ro'yxati olinmadi` + `httpx.ReadTimeout`. Sabab:
+    `/stocks?country=United States` javobi bir necha megabayt — 15 soniyalik
+    chegaraga sig'maydi. Ro'yxat DOIM bo'sh qolar, har bir tiker esa o'sha 15
+    soniyani kutardi.
+    - Endi `/price?symbol=TSLA` so'raladi: javob bir necha bayt va bir yo'la
+      IKKI savolga javob beradi — tiker bormi VA shu rejada narx keladimi.
+      Ikkinchisi muhim: narx kelmasa signal qabul qilinib, keyin PENDING'da
+      qotib qolardi (metallardagi bilan bir xil mantiq, 63-band).
+    - Kesh: topilgani 24 soat, topilmagani 1 soat. Tarmoq xatosi
+      KESHLANMAYDI — vaqtinchalik uzilish tikerni bir soatga "yo'q" qilib
+      qo'ymasin.
+    - `resolve_symbol` da aksiya bosqichi FAQAT dastlabki 2 nomzodni sinaydi:
+      bu tarmoq so'rovi (kripto/forex esa keshdagi ro'yxatda qidiruv), bepul
+      reja esa daqiqasiga 8 so'rov beradi.
+    - 6 belgidan uzun so'z umuman so'ralmaydi.
+    - Tekshirildi: DOCU, docu, CRCL, crcl, tsla, $AAPL, NASDAQ:TSLA — hammasi
+      topildi; uzun so'zlar tarmoqqa chiqmadi; ikkinchi chaqiruvda 0 so'rov;
+      olti nomzodli xabarda atigi 2 so'rov.

@@ -1752,7 +1752,11 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
     # bilan to'qnashib qolsa, kripto ustun bo'lib qolsin (bot asosan kripto
     # uchun ishlatiladi).
     if stocks.enabled():
-        for raw in cands:
+        # Faqat DASTLABKI ikkita nomzod: aksiya tekshiruvi — tarmoq so'rovi
+        # (kripto va forex esa keshdagi ro'yxatda qidiruv). Twelve Data bepul
+        # rejasi daqiqasiga 8 so'rov beradi, oltita nomzodni sinash uni bir
+        # xabarda yeb qo'yishi mumkin edi.
+        for raw in cands[:2]:
             try:
                 sym = await stocks.resolve(raw)
             except Exception:
