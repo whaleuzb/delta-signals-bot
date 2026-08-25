@@ -1168,3 +1168,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     kattaroq (16px matn, 13×26 padding) va yengil ko'k soya bilan.
     Telefonda `display:block` — butun kenglikni egallaydi, barmoq bilan
     bosish oson. O'lchandi: 390px ekranda 350×52, desktopda 218×50.
+
+55. **Bosh sahifa: umumiy plitalar olib tashlandi, guruh kartalari yangilandi.**
+    - "2 ochiq guruh / 19 signal / 58% winrate / 6 kuzatuvda" plitalari
+      olib tashlandi. Bu raqamlar HECH KIMNING natijasi emas — turli
+      guruhlarning aralashmasi; har bir guruhning o'z raqamlari kartasida
+      va o'z sahifasida bor. `.htiles`/`.htile` uslublari ham o'chirildi.
+    - Sarlavha: "Guruhlar" → **"Top daromad beruvchi guruhlar"** (ro'yxat
+      allaqachon daromad bo'yicha tartiblangan, sarlavha buni aytadi).
+    - Har bir kartada endi **o'rin raqami** bor (1, 2, 3 — oltin/kumush/
+      bronza, keyingilari kulrang), fon yengil gradient, "Batafsil →" esa
+      matn emas — ramkali tugma (kursor ustiga kelganda to'lib ko'karadi).
+      Guruh nomi uzun bo'lsa ellipsis bilan kesiladi, karta buzilmaydi.
+    - O'lchandi (390px): 3 karta, 3 o'rin raqami, 3 tugma, plita 0,
+      gorizontal siljish yo'q.

@@ -137,16 +137,27 @@ tbody tr:hover{background:#ffffff06}
 .b-long{background:#2ecc8f22;color:var(--long)}
 .b-short{background:#ff5c5c22;color:var(--short)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
-.gcard{background:var(--card);border:1px solid var(--line);border-radius:14px;
-       padding:20px 22px;display:block;color:inherit;position:relative;
+.gcard{background:linear-gradient(165deg,#171e28,#12171f);
+       border:1px solid var(--line);border-radius:14px;
+       padding:18px 20px;display:block;color:inherit;position:relative;
        overflow:hidden;transition:border-color .15s,transform .15s}
 .gcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
                background:var(--line)}
 .gcard.pos-edge::before{background:var(--long)}
 .gcard.neg-edge::before{background:var(--short)}
 .gcard:hover{border-color:#3a4351;text-decoration:none;transform:translateY(-2px)}
-.gtop{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.gcard .n{font-size:18px;font-weight:600}
+.gtop{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.gname{display:flex;align-items:center;gap:10px;min-width:0}
+.gcard .n{font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap}
+/* O'rin raqami. Ro'yxat daromad bo'yicha tartiblangan — birinchi uchtasi
+   ko'zga tashlansin, qolgani xotirjam kulrang. */
+.rank{display:inline-flex;align-items:center;justify-content:center;
+      width:28px;height:28px;flex:none;border-radius:9px;background:#222a35;
+      color:var(--mut);font-size:13px;font-weight:700}
+.rank.r1{background:linear-gradient(150deg,#f6d67a,#c8a12a);color:#231d05}
+.rank.r2{background:linear-gradient(150deg,#e2e7ef,#98a2b1);color:#1b1f26}
+.rank.r3{background:linear-gradient(150deg,#e4a97b,#b57741);color:#241606}
 .gcard .big{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;
             white-space:nowrap}
 .gstats{display:flex;gap:18px;margin-top:14px;color:var(--mut);font-size:13px;
@@ -156,17 +167,16 @@ tbody tr:hover{background:#ffffff06}
        padding-top:14px;border-top:1px solid var(--line);min-height:20px}
 .chip{background:#4da3ff1f;color:var(--acc);font-size:12px;font-weight:600;
       padding:3px 9px;border-radius:20px}
-.go{color:var(--mut);font-size:13px;margin-left:auto}
-.gcard:hover .go{color:var(--acc)}
+/* "Batafsil" — havola emas, tugmaga o'xshasin: karta bosiladigan
+   ekanligi bir qarashda tushunilsin. */
+.gbtn{margin-left:auto;display:inline-flex;align-items:center;
+      background:#4da3ff14;border:1px solid #4da3ff3d;color:var(--acc);
+      font-size:13px;font-weight:600;padding:7px 14px;border-radius:9px;
+      transition:background .15s,color .15s,border-color .15s}
+.gcard:hover .gbtn{background:var(--acc);border-color:var(--acc);color:#06121f}
 
 /* hero */
 .hero{border-bottom:1px solid var(--line);padding-bottom:30px}
-.htiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
-        gap:12px;margin-top:26px}
-.htile{background:var(--card);border:1px solid var(--line);border-radius:12px;
-       padding:14px 16px;text-align:center}
-.htile .hv{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
-.htile .hk{font-size:12px;color:var(--mut);margin-top:3px;letter-spacing:.03em}
 .btn{display:inline-block;margin-top:22px;background:var(--acc);color:#06121f;
      font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
@@ -334,14 +344,11 @@ async def index(request):
     # Eng yaxshi natija yuqorida — bu sahifaning butun mazmuni shu.
     rows = sorted(rows, key=lambda r: net_result(r), reverse=True)
 
-    n_groups = len(rows)
-    n_signals = sum(r["total"] or 0 for r in rows)
-    n_open = sum(r["n_open"] or 0 for r in rows)
-    n_wins = sum(r["wins"] or 0 for r in rows)
-    wr_all = (n_wins / n_signals * 100) if n_signals else 0
-
+    # Umumiy plitalar (jami signal, umumiy winrate...) olib tashlandi:
+    # ular hech kimning natijasi emas — turli guruhlarning aralashmasi.
+    # Har bir guruhning o'z raqamlari kartasida va o'z sahifasida.
     cards = []
-    for r in rows:
+    for pos, r in enumerate(rows, 1):
         total = r["total"] or 0
         wr = (r["wins"] / total * 100) if total else 0
         net = net_result(r)
@@ -349,21 +356,20 @@ async def index(request):
                 if r["last_closed"] else "—")
         openb = (f"<span class='chip'>{r['n_open']} ta ochiq</span>"
                  if r["n_open"] else "")
+        # O'rin raqami: ro'yxat daromad bo'yicha tartiblangan, shuning uchun
+        # o'rin ma'noli. Birinchi uchtasi alohida rangda.
+        rank_cls = f"r{pos}" if pos <= 3 else ""
         cards.append(
             f"<a class='gcard {_cls(net)}-edge' href='/g/{r['id']}'>"
-            f"<div class='gtop'><div class='n'>{e(r['name'])}</div>"
+            f"<div class='gtop'>"
+            f"<div class='gname'><span class='rank {rank_cls}'>{pos}</span>"
+            f"<span class='n'>{e(r['name'])}</span></div>"
             f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
             f"<div class='gstats'>"
             f"<div><span>{total}</span> signal</div>"
             f"<div><span>{wr:.0f}%</span> winrate</div>"
             f"<div><span>{e(when)}</span></div></div>"
-            f"<div class='gfoot'>{openb}<span class='go'>Batafsil →</span></div></a>")
-
-    hero_tiles = "".join(
-        f"<div class='htile'><div class='hv'>{e(v)}</div><div class='hk'>{e(k)}</div></div>"
-        for v, k in [(n_groups, "ochiq guruh"), (f"{n_signals:,}".replace(",", " "),
-                                                  "yopilgan signal"),
-                     (f"{wr_all:.0f}%", "umumiy winrate"), (n_open, "kuzatuvda")])
+            f"<div class='gfoot'>{openb}<span class='gbtn'>Batafsil →</span></div></a>")
 
     cta = (f"<a class='btn' href='https://t.me/{e(bot)}'>Botni ochish</a>"
            if bot else "")
@@ -375,9 +381,9 @@ async def index(request):
         "Har bir raqam bazadan jonli o'qiladi — signal kiritilganda yoziladi, "
         "bozor TP yoki stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab "
         "bo'lmaydi.</div>"
-        f"{'<div class=htiles>' + hero_tiles + '</div>' if n_signals else ''}"
         f"{cta}</header>"
-        + (f"<h2>Guruhlar</h2><div class='cards'>{''.join(cards)}</div>" if cards else
+        + (f"<h2>Top daromad beruvchi guruhlar</h2>"
+           f"<div class='cards'>{''.join(cards)}</div>" if cards else
            "<div class='empty'>Hozircha ochiq guruh yo'q.</div>")
         + ("<div class='note'>Reyting joriy umumiy natija bo'yicha tartiblangan. "
            "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else "")
