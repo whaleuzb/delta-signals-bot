@@ -28,6 +28,11 @@ import stats
 
 log = logging.getLogger("web")
 
+# Brauzer/Telegram HTML'ni SAQLAMASIN. Server keshi (CACHE_TTL) baribir
+# ishlaydi, lekin Telegram WebView eski sahifani ko'rsatib turishi
+# yangilanish chiqqanda foydalanuvchini adashtirardi.
+NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
+
 CACHE_TTL = 120.0          # sahifa/grafik keshi (soniya)
 _cache: dict[str, tuple[float, object]] = {}
 
@@ -229,12 +234,12 @@ TG_SCRIPT = """
     var t = 0;
     try { t += inset(tg.safeAreaInset); } catch (e) {}
     try { t += inset(tg.contentSafeAreaInset); } catch (e) {}
-    // Mijoz insetlarni bermasa ham, mobil telefonda kengaytirilgan oynada
-    // suzuvchi sarlavha baribir bor — unga kamida shuncha joy kerak.
-    if (!t) {
-      var m = tg.platform === 'ios' || tg.platform === 'android';
-      if (m && tg.isExpanded) t = 56;
-    }
+    // Mobil Telegram suzuvchi sarlavhani HAR DOIM sahifa ustidan chizadi,
+    // lekin ba'zi mijozlar insetlarni 0 deb qaytaradi — shuning uchun
+    // telefonda quyi chegara qo'yiladi. Desktop va oddiy brauzerda tugmalar
+    // sahifadan tashqarida, u yerda hech narsa qo'shilmaydi.
+    var mobil = tg.platform === 'ios' || tg.platform === 'android';
+    if (mobil && t < 72) t = 72;
     // 0 bo'lsa CSS'dagi env(safe-area-inset-top) o'z holicha qolsin.
     if (t > 0) {
       document.documentElement.style.setProperty('--tgtop', t + 'px');
@@ -299,7 +304,7 @@ async def index(request):
     bot = request.app["bot_username"]
     cached = _cached("index")
     if cached is not None:
-        return web.Response(text=cached, content_type="text/html")
+        return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
     rows = await db.public_workspaces()
     # Eng yaxshi natija yuqorida — bu sahifaning butun mazmuni shu.
@@ -354,7 +359,7 @@ async def index(request):
            "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else "")
         + join_cta(bot))
     cached = _put("index", page("Ochiq natijalar — Trade Controller", body, bot))
-    return web.Response(text=cached, content_type="text/html")
+    return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
 
 async def group_page(request):
@@ -366,7 +371,7 @@ async def group_page(request):
 
     cached = _cached(f"g{ws_id}")
     if cached is not None:
-        return web.Response(text=cached, content_type="text/html")
+        return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
     s = await db.period_stats(ws_id)
     rows = await db.equity_series(ws_id)
@@ -393,16 +398,6 @@ async def group_page(request):
     tiles_html = "".join(
         f"<div class='tile'><div class='k'>{e(k)}</div>"
         f"<div class='v {c}'>{e(v)}</div></div>" for k, v, c in tiles)
-
-    # Juftliklar
-    syms = await db.top_symbols(ws_id, limit=12)
-    sym_rows = "".join(
-        f"<tr><td>{e(r['symbol'])}</td><td data-k='Savdo'>{r['closed']}</td>"
-        f"<td data-k='Winrate'>"
-        f"{(r['wins'] / r['closed'] * 100) if r['closed'] else 0:.0f}%</td>"
-        f"<td data-k='Natija' class='{_cls(float(r['sum_pct']))}'>"
-        f"{float(r['sum_pct']):+.2f}%</td></tr>"
-        for r in syms)
 
     # Oylik
     months = await db.monthly_breakdown(ws_id, limit=12)
@@ -453,8 +448,6 @@ async def group_page(request):
         + (f"<h2>Balans o'zgarishi</h2>"
            f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"
            if len(pnls) >= 2 else "")
-        + section("Juftliklar kesimi",
-                  "<th>Juftlik</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", sym_rows)
         + section("Oylik natijalar",
                   "<th>Oy</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", mon_rows)
         + (f"<h2>Oxirgi savdolar</h2><div class='trades'>{trades}</div>"
@@ -463,7 +456,7 @@ async def group_page(request):
 
     out = page(f"{ws['name']} — natijalar", body, bot)
     _put(f"g{ws_id}", out)
-    return web.Response(text=out, content_type="text/html")
+    return web.Response(text=out, content_type="text/html", headers=NO_CACHE)
 
 
 async def equity_png(request):

@@ -1096,3 +1096,19 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       bo'lsa — 56px zaxira. Desktop va oddiy brauzerda hech narsa qo'shilmaydi.
     - O'lchandi (390px, Chromium): oddiy brauzer 34px, tdesktop 34px,
       insetli iOS (59+46) 139px, insetsiz iOS 90px.
+
+49. **Veb sahifa: HTML keshlanmaydi, "Juftliklar kesimi" olib tashlandi.**
+    - `NO_CACHE = {"Cache-Control": "no-store, max-age=0"}` — bosh va guruh
+      sahifasida. Telegram WebView HTML'ni saqlab qolib, yangilanish
+      chiqqanidan keyin ham ESKI sahifani ko'rsatardi (tepa bo'shlig'i
+      tuzatilgani ko'rinmadi). Server keshi (`CACHE_TTL=120`) o'z holicha
+      ishlayveradi — bu faqat mijoz keshi haqida.
+    - `--tgtop`: mobil Telegram'da endi SHARTSIZ kamida 72px. Ba'zi mijozlar
+      `safeAreaInset`/`contentSafeAreaInset` ni 0 deb qaytaradi, suzuvchi
+      sarlavha esa baribir sahifa ustida turadi. Desktop va oddiy brauzerda
+      0 — u yerda tugmalar sahifadan tashqarida.
+      O'lchandi (390px): brauzer 34px, tdesktop 34px, insetli iOS 139px,
+      insetsiz iOS 106px.
+    - Guruh sahifasidan "Juftliklar kesimi" jadvali olib tashlandi (`top_symbols`
+      endi faqat botda ishlatiladi). Oxirgi savdolar kartalari o'sha
+      ma'lumotni ko'rgazmaliroq beradi.
