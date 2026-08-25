@@ -1309,3 +1309,19 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       AAPL ro'yxatga tushmadi, `/time_series` ga `NVDA` (bo'linmagan) va
       forexga `EUR/USD` ketdi, uchala moduldagi `provider("stock")` → stocks,
       `resolve_symbol(["TSLA"])` → `("TSLA","stock")`.
+
+63. **XAUUSD (oltin) topilmasligi — `/forex_pairs` metallarni bermaydi.**
+    Modul izohida "oltin/kumush kabi metallar" deb yozilgan bo'lsa ham,
+    ishlab turgan serverda `XAUUSD` "topilmadi" edi: Twelve Data'ning
+    `/forex_pairs` ro'yxatida metallar yo'q ekan. `/time_series` va `/price`
+    esa `XAU/USD` ni bemalol qabul qiladi.
+    - Yechim: `_METALS` to'plami (XAU/XAG/XPT/XPD + EUR juftliklari) ro'yxatdan
+      TASHQARI tekshiriladi.
+    - **Shunchaki ro'yxatga qo'shib qo'yish YETARLI EMAS edi**: reja yoki
+      hudud sabab narx kelmasa, signal qabul qilinib, keyin PENDING'da qotib
+      qolardi. Shu sabab `_probe()` bir marta `/price` so'raydi va javobni
+      1 soat keshlaydi — narx kelmasa juftlik topilmagan hisoblanadi.
+    - Tekshirildi (soxta API, metallar ro'yxatda YO'Q holatda): narx kelganda
+      XAUUSD/XAGUSD topiladi va API'ga `XAU/USD` shaklida ketadi; narx
+      kelmaganda topilmaydi; EURUSD ikkala holatda ham ishlayveradi; probe
+      ikkinchi chaqiruvda qayta so'ramaydi.

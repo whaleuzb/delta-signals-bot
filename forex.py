@@ -54,11 +54,42 @@ def normalize(raw: str) -> str:
     return s
 
 
+# Metallar. Twelve Data'ning /forex_pairs ro'yxati ularni HAR DOIM
+# qaytaravermaydi (aynan shu sabab XAUUSD "topilmadi" bo'lardi), lekin
+# /time_series va /price "XAU/USD" ni bemalol qabul qiladi. Shuning uchun
+# metallar ro'yxatdan tashqari, ALOHIDA tekshiriladi.
+_METALS = {"XAUUSD", "XAGUSD", "XPTUSD", "XPDUSD", "XAUEUR", "XAGEUR"}
+
+# Probe natijasi: {symbol: (vaqt, bor_yoki_yo'q)}. Ro'yxatda yo'q metall
+# haqiqatan narx berishini BIR MARTA tekshiramiz va javobni 1 soat saqlaymiz.
+# Bu muhim: shunchaki "ro'yxatga qo'shib qo'yish" signalni qabul qilib,
+# keyin narx kelmasdan uni PENDING'da qotirib qo'yardi.
+_probe_cache: dict[str, tuple[float, bool]] = {}
+_PROBE_TTL = 3600.0
+
+
+async def _probe(symbol: str) -> bool:
+    hit = _probe_cache.get(symbol)
+    if hit and (time.time() - hit[0]) < _PROBE_TTL:
+        return hit[1]
+    try:
+        ok = await price(_api_symbol(symbol), fresh=True) is not None
+    except Exception:
+        log.warning("Metall tekshiruvi bajarilmadi: %s", symbol, exc_info=True)
+        ok = False
+    _probe_cache[symbol] = (time.time(), ok)
+    return ok
+
+
 async def resolve(raw: str) -> str | None:
     if not enabled():
         return None
     s = normalize(raw)
-    return s if s in await valid_symbols() else None
+    if s in await valid_symbols():
+        return s
+    if s in _METALS:
+        return s if await _probe(s) else None
+    return None
 
 
 def _api_symbol(symbol: str) -> str:
