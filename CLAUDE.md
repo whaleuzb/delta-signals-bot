@@ -1081,3 +1081,18 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
         chizib qo'ygan bo'lishi mumkin.
     - Diagnostika: `mini_chart` endi ikkala "grafik chizilmadi" yo'lida ham
       sababni log'ga yozadi (sham kelmadi / oraliqqa tushmadi).
+
+48. **Mini App tepasida Telegram sarlavhasi uchun joy (`--tgtop`).**
+    Telegram kengaytirilgan oynada "Yopish", cheveron va menyu tugmalarini
+    sahifa USTIDAN chizadi — "TRADE CONTROLLER" yozuvi va sarlavha ular
+    tagida qolib ketardi.
+    - `header{padding-top:calc(34px + var(--tgtop,0px))}`. Standart qiymat —
+      `env(safe-area-inset-top,0px)`, ya'ni oddiy brauzerda 0.
+    - Skript `safeAreaInset.top` (holat qatori) + `contentSafeAreaInset.top`
+      (Telegram sarlavhasi) yig'indisini qo'yadi va uni
+      `safeAreaChanged` / `contentSafeAreaChanged` / `viewportChanged`
+      hodisalarida qayta hisoblaydi.
+    - Mijoz insetlarni bermasa (eski API), lekin mobil va oyna kengaytirilgan
+      bo'lsa — 56px zaxira. Desktop va oddiy brauzerda hech narsa qo'shilmaydi.
+    - O'lchandi (390px, Chromium): oddiy brauzer 34px, tdesktop 34px,
+      insetli iOS (59+46) 139px, insetsiz iOS 90px.

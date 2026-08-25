@@ -71,12 +71,15 @@ def fmt_price(x) -> str:
 CSS = """
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0b0e14;--card:#141a22;--line:#232b36;--mut:#8592a3;--ink:#eef2f7;
-      --acc:#4da3ff;--long:#2ecc8f;--short:#ff5c5c;--silver:#8a8f99}
+      --acc:#4da3ff;--long:#2ecc8f;--short:#ff5c5c;--silver:#8a8f99;
+      /* Tepadagi band joy. Oddiy brauzerda 0; Telegram'da skript aniq
+         qiymatni qo'yadi (pastdagi TG_SCRIPT'ga qarang). */
+      --tgtop:env(safe-area-inset-top,0px)}
 body{background:var(--bg);color:var(--ink);
      font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
      line-height:1.5;padding:0 20px 64px}
 .wrap{max-width:980px;margin:0 auto}
-header{padding:34px 0 26px;border-bottom:1px solid var(--line);margin-bottom:32px}
+header{padding:calc(34px + var(--tgtop,0px)) 0 26px;border-bottom:1px solid var(--line);margin-bottom:32px}
 .brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;font-weight:600;
        letter-spacing:.26em;color:var(--silver);text-transform:uppercase}
 h1{font-size:clamp(26px,5vw,40px);font-weight:700;letter-spacing:-.02em;margin-top:8px}
@@ -214,6 +217,34 @@ TG_SCRIPT = """
     tg.setHeaderColor && tg.setHeaderColor('#0b0e14');
     tg.setBackgroundColor && tg.setBackgroundColor('#0b0e14');
   } catch (e) {}
+
+  // TEPADAGI BAND JOY.
+  // Telegram sarlavhasi (Yopish / cheveron / menyu) sahifa USTIDAN chiziladi,
+  // shuning uchun sarlavha va "TRADE CONTROLLER" yozuvi tugmalar tagida
+  // qolib ketardi. safeAreaInset = holat qatori (soat, batareya),
+  // contentSafeAreaInset = Telegram sarlavhasi balandligi. Ikkalasi
+  // qo'shilib, header'ning tepa bo'shlig'iga qo'shiladi.
+  function inset(o) { return (o && typeof o.top === 'number') ? o.top : 0; }
+  function applyTop() {
+    var t = 0;
+    try { t += inset(tg.safeAreaInset); } catch (e) {}
+    try { t += inset(tg.contentSafeAreaInset); } catch (e) {}
+    // Mijoz insetlarni bermasa ham, mobil telefonda kengaytirilgan oynada
+    // suzuvchi sarlavha baribir bor — unga kamida shuncha joy kerak.
+    if (!t) {
+      var m = tg.platform === 'ios' || tg.platform === 'android';
+      if (m && tg.isExpanded) t = 56;
+    }
+    // 0 bo'lsa CSS'dagi env(safe-area-inset-top) o'z holicha qolsin.
+    if (t > 0) {
+      document.documentElement.style.setProperty('--tgtop', t + 'px');
+    }
+  }
+  applyTop();
+  // Insetlar oyna o'zgarganda (kengaytirish, aylantirish) yangilanadi.
+  ['safeAreaChanged', 'contentSafeAreaChanged', 'viewportChanged'].forEach(function (ev) {
+    try { tg.onEvent && tg.onEvent(ev, applyTop); } catch (e) {}
+  });
 })();
 </script>"""
 
