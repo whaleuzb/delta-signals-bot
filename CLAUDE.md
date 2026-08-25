@@ -1140,12 +1140,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - O'lchandi (Chromium, haqiqiy sahifa): 390px va 360px — 10/10 grafik
       chizildi, hamma karta 68px, kesilgan matn 0, gorizontal siljish yo'q.
 
-52. **Kirish narxi shamlarga mos kelmasa — kichik grafik chizilmaydi.**
-    Eski sinov signallarida narxlar o'ylab yozilgan ("kirish 100, chiqish 91"),
-    shamlar esa haqiqiy bozordan keladi. Natijada miqyos kirish chizig'iga
-    tortilib, haqiqiy narx tep-tekis chiziqqa aylanardi — savdo +60% deb
-    turgani holda grafik hech narsa ko'rsatmasdi.
-    Haqiqiy savdoda kirish HAR DOIM oyna ichida bo'ladi (savdo o'sha narxdan
-    ochilgan), shuning uchun `entry < min*0.9` yoki `entry > max*1.1` bo'lsa
-    grafik chizilmaydi va sabab log'ga yoziladi. Karta grafiksiz qoladi —
-    bo'sh joy noto'g'ri grafikdan yaxshiroq.
+52. **Kirish narxi shamlarga mos kelmasa — chiziq chizilmaydi, grafik qoladi.**
+    Eski sinov signallarida narxlar qo'lda o'ylab yozilgan ("kirish 100,
+    chiqish 91"), shamlar esa haqiqiy bozordan keladi. Miqyos kirish
+    chizig'iga tortilib, haqiqiy narx harakati tep-tekis chiziqqa aylanardi —
+    savdo +60% deb turgani holda grafik hech narsa ko'rsatmasdi.
+    - `show_entry = c_lo*0.9 <= entry <= c_hi*1.1`. Shart bajarilmasa kirish
+      punktiri CHIZILMAYDI va — muhimi — `set_ylim` ham uni HISOBGA OLMAYDI.
+      Faqat chiziqni yashirish yetarli emas edi: miqyos baribir buzilgan
+      bo'lardi.
+    - Grafikning o'zi baribir chiziladi: u o'sha davrdagi haqiqiy narx
+      harakatini ko'rsatadi. Eski statistika ham grafikli bo'lib qoladi.
+    - Haqiqiy savdoda kirish HAR DOIM oyna ichida (savdo o'sha narxdan
+      ochilgan), shuning uchun bu shart yangi signallarga umuman tegmaydi.

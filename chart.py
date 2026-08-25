@@ -254,18 +254,13 @@ async def mini_chart(sig) -> io.BytesIO | None:
     closes = [c.close for c in candles]
     xs = list(range(len(closes)))
 
-    # Kirish narxi shamlar diapazonidan chetda bo'lsa — bu savdo emas, mos
-    # kelmaydigan ma'lumot (masalan sinov signali: BTC uchun "kirish 100").
-    # Bunday grafik miqyosni buzadi: haqiqiy narx chizig'i tep-tekis chiziqqa
-    # aylanib, kirish punktiri kadrning bir chetiga yopishib qoladi.
-    # Haqiqiy savdoda kirish HAR DOIM oyna ichida bo'ladi — savdo o'sha
-    # narxdan ochilgan. Shuning uchun grafik chizilmaydi, karta grafiksiz
-    # qoladi: bo'sh joy noto'g'ri grafikdan yaxshiroq.
-    lo, hi = min(closes), max(closes)
-    if entry < lo * 0.9 or entry > hi * 1.1:
-        log.info("Kichik grafik: #%s %s — kirish %.8g shamlar oralig'idan "
-                 "(%.8g..%.8g) tashqarida", sig["id"], sig["symbol"], entry, lo, hi)
-        return None
+    # Kirish chizig'i FAQAT shamlar diapazoniga tushsa chiziladi. Eski sinov
+    # signallarida narxlar qo'lda o'ylab yozilgan ("kirish 100"), shamlar esa
+    # haqiqiy bozordan keladi — bunday kirish miqyosni o'ziga tortib, haqiqiy
+    # narx harakatini tep-tekis chiziqqa aylantirardi. Grafikning o'zi
+    # baribir chiziladi: u o'sha davrdagi haqiqiy narxni ko'rsatadi.
+    c_lo, c_hi = min(closes), max(closes)
+    show_entry = c_lo * 0.9 <= entry <= c_hi * 1.1
 
     fig, ax = plt.subplots(figsize=(3.2, 1.1), dpi=100)
     fig.patch.set_facecolor(BG)
@@ -273,7 +268,8 @@ async def mini_chart(sig) -> io.BytesIO | None:
 
     ax.plot(xs, closes, color=col, lw=1.6, zorder=3)
     ax.fill_between(xs, closes, min(closes), color=col, alpha=0.13, zorder=2)
-    ax.axhline(entry, color=ACC, lw=1.0, ls="--", alpha=0.75, zorder=1)
+    if show_entry:
+        ax.axhline(entry, color=ACC, lw=1.0, ls="--", alpha=0.75, zorder=1)
 
     exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
     if exit_price is not None:
@@ -283,7 +279,10 @@ async def mini_chart(sig) -> io.BytesIO | None:
         ax.scatter([idx], [closes[idx]], color=col, s=26, zorder=4,
                    edgecolor=BG, linewidth=1.2)
 
-    lo, hi = min(min(closes), entry), max(max(closes), entry)
+    # Miqyos: kirish chizig'i ko'rsatilsagina u ham hisobga olinadi. Aks
+    # holda (mos kelmaydigan eski narx) u butun kadrni o'ziga tortib,
+    # haqiqiy narx harakati tekis chiziqqa aylanib qolardi.
+    lo, hi = (min(c_lo, entry), max(c_hi, entry)) if show_entry else (c_lo, c_hi)
     pad = (hi - lo) * 0.12 or hi * 0.005
     ax.set_ylim(lo - pad, hi + pad)
     ax.set_xlim(-0.5, len(closes) - 0.5)
