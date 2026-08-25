@@ -74,17 +74,24 @@ _TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
 
 
 async def klines(symbol: str, start_ms: int, limit: int = 500,
-                  tf: str = "1m") -> list[Candle]:
+                  tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
     """Shamlar. Standart 1m — KUZATUV (tracker.py) aynan shuni ishlatadi.
-    tf faqat grafik ko'rsatish uchun (exchange.klines bilan bir xil shart)."""
+    tf faqat grafik ko'rsatish uchun (exchange.klines bilan bir xil shart).
+
+    end_ms — oynaning oxiri (grafik uchun). exchange.klines bilan bir xil
+    imzo bo'lishi shart: chart._fetch ikkalasini ham bir xil chaqiradi."""
     interval = _INTERVALS.get(tf, "1min")
     dur = _TF_MS.get(tf, 60_000)
     start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
-    r = await _client.get("/time_series", params={
+    params = {
         "symbol": _api_symbol(symbol), "interval": interval, "outputsize": limit,
         "start_date": start.strftime("%Y-%m-%d %H:%M:%S"), "order": "ASC",
         "timezone": "UTC", "apikey": config.TWELVE_DATA_API_KEY,
-    })
+    }
+    if end_ms is not None:
+        end = datetime.fromtimestamp(end_ms / 1000, timezone.utc)
+        params["end_date"] = end.strftime("%Y-%m-%d %H:%M:%S")
+    r = await _client.get("/time_series", params=params)
     if r.status_code == 429:
         log.warning("Twelve Data rate limit — kutamiz")
         return []

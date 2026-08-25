@@ -79,17 +79,24 @@ _TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
 
 
 async def klines(symbol: str, start_ms: int, limit: int = 500,
-                  tf: str = "1m") -> list[Candle]:
+                  tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
     """Shamlar. Standart 1m — KUZATUV (tracker.py) aynan shuni ishlatadi va
     o'zgartirilmasligi kerak: 1m'dan yirikroq shamda TP/SL teginishi sham
-    ichida yashirinib qolishi mumkin. tf faqat KO'RSATISH (grafik) uchun."""
+    ichida yashirinib qolishi mumkin. tf faqat KO'RSATISH (grafik) uchun.
+
+    end_ms — oynaning oxiri. MUHIM: MEXC faqat `startTime` berilganda
+    oraliqning BOSHIDAN emas, OXIRIDAN `limit` ta sham qaytaradi (Binance'dan
+    farqi shu). Ya'ni o'tmishdagi savdo uchun so'ralgan oyna o'rniga eng
+    so'nggi shamlar kelib qolardi va grafik chizilmasdi. `endTime` berilsa
+    oyna aniq cheklanadi. Kuzatuv buni sezmaydi — u doim "hozirgacha"
+    o'qiydi, shuning uchun end_ms'siz ham to'g'ri ishlaydi."""
     interval = _INTERVALS.get(tf, "1m")
     dur = _TF_MS.get(tf, 60_000)
-    r = await _client.get(
-        "/api/v3/klines",
-        params={"symbol": symbol, "interval": interval, "startTime": start_ms,
-                "limit": limit},
-    )
+    params = {"symbol": symbol, "interval": interval, "startTime": start_ms,
+              "limit": limit}
+    if end_ms is not None:
+        params["endTime"] = end_ms
+    r = await _client.get("/api/v3/klines", params=params)
     if r.status_code == 429:
         log.warning("MEXC rate limit — kutamiz")
         return []

@@ -1112,3 +1112,30 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - Guruh sahifasidan "Juftliklar kesimi" jadvali olib tashlandi (`top_symbols`
       endi faqat botda ishlatiladi). Oxirgi savdolar kartalari o'sha
       ma'lumotni ko'rgazmaliroq beradi.
+
+50. **MEXC `startTime` ni yolg'iz qabul qilmaydi — `endTime` ham kerak.**
+    `align()` dan keyin shamlar kela boshladi, lekin grafiklar baribir
+    chizilmadi. Diagnostika log'i sababni ko'rsatdi:
+    `"34 shamdan 0 tasi oraliqqa tushdi"` — MEXC so'ralgan oynaning BOSHIDAN
+    emas, OXIRIDAN `limit` ta sham qaytaradi (Binance'dan farqi shu). Ya'ni
+    o'tmishdagi savdo uchun eng SO'NGGI shamlar kelib, hammasi filtrdan
+    o'tmay tushib qolardi.
+    - `exchange.klines` va `forex.klines` ga `end_ms` qo'shildi
+      (`endTime` / `end_date`), `chart._fetch` uni uzatadi,
+      `mini_chart` va `signal_chart` oyna oxirini fetch'dan OLDIN hisoblaydi.
+    - **Kuzatuv (tracker) buni sezmaydi** — u doim "hozirgacha" o'qiydi,
+      shuning uchun `end_ms` siz ham to'g'ri ishlaydi. Shu sabab bu xato
+      faqat grafiklarda ko'rindi.
+    - Tekshirildi (MEXC xatti-harakatini taqlid qiluvchi soxta birja +
+      haqiqiy Postgres): `endTime` yo'q → uchala `mini.png` 404;
+      `endTime` bor → uchalasi ham 200. Sahifada 10/10 grafik chizildi.
+
+51. **Telefonda savdo kartasi bir qator.**
+    Avval grafik pastga to'liq kenglikda tushardi va bitta savdo ekranning
+    uchdan birini egallardi. Endi: chapda juftlik, o'rtada 84×30 grafik,
+    o'ngda natija.
+    - `.tsym`/`.tsub` — `nowrap + ellipsis`: matn ko'chib, kartalar notekis
+      balandlikda bo'lib qolmasin.
+    - Kartadagi sana `dd.mm` (yilsiz) — tor ekranda joy yetsin uchun.
+    - O'lchandi (Chromium, haqiqiy sahifa): 390px va 360px — 10/10 grafik
+      chizildi, hamma karta 68px, kesilgan matn 0, gorizontal siljish yo'q.

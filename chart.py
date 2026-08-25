@@ -60,11 +60,17 @@ def align(start_ms: int, tf: str) -> int:
     return start_ms - (start_ms % step)
 
 
-async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str):
+async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str,
+                 end_ms: int | None = None):
     """Shamlarni olish. Xato bo'lsa None — grafik shunchaki chizilmaydi va
-    chaqiruvchi oddiy matn/rasm yo'liga qaytadi."""
+    chaqiruvchi oddiy matn/rasm yo'liga qaytadi.
+
+    end_ms O'TMISHDAGI oyna uchun SHART: MEXC faqat startTime berilganda
+    oraliqning oxiridan `limit` ta sham qaytaradi va so'ralgan oyna emas,
+    eng so'nggi shamlar kelib qoladi."""
     try:
-        return await tracker.provider(market).klines(symbol, start_ms, limit=limit, tf=tf)
+        return await tracker.provider(market).klines(symbol, start_ms, limit=limit,
+                                                     tf=tf, end_ms=end_ms)
     except Exception:
         log.warning("Grafik uchun shamlar olinmadi (%s %s %s)", market, symbol, tf,
                     exc_info=True)
@@ -226,14 +232,15 @@ async def mini_chart(sig) -> io.BytesIO | None:
     span_bars = max(1, int((closed_at - opened_at).total_seconds() * 1000 // tf_ms))
     pad_bars = max(3, (30 - span_bars) // 2)
     start_ms = align(int(opened_at.timestamp() * 1000) - pad_bars * tf_ms, tf)
+    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
     limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
 
-    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
+    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf,
+                           end_ms=end_ms)
     if not candles:
         log.info("Kichik grafik: #%s %s %s uchun sham kelmadi", sig["id"],
                  sig["symbol"], tf)
         return None
-    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
     n_raw = len(candles)
     candles = [c for c in candles if c.open_ms <= end_ms]
     if len(candles) < 3:
@@ -297,12 +304,13 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     pad_bars = max(PAD_BARS, (MIN_BARS - span_bars) // 2)
     limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
     start_ms = align(int(opened_at.timestamp() * 1000) - pad_bars * tf_ms, tf)
+    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
 
-    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
+    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf,
+                           end_ms=end_ms)
     if not candles:
         return None
 
-    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
     candles = [c for c in candles if c.open_ms <= end_ms]
     if len(candles) < 3:
         return None

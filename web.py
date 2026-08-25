@@ -176,11 +176,23 @@ tbody tr:hover{background:#ffffff06}
 .tpnl{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;
       white-space:nowrap;min-width:76px;text-align:right}
 @media (max-width:640px){
-  /* Tor ekranda grafik pastga to'liq kenglikda tushadi — siqilib
-     o'qilmaydigan bo'lib qolmasin. */
-  .trade{grid-template-columns:minmax(0,1fr) auto}
-  .tmini{grid-column:1 / -1;grid-row:2;width:100%;height:64px;margin-top:4px}
-  .tpnl{font-size:16px;min-width:0}
+  /* Telefonda karta BIR QATOR bo'lib qoladi: chapda juftlik, o'rtada
+     kichkina grafik, o'ngda natija. Avval grafik pastga to'liq kenglikda
+     tushardi va bitta savdo ekranning uchdan birini egallardi — 25 ta
+     savdoni ko'rish uchun juda uzoq aylantirish kerak edi. */
+  .trade{padding:12px;gap:9px}
+  /* Matn ko'chmasin: bir kartada ikki qator, boshqasida uch qator bo'lib
+     ro'yxat notekis ko'rinardi. Endi hamma karta bir xil balandlikda. */
+  .tsym,.tsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tsym{font-size:14px}
+  .tsub{font-size:11px;margin-top:3px}
+  .badge{padding:2px 6px;font-size:11px}
+  .tmini{width:84px;height:30px;border-radius:5px}
+  .tpnl{font-size:15px;min-width:0}
+}
+@media (max-width:360px){
+  /* Eng tor telefonlarda grafik matnni siqib qo'ymasin. */
+  .tmini{width:74px;height:27px}
 }
 
 .cta{margin-top:40px;background:linear-gradient(160deg,#161d27,#10151c);
@@ -418,7 +430,9 @@ async def group_page(request):
     for r in recent:
         p = float(r["pnl_pct"]) if r["pnl_pct"] is not None else 0.0
         side_cls = "b-long" if r["side"] == "LONG" else "b-short"
-        when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m.%y}" if r["closed_at"] else "—"
+        # Sana qisqa: telefonda "0.02038 → 0.02145 · 23.08" bir qatorga sig'sin.
+        # Yil ro'yxatda ortiqcha — savdolar yaqin sanalar bo'yicha tartiblangan.
+        when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
         exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
         trades += (
             "<div class='trade'>"
