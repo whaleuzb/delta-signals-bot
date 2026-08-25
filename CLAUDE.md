@@ -1257,3 +1257,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     buyrug'i qoldi (u manzilni `<code>` ichida yuboradi, nusxalashga qulay);
     `m:weblink` ishlov beruvchisi ham saqlandi — eski xabarlardagi tugmalar
     ishlayversin.
+
+61. **Guruh logotipi = Telegram guruh AVATARI.**
+    - Rasm **bazada bayt ko'rinishida** saqlanadi (`workspaces.logo BYTEA`,
+      `logo_at`). Nega `file_id` emas: veb servis ALOHIDA jarayon va unda
+      `BOT_TOKEN` yo'q — `file_id` bilan rasmni yuklab ololmaydi. Bayt bazada
+      tursa, veb uni to'g'ridan to'g'ri beradi va Telegram'ga umuman
+      murojaat qilmaydi.
+    - `bot.refresh_logo()` — `get_chat` → `photo.big_file_id` → `get_file` →
+      yuklab olish → markazidan kvadrat qirqish → 256×256 PNG. Guruhda avatar
+      bo'lmasa bazadagi eskisi tozalanadi.
+    - Chaqiriladi: `/setup` da darhol, so'ng `logo_job` (sutkada bir marta,
+      bir siklda 25 tagacha guruh — `db.logo_targets(24)`). Avatar
+      o'zgartirilsa sahifada ham bir kun ichida yangilanadi.
+    - Veb: `/g/<id>/logo.png` — darvoza `public_workspace()` bilan bir xil
+      (yopiq guruh rasmi id taxmin qilib olinmaydi), brauzerda 1 soat
+      keshlanadi. Ro'yxatda 32×32, guruh sahifasida 76×76 (telefonda 60×60).
+    - **Rasm bo'lmasa** — nomning birinchi harfi bilan avatar (`.glogo.ph`,
+      `.blogo.ph`), shunda kartalar bir xil ko'rinishda qoladi.
+    - `requirements.txt` ga `pillow` qo'shildi: avval u faqat matplotlib
+      orqali kelardi, endi kod uni to'g'ridan-to'g'ri ishlatadi.
+    - Tekshirildi: kvadrat avatar → 256×256 PNG; kvadrat bo'lmagan rasm →
+      qirqilib 256×256; avatarsiz guruh → baza tozalandi; Telegram xatosi →
+      yiqilmaydi. Sahifada 2 ta rasm + 1 ta harf-avatar, buzuq rasm yo'q.

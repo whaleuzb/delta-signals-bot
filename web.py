@@ -187,6 +187,27 @@ tbody tr:hover{background:#ffffff06}
 .gname{display:flex;align-items:center;gap:10px;min-width:0}
 .gcard .n{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:600;
           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Guruh logotipi — Telegram avatari. Rasm bo'lmasa nomning birinchi harfi
+   (.ph) chiziladi: shunda kartalar bir xil ko'rinishda qoladi. */
+.glogo{width:32px;height:32px;flex:none;border-radius:10px;object-fit:cover;
+       border:1px solid var(--line);background:var(--card2);display:block}
+.glogo.ph{display:flex;align-items:center;justify-content:center;
+          font-family:"Space Grotesk",Inter,sans-serif;font-size:15px;
+          font-weight:700;color:var(--silver-dim)}
+/* Guruh sahifasidagi KATTA logotip. */
+.htitle{display:flex;align-items:center;gap:16px;margin-top:10px}
+.htitle h1{margin-top:0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.blogo{width:76px;height:76px;flex:none;border-radius:20px;object-fit:cover;
+       border:1px solid var(--line);background:var(--card2);
+       box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.blogo.ph{display:flex;align-items:center;justify-content:center;
+          font-family:"Space Grotesk",Inter,sans-serif;font-size:32px;
+          font-weight:700;color:var(--silver-dim)}
+@media (max-width:640px){
+  .htitle{gap:12px}
+  .blogo{width:60px;height:60px;border-radius:16px}
+  .blogo.ph{font-size:26px}
+}
 /* O'rin raqami. Ro'yxat daromad bo'yicha tartiblangan — birinchi uchtasi
    ko'zga tashlansin, qolgani xotirjam kulrang. */
 .rank{display:inline-flex;align-items:center;justify-content:center;
@@ -455,10 +476,16 @@ async def index(request):
         # O'rin raqami: ro'yxat daromad bo'yicha tartiblangan, shuning uchun
         # o'rin ma'noli. Birinchi uchtasi alohida rangda.
         rank_cls = f"r{pos}" if pos <= 3 else ""
+        # Logotip — guruh avatari. Bo'lmasa nomning birinchi harfi.
+        logo = (f"<img class='glogo' src='/g/{r['id']}/logo.png' alt='' "
+                f"loading='lazy' onerror=\"this.remove()\">"
+                if r["has_logo"] else
+                f"<span class='glogo ph'>{e(r['name'][:1].upper())}</span>")
         cards.append(
             f"<a class='gcard {_cls(net)}-edge' href='/g/{r['id']}'>"
             f"<div class='gtop'>"
             f"<div class='gname'><span class='rank {rank_cls}'>{pos}</span>"
+            f"{logo}"
             f"<span class='n'>{e(r['name'])}</span></div>"
             f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
             f"<div class='gstats'>"
@@ -595,8 +622,16 @@ async def group_page(request):
         invite = (f"<a class='btn join' href='{e(ws['invite_link'])}' "
                   "rel='nofollow noopener'>Guruhga qo'shilish →</a>")
 
+    # Katta logotip sarlavha yonida. Bo'lmasa — nomning birinchi harfi;
+    # shunda sarlavha qatori har doim bir xil balandlikda turadi.
+    big_logo = (f"<img class='blogo' src='/g/{ws_id}/logo.png' alt='' "
+                f"onerror=\"this.remove()\">"
+                if ws["logo"] else
+                f"<span class='blogo ph'>{e(ws['name'][:1].upper())}</span>")
+
     body = (
-        f"<header><div class='brand'>Trade Controller</div><h1>{e(ws['name'])}</h1>"
+        f"<header><div class='brand'>Trade Controller</div>"
+        f"<div class='htitle'>{big_logo}<h1>{e(ws['name'])}</h1></div>"
         f"<div class='sub'><a class='ghost back' href='/'>← Barcha guruhlar</a></div>"
         f"{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
@@ -633,6 +668,17 @@ async def equity_png(request):
         buf = _put(key, img.getvalue())
     return web.Response(body=buf, content_type="image/png",
                         headers={"Cache-Control": "public, max-age=120"})
+
+
+async def logo_png(request):
+    """Guruh logotipi (Telegram avatari). Bazadan o'qiladi — veb servisda
+    BOT_TOKEN yo'q, Telegram'ga umuman murojaat qilinmaydi."""
+    ws_id = int(request.match_info["wid"])
+    data = await db.public_logo(ws_id)
+    if not data:
+        raise web.HTTPNotFound()
+    return web.Response(body=bytes(data), content_type="image/png",
+                        headers={"Cache-Control": "public, max-age=3600"})
 
 
 async def mini_png(request):
@@ -690,6 +736,7 @@ def build_app() -> web.Application:
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", group_page),
         web.get(r"/g/{wid:\d+}/equity.png", equity_png),
+        web.get(r"/g/{wid:\d+}/logo.png", logo_png),
         web.get(r"/s/{sid:\d+}/mini.png", mini_png),
     ])
     app.on_startup.append(on_start)

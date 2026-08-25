@@ -194,6 +194,13 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS chart_tf TEXT;
 -- (job har 15 daqiqada aylanadi, restart ham bo'lishi mumkin).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_hour INT;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_last DATE;
+
+-- Guruh logotipi (Telegram guruh rasmi) BAZADA saqlanadi, file_id emas.
+-- Sabab: veb servis alohida jarayon va unda BOT_TOKEN yo'q — file_id bilan
+-- rasmni yuklab ololmaydi. Bayt ko'rinishida saqlansa, veb uni to'g'ridan
+-- to'g'ri beradi. Rasm 256x256 PNG — bir necha o'n kilobayt.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo BYTEA;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo_at TIMESTAMPTZ;
 """
 
 
@@ -615,6 +622,7 @@ async def public_workspaces() -> list[asyncpg.Record]:
     Python tomonida qilinadi va ikki sahifada ikki xil son chiqmaydi."""
     q = f"""
     SELECT w.id, w.name, w.invite_link, w.deposit,
+           (w.logo IS NOT NULL)                              AS has_logo,
            COUNT(s.id)                                       AS total,
            COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)          AS wins,
            COALESCE(SUM(s.pnl_pct), 0)                       AS sum_pct,
@@ -630,11 +638,39 @@ async def public_workspaces() -> list[asyncpg.Record]:
          AND s.status IN {CLOSED} AND NOT s.excluded
     WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived
-    GROUP BY w.id, w.name, w.invite_link, w.deposit
+    GROUP BY w.id, w.name, w.invite_link, w.deposit, w.logo
     ORDER BY last_closed DESC NULLS LAST
     """
     async with pool().acquire() as c:
         return await c.fetch(q)
+
+
+async def set_workspace_logo(workspace_id: int, data: bytes | None) -> None:
+    """Guruh logotipini saqlaydi (None — o'chiradi)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET logo=$2, logo_at=now() WHERE id=$1",
+            workspace_id, data)
+
+
+async def public_logo(workspace_id: int) -> bytes | None:
+    """Ochiq sahifa uchun logotip. Darvoza `public_workspace()` bilan bir xil —
+    yopiq guruhning rasmi id taxmin qilib olinmasin."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "SELECT logo FROM workspaces WHERE id=$1 AND type='group' "
+            "AND public = TRUE AND public_approved = TRUE AND NOT archived",
+            workspace_id)
+
+
+async def logo_targets(max_age_hours: int = 24) -> list[asyncpg.Record]:
+    """Logotipi yo'q yoki eskirgan guruhlar — yangilash sikli uchun."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, group_chat_id FROM workspaces "
+            "WHERE type='group' AND group_chat_id IS NOT NULL AND NOT archived "
+            "AND (logo_at IS NULL OR logo_at < now() - ($1 || ' hours')::interval) "
+            "ORDER BY logo_at NULLS FIRST LIMIT 25", str(max_age_hours))
 
 
 async def public_signal(sig_id: int) -> asyncpg.Record | None:

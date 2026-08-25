@@ -14,6 +14,8 @@ import secrets
 import time
 from datetime import datetime, timezone
 
+from PIL import Image
+
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
 )
@@ -1296,6 +1298,55 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Guruhni ro'yxatdan o'tkazish ───────────────────────────
 
+async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
+    """Guruh AVATARINI olib, bazaga 256x256 PNG qilib yozadi.
+
+    Nega file_id emas, BAYT? Veb servis alohida jarayon va unda BOT_TOKEN
+    yo'q — file_id bilan rasmni yuklab ololmaydi. Bayt bazada tursa, veb uni
+    to'g'ridan to'g'ri beradi va Telegram'ga umuman murojaat qilmaydi.
+
+    Rasm yo'q bo'lsa (guruhda avatar qo'yilmagan) — bazadagi eskisi tozalanadi
+    va veb harf-avatarga qaytadi."""
+    try:
+        chat = await bot.get_chat(chat_id)
+    except Exception:
+        log.warning("Logotip: #%s guruh ma'lumoti olinmadi", ws_id, exc_info=True)
+        return False
+
+    photo = getattr(chat, "photo", None)
+    if not photo:
+        await db.set_workspace_logo(ws_id, None)
+        return False
+    try:
+        f = await bot.get_file(photo.big_file_id)
+        raw = bytes(await f.download_as_bytearray())
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        # Kvadratga qirqib, keyin kichraytiramiz: Telegram avatari kvadrat
+        # bo'lsa ham, kelajakda boshqacha bo'lib qolsa sahifa buzilmasin.
+        side = min(img.size)
+        left, top = (img.width - side) // 2, (img.height - side) // 2
+        img = img.crop((left, top, left + side, top + side)).resize((256, 256))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG", optimize=True)
+        await db.set_workspace_logo(ws_id, buf.getvalue())
+        return True
+    except Exception:
+        log.warning("Logotip: #%s rasmi yuklanmadi", ws_id, exc_info=True)
+        return False
+
+
+async def logo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Logotiplarni sutkada bir marta yangilaydi — guruh avatarini o'zgartirsa
+    sahifada ham o'zgarsin. Bir siklda ko'pi bilan 25 ta guruh."""
+    try:
+        rows = await db.logo_targets(24)
+    except Exception:
+        log.exception("Logotip siklida xato (bazadan o'qishda)")
+        return
+    for r in rows:
+        await refresh_logo(ctx.bot, r["id"], r["group_chat_id"])
+
+
 async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
     if chat.type not in ("group", "supergroup"):
@@ -1334,6 +1385,8 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         f"✅ \"{name}\" workspace sifatida ro'yxatdan o'tdi!\n"
         "Endi botga shaxsiy xabar yozib (/start) signal kirita olasiz."
     )
+    # Guruh avatari darhol olinadi — ochiq sahifada logotip bo'lib turadi.
+    await refresh_logo(ctx.bot, wid, chat.id)
 
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
@@ -3548,6 +3601,8 @@ def main() -> None:
     # Kunlik hisobot: soatni o'tkazib yubormaslik uchun 15 daqiqada bir
     # aylanadi, lekin har guruhga kuniga faqat BIR marta yuboriladi.
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
+    # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
+    app.job_queue.run_repeating(logo_job, interval=86400, first=90)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)
