@@ -2067,15 +2067,36 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
 
-    if entry_mode == "market" and ws["type"] == "group" and ws["group_chat_id"]:
+    elif ws["type"] == "personal":
+        # Shaxsiy jurnalda signal kartasi AVVAL umuman yuborilmasdi — faqat
+        # "qabul qilindi" tasdig'i chiqardi. Natijada keyingi xabarlar (TP,
+        # stop, ±5%) javob beradigan asosiy xabar ham bo'lmasdi. Endi karta
+        # egasining shaxsiy chatiga yuboriladi va uning id'si saqlanadi —
+        # guruhdagi bilan bir xil tartib.
+        body = draft_text(d, sig_id)
+        try:
+            if post_file_id:
+                sent = await ctx.bot.send_photo(ws["owner_id"], post_file_id,
+                                                 caption=body, parse_mode=ParseMode.HTML)
+            else:
+                sent = await ctx.bot.send_message(ws["owner_id"], body,
+                                                   parse_mode=ParseMode.HTML)
+            group_msg_id = sent.message_id
+            await db.set_group_msg(sig_id, group_msg_id)
+        except Exception:
+            log.exception("Shaxsiy jurnalga yuborib bo'lmadi")
+
+    if entry_mode == "market":
+        chat_id = (ws["group_chat_id"] if ws["type"] == "group" else ws["owner_id"])
         try:
             await ctx.bot.send_message(
-                ws["group_chat_id"],
+                chat_id,
                 f"▶️ <b>#{sig_id} {d['symbol']}</b> — pozitsiya ochildi @ <b>{fmt_price(d['entry'])}</b>",
                 parse_mode=ParseMode.HTML, reply_to_message_id=group_msg_id,
-                allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+                allow_sending_without_reply=True,
+                message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
         except Exception:
-            log.exception("Guruhga yuborilmadi (oddiy rejim ochilish xabari)")
+            log.exception("Ochilish xabari yuborilmadi")
 
     if ws["deposit"] is not None:
         AWAITING_ALLOC[q.from_user.id] = sig_id
@@ -2257,12 +2278,19 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception:
                 log.exception("Xabar yuborilmadi")
         elif ws["type"] == "personal":
+            # Guruhdagi kabi — natija signal kartasiga javob bo'lib keladi,
+            # shunda qaysi signal haqida ekani darrov ko'rinadi.
+            reply_to = sig["group_msg_id"] if sig else None
             try:
                 if photo:
                     await ctx.bot.send_photo(ws["owner_id"], InputFile(photo, "signal.png"),
-                                              caption=txt, parse_mode=ParseMode.HTML)
+                                              caption=txt, parse_mode=ParseMode.HTML,
+                                              reply_to_message_id=reply_to,
+                                              allow_sending_without_reply=True)
                 else:
-                    await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
+                    await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML,
+                                                reply_to_message_id=reply_to,
+                                                allow_sending_without_reply=True)
             except Exception:
                 log.exception("Shaxsiy xabar yuborilmadi")
 
@@ -2503,7 +2531,9 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 log.exception("Milestone xabari yuborilmadi")
         elif ws["type"] == "personal":
             try:
-                await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML)
+                await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML,
+                                            reply_to_message_id=s["group_msg_id"],
+                                            allow_sending_without_reply=True)
             except Exception:
                 log.exception("Milestone shaxsiy xabar yuborilmadi")
 

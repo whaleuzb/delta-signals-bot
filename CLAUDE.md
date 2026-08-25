@@ -1376,3 +1376,21 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       darajalari qayta taqsimlandi va ishonch pasaydi; "grafik emas" javobida
       qayta so'ralmadi (1 so'rov); buzuq geometriyada qayta so'raldi (2 so'rov)
       va ogohlantirish promptga tushdi.
+
+66. **Shaxsiy jurnalda signal KARTASI yuborilmasdi.**
+    Guruhda signal tasdiqlangach karta (rasm + darajalar) guruhga post
+    qilinardi; shaxsiy jurnalda esa faqat "✅ qabul qilindi" tasdig'i chiqib,
+    signalning o'zi hech qayerda ko'rinmasdi. Natijada keyingi xabarlar
+    (TP, stop, ±5%) javob beradigan asosiy xabar ham yo'q edi.
+    - Endi karta egasining shaxsiy chatiga yuboriladi va uning `message_id`
+      `signals.group_msg_id` ga saqlanadi (ustun nomi guruhdan qolgan, lekin
+      bu shunchaki xabar id'si — javob o'sha chatda bo'ladi).
+    - "Oddiy rejim" ochilish xabari ham shaxsiyda ishlaydi (avval faqat
+      guruhga ketardi).
+    - Natija va ±5% xabarlari endi shaxsiyda ham signal kartasiga JAVOB
+      bo'lib keladi — guruhdagi bilan bir xil tartib.
+    - Tekshirildi (haqiqiy Postgres + soxta Telegram): karta ketdi
+      (`karta_xabar_id=1002`), ochilish xabari unga javob bo'ldi, TP
+      yopilishi va +5% bosqichi ham javob bo'lib keldi.
+    - **Kunlik hisobot (`/hisobot`) hali FAQAT guruh uchun** —
+      `db.digest_workspaces()` da `type='group'` sharti bor.
