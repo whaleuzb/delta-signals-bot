@@ -254,6 +254,19 @@ async def mini_chart(sig) -> io.BytesIO | None:
     closes = [c.close for c in candles]
     xs = list(range(len(closes)))
 
+    # Kirish narxi shamlar diapazonidan chetda bo'lsa — bu savdo emas, mos
+    # kelmaydigan ma'lumot (masalan sinov signali: BTC uchun "kirish 100").
+    # Bunday grafik miqyosni buzadi: haqiqiy narx chizig'i tep-tekis chiziqqa
+    # aylanib, kirish punktiri kadrning bir chetiga yopishib qoladi.
+    # Haqiqiy savdoda kirish HAR DOIM oyna ichida bo'ladi — savdo o'sha
+    # narxdan ochilgan. Shuning uchun grafik chizilmaydi, karta grafiksiz
+    # qoladi: bo'sh joy noto'g'ri grafikdan yaxshiroq.
+    lo, hi = min(closes), max(closes)
+    if entry < lo * 0.9 or entry > hi * 1.1:
+        log.info("Kichik grafik: #%s %s — kirish %.8g shamlar oralig'idan "
+                 "(%.8g..%.8g) tashqarida", sig["id"], sig["symbol"], entry, lo, hi)
+        return None
+
     fig, ax = plt.subplots(figsize=(3.2, 1.1), dpi=100)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
