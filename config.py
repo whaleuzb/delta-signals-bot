@@ -19,7 +19,10 @@ ADMIN_IDS = _ids(os.getenv("ADMIN_IDS", "1101182189"))
 
 # --- Claude vision (caption yozilmagan rasmlarni o'qish uchun). Bo'sh bo'lsa o'chadi ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-VISION_MODEL = os.getenv("VISION_MODEL", "claude-sonnet-5")
+# Grafik o'qish uchun eng kuchli model ishlatiladi: bu yerda xato qilish
+# narxi baland (noto'g'ri daraja = noto'g'ri signal), rasm esa kuniga
+# bir necha marta o'qiladi — farq pul jihatidan sezilmaydi.
+VISION_MODEL = os.getenv("VISION_MODEL", "claude-opus-5")
 
 # --- Narx manbasi: MEXC Spot (Binance Futures AQSH IP'larini 451 bilan bloklagani uchun
 #     almashtirildi; MEXC'da kichik altcoinlar ham ko'proq bor) ---

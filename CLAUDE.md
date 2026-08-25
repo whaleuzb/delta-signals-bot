@@ -1341,3 +1341,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       yuboriladigan signal mos kelmasligi mumkin edi.
     - Tekshirildi: rasmli xabar → caption tahrirlandi; matnli → matn;
       Telegram rad etsa → yangi xabar yozildi.
+
+65. **Rasmdan o'qish (vision) sifatini oshirish.**
+    "Ko'p rasmlarni o'qiy olmayabti" muammosi bo'yicha beshta o'zgarish:
+    - **Model**: `claude-sonnet-5` → **`claude-opus-5`**. Bu yerda xato narxi
+      baland (noto'g'ri daraja = noto'g'ri signal), rasm esa kuniga bir necha
+      marta o'qiladi — pul jihatidan farq sezilmaydi.
+    - **Javob shakli**: majburiy asbob chaqirish (`tool_choice`) o'rniga
+      **structured outputs** (`output_config.format` + JSON sxema). Sabab:
+      majburiy asbob tanlash fikrlash bilan yaxshi birlashmaydi, fikrlash esa
+      aynan grafik o'qishda (narx o'qini solishtirish, darajalarni taqqoslash)
+      eng ko'p yordam beradi. Buning uchun `anthropic` 0.40 → **1.0.0**
+      (Railway Python 3.13 — 1.x talabi ≥3.10, mos).
+    - **Prompt qayta yozildi**: qayerga qarash (pozitsiya asbobi, matnli
+      yorliqlar, gorizontal chiziqlar), ming ajratgichi tuzog'i
+      ("65 000" va "65.000"), va **javob berishdan oldin mantiqiy tekshiruv**
+      (LONG'da stop past, TP yuqori; SHORT'da teskari).
+    - **Rasm ostidagi yozuv MASLAHAT sifatida beriladi**: to'liq signal
+      sifatida o'qib bo'lmasa ham, unda ko'pincha juftlik nomi yoki tomon
+      bo'ladi. Zid bo'lsa rasmga ishonish aytilgan.
+    - **Javobdan keyingi tozalash (`_clean`)**: model darajani to'g'ri o'qib,
+      stop bilan TP ni ALMASHTIRIB qo'yishi mumkin (ayniqsa SHORT'da). Endi
+      darajalar kirish narxiga nisbatan joylashuvi bo'yicha qayta taqsimlanadi
+      (geometriya yolg'on gapirmaydi) va ishonch 0.6 gacha pasaytiriladi.
+      Geometriya baribir buzuq bo'lsa — modelga aynan shu xato aytilib **bir
+      marta qayta so'raladi**.
+    - Yonida: rasm turi baytlardan aniqlanadi (avval doim "image/jpeg" deb
+      yuborilardi — fayl sifatida yuborilgan PNG'da API xato berardi), va
+      grafikdagi "BINANCE:BTCUSDT.P" kabi nom nomzodlarga bo'linadi
+      (`_vision_symbols`) — aks holda birja prefiksi bilan birga qidirilib
+      topilmasdi.
+    - Tekshirildi (mahalliy soxta API): so'rovda `claude-opus-5`, json_schema,
+      to'g'ri media turi va caption maslahati bor; almashtirilgan SHORT
+      darajalari qayta taqsimlandi va ishonch pasaydi; "grafik emas" javobida
+      qayta so'ralmadi (1 so'rov); buzuq geometriyada qayta so'raldi (2 so'rov)
+      va ogohlantirish promptga tushdi.

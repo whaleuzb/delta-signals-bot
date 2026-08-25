@@ -1571,6 +1571,27 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 # ─────────────────────────── Signal kiritish — tezkor usul ───────────────────────────
 
+def _vision_symbols(draft: dict) -> None:
+    """Grafikdan o'qilgan juftlik nomidan nomzodlar ro'yxatini yasaydi.
+
+    TradingView skrinshotida nom ko'pincha "BINANCE:BTCUSDT.P" yoki
+    "MEXC:BTCUSDT" ko'rinishida bo'ladi. Bunday satr birjaga to'g'ridan-to'g'ri
+    berilsa topilmaydi (birja prefiksi qo'shilib ketadi), shuning uchun undan
+    ajratilgan so'zlar ham nomzod sifatida qo'shiladi — resolve_symbol
+    ularni birma-bir sinab ko'radi."""
+    raw = (draft.get("symbol") or "").strip()
+    if not raw:
+        return
+    cands = [raw]
+    if ":" in raw:
+        cands.append(raw.rsplit(":", 1)[1])
+    for c in parsing.symbol_candidates(raw):
+        if c not in cands:
+            cands.append(c)
+    draft["symbol"] = cands[0]
+    draft["symbols"] = cands
+
+
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     uid = update.effective_user.id
@@ -1611,7 +1632,10 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await msg.reply_text("🔎 Grafikni o'qiyapman…")
         f = await ctx.bot.get_file(file_id)
         data = bytes(await f.download_as_bytearray())
-        draft = await vision.read_chart(data)
+        # Rasm ostidagi yozuv modelga MASLAHAT sifatida beriladi: ko'pincha
+        # juftlik nomi yoki tomon aynan shu yerda bo'ladi, garchi to'liq
+        # signal sifatida o'qib bo'lmagan bo'lsa ham.
+        draft = await vision.read_chart(data, hint=caption.strip())
         source = "vision"
         if draft is None:
             await msg.reply_text(
@@ -1620,6 +1644,7 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
             )
             return
+        _vision_symbols(draft)
 
     await show_preview(msg, ctx, draft, file_id, source, ws["id"])
 
