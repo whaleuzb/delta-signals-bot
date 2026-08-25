@@ -11,13 +11,18 @@ import config
 import db
 import exchange
 import forex
+import stocks
 
 log = logging.getLogger(__name__)
 
 
 def provider(market: str):
-    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
-    return forex if market == "forex" else exchange
+    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
+    if market == "forex":
+        return forex
+    if market == "stock":
+        return stocks
+    return exchange
 
 
 def allocation(n: int) -> list[float]:

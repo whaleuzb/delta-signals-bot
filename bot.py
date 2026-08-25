@@ -31,6 +31,7 @@ import config
 import db
 import exchange
 import forex
+import stocks
 import parsing
 import stats
 import tracker
@@ -404,8 +405,12 @@ async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def provider_for(market: str):
-    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
-    return forex if market == "forex" else exchange
+    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
+    if market == "forex":
+        return forex
+    if market == "stock":
+        return stocks
+    return exchange
 
 
 async def safe_last_price(market: str, symbol: str, fresh: bool = False):
@@ -433,7 +438,7 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
     reward = abs(tps[-1] - e) / e * 100
     rr = reward / risk if risk else 0
     arrow = "🟢 LONG" if d["side"] == "LONG" else "🔴 SHORT"
-    tag = "💱 " if d.get("market") == "forex" else ""
+    tag = {"forex": "💱 ", "stock": "📈 "}.get(d.get("market"), "")
     head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
     if sig_id:
         head += f"  <code>#{sig_id}</code>"
@@ -1455,7 +1460,8 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     sym, market = await resolve_symbol(cands)
     if not sym:
         await msg.reply_text(
-            f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto yoki forex). Qayta yozing:",
+            f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto, forex yoki aksiya). "
+            "Qayta yozing:",
             parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
         return WIZ_SYMBOL
     wiz = await _wiz_or_end(update, ctx)
@@ -1717,6 +1723,18 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
                 break
             if sym:
                 return sym, "forex"
+    # Aksiyalar — ENG OXIRIDA. Sabab: "BTC" kabi so'z tasodifan biror tiker
+    # bilan to'qnashib qolsa, kripto ustun bo'lib qolsin (bot asosan kripto
+    # uchun ishlatiladi).
+    if stocks.enabled():
+        for raw in cands:
+            try:
+                sym = await stocks.resolve(raw)
+            except Exception:
+                log.warning("Aksiyalar ro'yxati olinmadi", exc_info=True)
+                break
+            if sym:
+                return sym, "stock"
     return None, "crypto"
 
 
@@ -1727,9 +1745,9 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     if not sym:
         shown = html.escape(", ".join(cands[:3]))
         await msg.reply_text(
-            f"❌ <code>{shown}</code> topilmadi (kripto yoki forex).\n"
-            "Juftlikni tekshiring — masalan <code>BTCUSDT</code>, <code>btc</code>, "
-            "<code>ETH/USDT</code>.",
+            f"❌ <code>{shown}</code> topilmadi (kripto, forex yoki aksiya).\n"
+            "Nomni tekshiring — masalan <code>BTCUSDT</code>, <code>btc</code>, "
+            "<code>EURUSD</code>, <code>TSLA</code>.",
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
         )
         return
@@ -1743,7 +1761,9 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         return
 
     warn = []
-    if draft["side"] == "SHORT" and not config.ALLOW_SHORT and market != "forex":
+    # SPOT cheklovi faqat KRIPTOGA tegishli: forex va aksiyalarda short
+    # oddiy hol (CFD/margin), shuning uchun ogohlantirish ko'rsatilmaydi.
+    if draft["side"] == "SHORT" and not config.ALLOW_SHORT and market == "crypto":
         warn.append("⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.")
     if draft.get("entry_mode") == "market":
         warn.append("🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.")
@@ -3479,6 +3499,7 @@ async def post_init(app: Application) -> None:
 async def post_shutdown(app: Application) -> None:
     await exchange.close()
     await forex.close()
+    await stocks.close()
 
 
 async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:

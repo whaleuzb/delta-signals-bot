@@ -1280,3 +1280,32 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - Tekshirildi: kvadrat avatar → 256×256 PNG; kvadrat bo'lmagan rasm →
       qirqilib 256×256; avatarsiz guruh → baza tozalandi; Telegram xatosi →
       yiqilmaydi. Sahifada 2 ta rasm + 1 ta harf-avatar, buzuq rasm yo'q.
+
+62. **Kompaniya aksiyalari (AAPL, TSLA, NVDA ...) — `market="stock"`.**
+    - Narx manbai forex bilan AYNI: Twelve Data, ayni API kalit, ayni so'rov
+      chegarasi. Shu sabab `stocks.py` o'z HTTP mijozini OCHMAYDI —
+      `forex.time_series()` va `forex.price()` ni ishlatadi. Buning uchun
+      forex.py ichida `klines`/`last_price` ikkiga bo'lindi: tashqi qism
+      juftlikni "EUR/USD" shakliga keltiradi, ichki qism esa API bilan
+      gaplashadi. Forex xatti-harakati o'zgarmadi (tekshirildi).
+    - **Tiker o'zgarishsiz uzatiladi.** Forexdagi `_api_symbol` 6 belgili
+      nomni ikkiga bo'ladi — aksiyada bu tikerni buzardi.
+    - Ro'yxat `/stocks?country=United States` dan, **24 soatga** keshlanadi
+      (javob katta, tikerlar esa kamdan-kam o'zgaradi). Faqat asosiy AQSh
+      birjalari (`NASDAQ`, `NYSE`, ...) — boshqa mamlakatda bir xil tiker
+      boshqa kompaniya bo'lishi mumkin.
+    - `resolve_symbol` tartibi: **kripto → forex → aksiya**. Aksiya oxirida,
+      chunki bot asosan kripto uchun ishlatiladi va to'qnashuvda kripto
+      ustun bo'lishi kerak. Tiker uzunligi 6 dan oshsa umuman qidirilmaydi —
+      "SIGNAL" kabi tasodifiy so'zlar ro'yxatga urilmasin.
+    - `normalize`: `$AAPL`, `NASDAQ:NVDA`, `tsla` → toza tiker; nuqta
+      saqlanadi (BRK.B kabi sinf belgisi).
+    - Bozor yopiq bo'lsa (kechasi, dam olish, bayram) Twelve Data yangi sham
+      bermaydi → `time_series` bo'sh ro'yxat qaytaradi va kuzatuv keyingi
+      ochilishda davom etadi. Forexdagi dam olish kuni bilan bir xil holat.
+    - Belgisi: 📈 (forex 💱). SPOT SHORT ogohlantirishi endi FAQAT kriptoga
+      chiqadi — forex va aksiyada short oddiy hol.
+    - Tekshirildi (soxta Twelve Data): tiker aniqlash 7/7, Meksika birjasidagi
+      AAPL ro'yxatga tushmadi, `/time_series` ga `NVDA` (bo'linmagan) va
+      forexga `EUR/USD` ketdi, uchala moduldagi `provider("stock")` → stocks,
+      `resolve_symbol(["TSLA"])` → `("TSLA","stock")`.

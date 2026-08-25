@@ -14,6 +14,7 @@ import config
 import db
 import exchange
 import forex
+import stocks
 import tracker
 
 TZ = ZoneInfo(config.TZ)
@@ -29,8 +30,12 @@ RED = "#ef5350"
 
 
 def _provider(market: str):
-    """market='forex' bo'lsa Twelve Data, aks holda MEXC (kripto)."""
-    return forex if market == "forex" else exchange
+    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
+    if market == "forex":
+        return forex
+    if market == "stock":
+        return stocks
+    return exchange
 
 
 async def _safe_price(market: str, symbol: str):

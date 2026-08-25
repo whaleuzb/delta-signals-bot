@@ -80,11 +80,22 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
 
     end_ms — oynaning oxiri (grafik uchun). exchange.klines bilan bir xil
     imzo bo'lishi shart: chart._fetch ikkalasini ham bir xil chaqiradi."""
+    return await time_series(_api_symbol(symbol), start_ms, limit, tf, end_ms)
+
+
+async def time_series(api_symbol: str, start_ms: int, limit: int = 500,
+                       tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
+    """Twelve Data /time_series — forex va AKSIYALAR uchun umumiy.
+
+    `api_symbol` allaqachon API kutgan shaklda ("EUR/USD" yoki "AAPL"):
+    juftlikka bo'lish forex tomonida, aksiyada esa tiker o'zgarishsiz ketadi
+    (aks holda 6 harfli tiker "ABC/DEF" bo'lib buzilardi)."""
+    symbol = api_symbol
     interval = _INTERVALS.get(tf, "1min")
     dur = _TF_MS.get(tf, 60_000)
     start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
     params = {
-        "symbol": _api_symbol(symbol), "interval": interval, "outputsize": limit,
+        "symbol": symbol, "interval": interval, "outputsize": limit,
         "start_date": start.strftime("%Y-%m-%d %H:%M:%S"), "order": "ASC",
         "timezone": "UTC", "apikey": config.TWELVE_DATA_API_KEY,
     }
@@ -126,12 +137,18 @@ async def last_price(symbol: str, fresh: bool = False) -> float | None:
     ham muhimroq, chunki Twelve Data bepul rejasi DAQIQASIGA 8 so'rov beradi:
     keshsiz bitta /stats bosilishi limitni yeb qo'yishi va forex signallari
     kuzatuvini to'xtatishi mumkin."""
+    return await price(_api_symbol(symbol), fresh)
+
+
+async def price(api_symbol: str, fresh: bool = False) -> float | None:
+    """Twelve Data /price — forex va aksiyalar uchun umumiy (kesh ham bitta)."""
+    symbol = api_symbol
     if not fresh:
         hit = _price_cache.get(symbol)
         if hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
             return hit[1]
     r = await _client.get("/price", params={
-        "symbol": _api_symbol(symbol), "apikey": config.TWELVE_DATA_API_KEY})
+        "symbol": symbol, "apikey": config.TWELVE_DATA_API_KEY})
     if r.status_code != 200:
         return None
     data = r.json()
