@@ -92,12 +92,43 @@ tbody tr:hover{background:#ffffff06}
 .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:600}
 .b-long{background:#2ecc8f22;color:var(--long)}
 .b-short{background:#ff5c5c22;color:var(--short)}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-.gcard{background:var(--card);border:1px solid var(--line);border-radius:12px;
-       padding:18px 20px;display:block;color:inherit}
-.gcard:hover{border-color:#3a4351;text-decoration:none}
-.gcard .n{font-size:17px;font-weight:600}
-.gcard .m{color:var(--mut);font-size:13px;margin-top:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:14px;
+       padding:20px 22px;display:block;color:inherit;position:relative;
+       overflow:hidden;transition:border-color .15s,transform .15s}
+.gcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+               background:var(--line)}
+.gcard.pos-edge::before{background:var(--long)}
+.gcard.neg-edge::before{background:var(--short)}
+.gcard:hover{border-color:#3a4351;text-decoration:none;transform:translateY(-2px)}
+.gtop{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.gcard .n{font-size:18px;font-weight:600}
+.gcard .big{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;
+            white-space:nowrap}
+.gstats{display:flex;gap:18px;margin-top:14px;color:var(--mut);font-size:13px;
+        flex-wrap:wrap}
+.gstats span{color:var(--ink);font-weight:600}
+.gfoot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;
+       padding-top:14px;border-top:1px solid var(--line);min-height:20px}
+.chip{background:#4da3ff1f;color:var(--acc);font-size:12px;font-weight:600;
+      padding:3px 9px;border-radius:20px}
+.go{color:var(--mut);font-size:13px;margin-left:auto}
+.gcard:hover .go{color:var(--acc)}
+
+/* hero */
+.hero{border-bottom:1px solid var(--line);padding-bottom:30px}
+.htiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+        gap:12px;margin-top:26px}
+.htile{background:var(--card);border:1px solid var(--line);border-radius:12px;
+       padding:14px 16px;text-align:center}
+.htile .hv{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.htile .hk{font-size:12px;color:var(--mut);margin-top:3px;letter-spacing:.03em}
+.btn{display:inline-block;margin-top:22px;background:var(--acc);color:#06121f;
+     font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
+.btn:hover{text-decoration:none;filter:brightness(1.08)}
+.note{margin-top:26px;color:var(--mut);font-size:13px}
+code{font-family:"IBM Plex Mono",ui-monospace,monospace;background:#ffffff0d;
+     padding:2px 7px;border-radius:5px;font-size:13px}
 footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
        color:var(--mut);font-size:13px;display:flex;justify-content:space-between;
        flex-wrap:wrap;gap:10px}
@@ -125,28 +156,74 @@ def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
+def net_result(r) -> float:
+    """Guruh natijasi — guruh sahifasidagi AYNI usul: pozitsiya hajmi
+    belgilangan bo'lsa depozitga tortilgan, aks holda sof foizlar yig'indisi."""
+    if r["deposit"] and r["n_alloc"]:
+        return float(r["sum_weighted"])
+    return float(r["sum_pct"])
+
+
 async def index(request):
     bot = request.app["bot_username"]
     cached = _cached("index")
-    if cached is None:
-        rows = await db.public_workspaces()
-        cards = []
-        for r in rows:
-            total = r["total"] or 0
-            wr = (r["wins"] / total * 100) if total else 0
-            when = (f"oxirgi natija {r['last_closed'].astimezone(stats.TZ):%d.%m.%Y}"
-                    if r["last_closed"] else "hali natija yo'q")
-            cards.append(
-                f"<a class='gcard' href='/g/{r['id']}'><div class='n'>{e(r['name'])}</div>"
-                f"<div class='m'>{total} ta yopilgan signal · winrate {wr:.0f}%<br>{e(when)}</div></a>")
-        body = (
-            "<header><div class='brand'>Trade Controller</div>"
-            "<h1>Ochiq natijalar</h1>"
-            "<div class='sub'>Quyidagi guruhlar o'z statistikasini ommaga ochgan. "
-            "Raqamlar bevosita bazadan o'qiladi va real vaqtda yangilanadi.</div></header>"
-            + (f"<div class='cards'>{''.join(cards)}</div>" if cards else
-               "<div class='empty'>Hozircha ochiq guruh yo'q.</div>"))
-        cached = _put("index", page("Ochiq natijalar — Trade Controller", body, bot))
+    if cached is not None:
+        return web.Response(text=cached, content_type="text/html")
+
+    rows = await db.public_workspaces()
+    # Eng yaxshi natija yuqorida — bu sahifaning butun mazmuni shu.
+    rows = sorted(rows, key=lambda r: net_result(r), reverse=True)
+
+    n_groups = len(rows)
+    n_signals = sum(r["total"] or 0 for r in rows)
+    n_open = sum(r["n_open"] or 0 for r in rows)
+    n_wins = sum(r["wins"] or 0 for r in rows)
+    wr_all = (n_wins / n_signals * 100) if n_signals else 0
+
+    cards = []
+    for r in rows:
+        total = r["total"] or 0
+        wr = (r["wins"] / total * 100) if total else 0
+        net = net_result(r)
+        when = (f"{r['last_closed'].astimezone(stats.TZ):%d.%m.%Y}"
+                if r["last_closed"] else "—")
+        openb = (f"<span class='chip'>{r['n_open']} ta ochiq</span>"
+                 if r["n_open"] else "")
+        cards.append(
+            f"<a class='gcard {_cls(net)}-edge' href='/g/{r['id']}'>"
+            f"<div class='gtop'><div class='n'>{e(r['name'])}</div>"
+            f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
+            f"<div class='gstats'>"
+            f"<div><span>{total}</span> signal</div>"
+            f"<div><span>{wr:.0f}%</span> winrate</div>"
+            f"<div><span>{e(when)}</span></div></div>"
+            f"<div class='gfoot'>{openb}<span class='go'>Batafsil →</span></div></a>")
+
+    hero_tiles = "".join(
+        f"<div class='htile'><div class='hv'>{e(v)}</div><div class='hk'>{e(k)}</div></div>"
+        for v, k in [(n_groups, "ochiq guruh"), (f"{n_signals:,}".replace(",", " "),
+                                                  "yopilgan signal"),
+                     (f"{wr_all:.0f}%", "umumiy winrate"), (n_open, "kuzatuvda")])
+
+    cta = (f"<a class='btn' href='https://t.me/{e(bot)}'>Botni ochish</a>"
+           if bot else "")
+
+    body = (
+        "<header class='hero'><div class='brand'>Trade Controller</div>"
+        "<h1>Ochiq natijalar</h1>"
+        "<div class='sub'>Bu guruhlar o'z savdo statistikasini ommaga ochgan. "
+        "Har bir raqam bazadan jonli o'qiladi — signal kiritilganda yoziladi, "
+        "bozor TP yoki stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab "
+        "bo'lmaydi.</div>"
+        f"{'<div class=htiles>' + hero_tiles + '</div>' if n_signals else ''}"
+        f"{cta}</header>"
+        + (f"<h2>Guruhlar</h2><div class='cards'>{''.join(cards)}</div>" if cards else
+           "<div class='empty'>Hozircha ochiq guruh yo'q. Guruh egasi botda "
+           "<code>/public on</code> yozib, tasdiqdan o'tgach shu yerda "
+           "paydo bo'ladi.</div>")
+        + ("<div class='note'>Reyting joriy umumiy natija bo'yicha tartiblangan. "
+           "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else ""))
+    cached = _put("index", page("Ochiq natijalar — Trade Controller", body, bot))
     return web.Response(text=cached, content_type="text/html")
 
 

@@ -606,18 +606,31 @@ async def public_workspace(workspace_id: int) -> asyncpg.Record | None:
 
 
 async def public_workspaces() -> list[asyncpg.Record]:
-    """Ochiq sahifa bosh ro'yxati — yopilgan signali borlari, yangisi birinchi."""
+    """Ochiq sahifa bosh ro'yxati.
+
+    `sum_weighted` — depozitga tortilgan natija (guruh sahifasidagi AYNI usul):
+    har savdo o'z pozitsiya hajmiga qarab hisoblanadi. `n_alloc` — hajmi
+    belgilangan savdolar soni; nol bo'lsa chaqiruvchi `sum_pct` (sof foizlar
+    yig'indisi) ga qaytadi. Ikkala raqam ham qaytariladi — tanlov bitta joyda,
+    Python tomonida qilinadi va ikki sahifada ikki xil son chiqmaydi."""
     q = f"""
-    SELECT w.id, w.name, w.invite_link,
-           COUNT(s.id)                                   AS total,
-           COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)      AS wins,
-           MAX(s.closed_at)                              AS last_closed
+    SELECT w.id, w.name, w.invite_link, w.deposit,
+           COUNT(s.id)                                       AS total,
+           COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)          AS wins,
+           COALESCE(SUM(s.pnl_pct), 0)                       AS sum_pct,
+           COALESCE(SUM(s.pnl_pct * s.alloc_amount / NULLIF(w.deposit, 0))
+                    FILTER (WHERE s.alloc_amount IS NOT NULL), 0) AS sum_weighted,
+           COUNT(s.id) FILTER (WHERE s.alloc_amount IS NOT NULL)  AS n_alloc,
+           MAX(s.closed_at)                                  AS last_closed,
+           (SELECT COUNT(*) FROM signals o
+             WHERE o.workspace_id = w.id AND NOT o.excluded
+               AND o.status IN ('PENDING','ACTIVE'))          AS n_open
     FROM workspaces w
     LEFT JOIN signals s ON s.workspace_id = w.id
          AND s.status IN {CLOSED} AND NOT s.excluded
     WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived
-    GROUP BY w.id, w.name, w.invite_link
+    GROUP BY w.id, w.name, w.invite_link, w.deposit
     ORDER BY last_closed DESC NULLS LAST
     """
     async with pool().acquire() as c:
