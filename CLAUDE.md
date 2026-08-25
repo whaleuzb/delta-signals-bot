@@ -1059,3 +1059,25 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       tekshirildi: yopiq guruh signali va mavjud bo'lmagan id — ikkalasi 404.
     - Rasm yuklanmasa `onerror` uni olib tashlaydi — buzuq rasm belgisi
       chiqmaydi, karta shunchaki grafiksiz qoladi.
+
+47. **`startTime` sham chegarasiga tushirilishi shart (`chart.align`).**
+    Ishlab turgan serverda BARCHA `/s/<id>/mini.png` 404 qaytardi, holbuki
+    MEXC `200 OK` javob berardi. Sabab: chegaraga tushmagan `startTime`
+    (masalan `1787136373499` — 15m qadamiga bo'linmaydi) uchun MEXC 200
+    bilan BO'SH ro'yxat qaytaradi. `_fetch` bo'sh ro'yxatni "ma'lumot yo'q"
+    deb tushunib, grafikni jimgina chizmay qo'yardi.
+    - Kuzatuv (tracker) bu tuzoqqa tushmaydi: uning `last_checked_ms` qiymati
+      sham OCHILISH vaqtidan olinadi va allaqachon chegarada. Grafikda esa
+      boshlang'ich nuqta `opened_at` — ixtiyoriy soniya.
+    - `align()` uchala grafik funksiyasida ham qo'llanadi. Chegaraga PASTGA
+      tushiriladi, ya'ni oyna faqat kengayadi — hech qanday sham yo'qolmaydi.
+    - Yonida ikkita kichik tuzatish:
+      - `exchange.klines` endi har qanday 4xx da traceback ko'tarmay, ogohlantirish
+        yozib bo'sh ro'yxat qaytaradi (`VANRYUSDT` — ro'yxatdan chiqarilgan
+        juftlik — 400 berib log'ni traceback bilan to'ldirgandi).
+      - `web.py` da `asyncio.Semaphore(2)`: brauzer sahifadagi rasmlarni
+        birdan so'raganda birjaga ~15 ta parallel so'rov ketardi. Navbatda
+        turgan so'rov keshni QAYTA tekshiradi — oldingisi allaqachon
+        chizib qo'ygan bo'lishi mumkin.
+    - Diagnostika: `mini_chart` endi ikkala "grafik chizilmadi" yo'lida ham
+      sababni log'ga yozadi (sham kelmadi / oraliqqa tushmadi).

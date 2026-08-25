@@ -13,6 +13,7 @@ Xavfsizlik:
   - Bot bilan ALOHIDA servis: bu yerda nima bo'lsa ham signal kuzatuvi
     to'xtamaydi.
 """
+import asyncio
 import html
 import logging
 import os
@@ -463,14 +464,21 @@ async def mini_png(request):
         sig = await db.public_signal(sig_id)
         if not sig:
             raise web.HTTPNotFound()
-        try:
-            img = await chart.mini_chart(sig)
-        except Exception:
-            log.warning("Kichik grafik yasalmadi (#%s)", sig_id, exc_info=True)
-            img = None
-        if img is None:
-            raise web.HTTPNotFound()
-        buf = _put(key, img.getvalue())
+        # Brauzer sahifadagi barcha rasmni BIRDAN so'raydi (25 tagacha).
+        # Semafor ularni navbatga qo'yadi: birjaga bir vaqtda ko'pi bilan
+        # ikkita so'rov ketadi, ya'ni bitta sahifa ochilishi rate-limit'ga
+        # urilib, kuzatuv siklini ham buzib qo'ymaydi.
+        async with request.app["mini_sem"]:
+            buf = _cached(key, MINI_TTL)     # navbatda turganda tayyor bo'lishi mumkin
+            if buf is None:
+                try:
+                    img = await chart.mini_chart(sig)
+                except Exception:
+                    log.warning("Kichik grafik yasalmadi (#%s)", sig_id, exc_info=True)
+                    img = None
+                if img is None:
+                    raise web.HTTPNotFound()
+                buf = _put(key, img.getvalue())
     return web.Response(body=buf, content_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
 
@@ -492,6 +500,8 @@ async def on_stop(app):
 def build_app() -> web.Application:
     app = web.Application()
     app["bot_username"] = os.getenv("BOT_USERNAME", "")
+    # Birjaga bir vaqtda ketadigan grafik so'rovlari soni (pastda izoh).
+    app["mini_sem"] = asyncio.Semaphore(2)
     app.add_routes([
         web.get("/", index),
         web.get("/healthz", healthz),

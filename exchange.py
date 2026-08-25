@@ -93,6 +93,12 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
     if r.status_code == 429:
         log.warning("MEXC rate limit — kutamiz")
         return []
+    if 400 <= r.status_code < 500:
+        # Odatda juftlik ro'yxatdan chiqarilgan yoki nomi o'zgargan. Bu xato
+        # emas, ma'lumot yo'q — traceback ko'tarish o'rniga bo'sh ro'yxat
+        # qaytaramiz. Chaqiruvchilar buni allaqachon to'g'ri ishlatadi.
+        log.warning("MEXC %s: %s %s uchun ma'lumot yo'q", r.status_code, symbol, interval)
+        return []
     r.raise_for_status()
     out = []
     for k in r.json():

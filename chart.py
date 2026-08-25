@@ -49,6 +49,17 @@ def norm_tf(tf: str | None) -> str:
     return tf if tf in TF_MINUTES else DEFAULT_TF
 
 
+def align(start_ms: int, tf: str) -> int:
+    """`startTime` ni sham chegarasiga tushiradi.
+
+    MEXC chegaraga tushmagan `startTime` ga 200 OK bilan BO'SH ro'yxat
+    qaytaradi — grafik esa jimgina chizilmay qolardi. Kuzatuv (tracker) bu
+    muammoga duch kelmaydi, chunki uning vaqti sham ochilish vaqtidan olinadi
+    va allaqachon chegarada; grafikda esa `opened_at` — ixtiyoriy soniya."""
+    step = TF_MINUTES[tf] * 60_000
+    return start_ms - (start_ms % step)
+
+
 async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str):
     """Shamlarni olish. Xato bo'lsa None — grafik shunchaki chizilmaydi va
     chaqiruvchi oddiy matn/rasm yo'liga qaytadi."""
@@ -178,7 +189,7 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     market = draft.get("market", "crypto")
     symbol = draft["symbol"]
     span_ms = SETUP_BARS * TF_MINUTES[tf] * 60_000
-    start_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - span_ms
+    start_ms = align(int(datetime.now(timezone.utc).timestamp() * 1000) - span_ms, tf)
     candles = await _fetch(market, symbol, start_ms, min(MAX_CANDLES, SETUP_BARS + 5), tf)
     if not candles or len(candles) < 3:
         return None
@@ -214,15 +225,20 @@ async def mini_chart(sig) -> io.BytesIO | None:
     tf_ms = TF_MINUTES[tf] * 60_000
     span_bars = max(1, int((closed_at - opened_at).total_seconds() * 1000 // tf_ms))
     pad_bars = max(3, (30 - span_bars) // 2)
-    start_ms = int(opened_at.timestamp() * 1000) - pad_bars * tf_ms
+    start_ms = align(int(opened_at.timestamp() * 1000) - pad_bars * tf_ms, tf)
     limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
 
     candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
     if not candles:
+        log.info("Kichik grafik: #%s %s %s uchun sham kelmadi", sig["id"],
+                 sig["symbol"], tf)
         return None
     end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
+    n_raw = len(candles)
     candles = [c for c in candles if c.open_ms <= end_ms]
     if len(candles) < 3:
+        log.info("Kichik grafik: #%s %s — %s shamdan %s tasi oraliqqa tushdi",
+                 sig["id"], sig["symbol"], n_raw, len(candles))
         return None
 
     pnl = float(sig["pnl_pct"]) if sig["pnl_pct"] is not None else 0.0
@@ -280,7 +296,7 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     # shuning uchun oynani orqaga cho'zib, kamida MIN_BARS sham beramiz.
     pad_bars = max(PAD_BARS, (MIN_BARS - span_bars) // 2)
     limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
-    start_ms = int(opened_at.timestamp() * 1000) - pad_bars * tf_ms
+    start_ms = align(int(opened_at.timestamp() * 1000) - pad_bars * tf_ms, tf)
 
     candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
     if not candles:
