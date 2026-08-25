@@ -637,6 +637,23 @@ async def public_workspaces() -> list[asyncpg.Record]:
         return await c.fetch(q)
 
 
+async def public_signal(sig_id: int) -> asyncpg.Record | None:
+    """Ochiq sahifada ko'rsatish mumkin bo'lgan YOPILGAN signal.
+
+    Signalning o'zi emas, uning WORKSPACE'i darvozadan o'tishi kerak —
+    `public_workspace()` bilan bir xil shart. Bu yo'l orqali yopiq guruhning
+    signalini id bilan taxmin qilib ko'rish mumkin emas."""
+    q = f"""
+    SELECT s.* FROM signals s
+    JOIN workspaces w ON w.id = s.workspace_id
+    WHERE s.id = $1 AND NOT s.excluded AND s.status IN {CLOSED}
+      AND w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
+      AND NOT w.archived
+    """
+    async with pool().acquire() as c:
+        return await c.fetchrow(q, sig_id)
+
+
 async def recent_closed(workspace_id: int, limit: int = 25) -> list[asyncpg.Record]:
     q = f"""
     SELECT id, symbol, side, entry, exit_price, pnl_pct, r_multiple,

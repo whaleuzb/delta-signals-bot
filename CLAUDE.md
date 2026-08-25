@@ -1036,3 +1036,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       sahifa foniga moslanadi.
     - Skript har chaqiruvni `window.Telegram` va metod mavjudligiga
       tekshiradi — oddiy brauzerda sahifa hech narsa buzilmasdan ishlayveradi.
+
+46. **Har bir savdo uchun kichik grafik (`chart.mini_chart`, `/s/<id>/mini.png`).**
+    - "Oxirgi savdolar" jadval emas, endi KARTA ro'yxati: chapda juftlik va
+      kirish→chiqish, o'rtada kichik grafik, o'ngda natija.
+    - Grafik ataylab soddalashtirilgan (320×110, o'q ham yozuv ham yo'q):
+      narx chizig'i, kirish darajasi (ko'k punktir) va chiqish nuqtasi.
+      Bu o'lchamda shamlar o'qilmaydi, chiziq esa savdo shaklini bir
+      qarashda ko'rsatadi.
+    - **Birjani ortiqcha yuklamaslik uchun ikki himoya**:
+      1. `loading="lazy"` — ekranga chiqmagan rasm umuman yuklanmaydi.
+      2. Yopilgan savdo grafigi HECH QACHON o'zgarmaydi (savdo tugagan,
+         shamlar tarixiy) → `MINI_TTL = 24 soat` va HTTP
+         `Cache-Control: max-age=86400`. Ya'ni birjaga savdo boshiga
+         faqat BIR marta murojaat qilinadi.
+      Bu muhim edi: bitta sahifada 25 ta savdo bor, keshsiz har ochilish
+      25 ta klines so'rovi yuborib, birja limitini yeb qo'yardi va
+      kuzatuv siklini ham buzardi.
+    - **Xavfsizlik**: `db.public_signal()` signalning o'zini emas, uning
+      WORKSPACE'ini tekshiradi (`public_workspace()` bilan bir xil shart).
+      Shu sabab yopiq guruh signalini id taxmin qilib ko'rish mumkin emas —
+      tekshirildi: yopiq guruh signali va mavjud bo'lmagan id — ikkalasi 404.
+    - Rasm yuklanmasa `onerror` uni olib tashlaydi — buzuq rasm belgisi
+      chiqmaydi, karta shunchaki grafiksiz qoladi.

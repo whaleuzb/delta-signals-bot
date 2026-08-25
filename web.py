@@ -21,6 +21,7 @@ from datetime import datetime
 
 from aiohttp import web
 
+import chart
 import db
 import stats
 
@@ -30,9 +31,16 @@ CACHE_TTL = 120.0          # sahifa/grafik keshi (soniya)
 _cache: dict[str, tuple[float, object]] = {}
 
 
-def _cached(key: str):
+# Yopilgan savdo grafigi HECH QACHON o'zgarmaydi (savdo tugagan, shamlar
+# tarixiy) — shuning uchun uzoq keshlanadi va birjaga faqat bir marta
+# murojaat qilinadi. Aks holda bitta sahifa ochilishi o'nlab so'rov yuborib,
+# birja limitini yeb qo'yardi va kuzatuv siklini ham buzardi.
+MINI_TTL = 86400.0
+
+
+def _cached(key: str, ttl: float = CACHE_TTL):
     hit = _cache.get(key)
-    if hit and (time.monotonic() - hit[0]) < CACHE_TTL:
+    if hit and (time.monotonic() - hit[0]) < ttl:
         return hit[1]
     return None
 
@@ -147,6 +155,25 @@ tbody tr:hover{background:#ffffff06}
      font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
 .note{margin-top:26px;color:var(--mut);font-size:13px}
+/* oxirgi savdolar — grafikli kartalar */
+.trades{display:flex;flex-direction:column;gap:10px}
+.trade{background:var(--card);border:1px solid var(--line);border-radius:12px;
+       padding:14px 16px;display:grid;
+       grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px}
+.tsym{font-size:15px;font-weight:600}
+.tsub{color:var(--mut);font-size:12.5px;margin-top:4px;
+      font-variant-numeric:tabular-nums}
+.tmini{width:160px;height:55px;border-radius:6px;display:block;flex:none}
+.tpnl{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;
+      white-space:nowrap;min-width:76px;text-align:right}
+@media (max-width:640px){
+  /* Tor ekranda grafik pastga to'liq kenglikda tushadi — siqilib
+     o'qilmaydigan bo'lib qolmasin. */
+  .trade{grid-template-columns:minmax(0,1fr) auto}
+  .tmini{grid-column:1 / -1;grid-row:2;width:100%;height:64px;margin-top:4px}
+  .tpnl{font-size:16px;min-width:0}
+}
+
 .cta{margin-top:40px;background:linear-gradient(160deg,#161d27,#10151c);
      border:1px solid var(--line);border-radius:16px;padding:28px 30px}
 .cta h3{font-size:21px;font-weight:600;margin-bottom:10px}
@@ -356,21 +383,25 @@ async def group_page(request):
         f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in months)
 
-    # Oxirgi savdolar
+    # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
+    # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni
+    # sahifa ochilishi birjaga o'nlab so'rov yubormaydi.
     recent = await db.recent_closed(ws_id, 25)
-    rec_rows = ""
+    trades = ""
     for r in recent:
         p = float(r["pnl_pct"]) if r["pnl_pct"] is not None else 0.0
         side_cls = "b-long" if r["side"] == "LONG" else "b-short"
         when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m.%y}" if r["closed_at"] else "—"
-        rec_rows += (
-            f"<tr><td>{e(r['symbol'])} "
-            f"<span class='badge {side_cls}'>{e(r['side'])}</span></td>"
-            f"<td data-k='Kirish'>{fmt_price(r['entry'])}</td>"
-            f"<td data-k='Chiqish'>"
-            f"{fmt_price(r['exit_price']) if r['exit_price'] is not None else '—'}</td>"
-            f"<td data-k='Natija' class='{_cls(p)}'>{p:+.2f}%</td>"
-            f"<td data-k='Sana'>{e(when)}</td></tr>")
+        exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
+        trades += (
+            "<div class='trade'>"
+            f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
+            f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
+            f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
+            f" · {e(when)}</div></div>"
+            f"<img class='tmini' src='/s/{r['id']}/mini.png' loading='lazy' "
+            f"alt='' onerror=\"this.remove()\">"
+            f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div></div>")
 
     def section(title, header, body_rows):
         if not body_rows:
@@ -394,9 +425,8 @@ async def group_page(request):
                   "<th>Juftlik</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", sym_rows)
         + section("Oylik natijalar",
                   "<th>Oy</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", mon_rows)
-        + section("Oxirgi savdolar",
-                  "<th>Juftlik</th><th>Kirish</th><th>Chiqish</th><th>Natija</th><th>Sana</th>",
-                  rec_rows)
+        + (f"<h2>Oxirgi savdolar</h2><div class='trades'>{trades}</div>"
+           if trades else "")
         + ("<div class='empty'>Hali yopilgan signal yo'q.</div>" if not total else ""))
 
     out = page(f"{ws['name']} — natijalar", body, bot)
@@ -421,6 +451,30 @@ async def equity_png(request):
                         headers={"Cache-Control": "public, max-age=120"})
 
 
+async def mini_png(request):
+    """Bitta yopilgan savdoning kichik grafigi.
+
+    Signal o'zi emas, uning WORKSPACE'i darvozadan o'tishi tekshiriladi —
+    yopiq guruh signalini id taxmin qilib ko'rish mumkin emas."""
+    sig_id = int(request.match_info["sid"])
+    key = f"mini{sig_id}"
+    buf = _cached(key, MINI_TTL)
+    if buf is None:
+        sig = await db.public_signal(sig_id)
+        if not sig:
+            raise web.HTTPNotFound()
+        try:
+            img = await chart.mini_chart(sig)
+        except Exception:
+            log.warning("Kichik grafik yasalmadi (#%s)", sig_id, exc_info=True)
+            img = None
+        if img is None:
+            raise web.HTTPNotFound()
+        buf = _put(key, img.getvalue())
+    return web.Response(body=buf, content_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def healthz(request):
     return web.Response(text="ok")
 
@@ -443,6 +497,7 @@ def build_app() -> web.Application:
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", group_page),
         web.get(r"/g/{wid:\d+}/equity.png", equity_png),
+        web.get(r"/s/{sid:\d+}/mini.png", mini_png),
     ])
     app.on_startup.append(on_start)
     app.on_cleanup.append(on_stop)

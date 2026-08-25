@@ -197,6 +197,70 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     )
 
 
+async def mini_chart(sig) -> io.BytesIO | None:
+    """Yopilgan savdoning KICHIK grafigi (veb sahifadagi ro'yxat uchun).
+
+    Ataylab soddalashtirilgan: o'q ham, yozuv ham yo'q — faqat narx chizig'i,
+    kirish darajasi va chiqish nuqtasi. Bu o'lchamda shamlar o'qilmaydi,
+    chiziq esa savdoning shaklini bir qarashda ko'rsatadi.
+
+    Rasm 320x110 — to'liq grafikdan ~5 barobar yengil, chunki bitta sahifada
+    o'nlab shunday rasm bo'ladi."""
+    opened_at, closed_at = sig["opened_at"], sig["closed_at"]
+    if not opened_at or not closed_at:
+        return None
+
+    tf = norm_tf(sig["chart_tf"] if "chart_tf" in sig.keys() else None)
+    tf_ms = TF_MINUTES[tf] * 60_000
+    span_bars = max(1, int((closed_at - opened_at).total_seconds() * 1000 // tf_ms))
+    pad_bars = max(3, (30 - span_bars) // 2)
+    start_ms = int(opened_at.timestamp() * 1000) - pad_bars * tf_ms
+    limit = min(MAX_CANDLES, span_bars + 2 * pad_bars + 5)
+
+    candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf)
+    if not candles:
+        return None
+    end_ms = int(closed_at.timestamp() * 1000) + pad_bars * tf_ms
+    candles = [c for c in candles if c.open_ms <= end_ms]
+    if len(candles) < 3:
+        return None
+
+    pnl = float(sig["pnl_pct"]) if sig["pnl_pct"] is not None else 0.0
+    col = GREEN if pnl >= 0 else RED
+    entry = float(sig["entry"])
+    closes = [c.close for c in candles]
+    xs = list(range(len(closes)))
+
+    fig, ax = plt.subplots(figsize=(3.2, 1.1), dpi=100)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    ax.plot(xs, closes, color=col, lw=1.6, zorder=3)
+    ax.fill_between(xs, closes, min(closes), color=col, alpha=0.13, zorder=2)
+    ax.axhline(entry, color=ACC, lw=1.0, ls="--", alpha=0.75, zorder=1)
+
+    exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
+    if exit_price is not None:
+        closed_ms = int(closed_at.timestamp() * 1000)
+        idx = min(range(len(candles)),
+                  key=lambda i: abs(candles[i].close_ms - closed_ms))
+        ax.scatter([idx], [closes[idx]], color=col, s=26, zorder=4,
+                   edgecolor=BG, linewidth=1.2)
+
+    lo, hi = min(min(closes), entry), max(max(closes), entry)
+    pad = (hi - lo) * 0.12 or hi * 0.005
+    ax.set_ylim(lo - pad, hi + pad)
+    ax.set_xlim(-0.5, len(closes) - 0.5)
+    ax.axis("off")
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.97, bottom=0.03)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
 async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesIO | None:
     """Yopilgan signal uchun grafik: kirishdan chiqishgacha bo'lgan haqiqiy
     shamlar, darajalar va aniq chiqish nuqtasi. Shamlar topilmasa None —
