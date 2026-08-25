@@ -1153,3 +1153,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       harakatini ko'rsatadi. Eski statistika ham grafikli bo'lib qoladi.
     - Haqiqiy savdoda kirish HAR DOIM oyna ichida (savdo o'sha narxdan
       ochilgan), shuning uchun bu shart yangi signallarga umuman tegmaydi.
+
+53. **Kichik grafik havolasida versiya (`MINI_V`).**
+    Rasm brauzerda 24 soat keshlanadi (yopilgan savdo o'zgarmaydi). Chizish
+    uslubi o'zgarganda esa telefonda ESKI rasm ko'rinib qolardi — sahifa
+    yangilansa ham. Havola endi `/s/<id>/mini.png?v=2` ko'rinishida:
+    yangi manzil eski keshga tushmaydi. **Grafik ko'rinishini
+    o'zgartirsangiz, `MINI_V` ni oshiring.** So'rov qatori route'ga ta'sir
+    qilmaydi — tekshirildi, `?v=2` bilan ham 200 keladi.

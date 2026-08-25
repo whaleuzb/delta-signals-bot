@@ -33,6 +33,13 @@ log = logging.getLogger("web")
 # yangilanish chiqqanda foydalanuvchini adashtirardi.
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
+# Kichik grafik rasmi brauzerda 24 soat keshlanadi (yopilgan savdo
+# o'zgarmaydi). Chizish uslubi o'zgarganda esa eski rasm ko'rinib
+# qolmasligi uchun havolaga versiya qo'shiladi — yangi manzil eski
+# keshga tushmaydi. Grafik ko'rinishini o'zgartirsangiz, shu raqamni
+# oshiring.
+MINI_V = "2"
+
 CACHE_TTL = 120.0          # sahifa/grafik keshi (soniya)
 _cache: dict[str, tuple[float, object]] = {}
 
@@ -440,7 +447,7 @@ async def group_page(request):
             f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
             f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
             f" · {e(when)}</div></div>"
-            f"<img class='tmini' src='/s/{r['id']}/mini.png' loading='lazy' "
+            f"<img class='tmini' src='/s/{r['id']}/mini.png?v={MINI_V}' loading='lazy' "
             f"alt='' onerror=\"this.remove()\">"
             f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div></div>")
 
