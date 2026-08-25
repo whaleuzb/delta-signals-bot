@@ -13,18 +13,20 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from PIL import Image
 
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
+    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, LabeledPrice,
+    WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
-    Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
+    Application, ApplicationHandlerStop, ChatJoinRequestHandler, CommandHandler,
+    MessageHandler, CallbackQueryHandler, ConversationHandler, ContextTypes,
+    PreCheckoutQueryHandler, TypeHandler, filters,
 )
 
 import chart
@@ -178,6 +180,17 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     if q and q.data == "subcheck":
         return                      # tekshirish tugmasi doim o'tishi kerak
+
+    # To'lov oqimi HECH QACHON to'sib qo'yilmaydi. Odam "To'lash" tugmasini
+    # bosgandan keyin majburiy obuna talabi bilan to'xtatilsa, eng yomon
+    # holatda puli yechilib, obunasi yozilmay qolardi. Talab kirish
+    # nuqtasida (taklifni ko'rishda) baribir ishlaydi.
+    if q and q.data.startswith("pay:"):
+        return
+    if update.pre_checkout_query is not None:
+        return
+    if update.message is not None and update.message.successful_payment is not None:
+        return
 
     missing = await missing_subscriptions(ctx.bot, user.id)
     if missing:
@@ -493,6 +506,8 @@ def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
         page = (InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url))
                 if private else InlineKeyboardButton("🌐 Ochiq sahifa", url=url))
         rows.append([page])
+    if can_manage(uid, ws) and ws["type"] == "group":
+        rows.append([InlineKeyboardButton("💳 To'lovli kirish", callback_data="paid:home")])
     rows.append([InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
                  InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")])
     return InlineKeyboardMarkup(rows)
@@ -1679,6 +1694,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await handle_broadcast_input(update, ctx)
         return
 
+    # To'lovli kirish panelida so'ralgan narx.
+    if await handle_price_input(update, ctx):
+        return
+
     # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
     if await handle_manage_input(update, ctx):
         return
@@ -2622,6 +2641,23 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except ValueError:
             pass
 
+    # To'lov chuqur havolasi: t.me/<bot>?start=pay_<workspace_id>. Guruhga
+    # kirmoqchi bo'lgan odam bu yerga tushadi — unga workspace tanlash yoki
+    # onboarding emas, to'g'ridan-to'g'ri taklif ko'rsatiladi.
+    if ctx.args and ctx.args[0].startswith("pay_"):
+        try:
+            target = await db.get_workspace(int(ctx.args[0][4:]))
+        except ValueError:
+            target = None
+        if target and paid_ready(target):
+            await update.message.reply_text(offer_text(target),
+                                            parse_mode=ParseMode.HTML,
+                                            reply_markup=offer_kb(target))
+            return
+        await update.message.reply_text(
+            "Bu guruhda to'lovli kirish hozir yoqilmagan.")
+        return
+
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -2641,6 +2677,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_SL.pop(update.effective_user.id, None)
     AWAITING_TPS.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
+    AWAITING_PRICE.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
     await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
@@ -3630,6 +3667,527 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
+# ══════════════════════ To'lovli kirish (paywall) ══════════════════════
+# Guruh egasi o'z yopiq guruhiga obuna sotadi. Ikkita kirish yo'li BIR
+# VAQTDA ishlaydi va bir-birini to'ldiradi:
+#
+#   A) UMUMIY havola — `creates_join_request=TRUE` bilan yaratiladi. Uni
+#      reklamaga, ochiq sahifaga, istalgan joyga qo'yish mumkin: havolaning
+#      o'zi hech kimni ichkariga kiritmaydi, faqat SO'ROV yuboradi. So'rovni
+#      bot ko'radi — obunasi bor bo'lsa darhol tasdiqlaydi, bo'lmasa shaxsiy
+#      chatga to'lov tugmasini yuboradi va so'rovni OCHIQ qoldiradi (rad
+#      etmaydi: odam aynan shu daqiqada to'lashi mumkin, keyin so'rov
+#      tasdiqlanadi). Diqqat: guruh YOPIQ bo'lishi shart — ochiq guruhda
+#      Telegram oddiy "Join" tugmasini ko'rsatib so'rovni chetlab o'tadi.
+#
+#   B) BIR MARTALIK havola — `member_limit=1`, 1 soat amal qiladi. To'lov
+#      o'tgach kutib turgan so'rov bo'lmasa shu havola yuboriladi. Undan
+#      faqat bitta odam foydalana oladi, ya'ni tarqalib ketishi xavfsiz.
+#
+# To'lov — Telegram Stars (XTR). Provayder, shartnoma, merchant hisob kerak
+# emas. MUHIM: Stars BOT EGASINING balansiga tushadi, guruh egasiga emas —
+# shuning uchun panelda komissiya ayirilgan "sizga tegishli" summa ko'rsatiladi
+# va uni qo'lda o'tkazish kerak.
+
+# uid -> workspace_id (panelda "Narxni o'zgartirish" bosilgan, matn kutilmoqda)
+AWAITING_PRICE: dict[int, int] = {}
+
+PERIOD_CHOICES = [7, 30, 90, 365]
+
+
+def _stars(n) -> str:
+    return f"{int(n):,}".replace(",", " ") + " ⭐"
+
+
+def paid_ready(ws) -> bool:
+    """Guruh to'lov qabul qilishga tayyormi."""
+    return bool(ws["type"] == "group" and ws["paid_enabled"]
+                and ws["price_stars"] and ws["group_chat_id"])
+
+
+def offer_text(ws) -> str:
+    return (f"💳 <b>{html.escape(ws['name'])}</b> — yopiq guruhga kirish\n\n"
+            f"Narx: <b>{_stars(ws['price_stars'])}</b>\n"
+            f"Muddat: <b>{ws['period_days']} kun</b>\n\n"
+            "To'lovdan so'ng bot sizni guruhga o'zi kiritadi. "
+            "Muddat tugashidan oldin eslatib qo'yadi.")
+
+
+def offer_kb(ws) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        f"⭐ To'lash — {_stars(ws['price_stars'])}", callback_data=f"pay:{ws['id']}")]])
+
+
+async def send_offer(bot, uid: int, ws, prefix: str = "") -> bool:
+    """To'lov taklifini shaxsiy chatga yuboradi.
+
+    False qaytsa — odam bot bilan hech qachon yozishmagan (yoki bloklagan),
+    ya'ni unga umuman xabar yubora olmaymiz."""
+    try:
+        await bot.send_message(uid, prefix + offer_text(ws), parse_mode=ParseMode.HTML,
+                               reply_markup=offer_kb(ws))
+        return True
+    except Forbidden:
+        return False
+    except Exception:
+        log.exception("To'lov taklifini yuborib bo'lmadi (uid=%s ws=%s)", uid, ws["id"])
+        return False
+
+
+async def on_pay(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"⭐ To'lash" — Stars invoysini yuboradi."""
+    q = update.callback_query
+    ws_id = int(q.data.split(":")[1])
+    ws = await db.get_workspace(ws_id)
+    if not ws or not paid_ready(ws):
+        await q.answer("Bu guruhda to'lovli kirish hozir yoqilmagan.", show_alert=True)
+        return
+    await q.answer()
+    price = int(ws["price_stars"])
+    await ctx.bot.send_invoice(
+        chat_id=q.from_user.id,
+        # Bot API cheklovi: sarlavha 1-32 belgi.
+        title=ws["name"][:32],
+        description=f"{ws['period_days']} kunlik kirish — {ws['name']}"[:255],
+        payload=f"sub:{ws['id']}",
+        provider_token=None,          # Stars uchun provayder kerak emas
+        currency="XTR",
+        prices=[LabeledPrice(label=f"{ws['period_days']} kun", amount=price)],
+    )
+
+
+async def on_precheckout(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """To'lovni yakunlashdan oldingi oxirgi tekshiruv (Telegram 10 soniya kutadi).
+
+    Bu yerda "yo'q" deyish — pul yechilishidan OLDIN to'xtatish, ya'ni pulni
+    qaytarish muammosi umuman tug'ilmaydi."""
+    q = update.pre_checkout_query
+    try:
+        ws_id = int(q.invoice_payload.split(":")[1])
+    except (IndexError, ValueError):
+        await q.answer(ok=False, error_message="Noto'g'ri to'lov ma'lumoti.")
+        return
+    ws = await db.get_workspace(ws_id)
+    if not ws or not paid_ready(ws):
+        await q.answer(ok=False,
+                       error_message="Bu guruhda to'lovli kirish o'chirilgan.")
+        return
+    if q.total_amount != int(ws["price_stars"]):
+        # Narx invoys yuborilgandan keyin o'zgargan — eski invoysni qabul
+        # qilmaymiz, odam yangi narx bilan qaytadan boshlaydi.
+        await q.answer(ok=False, error_message="Narx o'zgardi. Qaytadan urinib ko'ring.")
+        return
+    await q.answer(ok=True)
+
+
+async def grant_access(bot, ws, uid: int) -> str | None:
+    """Odamni guruhga kiritadi. Qaytaradi: yuborilishi kerak bo'lgan havola
+    (bir martalik) yoki None (havola kerak emas — allaqachon ichkarida yoki
+    kutib turgan so'rovi tasdiqlandi)."""
+    chat_id = ws["group_chat_id"]
+
+    # 1) Allaqachon a'zomi? (obunani uzaytirish — eng ko'p uchraydigan holat)
+    try:
+        member = await bot.get_chat_member(chat_id, uid)
+        if member.status not in ("left", "kicked"):
+            return None
+    except Exception:
+        log.warning("A'zolikni tekshirib bo'lmadi (ws=%s uid=%s)", ws["id"], uid)
+
+    # 2) A) yo'li — kutib turgan qo'shilish so'rovi bormi?
+    try:
+        await bot.approve_chat_join_request(chat_id, uid)
+        return None
+    except Exception:
+        pass                       # so'rov yo'q edi — B) yo'liga o'tamiz
+
+    # 3) B) yo'li — bir martalik, qisqa muddatli havola.
+    try:
+        link = await bot.create_chat_invite_link(
+            chat_id,
+            member_limit=1,
+            expire_date=datetime.now(timezone.utc) + timedelta(hours=1),
+            name=f"sub {uid}"[:32],
+        )
+        return link.invite_link
+    except Exception:
+        log.exception("Bir martalik havola yaratilmadi (ws=%s uid=%s)", ws["id"], uid)
+        return None
+
+
+async def on_successful_payment(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.effective_message
+    sp = msg.successful_payment
+    uid = update.effective_user.id
+    try:
+        kind, ws_id = sp.invoice_payload.split(":")[:2]
+        ws_id = int(ws_id)
+    except ValueError:
+        log.error("Tushunarsiz to'lov payload: %s", sp.invoice_payload)
+        return
+    if kind != "sub":
+        return
+
+    ws = await db.get_workspace(ws_id)
+    if not ws:
+        log.error("To'lov keldi, lekin workspace topilmadi: %s", ws_id)
+        return
+
+    days = int(ws["period_days"])
+    fresh = await db.record_star_payment(
+        ws_id, uid, sp.total_amount, days, config.PLATFORM_FEE_PCT,
+        sp.telegram_payment_charge_id)
+    if not fresh:
+        # Telegram bir xil to'lov xabarini qayta yuborgan — obunani ikkinchi
+        # marta uzaytirmaymiz.
+        log.info("Takroriy to'lov xabari o'tkazib yuborildi: %s",
+                 sp.telegram_payment_charge_id)
+        return
+
+    expires = await db.extend_membership(ws_id, uid, days)
+    link = await grant_access(ctx.bot, ws, uid)
+
+    when = expires.astimezone(stats.TZ).strftime("%d.%m.%Y")
+    text = (f"✅ To'lov qabul qilindi — <b>{html.escape(ws['name'])}</b>\n\n"
+            f"Obuna amal qiladi: <b>{when}</b> gacha.")
+    if link:
+        text += (f"\n\n👉 Guruhga kirish havolasi (1 soat amal qiladi, "
+                 f"faqat siz uchun):\n{link}")
+    else:
+        text += "\n\nGuruhga kirish ochildi 👇"
+    await msg.reply_text(text, parse_mode=ParseMode.HTML,
+                         disable_web_page_preview=True)
+
+    who = update.effective_user.username
+    who = f"@{who}" if who else str(uid)
+    try:
+        await ctx.bot.send_message(
+            ws["owner_id"],
+            f"💰 <b>Yangi obunachi</b> — {html.escape(ws['name'])}\n\n"
+            f"👤 {html.escape(who)}\n"
+            f"⭐ {_stars(sp.total_amount)} · {days} kun\n"
+            f"📅 {when} gacha",
+            parse_mode=ParseMode.HTML)
+    except Exception:
+        log.warning("Guruh egasiga xabar yuborilmadi (ws=%s)", ws_id)
+
+
+async def on_join_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """A) yo'li — umumiy havola orqali kelgan qo'shilish so'rovi."""
+    req = update.chat_join_request
+    ws = await db.get_workspace_by_group(req.chat.id)
+    if not ws or not paid_ready(ws):
+        # To'lovli kirish yoqilmagan — bu guruhning ichki ishi, aralashmaymiz
+        # (so'rovni guruh adminlari o'zlari ko'rib chiqishadi).
+        return
+
+    uid = req.from_user.id
+    if can_manage(uid, ws) or await db.is_active_member(ws["id"], uid):
+        try:
+            await ctx.bot.approve_chat_join_request(req.chat.id, uid)
+        except Exception:
+            log.exception("So'rovni tasdiqlab bo'lmadi (ws=%s uid=%s)", ws["id"], uid)
+        return
+
+    sent = await send_offer(
+        ctx.bot, uid, ws,
+        "👋 Qo'shilish so'rovingiz qabul qilindi.\n"
+        "Bu guruh — obuna asosida ishlaydi.\n\n")
+    if not sent:
+        # Bot bu odamga yoza olmaydi (u botni hech qachon ochmagan). So'rovni
+        # ochiq qoldirsak u abadiy javobsiz osilib qolardi — rad etamiz, bu
+        # qaytarib bo'lmaydigan qadam emas: to'lagach qayta so'rashi mumkin.
+        try:
+            await ctx.bot.decline_chat_join_request(req.chat.id, uid)
+        except Exception:
+            log.exception("So'rovni rad etib bo'lmadi (ws=%s uid=%s)", ws["id"], uid)
+        log.info("So'rov rad etildi — botga yoza olmaymiz (ws=%s uid=%s)", ws["id"], uid)
+
+
+async def subs_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Muddati tugayotganlarga eslatma, tugaganlarni guruhdan chiqarish."""
+    try:
+        rows = await db.memberships_expiring(config.SUB_REMIND_DAYS)
+    except Exception:
+        log.exception("Obuna eslatmalarini olishda xato")
+        rows = []
+    for m in rows:
+        ws = await db.get_workspace(m["workspace_id"])
+        if not ws or not paid_ready(ws):
+            continue
+        left = (m["expires_at"] - datetime.now(timezone.utc)).days
+        try:
+            await ctx.bot.send_message(
+                m["user_id"],
+                f"⏳ <b>{html.escape(ws['name'])}</b> guruhidagi obunangiz "
+                f"<b>{max(left, 0)} kun</b>dan keyin tugaydi.\n\n"
+                "Uzaytirmasangiz bot sizni guruhdan chiqaradi.",
+                parse_mode=ParseMode.HTML, reply_markup=offer_kb(ws))
+        except Forbidden:
+            pass                    # botni bloklagan — baribir belgilaymiz
+        except Exception:
+            log.exception("Eslatma yuborilmadi (uid=%s)", m["user_id"])
+        await db.mark_reminded(m["workspace_id"], m["user_id"])
+
+    try:
+        rows = await db.memberships_expired()
+    except Exception:
+        log.exception("Muddati tugagan obunalarni olishda xato")
+        return
+    for m in rows:
+        uid, ws_id = m["user_id"], m["workspace_id"]
+        # Guruh egasini va super-adminlarni hech qachon chiqarmaymiz.
+        if uid == m["owner_id"] or is_admin(uid):
+            await db.mark_kicked(ws_id, uid)
+            continue
+        try:
+            # ban + darhol unban = "chiqarib yuborish, lekin qora ro'yxatga
+            # QO'YMASLIK" — qayta to'lasa yana kira oladi.
+            await ctx.bot.ban_chat_member(m["group_chat_id"], uid)
+            await ctx.bot.unban_chat_member(m["group_chat_id"], uid, only_if_banned=True)
+        except Exception:
+            log.exception("Guruhdan chiqarib bo'lmadi (ws=%s uid=%s)", ws_id, uid)
+            continue                # kicked_at qo'yilmaydi — keyingi aylanishda qayta urinamiz
+        await db.mark_kicked(ws_id, uid)
+
+        ws = await db.get_workspace(ws_id)
+        if not ws:
+            continue
+        try:
+            await ctx.bot.send_message(
+                uid,
+                f"🔒 <b>{html.escape(ws['name'])}</b> guruhidagi obunangiz tugadi.\n\n"
+                "Qayta ulanish uchun to'lovni amalga oshiring.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=offer_kb(ws) if paid_ready(ws) else None)
+        except Exception:
+            pass
+
+
+# ─────────────────────── Guruh egasi uchun panel ───────────────────────
+
+async def paid_panel(ws, bot_username: str) -> tuple[str, InlineKeyboardMarkup]:
+    s = await db.paid_summary(ws["id"])
+    price = _stars(ws["price_stars"]) if ws["price_stars"] else "belgilanmagan"
+    state = "✅ yoqilgan" if paid_ready(ws) else "⛔ o'chirilgan"
+
+    lines = [
+        f"💳 <b>To'lovli kirish</b> — {html.escape(ws['name'])}",
+        "",
+        f"Holat: <b>{state}</b>",
+        f"Narx: <b>{price}</b> / {ws['period_days']} kun",
+        f"Obunachilar: <b>{s['active']}</b>",
+    ]
+    if s["payments"]:
+        lines.append(f"To'lovlar: <b>{s['payments']}</b> · jami "
+                     f"<b>{_stars(s['gross'])}</b> · sizga "
+                     f"<b>{_stars(s['net'])}</b> "
+                     f"(komissiya {config.PLATFORM_FEE_PCT:g}%)")
+    if ws["join_link"]:
+        lines += ["", "🔗 <b>Guruh havolasi</b> (hamma joyga qo'yish mumkin):",
+                  f"<code>{html.escape(ws['join_link'])}</code>"]
+    if bot_username:
+        lines += ["", "🤖 <b>Bot havolasi</b> (avval to'laydi, keyin kiradi):",
+                  f"<code>https://t.me/{bot_username}?start=pay_{ws['id']}</code>"]
+
+    rows = [[InlineKeyboardButton(
+        "⛔ O'chirish" if ws["paid_enabled"] else "✅ Yoqish",
+        callback_data="paid:toggle")]]
+    rows.append([InlineKeyboardButton("💰 Narx", callback_data="paid:price"),
+                 InlineKeyboardButton("📅 Muddat", callback_data="paid:days")])
+    rows.append([InlineKeyboardButton(
+        "🔗 Havolani yangilash" if ws["join_link"] else "🔗 Havola yaratish",
+        callback_data="paid:link")])
+    rows.append([InlineKeyboardButton("👥 Obunachilar", callback_data="paid:members")])
+    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def _paid_ws(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Panel uchun workspace + huquq tekshiruvi. Xato bo'lsa None."""
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return None
+    uid = update.effective_user.id
+    msg = update.effective_message
+    if not can_manage(uid, ws):
+        await msg.reply_text("Ruxsat yo'q.")
+        return None
+    if ws["type"] != "group":
+        await msg.reply_text(
+            "To'lovli kirish faqat GURUH uchun ishlaydi — shaxsiy jurnalga "
+            "obuna sotib bo'lmaydi.", reply_markup=MENU_BACK_KB)
+        return None
+    return ws
+
+
+async def cmd_paid(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    ws = await _paid_ws(update, ctx)
+    if not ws:
+        return
+    text, kb = await paid_panel(ws, ctx.bot.username)
+    await update.effective_message.reply_text(
+        text, parse_mode=ParseMode.HTML, reply_markup=kb,
+        disable_web_page_preview=True)
+
+
+async def _paid_refresh(q, ws, ctx) -> None:
+    text, kb = await paid_panel(ws, ctx.bot.username)
+    await _edit(q, text, kb, ParseMode.HTML)
+
+
+async def bot_rights(bot, chat_id: int) -> tuple[bool, bool]:
+    """(kirita oladimi, chiqara oladimi). Xatoda (False, False)."""
+    try:
+        me = await bot.get_chat_member(chat_id, bot.id)
+    except Exception:
+        return False, False
+    if me.status == "creator":
+        return True, True
+    return (bool(getattr(me, "can_invite_users", False)),
+            bool(getattr(me, "can_restrict_members", False)))
+
+
+async def on_paid(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    parts = q.data.split(":")
+    action = parts[1]
+    uid = q.from_user.id
+
+    ws = await resolve_workspace(update, ctx)
+    if not ws or not can_manage(uid, ws) or ws["type"] != "group":
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return
+
+    if action == "home":
+        await q.answer()
+        await _paid_refresh(q, ws, ctx)
+        return
+
+    if action == "toggle":
+        if ws["paid_enabled"]:
+            await db.set_paid_access(ws["id"], False)
+            await q.answer("To'lovli kirish o'chirildi")
+        else:
+            if not ws["price_stars"]:
+                await q.answer("Avval narxni belgilang.", show_alert=True)
+                return
+            can_invite, can_kick = await bot_rights(ctx.bot, ws["group_chat_id"])
+            if not can_invite:
+                await q.answer(
+                    "Bot guruhda admin emas yoki \"Odam qo'shish\" huquqi yo'q. "
+                    "Huquqni bering va qaytadan urinib ko'ring.", show_alert=True)
+                return
+            await db.set_paid_access(ws["id"], True)
+            await q.answer("Yoqildi ✅")
+            if not can_kick:
+                await ctx.bot.send_message(
+                    uid,
+                    "⚠️ Botda \"A'zolarni cheklash\" huquqi yo'q — muddati "
+                    "tugagan obunachilarni guruhdan CHIQARA OLMAYDI. "
+                    "Guruh sozlamalaridan shu huquqni bering.")
+        ws = await db.get_workspace(ws["id"])
+        await _paid_refresh(q, ws, ctx)
+        return
+
+    if action == "price":
+        AWAITING_PRICE[uid] = ws["id"]
+        await q.answer()
+        await _edit(q,
+                    "💰 Yangi narxni <b>Telegram Stars</b>da yozing (faqat son).\n\n"
+                    "Masalan: <code>100</code>\n\n"
+                    f"Ruxsat etilgan oraliq: {config.MIN_PRICE_STARS}–"
+                    f"{config.MAX_PRICE_STARS:,} ⭐".replace(",", " "),
+                    InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("⬅️ Orqaga", callback_data="paid:home")]]),
+                    ParseMode.HTML)
+        return
+
+    if action == "days":
+        if len(parts) == 2:
+            await q.answer()
+            rows = [[InlineKeyboardButton(f"{d} kun", callback_data=f"paid:days:{d}")]
+                    for d in PERIOD_CHOICES]
+            rows.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="paid:home")])
+            await _edit(q, "📅 Obuna muddatini tanlang:", InlineKeyboardMarkup(rows))
+            return
+        days = int(parts[2])
+        await db.set_paid_access(ws["id"], ws["paid_enabled"], period_days=days)
+        await q.answer(f"{days} kun ✅")
+        ws = await db.get_workspace(ws["id"])
+        await _paid_refresh(q, ws, ctx)
+        return
+
+    if action == "link":
+        can_invite, _ = await bot_rights(ctx.bot, ws["group_chat_id"])
+        if not can_invite:
+            await q.answer("Botga guruhda \"Odam qo'shish\" huquqini bering.",
+                           show_alert=True)
+            return
+        try:
+            link = await ctx.bot.create_chat_invite_link(
+                ws["group_chat_id"], creates_join_request=True,
+                name="To'lovli kirish")
+        except Exception:
+            log.exception("Umumiy havola yaratilmadi (ws=%s)", ws["id"])
+            await q.answer("Havola yaratilmadi. Bot huquqlarini tekshiring.",
+                           show_alert=True)
+            return
+        await db.set_join_link(ws["id"], link.invite_link)
+        await q.answer("Havola tayyor ✅")
+        ws = await db.get_workspace(ws["id"])
+        await _paid_refresh(q, ws, ctx)
+        return
+
+    if action == "members":
+        await q.answer()
+        rows = await db.list_members(ws["id"])
+        if not rows:
+            body = "Hozircha obunachi yo'q."
+        else:
+            body = "\n".join(
+                f"• {html.escape('@' + m['username'] if m['username'] else (m['first_name'] or str(m['user_id'])))}"
+                f" — {m['expires_at'].astimezone(stats.TZ):%d.%m.%Y}"
+                for m in rows)
+        await _edit(q, f"👥 <b>Obunachilar</b> ({len(rows)})\n\n{body}",
+                    InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("⬅️ Orqaga", callback_data="paid:home")]]),
+                    ParseMode.HTML)
+        return
+
+
+async def handle_price_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Panelda so'ralgan narx matni. True qaytsa — xabar shu yerda ishlandi."""
+    uid = update.effective_user.id
+    ws_id = AWAITING_PRICE.get(uid)
+    if not ws_id:
+        return False
+    msg = update.effective_message
+    raw = (msg.text or "").strip().replace(" ", "")
+    if not raw.isdigit():
+        await msg.reply_text("Faqat butun son yozing. Masalan: 100")
+        return True
+    price = int(raw)
+    if not (config.MIN_PRICE_STARS <= price <= config.MAX_PRICE_STARS):
+        await msg.reply_text(
+            f"Narx {config.MIN_PRICE_STARS} va {config.MAX_PRICE_STARS} "
+            "oralig'ida bo'lishi kerak.")
+        return True
+    AWAITING_PRICE.pop(uid, None)
+    ws = await db.get_workspace(ws_id)
+    if not ws or not can_manage(uid, ws):
+        await msg.reply_text("Ruxsat yo'q.")
+        return True
+    await db.set_paid_access(ws_id, ws["paid_enabled"], price_stars=price)
+    ws = await db.get_workspace(ws_id)
+    text, kb = await paid_panel(ws, ctx.bot.username)
+    await msg.reply_text(f"✅ Narx: <b>{_stars(price)}</b>\n\n{text}",
+                         parse_mode=ParseMode.HTML, reply_markup=kb,
+                         disable_web_page_preview=True)
+    return True
+
+
+
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
@@ -3653,6 +4211,7 @@ async def post_init(app: Application) -> None:
         ("taklif", "Do'stlaringizni taklif qilish havolasi"),
         ("sahifa", "Guruhning ochiq natijalar sahifasi"),
         ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
+        ("tolov", "To'lovli kirish: narx, havola, obunachilar (guruh admini)"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
 
@@ -3718,6 +4277,12 @@ def main() -> None:
     app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
+    app.add_handler(CommandHandler("tolov", cmd_paid))
+    app.add_handler(CallbackQueryHandler(on_paid, pattern=r"^paid:"))
+    app.add_handler(CallbackQueryHandler(on_pay, pattern=r"^pay:"))
+    app.add_handler(PreCheckoutQueryHandler(on_precheckout))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, on_successful_payment))
+    app.add_handler(ChatJoinRequestHandler(on_join_request))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))
@@ -3785,6 +4350,9 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    # Obuna muddatlari: 6 soatda bir aylanadi — eslatma o'z vaqtida boradi,
+    # muddati tugagan odam esa yarim kundan ko'proq ichkarida qolib ketmaydi.
+    app.job_queue.run_repeating(subs_job, interval=21600, first=120)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

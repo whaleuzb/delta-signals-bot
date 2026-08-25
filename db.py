@@ -201,6 +201,51 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_last DATE;
 -- to'g'ri beradi. Rasm 256x256 PNG — bir necha o'n kilobayt.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo BYTEA;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo_at TIMESTAMPTZ;
+
+-- ─────────────────────── To'lovli kirish (paywall) ───────────────────────
+-- Guruh egasi o'z guruhiga obuna sotadi, bot esa kirish-chiqishni boshqaradi.
+-- Standart holat — O'CHIQ: hech bir mavjud guruh bexosdan pullik bo'lib
+-- qolmasligi kerak.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS paid_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+-- Narx Telegram Stars'da (butun son). NULL — hali belgilanmagan, shu holatda
+-- paid_enabled yoqilmaydi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS price_stars INT;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS period_days INT NOT NULL DEFAULT 30;
+-- creates_join_request=TRUE bilan yaratilgan YAGONA umumiy havola. Uni hamma
+-- joyga qo'yish mumkin — havolaning o'zi hech kimni ichkariga kiritmaydi,
+-- faqat so'rov yuboradi, qaror esa botda (obuna bormi) qabul qilinadi.
+-- Shu sabab u invite_link'dan (oddiy taklif havolasi) ALOHIDA saqlanadi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS join_link TEXT;
+
+-- Bitta odamning bitta guruhdagi obunasi. Muddat tugagach `kicked_at`
+-- to'ldiriladi (ikki marta chiqarib yubormaslik uchun), qayta to'lasa
+-- tozalanadi.
+CREATE TABLE IF NOT EXISTS memberships (
+    workspace_id INT         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id      BIGINT      NOT NULL,
+    expires_at   TIMESTAMPTZ NOT NULL,
+    reminded     BOOLEAN     NOT NULL DEFAULT FALSE,
+    kicked_at    TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memberships_expires ON memberships(expires_at);
+
+-- Har bir muvaffaqiyatli Stars to'lovi. charge_id UNIQUE — Telegram bir xil
+-- to'lovni qayta yuborsa obuna ikki marta uzaytirilmaydi.
+-- fee_pct to'lov PAYTIDAGI komissiya foizi bilan muzlatiladi: keyin stavka
+-- o'zgarsa eski hisob-kitob buzilmasin.
+CREATE TABLE IF NOT EXISTS star_payments (
+    id           SERIAL      PRIMARY KEY,
+    workspace_id INT         NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id      BIGINT      NOT NULL,
+    stars        INT         NOT NULL,
+    days         INT         NOT NULL,
+    fee_pct      NUMERIC     NOT NULL DEFAULT 0,
+    charge_id    TEXT        NOT NULL UNIQUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_star_payments_ws ON star_payments(workspace_id);
 """
 
 
@@ -346,6 +391,141 @@ async def list_pending_public() -> list[asyncpg.Record]:
         return await c.fetch(
             "SELECT * FROM workspaces WHERE type='group' AND public = TRUE "
             "AND public_approved = FALSE ORDER BY id")
+
+
+# ────────────────────────── To'lovli kirish ──────────────────────────
+# Guruh egasi narx belgilaydi, odam Stars bilan to'laydi, bot uni guruhga
+# kiritadi va muddat tugagach chiqaradi. Barcha vaqtlar UTC (TIMESTAMPTZ).
+
+async def set_paid_access(workspace_id: int, enabled: bool,
+                          price_stars: int | None = None,
+                          period_days: int | None = None) -> None:
+    """Narx/muddat faqat berilgan bo'lsa o'zgaradi (COALESCE) — panelda
+    ularni alohida-alohida tahrirlash uchun."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET paid_enabled = $2, "
+            "price_stars = COALESCE($3, price_stars), "
+            "period_days = COALESCE($4, period_days) WHERE id = $1",
+            workspace_id, enabled, price_stars, period_days)
+
+
+async def set_join_link(workspace_id: int, link: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET join_link = $2 WHERE id = $1",
+                        workspace_id, link)
+
+
+async def membership(workspace_id: int, user_id: int) -> asyncpg.Record | None:
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT * FROM memberships WHERE workspace_id = $1 AND user_id = $2",
+            workspace_id, user_id)
+
+
+async def is_active_member(workspace_id: int, user_id: int) -> bool:
+    async with pool().acquire() as c:
+        return bool(await c.fetchval(
+            "SELECT 1 FROM memberships WHERE workspace_id = $1 AND user_id = $2 "
+            "AND expires_at > now()", workspace_id, user_id))
+
+
+async def extend_membership(workspace_id: int, user_id: int, days: int) -> datetime:
+    """Obunani uzaytiradi va yangi tugash sanasini qaytaradi.
+
+    Muddati hali tugamagan bo'lsa MAVJUD sanaga qo'shiladi (odam erta
+    to'laganida kunlarini yo'qotmasligi kerak), tugagan bo'lsa hozirdan
+    boshlanadi. `kicked_at` va `reminded` tozalanadi — bu yangi davr."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            """
+            INSERT INTO memberships (workspace_id, user_id, expires_at)
+            VALUES ($1, $2, now() + ($3 || ' days')::interval)
+            ON CONFLICT (workspace_id, user_id) DO UPDATE SET
+                expires_at = GREATEST(memberships.expires_at, now())
+                             + ($3 || ' days')::interval,
+                reminded = FALSE,
+                kicked_at = NULL
+            RETURNING expires_at
+            """, workspace_id, user_id, str(days))
+
+
+async def record_star_payment(workspace_id: int, user_id: int, stars: int,
+                              days: int, fee_pct: float, charge_id: str) -> bool:
+    """To'lovni yozadi. Bu to'lov ILGARI yozilgan bo'lsa False qaytaradi —
+    chaqiruvchi obunani uzaytirmasligi kerak (takroriy xabar himoyasi)."""
+    async with pool().acquire() as c:
+        row = await c.fetchval(
+            "INSERT INTO star_payments (workspace_id, user_id, stars, days, "
+            "fee_pct, charge_id) VALUES ($1,$2,$3,$4,$5,$6) "
+            "ON CONFLICT (charge_id) DO NOTHING RETURNING id",
+            workspace_id, user_id, stars, days, _d(fee_pct), charge_id)
+        return row is not None
+
+
+async def paid_summary(workspace_id: int) -> asyncpg.Record:
+    """Panel uchun: hozirgi obunachilar soni, to'lovlar soni, jami va
+    komissiya ayirilgandan keyingi Stars."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            """
+            SELECT
+              (SELECT count(*) FROM memberships
+                WHERE workspace_id = $1 AND expires_at > now())      AS active,
+              (SELECT count(*) FROM star_payments WHERE workspace_id = $1) AS payments,
+              (SELECT COALESCE(sum(stars), 0) FROM star_payments
+                WHERE workspace_id = $1)                             AS gross,
+              (SELECT COALESCE(sum(stars * (100 - fee_pct) / 100), 0)
+                 FROM star_payments WHERE workspace_id = $1)         AS net
+            """, workspace_id)
+
+
+async def list_members(workspace_id: int, limit: int = 30) -> list[asyncpg.Record]:
+    """Faol obunachilar — tugash sanasi yaqinlari birinchi."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT m.*, u.username, u.first_name FROM memberships m "
+            "LEFT JOIN users u ON u.user_id = m.user_id "
+            "WHERE m.workspace_id = $1 AND m.expires_at > now() "
+            "ORDER BY m.expires_at LIMIT $2", workspace_id, limit)
+
+
+async def memberships_expiring(days: int = 3) -> list[asyncpg.Record]:
+    """Muddati shu kunlar ichida tugaydiganlar (hali eslatilmaganlar).
+
+    Faqat to'lovli kirish YOQIQ guruhlar: egasi uni o'chirib qo'ygan bo'lsa
+    odamlarni bezovta qilish ham, chiqarib yuborish ham noto'g'ri."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT m.*, w.name, w.group_chat_id, w.price_stars, w.period_days "
+            "FROM memberships m JOIN workspaces w ON w.id = m.workspace_id "
+            "WHERE w.paid_enabled AND NOT m.reminded AND m.kicked_at IS NULL "
+            "AND m.expires_at > now() AND m.expires_at < now() + ($1 || ' days')::interval",
+            str(days))
+
+
+async def memberships_expired() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT m.*, w.name, w.group_chat_id, w.owner_id, w.price_stars "
+            "FROM memberships m JOIN workspaces w ON w.id = m.workspace_id "
+            "WHERE w.paid_enabled AND m.kicked_at IS NULL AND m.expires_at <= now() "
+            "AND w.group_chat_id IS NOT NULL")
+
+
+async def mark_reminded(workspace_id: int, user_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE memberships SET reminded = TRUE "
+            "WHERE workspace_id = $1 AND user_id = $2", workspace_id, user_id)
+
+
+async def mark_kicked(workspace_id: int, user_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE memberships SET kicked_at = now() "
+            "WHERE workspace_id = $1 AND user_id = $2", workspace_id, user_id)
+
 
 
 # ─────────────────── Foydalanuvchilar va majburiy obuna ───────────────────

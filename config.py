@@ -61,3 +61,17 @@ WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rs
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")
+
+# --- To'lovli kirish (guruh egasi o'z guruhiga obuna sotadi) ---
+# Platforma komissiyasi, foizda. Telegram Stars BOT EGASINING hisobiga
+# tushadi, ya'ni pulni guruh egasiga qo'lda o'tkazish kerak — bu foiz shu
+# hisob-kitobda ishlatiladi va har bir to'lov yozuvida muzlatiladi.
+PLATFORM_FEE_PCT = float(os.getenv("PLATFORM_FEE_PCT", "10"))
+# Telegram Stars invoysi uchun chegaralar (Bot API talabi: 1..2500 ⭐ oralig'i
+# obuna havolalari uchun; oddiy invoysda yuqori chegara yo'q, lekin real
+# narxlar shu oraliqda bo'ladi — bu yerda faqat aql bovar qilmaydigan
+# qiymatlardan himoya).
+MIN_PRICE_STARS = 1
+MAX_PRICE_STARS = 100_000
+# Muddati tugaydigan obunachiga necha kun oldin eslatiladi.
+SUB_REMIND_DAYS = int(os.getenv("SUB_REMIND_DAYS", "3"))
