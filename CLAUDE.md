@@ -1424,3 +1424,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - Tekshirildi: DOCU, docu, CRCL, crcl, tsla, $AAPL, NASDAQ:TSLA — hammasi
       topildi; uzun so'zlar tarmoqqa chiqmadi; ikkinchi chaqiruvda 0 so'rov;
       olti nomzodli xabarda atigi 2 so'rov.
+
+69. **Uzoq ishda "yozmoqda…" ko'rsatkichi (`busy`).**
+    Ba'zi javoblar 5-7 soniya kechikardi (juftlik tekshiruvi tarmoqqa
+    chiqadi) va foydalanuvchi bot ishlamayapti deb o'ylardi.
+    - `busy(bot, chat_id, note=None, after=1.2)` — async kontekst menejer,
+      IKKI bosqichli:
+      1. darhol Telegram'ning "yozmoqda…" belgisi (u ~5 soniya turadi,
+         shuning uchun 4 soniyada bir yangilanadi);
+      2. ish `after` dan cho'zilsa — matnli xabar ("🔎 Juftlikni
+         tekshiryapman…"), va u ish tugagach **o'chiriladi**.
+      Shu sabab tez javoblarda chat toza qoladi, sekinlarida esa nima
+      bo'layotgani ko'rinadi.
+    - Sikl qadami 0.25 s, lekin tarmoqqa 4 soniyada bir marta chiqadi.
+      **Avval qadam ham 4 soniya edi va 2.5 soniyalik ishda xabar umuman
+      chiqmasdi** — buni sinov ochib berdi.
+    - Ko'rsatkichdagi har qanday Telegram xatosi yutiladi: bu faqat
+      ko'rsatkich, asosiy ishga xalaqit bermasligi kerak. Ish istisno bilan
+      tugasa ham xabar o'chiriladi (`finally`).
+    - Qo'llangan joylar: sehrgar juftlik qadami, matn/rasm signal ko'rigi,
+      rasmdan o'qish, menyudagi Statistika / Juftliklar / Ochiq signallar,
+      `/stats`, `/open`, `/equity`.
+    - Tekshirildi: 0.3 s → faqat "yozmoqda"; 2.5 s → xabar chiqdi va o'chdi;
+      9 s → belgi 3 marta yangilandi, xabar bitta; xato bo'lsa ham tozalandi.

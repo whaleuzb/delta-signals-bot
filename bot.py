@@ -12,6 +12,7 @@ import os
 import logging
 import secrets
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from PIL import Image
@@ -19,7 +20,7 @@ from PIL import Image
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
 )
-from telegram.constants import ParseMode
+from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
     Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
@@ -1254,14 +1255,20 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "weblink":
         await send_web_link(q.message, ws)
     elif action == "stats":
-        await q.message.reply_text(await stats_view_text(ws, q.from_user.id, "all"), parse_mode=ParseMode.HTML,
+        # Statistika ochiq signallar uchun jonli narx so'raydi — sekin bo'lishi
+        # mumkin, shuning uchun "yozmoqda" belgisi ko'rsatiladi.
+        async with busy(ctx.bot, q.message.chat_id):
+            text = await stats_view_text(ws, q.from_user.id, "all")
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=stats_nav_kb("all"))
     elif action == "symbols":
-        text = await symbols_view_text(ws["id"], None, None)
+        async with busy(ctx.bot, q.message.chat_id):
+            text = await symbols_view_text(ws["id"], None, None)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=symbols_nav_kb(None, None))
     elif action == "open":
-        text, kb = await open_signals_view(ws, q.from_user.id)
+        async with busy(ctx.bot, q.message.chat_id):
+            text, kb = await open_signals_view(ws, q.from_user.id)
         rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
@@ -1457,7 +1464,11 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     # Butun matn ham, undan ajratilgan nomzodlar ham sinaladi: odam "btc",
     # "BTC/USDT" yoki "menga btc kerak" deb yozishi mumkin.
     cands = [raw] + [c for c in parsing.symbol_candidates(raw) if c != raw]
-    sym, market = await resolve_symbol(cands)
+    # Juftlik tekshiruvi tarmoqqa chiqadi (birja ro'yxati, aksiya narxi) va
+    # ba'zan 5-7 soniya davom etadi — jimlik "bot ishlamayapti" degan
+    # taassurot qoldirardi.
+    async with busy(ctx.bot, msg.chat_id, "🔎 Juftlikni tekshiryapman…"):
+        sym, market = await resolve_symbol(cands)
     if not sym:
         await msg.reply_text(
             f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto, forex yoki aksiya). "
@@ -1629,13 +1640,18 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     source = "caption"
 
     if draft is None:
-        await msg.reply_text("🔎 Grafikni o'qiyapman…")
+        note = await msg.reply_text("🔎 Grafikni o'qiyapman…")
         f = await ctx.bot.get_file(file_id)
         data = bytes(await f.download_as_bytearray())
         # Rasm ostidagi yozuv modelga MASLAHAT sifatida beriladi: ko'pincha
         # juftlik nomi yoki tomon aynan shu yerda bo'ladi, garchi to'liq
         # signal sifatida o'qib bo'lmagan bo'lsa ham.
-        draft = await vision.read_chart(data, hint=caption.strip())
+        async with busy(ctx.bot, msg.chat_id):
+            draft = await vision.read_chart(data, hint=caption.strip())
+        try:
+            await note.delete()      # o'qish tugadi — kutish xabari kerak emas
+        except Exception:
+            pass
         source = "vision"
         if draft is None:
             await msg.reply_text(
@@ -1770,7 +1786,8 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
                         token: str | None = None) -> None:
     cands = draft.get("symbols") or [draft["symbol"]]
-    sym, market = await resolve_symbol(cands)
+    async with busy(ctx.bot, msg.chat_id, "🔎 Juftlikni tekshiryapman…"):
+        sym, market = await resolve_symbol(cands)
     if not sym:
         shown = html.escape(", ".join(cands[:3]))
         await msg.reply_text(
@@ -1903,6 +1920,60 @@ def tf_kb(token: str) -> InlineKeyboardMarkup:
         rows.append(cur)
     rows.append([InlineKeyboardButton("↩️ Orqaga", callback_data=f"bk:{token}")])
     return InlineKeyboardMarkup(rows)
+
+
+@asynccontextmanager
+async def busy(bot, chat_id: int, note: str | None = None, after: float = 1.2):
+    """Uzoq ish paytida foydalanuvchi bot qotib qolgan deb o'ylamasin.
+
+    Ikki bosqichli, ataylab:
+      1. DARHOL "yozmoqda…" belgisi chiqadi (Telegram uni ~5 soniya ushlaydi,
+         shuning uchun har 4 soniyada yangilanadi). Ish tez tugasa chatda
+         hech qanday ortiqcha xabar qolmaydi.
+      2. Ish `after` soniyadan cho'zilsa — matnli xabar ham yuboriladi
+         ("⏳ ..."), va ish tugagach O'CHIRILADI. Shu sabab tez javoblarda
+         chat toza qoladi, sekinlarida esa nima bo'layotgani ko'rinadi.
+
+    Xabar yuborish yoki o'chirish yiqilsa jimgina o'tkazib yuboriladi: bu
+    faqat ko'rsatkich, asosiy ishga xalaqit bermasligi kerak."""
+    holder: dict = {}
+
+    async def ticker():
+        # Sikl QISQA qadam bilan aylanadi, lekin tarmoqqa kamdan-kam chiqadi:
+        # "yozmoqda" belgisi 4 soniyada bir marta yangilanadi, kutish xabari
+        # esa aynan `after` soniyada yuboriladi. Avval qadam ham 4 soniya edi
+        # va, masalan, 2.5 soniyalik ishda xabar umuman chiqmasdi.
+        started = time.monotonic()
+        next_action = 0.0
+        try:
+            while True:
+                elapsed = time.monotonic() - started
+                if elapsed >= next_action:
+                    try:
+                        await bot.send_chat_action(chat_id, ChatAction.TYPING)
+                    except Exception:
+                        pass
+                    next_action = elapsed + 4
+                if note and "msg" not in holder and elapsed >= after:
+                    try:
+                        holder["msg"] = await bot.send_message(chat_id, note)
+                    except Exception:
+                        holder["msg"] = None
+                await asyncio.sleep(0.25)
+        except asyncio.CancelledError:
+            pass
+
+    task = asyncio.create_task(ticker())
+    try:
+        yield
+    finally:
+        task.cancel()
+        msg = holder.get("msg")
+        if msg is not None:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
 
 
 async def _clear_kb(q) -> None:
@@ -2677,8 +2748,10 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    await update.message.reply_text(await stats_view_text(ws, update.effective_user.id, "all"),
-                                     parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb("all"))
+    async with busy(ctx.bot, update.effective_chat.id):
+        text = await stats_view_text(ws, update.effective_user.id, "all")
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML,
+                                     reply_markup=stats_nav_kb("all"))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2746,7 +2819,9 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
                                          reply_markup=MENU_BACK_KB)
         return
-    await update.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=MENU_BACK_KB)
+    async with busy(ctx.bot, update.effective_chat.id):
+        await update.message.reply_photo(InputFile(buf, "equity.png"),
+                                          reply_markup=MENU_BACK_KB)
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2757,7 +2832,8 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    text, kb = await open_signals_view(ws, update.effective_user.id)
+    async with busy(ctx.bot, update.effective_chat.id):
+        text, kb = await open_signals_view(ws, update.effective_user.id)
     rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
                                      reply_markup=InlineKeyboardMarkup(rows))
