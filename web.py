@@ -38,7 +38,7 @@ NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 # qolmasligi uchun havolaga versiya qo'shiladi — yangi manzil eski
 # keshga tushmaydi. Grafik ko'rinishini o'zgartirsangiz, shu raqamni
 # oshiring.
-MINI_V = "2"
+MINI_V = "3"
 
 CACHE_TTL = 120.0          # sahifa/grafik keshi (soniya)
 _cache: dict[str, tuple[float, object]] = {}
@@ -81,30 +81,45 @@ def fmt_price(x) -> str:
 
 
 CSS = """
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0b0e14;--card:#141a22;--line:#232b36;--mut:#8592a3;--ink:#eef2f7;
-      --acc:#4da3ff;--long:#2ecc8f;--short:#ff5c5c;--silver:#8a8f99;
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* Ranglar Whale Payment Bot mini-ilovasidan olingan: qora-kumush, sovuq
+   kulrang sirtlar. Yashil/qizil FAQAT savdo natijasi uchun qoladi —
+   boshqa hech qayerda rangli urg'u yo'q, shuning uchun raqamga ko'z
+   birinchi tushadi. */
+:root{--bg:#0A0A0C;--bg2:#101013;--card:#17171B;--card2:#1E1E23;
+      --line:#28282E;--ink:#F3F4F6;--mut:#95979E;--faint:#57585E;
+      --silver:#DADDE2;--silver-dim:#84868C;--glow:rgba(218,221,226,.10);
+      --acc:#DADDE2;--long:#2ecc8f;--short:#ff5c5c;
       /* Tepadagi band joy. Oddiy brauzerda 0; Telegram'da skript aniq
          qiymatni qo'yadi (pastdagi TG_SCRIPT'ga qarang). */
       --tgtop:env(safe-area-inset-top,0px)}
-body{background:var(--bg);color:var(--ink);
-     font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-     line-height:1.5;padding:0 20px 64px}
+body{background:radial-gradient(ellipse 650px 380px at 50% -8%,var(--glow),transparent 60%),
+                var(--bg);
+     background-attachment:fixed;color:var(--ink);
+     font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+     line-height:1.5;padding:0 20px 64px;min-height:100vh}
 .wrap{max-width:980px;margin:0 auto}
-header{padding:calc(34px + var(--tgtop,0px)) 0 26px;border-bottom:1px solid var(--line);margin-bottom:32px}
-.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;font-weight:600;
+header{padding:calc(34px + var(--tgtop,0px)) 0 26px;border-bottom:1px solid var(--line);
+       margin-bottom:32px}
+.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;font-weight:600;
        letter-spacing:.26em;color:var(--silver);text-transform:uppercase}
-h1{font-size:clamp(26px,5vw,40px);font-weight:700;letter-spacing:-.02em;margin-top:8px}
+h1{font-family:"Space Grotesk",Inter,sans-serif;font-size:clamp(26px,5vw,40px);
+   font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .sub{color:var(--mut);margin-top:6px;font-size:15px}
-a{color:var(--acc);text-decoration:none}
+a{color:var(--silver);text-decoration:none}
 a:hover{text-decoration:underline}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:30px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;
+      margin-bottom:30px}
+.tile{background:linear-gradient(155deg,rgba(23,23,27,.88),rgba(16,16,19,.88));
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .tile .k{font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
-.tile .v{font-size:26px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.tile .v{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:25px;font-weight:600;
+         margin-top:6px;letter-spacing:-.01em}
 .pos{color:var(--long)}.neg{color:var(--short)}
-h2{font-size:19px;font-weight:600;margin:34px 0 14px}
-.chart{width:100%;border:1px solid var(--line);border-radius:12px;display:block}
+h2{font-family:"Space Grotesk",Inter,sans-serif;font-size:20px;font-weight:600;
+   margin:34px 0 14px}
+.chart{width:100%;border:1px solid var(--line);border-radius:14px;display:block}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
 th,td{padding:11px 12px;text-align:right;border-bottom:1px solid var(--line);
@@ -136,106 +151,136 @@ tbody tr:hover{background:#ffffff06}
 .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:600}
 .b-long{background:#2ecc8f22;color:var(--long)}
 .b-short{background:#ff5c5c22;color:var(--short)}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
-.gcard{background:linear-gradient(165deg,#171e28,#12171f);
-       border:1px solid var(--line);border-radius:14px;
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.gcard{background:linear-gradient(155deg,rgba(23,23,27,.88),rgba(16,16,19,.88));
+       backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+       border:1px solid var(--line);border-radius:16px;
        padding:18px 20px;display:block;color:inherit;position:relative;
-       overflow:hidden;transition:border-color .15s,transform .15s}
+       overflow:hidden;transition:border-color .18s,transform .18s,background .18s}
 .gcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
                background:var(--line)}
 .gcard.pos-edge::before{background:var(--long)}
 .gcard.neg-edge::before{background:var(--short)}
-.gcard:hover{border-color:#3a4351;text-decoration:none;transform:translateY(-2px)}
+.gcard:hover{border-color:var(--silver-dim);text-decoration:none;transform:translateY(-2px)}
+.gcard:active{transform:scale(.985)}
 .gtop{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .gname{display:flex;align-items:center;gap:10px;min-width:0}
-.gcard .n{font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
-          white-space:nowrap}
+.gcard .n{font-family:"Space Grotesk",Inter,sans-serif;font-size:18px;font-weight:600;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* O'rin raqami. Ro'yxat daromad bo'yicha tartiblangan — birinchi uchtasi
    ko'zga tashlansin, qolgani xotirjam kulrang. */
 .rank{display:inline-flex;align-items:center;justify-content:center;
-      width:28px;height:28px;flex:none;border-radius:9px;background:#222a35;
-      color:var(--mut);font-size:13px;font-weight:700}
-.rank.r1{background:linear-gradient(150deg,#f6d67a,#c8a12a);color:#231d05}
-.rank.r2{background:linear-gradient(150deg,#e2e7ef,#98a2b1);color:#1b1f26}
-.rank.r3{background:linear-gradient(150deg,#e4a97b,#b57741);color:#241606}
-.gcard .big{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;
-            white-space:nowrap}
+      width:28px;height:28px;flex:none;border-radius:9px;background:var(--card2);
+      border:1px solid var(--line);color:var(--mut);
+      font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;font-weight:700}
+.rank.r1{background:linear-gradient(150deg,#f6d67a,#c8a12a);color:#231d05;border-color:transparent}
+.rank.r2{background:linear-gradient(150deg,#e2e7ef,#98a2b1);color:#1b1f26;border-color:transparent}
+.rank.r3{background:linear-gradient(150deg,#e4a97b,#b57741);color:#241606;border-color:transparent}
+.gcard .big{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:23px;
+            font-weight:600;white-space:nowrap;letter-spacing:-.01em}
 .gstats{display:flex;gap:18px;margin-top:14px;color:var(--mut);font-size:13px;
         flex-wrap:wrap}
-.gstats span{color:var(--ink);font-weight:600}
+.gstats span{color:var(--ink);font-weight:600;
+             font-family:"IBM Plex Mono",ui-monospace,monospace}
 .gfoot{display:flex;justify-content:space-between;align-items:center;margin-top:16px;
        padding-top:14px;border-top:1px solid var(--line);min-height:20px}
-.chip{background:#4da3ff1f;color:var(--acc);font-size:12px;font-weight:600;
+.chip{background:rgba(218,221,226,.10);color:var(--silver);font-size:12px;font-weight:600;
       padding:3px 9px;border-radius:20px}
 /* "Batafsil" — havola emas, tugmaga o'xshasin: karta bosiladigan
    ekanligi bir qarashda tushunilsin. */
 .gbtn{margin-left:auto;display:inline-flex;align-items:center;
-      background:#4da3ff14;border:1px solid #4da3ff3d;color:var(--acc);
+      background:var(--card2);border:1px solid var(--line);color:var(--silver);
       font-size:13px;font-weight:600;padding:7px 14px;border-radius:9px;
-      transition:background .15s,color .15s,border-color .15s}
-.gcard:hover .gbtn{background:var(--acc);border-color:var(--acc);color:#06121f}
+      transition:background .18s,color .18s,border-color .18s}
+.gcard:hover .gbtn{background:var(--silver);border-color:var(--silver);color:#0A0A0C}
 
 /* hero */
 .hero{border-bottom:1px solid var(--line);padding-bottom:30px}
-.btn{display:inline-block;margin-top:22px;background:var(--acc);color:#06121f;
-     font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
-.btn:hover{text-decoration:none;filter:brightness(1.08)}
+/* Asosiy tugma — kumush gradient, qora matn (Whale ilovasidagi kabi). */
+.btn{display:inline-block;margin-top:22px;
+     background:linear-gradient(150deg,#EDEEF1,#AEB1B7);color:#0A0A0C;
+     font-family:"Space Grotesk",Inter,sans-serif;font-weight:700;font-size:15px;
+     padding:12px 24px;border-radius:12px;
+     transition:transform .15s cubic-bezier(.22,.8,.32,1),filter .15s}
+.btn:hover{text-decoration:none;filter:brightness(1.05)}
+.btn:active{transform:scale(.98)}
 /* Guruhga qo'shilish — sahifadagi eng muhim harakat, shuning uchun
-   oddiy tugmadan kattaroq va yorug'roq. */
-.join{margin-top:18px;font-size:16px;padding:13px 26px;
-      box-shadow:0 6px 20px rgba(77,163,255,.22)}
-.note{margin-top:26px;color:var(--mut);font-size:13px}
+   oddiy tugmadan kattaroq. */
+.join{margin-top:18px;font-size:16px;padding:14px 28px;
+      box-shadow:0 8px 26px rgba(218,221,226,.14)}
+.note{margin-top:26px;color:var(--faint);font-size:13px}
 /* oxirgi savdolar — grafikli kartalar */
-.trades{display:flex;flex-direction:column;gap:10px}
-.trade{background:var(--card);border:1px solid var(--line);border-radius:12px;
-       padding:14px 16px;display:grid;
+.trades{display:flex;flex-direction:column;gap:9px}
+/* Fon SHAFFOF EMAS: ichidagi kichik grafik ham aynan shu rangda
+   chiziladi (chart.CARD_BG), shunda rasm chegarasi ko'rinmaydi. */
+.trade{background:var(--card);
+       border:1px solid var(--line);border-radius:14px;
+       padding:14px 16px;display:grid;position:relative;overflow:hidden;
        grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px}
-.tsym{font-size:15px;font-weight:600}
+/* Chap chetdagi rangli chiziq — guruh kartalaridagi kabi: foyda/zarar
+   ro'yxatda bir qarashda skanerlanadi. */
+.trade::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+               background:var(--line)}
+.trade.pos-edge::before{background:var(--long)}
+.trade.neg-edge::before{background:var(--short)}
+.tsym{font-family:"Space Grotesk",Inter,sans-serif;font-size:15px;font-weight:600}
 .tsub{color:var(--mut);font-size:12.5px;margin-top:4px;
-      font-variant-numeric:tabular-nums}
+      font-family:"IBM Plex Mono",ui-monospace,monospace}
 .tmini{width:160px;height:55px;border-radius:6px;display:block;flex:none}
-.tpnl{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;
+.tpnl{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:17px;font-weight:600;
       white-space:nowrap;min-width:76px;text-align:right}
 @media (max-width:640px){
   /* Telefonda karta BIR QATOR bo'lib qoladi: chapda juftlik, o'rtada
      kichkina grafik, o'ngda natija. Avval grafik pastga to'liq kenglikda
      tushardi va bitta savdo ekranning uchdan birini egallardi — 25 ta
      savdoni ko'rish uchun juda uzoq aylantirish kerak edi. */
-  .join{display:block;text-align:center;font-size:16px;padding:14px 18px}
-  .trade{padding:12px;gap:9px}
+  .join{display:block;text-align:center;font-size:16px;padding:15px 18px}
+  .trade{padding:12px 12px 12px 14px;gap:9px}
   /* Matn ko'chmasin: bir kartada ikki qator, boshqasida uch qator bo'lib
      ro'yxat notekis ko'rinardi. Endi hamma karta bir xil balandlikda. */
   .tsym,.tsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tsym{font-size:14px}
-  .tsub{font-size:11px;margin-top:3px}
+  .tsub{font-size:10.5px;margin-top:3px;letter-spacing:-.02em}
   .badge{padding:2px 6px;font-size:11px}
-  .tmini{width:84px;height:30px;border-radius:5px}
+  .tmini{width:78px;height:28px;border-radius:5px}
   .tpnl{font-size:15px;min-width:0}
 }
-@media (max-width:360px){
-  /* Eng tor telefonlarda grafik matnni siqib qo'ymasin. */
-  .tmini{width:74px;height:27px}
+@media (max-width:380px){
+  /* Eng tor telefonlarda grafik matnni siqib qo'ymasin: narx va sana
+     to'liq ko'rinsin, grafik esa kichrayaversin. */
+  .tmini{width:62px;height:24px}
+  .tsub{font-size:10px}
+  .trade{gap:7px}
+}
+@media (max-width:340px){
+  /* Juda tor ekran (eski iPhone SE): grafik o'rniga narx va sana muhim —
+     grafik butunlay olib tashlanadi, matn esa to'liq ko'rinadi. */
+  .tmini{display:none}
 }
 
-.cta{margin-top:40px;background:linear-gradient(160deg,#161d27,#10151c);
-     border:1px solid var(--line);border-radius:16px;padding:28px 30px}
-.cta h3{font-size:21px;font-weight:600;margin-bottom:10px}
+.cta{margin-top:40px;
+     background:linear-gradient(135deg,var(--glow),rgba(23,23,27,.9) 55%);
+     border:1px solid var(--line);border-radius:18px;padding:28px 30px}
+.cta h3{font-family:"Space Grotesk",Inter,sans-serif;font-size:21px;font-weight:600;
+        margin-bottom:10px}
 .cta p{color:var(--mut);font-size:15px}
 .steps{margin:16px 0 4px;padding-left:20px;color:var(--mut);font-size:15px}
 .steps li{margin-bottom:9px}
-.steps li::marker{color:var(--acc);font-weight:600}
+.steps li::marker{color:var(--silver);font-weight:600}
 .cta .btn{margin-top:18px}
-code{font-family:"IBM Plex Mono",ui-monospace,monospace;background:#ffffff0d;
-     padding:2px 7px;border-radius:5px;font-size:13px}
+code{font-family:"IBM Plex Mono",ui-monospace,monospace;background:rgba(218,221,226,.08);
+     color:var(--silver);padding:2px 7px;border-radius:5px;font-size:13px}
 footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
-       color:var(--mut);font-size:13px;display:flex;justify-content:space-between;
+       color:var(--faint);font-size:13px;display:flex;justify-content:space-between;
        flex-wrap:wrap;gap:10px}
 .empty{color:var(--mut);padding:26px 0}
 """
 
-FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
-         'family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700'
-         '&display=swap">')
+FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
+         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+         'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600'
+         '&family=IBM+Plex+Mono:wght@500;600;700&display=swap">')
 
 
 # Telegram Mini App skripti. Bo'lmasa ham sahifa oddiy veb-sahifa sifatida
@@ -453,7 +498,7 @@ async def group_page(request):
         when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
         exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
         trades += (
-            "<div class='trade'>"
+            f"<div class='trade {_cls(p)}-edge'>"
             f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
             f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
             f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"

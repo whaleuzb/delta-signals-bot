@@ -20,8 +20,8 @@ TZ = ZoneInfo(config.TZ)
 log = logging.getLogger("stats")
 
 # Grafik ranglari (bot xabarlaridagi qorong'i mavzuga mos)
-BG = "#0e1117"
-GRID = "#2a2f3a"
+BG = "#101013"      # veb sahifadagi karta foni bilan bir oila
+GRID = "#28282E"
 TXT = "#9aa4b2"
 TITLE = "#e6e9ef"
 GREEN = "#26a69a"

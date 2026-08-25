@@ -24,13 +24,16 @@ import tracker
 
 log = logging.getLogger("chart")
 
-BG = "#0e1117"
-GRID = "#2a2f3a"
+BG = "#101013"      # Whale uslubi: sahifa foni bilan bir xil oila
+GRID = "#28282E"
+# Kichik grafik KARTA ichida turadi — foni karta rangida bo'lsa, rasm
+# chegarasi ko'rinmaydi va grafik kartaning bir qismidek o'qiladi.
+CARD_BG = "#17171B"
 TXT = "#9aa4b2"
 TITLE = "#e6e9ef"
 GREEN = "#26a69a"
 RED = "#ef5350"
-ACC = "#4da3ff"
+ACC = "#DADDE2"     # kumush — kirish darajasi chizig'i
 SILVER = "#8a8f99"
 
 # Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
@@ -263,8 +266,8 @@ async def mini_chart(sig) -> io.BytesIO | None:
     show_entry = c_lo * 0.9 <= entry <= c_hi * 1.1
 
     fig, ax = plt.subplots(figsize=(3.2, 1.1), dpi=100)
-    fig.patch.set_facecolor(BG)
-    ax.set_facecolor(BG)
+    fig.patch.set_facecolor(CARD_BG)
+    ax.set_facecolor(CARD_BG)
 
     ax.plot(xs, closes, color=col, lw=1.6, zorder=3)
     ax.fill_between(xs, closes, min(closes), color=col, alpha=0.13, zorder=2)
@@ -277,7 +280,7 @@ async def mini_chart(sig) -> io.BytesIO | None:
         idx = min(range(len(candles)),
                   key=lambda i: abs(candles[i].close_ms - closed_ms))
         ax.scatter([idx], [closes[idx]], color=col, s=26, zorder=4,
-                   edgecolor=BG, linewidth=1.2)
+                   edgecolor=CARD_BG, linewidth=1.2)
 
     # Miqyos: kirish chizig'i ko'rsatilsagina u ham hisobga olinadi. Aks
     # holda (mos kelmaydigan eski narx) u butun kadrni o'ziga tortib,
@@ -290,7 +293,7 @@ async def mini_chart(sig) -> io.BytesIO | None:
     fig.subplots_adjust(left=0.01, right=0.99, top=0.97, bottom=0.03)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", facecolor=BG)
+    fig.savefig(buf, format="png", facecolor=CARD_BG)
     plt.close(fig)
     buf.seek(0)
     return buf

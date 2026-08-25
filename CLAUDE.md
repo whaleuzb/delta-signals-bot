@@ -1182,3 +1182,27 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       Guruh nomi uzun bo'lsa ellipsis bilan kesiladi, karta buzilmaydi.
     - O'lchandi (390px): 3 karta, 3 o'rin raqami, 3 tugma, plita 0,
       gorizontal siljish yo'q.
+
+56. **Dizayn Whale Payment Bot mini-ilovasidan olindi.**
+    Manba: `whale-payment-bot/webapp_static/index.html` — qora-kumush palitra,
+    yuqorida yengil kumush yorug'lik, shishasimon kartalar.
+    - Ranglar: `--bg:#0A0A0C`, `--card:#17171B`, `--card2:#1E1E23`,
+      `--line:#28282E`, `--silver:#DADDE2`, `--mut:#95979E`. Ko'k urg'u
+      butunlay olib tashlandi — yashil/qizil FAQAT savdo natijasi uchun,
+      shuning uchun ko'z birinchi raqamga tushadi.
+    - Shriftlar: **Space Grotesk** (sarlavha, tugma, juftlik nomi),
+      **Inter** (matn), **IBM Plex Mono** (barcha raqamlar, eyebrow).
+    - Asosiy tugma — kumush gradient, qora matn; bosilganda `scale(.98)`.
+    - `body` foni `radial-gradient(... at 50% -8%)` + `background-attachment:fixed`.
+    - **Grafik ranglari ham moslashtirildi**: `chart.BG`/`stats.BG` → `#101013`,
+      `GRID` → `#28282E`, `ACC` → kumush. Kichik grafik esa alohida
+      `chart.CARD_BG = "#17171B"` bilan chiziladi va `.trade` foni AYNAN
+      shu rang (shaffof emas) — shunda rasm chegarasi ko'rinmaydi.
+      Rasm uslubi o'zgargani uchun `MINI_V` 3 ga oshirildi.
+    - 3D kit va `three.js` OLINMADI: 670 KB, ustiga u Whale brendining
+      belgisi — Trade Controller sahifasiga tegishli emas.
+    - Savdo kartasiga ham chap chetdagi rangli chiziq qo'shildi.
+    - Tor ekranlar: ≤380px da grafik 62×24 va matn 10px; ≤340px da grafik
+      butunlay yashiriladi — narx va sana muhimroq.
+    - O'lchandi: 390px va 360px — 10/10 grafik, kesilgan matn 0, hamma
+      karta 67px, gorizontal siljish yo'q. 320px — matn to'liq, grafik yo'q.
