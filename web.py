@@ -25,6 +25,7 @@ from aiohttp import web
 import chart
 import db
 import stats
+import tracker
 
 log = logging.getLogger("web")
 
@@ -292,6 +293,22 @@ tbody tr:hover{background:#ffffff06}
   .tmini{display:none}
 }
 
+/* Ochiq pozitsiya kartasi — savdo kartasi bilan bir xil, faqat grafiksiz
+   va nomsiz. */
+.open{background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:14px 16px;display:flex;align-items:center;gap:12px;
+      position:relative;overflow:hidden}
+.open::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+              background:var(--line)}
+.open.pos-edge::before{background:var(--long)}
+.open.neg-edge::before{background:var(--short)}
+.ometa{min-width:0;flex:1}
+.oname{font-family:"Space Grotesk",Inter,sans-serif;font-size:15px;font-weight:600}
+.osub{color:var(--mut);font-size:11.5px;margin-top:3px;
+      font-family:"IBM Plex Mono",ui-monospace,monospace}
+.opnl{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:17px;
+      font-weight:600;white-space:nowrap}
+
 .cta{margin-top:40px;
      background:linear-gradient(135deg,var(--glow),rgba(23,23,27,.9) 55%);
      border:1px solid var(--line);border-radius:18px;padding:28px 30px}
@@ -518,6 +535,30 @@ async def group_page(request):
         f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in months)
 
+    # OCHIQ POZITSIYALAR — faqat joriy foiz, juftlik nomisiz.
+    # Ochiq savdoning tikeri guruh a'zolarining haqqi: ochiq sahifada uni
+    # ko'rsatish signalni tekinga berish bo'lardi. Foiz esa guruh hozir
+    # qanday ishlayotganini ko'rsatadi va hech narsani oshkor qilmaydi.
+    # PENDING'lar chiqmaydi: ular hali ochilmagan, joriy foizi ham yo'q.
+    live = [r for r in await db.live_signals(ws_id) if r["status"] == "ACTIVE"]
+    opens = ""
+    for i, r in enumerate(live, 1):
+        try:
+            price = await tracker.provider(r["market"]).last_price(r["symbol"])
+        except Exception:
+            log.warning("Ochiq pozitsiya narxi olinmadi (#%s)", r["id"], exc_info=True)
+            price = None
+        if price is None:
+            continue
+        p = tracker.pnl_at(r["side"], float(r["entry"]), price)
+        since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
+                 if r["opened_at"] else "—")
+        opens += (
+            f"<div class='open {_cls(p)}-edge'>"
+            f"<div class='ometa'><div class='oname'>Pozitsiya {i}</div>"
+            f"<div class='osub'>{e(since)} dan beri</div></div>"
+            f"<div class='opnl {_cls(p)}'>{p:+.2f}%</div></div>")
+
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
     # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni
     # sahifa ochilishi birjaga o'nlab so'rov yubormaydi.
@@ -564,6 +605,10 @@ async def group_page(request):
            if len(pnls) >= 2 else "")
         + section("Oylik natijalar",
                   "<th>Oy</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", mon_rows)
+        + (f"<h2>Hozir ochiq</h2><div class='trades'>{opens}</div>"
+           "<div class='note'>Juftlik nomi ko'rsatilmaydi — ochiq savdo "
+           "guruh a'zolari uchun. Foiz joriy bozor narxidan hisoblanadi.</div>"
+           if opens else "")
         + (f"<h2>Oxirgi savdolar</h2><div class='trades'>{trades}</div>"
            if trades else "")
         + ("<div class='empty'>Hali yopilgan signal yo'q.</div>" if not total else ""))

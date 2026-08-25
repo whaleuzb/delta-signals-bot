@@ -1224,3 +1224,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - **Bosilish sezgisi**: `.btn:active` → `scale(.955)` + yorug'lik pasayadi,
       `.ghost:active` → `scale(.955)` + fon yorishadi, `.gcard:active` →
       `scale(.975)` + chegara kumushga o'tadi va ichidagi "Batafsil" yorishadi.
+
+58. **Ochiq pozitsiyalar sahifada — faqat foiz, juftlik nomisiz.**
+    Guruh sahifasida "Hozir ochiq" bo'limi: har bir ACTIVE pozitsiya
+    "Pozitsiya N", ochilgan sanasi va JORIY foizi bilan ko'rsatiladi.
+    - Tiker ATAYLAB yashiriladi: ochiq savdoning juftligi guruh a'zolarining
+      haqqi, ochiq sahifada uni berish signalni tekinga berish bo'lardi.
+      Foiz esa guruh hozir qanday ishlayotganini ko'rsatadi va hech narsani
+      oshkor qilmaydi.
+    - PENDING chiqmaydi — hali ochilmagan, joriy foizi ham yo'q.
+    - Foiz `tracker.pnl_at()` bilan joriy narxdan hisoblanadi (bot ichidagi
+      ayni funksiya). Sahifa 120 s keshlanadi, `last_price` esa 5 s —
+      ya'ni birjaga ortiqcha yuk tushmaydi.
+
+59. **`web_app` tugmasi GURUHDA xabarni butunlay rad etadi.**
+    Guruhdagi "🏠 Bosh menyu" tugmasi bosilganda "Ishlov berishda xato"
+    chiqardi. Sabab: Mini App (`WebAppInfo`) tugmasi FAQAT shaxsiy chatda
+    ruxsat etilgan; guruhga yuborilsa Telegram butun xabarni
+    BUTTON_TYPE_INVALID bilan rad etadi va bitta tugma tufayli MENYU
+    UMUMAN ochilmaydi.
+    - `main_menu_kb(uid, ws, private)` va `send_web_link` endi chat turini
+      biladi: shaxsiy chatda `web_app`, guruhda oddiy `url` tugmasi
+      (sahifani brauzerda ochadi, hamma joyda ishlaydi).
+    - Chaqiruv joylari `update.effective_chat.type` / `q.message.chat.type`
+      ni uzatadi.
+    - Tekshirildi: shaxsiy chat → web_app tugma bor, url yo'q;
+      guruh → web_app yo'q, url tugma bor.

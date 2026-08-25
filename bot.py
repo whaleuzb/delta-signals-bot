@@ -294,7 +294,9 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         ws = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
         ctx.user_data["workspace_id"] = ws["id"]
         await q.edit_message_text("✅ Shaxsiy jurnal ochildi.")
-        await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+        await q.message.reply_text(
+            "Bosh menyu:",
+            reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
         return
 
     if choice == "group":
@@ -347,7 +349,9 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.add_group_viewer(uid, wid)
     ctx.user_data["workspace_id"] = wid
     await q.edit_message_text(f"✅ \"{ws['name']}\" ulandi — endi statistikasini ko'ra olasiz.")
-    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+    await q.message.reply_text(
+        "Bosh menyu:",
+        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
 
 
 async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -385,7 +389,9 @@ async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
         return
     ctx.user_data["workspace_id"] = wid
     await q.edit_message_text(f"✅ Tanlandi: {ws['name']}")
-    await q.message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+    await q.message.reply_text(
+        "Bosh menyu:",
+        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
 
 
 async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -455,7 +461,7 @@ def web_page_url(ws) -> str | None:
     return f"{config.WEB_URL}/g/{ws['id']}"
 
 
-def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
+def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
     rows = []
     if can_manage(uid, ws):
         rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig"),
@@ -468,10 +474,14 @@ def main_menu_kb(uid: int, ws) -> InlineKeyboardMarkup:
     ]
     url = web_page_url(ws)
     if url:
-        # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram buni
-        # faqat SHAXSIY chatdagi inline tugmada qo'llaydi; bosh menyu esa doim
-        # shaxsiy chatda ko'rsatiladi, shuning uchun bu yerda xavfsiz.
-        rows.append([InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url)),
+        # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram uni
+        # FAQAT shaxsiy chatdagi inline tugmada qabul qiladi; guruhda yuborilsa
+        # butun xabar BUTTON_TYPE_INVALID bilan rad etiladi va foydalanuvchi
+        # "Ishlov berishda xato" ko'radi. Shu sabab guruhda oddiy URL tugmasi
+        # ishlatiladi — u sahifani brauzerda ochadi va hamma joyda ishlaydi.
+        page = (InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url))
+                if private else InlineKeyboardButton("🌐 Ochiq sahifa", url=url))
+        rows.append([page,
                      InlineKeyboardButton("🔗 Havola", callback_data="m:weblink")])
     rows.append([InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
                  InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")])
@@ -1199,7 +1209,11 @@ async def send_web_link(target, ws) -> None:
         "qo'shiladi, qo'lda yangilash shart emas.",
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🌐 Sahifani ochish", web_app=WebAppInfo(url=url))],
+            # Mini App tugmasi faqat shaxsiy chatda ishlaydi; guruhda oddiy
+            # URL tugmasi (main_menu_kb dagi bilan bir xil sabab).
+            [InlineKeyboardButton("🌐 Sahifani ochish", web_app=WebAppInfo(url=url))
+             if target.chat.type == "private"
+             else InlineKeyboardButton("🌐 Sahifani ochish", url=url)],
             [InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")],
         ]))
 
@@ -1273,7 +1287,9 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.effective_message.reply_text(text, reply_markup=kb)
         return
-    await update.effective_message.reply_text("Bosh menyu:", reply_markup=main_menu_kb(uid, ws))
+    await update.effective_message.reply_text(
+        "Bosh menyu:",
+        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private"))
 
 
 # ─────────────────────────── Guruhni ro'yxatdan o'tkazish ───────────────────────────
@@ -2383,7 +2399,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     await update.message.reply_text(
-        f"Trade Controller — {ws['name']} 👇", reply_markup=main_menu_kb(uid, ws))
+        f"Trade Controller — {ws['name']} 👇",
+        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private"))
 
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
