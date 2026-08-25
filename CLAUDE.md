@@ -1017,3 +1017,22 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       shu yerda ko'rmoqchimisiz?") — uch qadamli yo'riqnoma va botga tugma.
       Sahifaga kelganlarning aksari guruh egasi, ular uchun keyingi qadam
       aniq bo'lishi kerak.
+
+45. **Mobil ko'rinish va Mini App xatti-harakati tuzatildi.**
+    - Shikoyat: "ma'lumotlar oxirigacha ko'rinmayapti, yonga surish hojat
+      bo'lmasin" + "pastga slayd qilinsa veb yopilib ketyapti".
+    - **Jadvallar**: `min-width:560px` tor ekranda gorizontal siljish
+      hosil qilar va ustunlar kesilib qolardi. Endi `@media (max-width:640px)`
+      da har qator BLOKKA aylanadi: birinchi katak (juftlik/oy) alohida
+      qatorda qalin, qolganlari `data-k` atributidan olingan yorliq bilan
+      "SAVDO 14  WINRATE 79%  NATIJA +119.99%" ko'rinishida yoniga tiziladi.
+      Hech narsa yashirilmaydi — barcha ustun ko'rinadi.
+      Tekshirildi (390px): sahifa 390 vs 390, uchala jadval 350 vs 350 —
+      gorizontal siljish YO'Q.
+    - **Mini App yopilib ketishi**: Telegram'da pastga surish ilovani
+      yopadi. `telegram-web-app.js` ulanib, `disableVerticalSwipes()`
+      chaqiriladi (Bot API 7.7+; eskirog'ida jimgina o'tkazib yuboriladi).
+      Shu bilan birga `expand()` — to'liq balandlik, va header/fon rangi
+      sahifa foniga moslanadi.
+    - Skript har chaqiruvni `window.Telegram` va metod mavjudligiga
+      tekshiradi — oddiy brauzerda sahifa hech narsa buzilmasdan ishlayveradi.

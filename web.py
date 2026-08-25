@@ -89,6 +89,26 @@ th{color:var(--mut);font-weight:600;font-size:12px;letter-spacing:.05em;
    text-transform:uppercase;text-align:right}
 th:first-child,td:first-child{text-align:left}
 tbody tr:hover{background:#ffffff06}
+
+/* Tor ekranda jadval yonga siljimaydi: har qator blokka aylanadi —
+   birinchi katak sarlavha bo'lib alohida qatorda, qolganlari esa
+   "yorliq qiymat" juftliklari bo'lib yoniga tiziladi. Shunda BARCHA
+   ma'lumot ko'rinadi, hech narsa kesilmaydi. */
+@media (max-width:640px){
+  .scroll{overflow-x:visible}
+  table{min-width:0}
+  thead{display:none}
+  tbody tr{display:block;padding:13px 0;border-bottom:1px solid var(--line)}
+  tbody tr:last-child{border-bottom:0}
+  tbody tr:hover{background:none}
+  td{display:inline-flex;align-items:baseline;gap:5px;border:0;
+     padding:0 16px 0 0;text-align:left;font-size:13.5px;white-space:nowrap}
+  td:first-child{display:block;font-size:15.5px;font-weight:600;
+                 padding:0;margin-bottom:7px}
+  td:not(:first-child)::before{content:attr(data-k);color:var(--mut);
+                                font-size:11.5px;letter-spacing:.04em;
+                                text-transform:uppercase}
+}
 .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:600}
 .b-long{background:#2ecc8f22;color:var(--long)}
 .b-short{background:#ff5c5c22;color:var(--short)}
@@ -148,13 +168,35 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
          '&display=swap">')
 
 
+# Telegram Mini App skripti. Bo'lmasa ham sahifa oddiy veb-sahifa sifatida
+# ishlayveradi — quyidagi kod har bir chaqiruvni tekshirib ishlatadi.
+TG_SCRIPT = """
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg) return;                       // oddiy brauzer — hech narsa qilmaymiz
+  try { tg.ready(); } catch (e) {}
+  try { tg.expand(); } catch (e) {}      // to'liq balandlikda ochilsin
+  // Pastga surganda ilova yopilib ketmasin: sahifa uzun, foydalanuvchi
+  // jadvalni o'qish uchun suradi va bu tasodifan yopilishga olib kelardi.
+  // Bot API 7.7+ da mavjud, eskirog'ida jimgina o'tkazib yuboriladi.
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+  try {
+    tg.setHeaderColor && tg.setHeaderColor('#0b0e14');
+    tg.setBackgroundColor && tg.setBackgroundColor('#0b0e14');
+  } catch (e) {}
+})();
+</script>"""
+
+
 def page(title: str, body: str, bot: str | None) -> str:
     link = f'<a href="https://t.me/{e(bot)}">@{e(bot)}</a>' if bot else "Trade Controller"
     return (
         "<!doctype html><html lang='uz'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='color-scheme' content='dark'>"
-        f"<title>{e(title)}</title>{FONTS}<style>{CSS}</style></head><body>"
+        f"<title>{e(title)}</title>{FONTS}<style>{CSS}</style>{TG_SCRIPT}</head><body>"
         f"<div class='wrap'>{body}"
         f"<footer><div>Trade Controller — {link}</div>"
         f"<div>Ma'lumot bazadan jonli o'qiladi</div></footer></div></body></html>")
@@ -296,18 +338,22 @@ async def group_page(request):
     # Juftliklar
     syms = await db.top_symbols(ws_id, limit=12)
     sym_rows = "".join(
-        f"<tr><td>{e(r['symbol'])}</td><td>{r['closed']}</td>"
-        f"<td>{(r['wins'] / r['closed'] * 100) if r['closed'] else 0:.0f}%</td>"
-        f"<td class='{_cls(float(r['sum_pct']))}'>{float(r['sum_pct']):+.2f}%</td></tr>"
+        f"<tr><td>{e(r['symbol'])}</td><td data-k='Savdo'>{r['closed']}</td>"
+        f"<td data-k='Winrate'>"
+        f"{(r['wins'] / r['closed'] * 100) if r['closed'] else 0:.0f}%</td>"
+        f"<td data-k='Natija' class='{_cls(float(r['sum_pct']))}'>"
+        f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in syms)
 
     # Oylik
     months = await db.monthly_breakdown(ws_id, limit=12)
     mon_rows = "".join(
         f"<tr><td>{stats.MONTHS_UZ[r['month'].month - 1]} {r['month'].year}</td>"
-        f"<td>{r['total']}</td>"
-        f"<td>{(r['wins'] / r['total'] * 100) if r['total'] else 0:.0f}%</td>"
-        f"<td class='{_cls(float(r['sum_pct']))}'>{float(r['sum_pct']):+.2f}%</td></tr>"
+        f"<td data-k='Savdo'>{r['total']}</td>"
+        f"<td data-k='Winrate'>"
+        f"{(r['wins'] / r['total'] * 100) if r['total'] else 0:.0f}%</td>"
+        f"<td data-k='Natija' class='{_cls(float(r['sum_pct']))}'>"
+        f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in months)
 
     # Oxirgi savdolar
@@ -320,10 +366,11 @@ async def group_page(request):
         rec_rows += (
             f"<tr><td>{e(r['symbol'])} "
             f"<span class='badge {side_cls}'>{e(r['side'])}</span></td>"
-            f"<td>{fmt_price(r['entry'])}</td>"
-            f"<td>{fmt_price(r['exit_price']) if r['exit_price'] is not None else '—'}</td>"
-            f"<td class='{_cls(p)}'>{p:+.2f}%</td>"
-            f"<td>{e(when)}</td></tr>")
+            f"<td data-k='Kirish'>{fmt_price(r['entry'])}</td>"
+            f"<td data-k='Chiqish'>"
+            f"{fmt_price(r['exit_price']) if r['exit_price'] is not None else '—'}</td>"
+            f"<td data-k='Natija' class='{_cls(p)}'>{p:+.2f}%</td>"
+            f"<td data-k='Sana'>{e(when)}</td></tr>")
 
     def section(title, header, body_rows):
         if not body_rows:
