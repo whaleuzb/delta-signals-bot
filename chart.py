@@ -217,6 +217,16 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     )
 
 
+def _synthetic_line(entry: float, exit_price: float, n: int = 20) -> list[float]:
+    """Haqiqiy sham topilmagan signal uchun kirish->chiqish oddiy chizig'i
+    (masalan MEXC'da yo'q eski sinov tikeri, yoki birja vaqtincha
+    javob bermadi). Tebranish qo'shilmaydi — bu haqiqiy narx harakati emas,
+    shunday ko'rsatish yolg'on migqiqlikni haqiqiyga o'xshatib qo'yardi."""
+    if n < 2:
+        return [entry, exit_price]
+    return [entry + (exit_price - entry) * i / (n - 1) for i in range(n)]
+
+
 async def mini_chart(sig) -> io.BytesIO | None:
     """Yopilgan savdoning KICHIK grafigi (veb sahifadagi ro'yxat uchun).
 
@@ -230,6 +240,11 @@ async def mini_chart(sig) -> io.BytesIO | None:
     if not opened_at or not closed_at:
         return None
 
+    entry = float(sig["entry"])
+    exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
+    pnl = float(sig["pnl_pct"]) if sig["pnl_pct"] is not None else 0.0
+    col = GREEN if pnl >= 0 else RED
+
     tf = norm_tf(sig["chart_tf"] if "chart_tf" in sig.keys() else None)
     tf_ms = TF_MINUTES[tf] * 60_000
     span_bars = max(1, int((closed_at - opened_at).total_seconds() * 1000 // tf_ms))
@@ -240,31 +255,42 @@ async def mini_chart(sig) -> io.BytesIO | None:
 
     candles = await _fetch(sig["market"], sig["symbol"], start_ms, limit, tf,
                            end_ms=end_ms)
-    if not candles:
-        log.info("Kichik grafik: #%s %s %s uchun sham kelmadi", sig["id"],
-                 sig["symbol"], tf)
-        return None
-    n_raw = len(candles)
-    candles = [c for c in candles if c.open_ms <= end_ms]
-    if len(candles) < 3:
-        log.info("Kichik grafik: #%s %s — %s shamdan %s tasi oraliqqa tushdi",
-                 sig["id"], sig["symbol"], n_raw, len(candles))
-        return None
+    if candles:
+        n_raw = len(candles)
+        candles = [c for c in candles if c.open_ms <= end_ms]
+        if len(candles) < 3:
+            log.info("Kichik grafik: #%s %s — %s shamdan %s tasi oraliqqa tushdi",
+                     sig["id"], sig["symbol"], n_raw, len(candles))
+            candles = None
 
-    pnl = float(sig["pnl_pct"]) if sig["pnl_pct"] is not None else 0.0
-    col = GREEN if pnl >= 0 else RED
-    entry = float(sig["entry"])
-    closes = [c.close for c in candles]
+    if candles:
+        closes = [c.close for c in candles]
+        # Kirish chizig'i FAQAT shamlar diapazoniga tushsa chiziladi. Eski
+        # sinov signallarida narxlar qo'lda o'ylab yozilgan ("kirish 100"),
+        # shamlar esa haqiqiy bozordan keladi — bunday kirish miqyosni
+        # o'ziga tortib, haqiqiy narx harakatini tep-tekis chiziqqa
+        # aylantirardi. Grafikning o'zi baribir chiziladi.
+        c_lo, c_hi = min(closes), max(closes)
+        show_entry = c_lo * 0.9 <= entry <= c_hi * 1.1
+        exit_idx = None
+        if exit_price is not None:
+            closed_ms = int(closed_at.timestamp() * 1000)
+            exit_idx = min(range(len(candles)),
+                           key=lambda i: abs(candles[i].close_ms - closed_ms))
+    else:
+        # Birjada bu tiker yo'q (eski sinov signali) yoki narx vaqtincha
+        # olinmadi — ro'yxatda bo'sh joy qoldirish o'rniga kirish->chiqish
+        # narxidan sun'iy chiziq chizamiz. Kirish/chiqish matn ostida
+        # baribir ko'rsatiladi, shuning uchun bu hech narsani yashirmaydi.
+        log.info("Kichik grafik: #%s %s uchun sham topilmadi — sun'iy chiziq",
+                 sig["id"], sig["symbol"])
+        if exit_price is None:
+            return None
+        closes = _synthetic_line(entry, exit_price)
+        show_entry = False
+        exit_idx = len(closes) - 1
+
     xs = list(range(len(closes)))
-
-    # Kirish chizig'i FAQAT shamlar diapazoniga tushsa chiziladi. Eski sinov
-    # signallarida narxlar qo'lda o'ylab yozilgan ("kirish 100"), shamlar esa
-    # haqiqiy bozordan keladi — bunday kirish miqyosni o'ziga tortib, haqiqiy
-    # narx harakatini tep-tekis chiziqqa aylantirardi. Grafikning o'zi
-    # baribir chiziladi: u o'sha davrdagi haqiqiy narxni ko'rsatadi.
-    c_lo, c_hi = min(closes), max(closes)
-    show_entry = c_lo * 0.9 <= entry <= c_hi * 1.1
-
     fig, ax = plt.subplots(figsize=(3.2, 1.1), dpi=100)
     fig.patch.set_facecolor(CARD_BG)
     ax.set_facecolor(CARD_BG)
@@ -273,18 +299,14 @@ async def mini_chart(sig) -> io.BytesIO | None:
     ax.fill_between(xs, closes, min(closes), color=col, alpha=0.13, zorder=2)
     if show_entry:
         ax.axhline(entry, color=ACC, lw=1.0, ls="--", alpha=0.75, zorder=1)
-
-    exit_price = float(sig["exit_price"]) if sig["exit_price"] is not None else None
-    if exit_price is not None:
-        closed_ms = int(closed_at.timestamp() * 1000)
-        idx = min(range(len(candles)),
-                  key=lambda i: abs(candles[i].close_ms - closed_ms))
-        ax.scatter([idx], [closes[idx]], color=col, s=26, zorder=4,
+    if exit_idx is not None:
+        ax.scatter([exit_idx], [closes[exit_idx]], color=col, s=26, zorder=4,
                    edgecolor=CARD_BG, linewidth=1.2)
 
     # Miqyos: kirish chizig'i ko'rsatilsagina u ham hisobga olinadi. Aks
     # holda (mos kelmaydigan eski narx) u butun kadrni o'ziga tortib,
     # haqiqiy narx harakati tekis chiziqqa aylanib qolardi.
+    c_lo, c_hi = min(closes), max(closes)
     lo, hi = (min(c_lo, entry), max(c_hi, entry)) if show_entry else (c_lo, c_hi)
     pad = (hi - lo) * 0.12 or hi * 0.005
     ax.set_ylim(lo - pad, hi + pad)
