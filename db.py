@@ -691,12 +691,15 @@ async def public_signal(sig_id: int) -> asyncpg.Record | None:
 
 
 async def recent_closed(workspace_id: int, limit: int = 25) -> list[asyncpg.Record]:
+    """Ochiq sahifadagi "Oxirgi savdolar" ro'yxati uchun — ataylab SANA
+    bo'yicha emas, NATIJA bo'yicha: eng katta foyda tepada, eng katta
+    yo'qotish pastda. Guruh o'z eng yaxshi natijalari bilan tanishtirilsin."""
     q = f"""
     SELECT id, symbol, side, entry, exit_price, pnl_pct, r_multiple,
            status, opened_at, closed_at
     FROM signals
     WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
-    ORDER BY closed_at DESC LIMIT $2
+    ORDER BY pnl_pct DESC NULLS LAST LIMIT $2
     """
     async with pool().acquire() as c:
         return await c.fetch(q, workspace_id, limit)
