@@ -1161,3 +1161,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     yangi manzil eski keshga tushmaydi. **Grafik ko'rinishini
     o'zgartirsangiz, `MINI_V` ni oshiring.** So'rov qatori route'ga ta'sir
     qilmaydi — tekshirildi, `?v=2` bilan ham 200 keladi.
+
+54. **"Guruhga qo'shilish" — matn havolasi emas, tugma.**
+    U sahifaning asosiy maqsadi, lekin sarlavha ostidagi kichkina havola
+    bo'lib ko'zga tashlanmasdi. Endi `.join` tugmasi: oddiy `.btn` dan
+    kattaroq (16px matn, 13×26 padding) va yengil ko'k soya bilan.
+    Telefonda `display:block` — butun kenglikni egallaydi, barmoq bilan
+    bosish oson. O'lchandi: 390px ekranda 350×52, desktopda 218×50.

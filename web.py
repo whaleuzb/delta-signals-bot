@@ -170,6 +170,10 @@ tbody tr:hover{background:#ffffff06}
 .btn{display:inline-block;margin-top:22px;background:var(--acc);color:#06121f;
      font-weight:600;font-size:15px;padding:11px 22px;border-radius:10px}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
+/* Guruhga qo'shilish — sahifadagi eng muhim harakat, shuning uchun
+   oddiy tugmadan kattaroq va yorug'roq. */
+.join{margin-top:18px;font-size:16px;padding:13px 26px;
+      box-shadow:0 6px 20px rgba(77,163,255,.22)}
 .note{margin-top:26px;color:var(--mut);font-size:13px}
 /* oxirgi savdolar — grafikli kartalar */
 .trades{display:flex;flex-direction:column;gap:10px}
@@ -187,6 +191,7 @@ tbody tr:hover{background:#ffffff06}
      kichkina grafik, o'ngda natija. Avval grafik pastga to'liq kenglikda
      tushardi va bitta savdo ekranning uchdan birini egallardi — 25 ta
      savdoni ko'rish uchun juda uzoq aylantirish kerak edi. */
+  .join{display:block;text-align:center;font-size:16px;padding:14px 18px}
   .trade{padding:12px;gap:9px}
   /* Matn ko'chmasin: bir kartada ikki qator, boshqasida uch qator bo'lib
      ro'yxat notekis ko'rinardi. Endi hamma karta bir xil balandlikda. */
@@ -457,14 +462,17 @@ async def group_page(request):
         return (f"<h2>{e(title)}</h2><div class='scroll'><table><thead><tr>{header}</tr>"
                 f"</thead><tbody>{body_rows}</tbody></table></div>")
 
+    # Guruhga qo'shilish — sahifaning ASOSIY maqsadi. Avval u sarlavha
+    # ostidagi kichkina matn havolasi edi va ko'zga tashlanmasdi; endi
+    # to'liq tugma, sarlavha ostida alohida qatorda.
     invite = ""
     if ws["invite_link"]:
-        invite = (f" · <a href='{e(ws['invite_link'])}' rel='nofollow noopener'>"
-                  "Guruhga qo'shilish</a>")
+        invite = (f"<a class='btn join' href='{e(ws['invite_link'])}' "
+                  "rel='nofollow noopener'>Guruhga qo'shilish →</a>")
 
     body = (
         f"<header><div class='brand'>Trade Controller</div><h1>{e(ws['name'])}</h1>"
-        f"<div class='sub'><a href='/'>← Barcha guruhlar</a>{invite}</div></header>"
+        f"<div class='sub'><a href='/'>← Barcha guruhlar</a></div>{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
         + (f"<h2>Balans o'zgarishi</h2>"
            f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"
