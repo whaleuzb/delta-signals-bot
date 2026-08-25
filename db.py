@@ -709,11 +709,14 @@ async def set_digest_hour(workspace_id: int, hour: int | None) -> None:
 
 
 async def digest_workspaces() -> list[asyncpg.Record]:
-    """Kunlik hisobot yoqilgan, arxivlanmagan guruh workspace'lari."""
+    """Kunlik hisobot yoqilgan, arxivlanmagan workspace'lar.
+
+    Guruh ham, shaxsiy jurnal ham bo'lishi mumkin: guruhda hisobot guruh
+    chatiga, shaxsiyda esa egasining shaxsiy chatiga boradi."""
     async with pool().acquire() as c:
         return await c.fetch(
-            "SELECT * FROM workspaces WHERE digest_hour IS NOT NULL "
-            "AND type='group' AND group_chat_id IS NOT NULL AND NOT archived")
+            "SELECT * FROM workspaces WHERE digest_hour IS NOT NULL AND NOT archived "
+            "AND (type='personal' OR (type='group' AND group_chat_id IS NOT NULL))")
 
 
 async def mark_digest_sent(workspace_id: int, day) -> None:

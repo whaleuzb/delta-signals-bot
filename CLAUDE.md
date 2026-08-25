@@ -1394,3 +1394,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       yopilishi va +5% bosqichi ham javob bo'lib keldi.
     - **Kunlik hisobot (`/hisobot`) hali FAQAT guruh uchun** —
       `db.digest_workspaces()` da `type='group'` sharti bor.
+
+67. **Kunlik hisobot shaxsiy jurnal uchun ham yoqildi.**
+    `db.digest_workspaces()` dagi `type='group'` sharti olib tashlandi:
+    endi guruh ham, shaxsiy jurnal ham qamrab olinadi. `digest_job` hisobotni
+    guruh chatiga yoki egasining shaxsiy chatiga yuboradi; `/hisobot`
+    buyrug'idagi "shaxsiy jurnal uchun mavjud emas" to'sig'i ham olib
+    tashlandi, matnlar workspace turiga qarab yoziladi.
+    `digest_last` himoyasi o'zgarmadi — kuniga bir marta.
+    Tekshirildi: ikkala workspace ham ro'yxatga tushdi, hisobot ikkalasiga
+    ham ketdi (guruh chatiga va shaxsiy chatga), ikkinchi aylanishda
+    takrorlanmadi.

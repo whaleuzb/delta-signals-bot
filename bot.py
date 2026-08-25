@@ -2385,8 +2385,9 @@ async def digest_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             if not text:
                 continue
             await ctx.bot.send_message(
-                ws["group_chat_id"], text, parse_mode=ParseMode.HTML,
-                message_thread_id=ws["group_topic_id"])
+                ws["group_chat_id"] if ws["type"] == "group" else ws["owner_id"],
+                text, parse_mode=ParseMode.HTML,
+                message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
         except Exception:
             log.exception("Kunlik hisobot yuborilmadi (ws=%s)", ws["id"])
 
@@ -2397,12 +2398,7 @@ async def cmd_digest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not can_manage(update.effective_user.id, ws):
-        await update.message.reply_text("Bu sozlamani faqat guruh admini o'zgartira oladi.")
-        return
-    if ws["type"] != "group":
-        await update.message.reply_text(
-            "Kunlik hisobot guruhga yuboriladi — shaxsiy jurnal uchun mavjud emas.",
-            reply_markup=MENU_BACK_KB)
+        await update.message.reply_text("Bu sozlamani faqat egasi o'zgartira oladi.")
         return
 
     if not ctx.args:
@@ -2412,8 +2408,9 @@ async def cmd_digest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             f"📊 Kunlik hisobot: {state}\n\n"
             "Yoqish: <code>/hisobot 21</code> (mahalliy vaqt, 0–23)\n"
             "O'chirish: <code>/hisobot off</code>\n\n"
-            "Belgilangan soatda guruhga kun yakuni chiqadi: nechta signal "
-            "yopildi, winrate, umumiy natija, eng yaxshi juftlik.",
+            f"Belgilangan soatda {'guruhga' if ws['type'] == 'group' else 'shu yerga'} "
+            "kun yakuni chiqadi: nechta signal yopildi, winrate, umumiy natija, "
+            "eng yaxshi juftlik.",
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
@@ -2434,7 +2431,7 @@ async def cmd_digest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.set_digest_hour(ws["id"], hour)
     await update.message.reply_text(
         f"✅ Kunlik hisobot yoqildi — har kuni <b>{hour:02d}:00</b> da "
-        f"({config.TZ}) guruhga chiqadi.\n\n"
+        f"({config.TZ}) {'guruhga' if ws['type'] == 'group' else 'shu yerga'} chiqadi.\n\n"
         "<i>Bugun yopilgan signal bo'lmasa post yuborilmaydi.</i>",
         parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
