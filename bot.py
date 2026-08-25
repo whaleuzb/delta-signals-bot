@@ -479,10 +479,12 @@ def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
         # butun xabar BUTTON_TYPE_INVALID bilan rad etiladi va foydalanuvchi
         # "Ishlov berishda xato" ko'radi. Shu sabab guruhda oddiy URL tugmasi
         # ishlatiladi — u sahifani brauzerda ochadi va hamma joyda ishlaydi.
+        # Yonida "🔗 Havola" tugmasi ham bor edi — olib tashlandi: ikkalasi
+        # ham AYNI sahifaga olib borardi. Havolani ulashish kerak bo'lsa
+        # /sahifa buyrug'i bor (u manzilni <code> ichida yuboradi).
         page = (InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url))
                 if private else InlineKeyboardButton("🌐 Ochiq sahifa", url=url))
-        rows.append([page,
-                     InlineKeyboardButton("🔗 Havola", callback_data="m:weblink")])
+        rows.append([page])
     rows.append([InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
                  InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")])
     return InlineKeyboardMarkup(rows)

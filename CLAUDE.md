@@ -1250,3 +1250,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       ni uzatadi.
     - Tekshirildi: shaxsiy chat → web_app tugma bor, url yo'q;
       guruh → web_app yo'q, url tugma bor.
+
+60. **"🔗 Havola" tugmasi olib tashlandi.** U "🌐 Ochiq sahifa" bilan AYNI
+    sahifaga olib borardi — bitta harakat uchun ikkita tugma. Endi bosh
+    menyuda faqat "Ochiq sahifa". Havolani ulashish kerak bo'lsa `/sahifa`
+    buyrug'i qoldi (u manzilni `<code>` ichida yuboradi, nusxalashga qulay);
+    `m:weblink` ishlov beruvchisi ham saqlandi — eski xabarlardagi tugmalar
+    ishlayversin.
