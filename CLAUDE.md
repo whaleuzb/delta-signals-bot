@@ -1961,3 +1961,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       (oxirgisi 46x portlash) bilan to'g'ri `Spike` qaytardi;
       `_process_liquidation_spike()` to'liq zanjiri (resolve → grafik →
       post → baza yozuvi) tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+82. **Upbit va Coinalyze — production'da real xatolar chiqib, ikkalasi
+    ham tuzatildi (81-band bilan bir xil ish davomi, alohida band —
+    haqiqiy manzil/sxema faqat DEPLOY qilingandan keyin ma'lum bo'ldi).**
+    - **Upbit — 3 marta noto'g'ri manzil**: `api-manager.upbit.com/notices`
+      → 404, `/notices/search` → 404, ochiq-manba crawler'dan topilgan
+      `project-team.upbit.com/api/v1/disclosure` → `httpx.ConnectError:
+      Name or service not known` (domen UMUMAN mavjud emas — o'sha
+      crawler loyihasi ESKIRGAN edi). Uchala urinish ham xavfsiz
+      ushlangan (`news_scan_job` HECH QACHON qulamadi, faqat Upbit
+      qismi ishlamadi) — lekin funksiya haligacha ISHLAMAYDI. Aniq
+      manzil topilmaguncha shu holatda qoladi (foydalanuvchidan brauzer
+      DevTools orqali haqiqiy so'rov manzilini so'rash so'raldi).
+    - **Coinalyze — RASMIY hujjat foydalanuvchi tomonidan taqdim etildi**
+      (`api.coinalyze.net` sandbox'da bloklangani uchun o'zim to'g'ridan-
+      to'g'ri o'qiy olmagan edim). Bu ANIQLAB berdi: (1) `/liquidation-history`
+      `from`/`to` (UNIX soniya) parametrlarini MAJBURIY talab qiladi —
+      dastlabki versiyada BU IKKALASI HAM YUBORILMAGAN edi (ishlatib
+      ko'rilganda 400 bilan rad etilardi); (2) `symbols` BITTA so'rovda
+      vergul bilan 20 tagacha instrumentni qabul qiladi — dastlab HAR
+      BIR instrument uchun ALOHIDA so'rov yuborilardi (5 ta so'rov
+      o'rniga endi 1 ta); (3) javob shakli — RO'YXAT, har biri
+      `{"symbol", "history": [...]}` — bu qism to'g'ri taxmin qilingan
+      edi. `liquidations.py` shu uchala tuzatish bilan to'liq qayta
+      yozildi: `liquidation_candidates()` endi BITTA `httpx` chaqiruvi
+      qiladi (`from`/`to`/`convert_to_usd=true` bilan), javobni
+      `{symbol: history}` ro'yxati sifatida ishlaydi.
+    - Tekshirildi: yangi so'rov URL'i sinov API kaliti bilan qurilib,
+      barcha majburiy parametrlar (`symbols` — 5 ta instrument vergul
+      bilan, `interval=5min`, `from`/`to`, `convert_to_usd=true`,
+      `api_key`) to'g'ri mavjudligi tasdiqlandi; to'liq mock-zanjir
+      (soxta ko'p-instrumentli javob → `Spike` → post) qayta ishga
+      tushirilib tekshirildi. `test_tracker.py` 9/9 — o'zgarmadi.

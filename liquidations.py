@@ -8,15 +8,20 @@ keladi (kaskadli likvidatsiya) — News Trade AI'ning boshqa hodisalari
 `COINALYZE_API_KEY` bo'sh bo'lsa butun modul jimgina o'chadi — boshqa
 News Trade AI manbalariga (SEC/Upbit/surge) hech qanday ta'siri yo'q.
 
-MUHIM: Coinalyze'ning `/liquidation-history` javob shakli bu yerda
-RASMIY hujjatdan emas, umumiy tavsifidan (t/l/s maydonlar — vaqt,
-long-likvidatsiya, short-likvidatsiya) olingan — sandbox tarmog'i
-`api.coinalyze.net`ni bloklagani uchun to'g'ridan-to'g'ri tekshirib
-bo'lmadi. Shu sabab BARCHA maydonlar `.get()` bilan himoyalangan
-o'qiladi; aniq shakl production loglarida tasdiqlanadi, kerak bo'lsa
-moslashtiriladi (SEC/CryptoPanic/Forex Factory integratsiyalarida
-bo'lgani kabi)."""
+Endpoint (`GET /liquidation-history`) rasmiy hujjatdan (foydalanuvchi
+yuborgan API spetsifikatsiyasi) tasdiqlangan: `symbols` (vergul bilan,
+BITTA so'rovda 20 tagacha), `interval`, `from`/`to` (UNIX soniya,
+IKKALASI HAM MAJBURIY), `convert_to_usd`. Javob: `[{"symbol": ...,
+"history": [...]}, ...]` — bitta so'rov barcha kuzatilayotgan
+instrumentlarni qamrab oladi (har biriga alohida so'rov SHART EMAS).
+
+MUHIM: bitta bucket ICHIDAGI aniq maydon nomlari (masalan uzun/qisqa
+likvidatsiya alohida-alohida qanday nomlanishi) rasmiy spetsifikatsiyada
+ko'rsatilmagan (`"history": []` — bo'sh namuna). Shu sabab `_bucket_total()`
+bir nechta ehtimoliy nom bilan himoyalangan o'qiydi; aniq shakl
+production loglarida tasdiqlanadi, kerak bo'lsa moslashtiriladi."""
 import logging
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -42,26 +47,10 @@ class Spike:
     ratio: float
 
 
-async def _fetch_buckets(client: httpx.AsyncClient, symbol: str) -> list[dict]:
-    r = await client.get(f"{BASE_URL}/liquidation-history", params={
-        "symbols": symbol, "interval": INTERVAL,
-        "api_key": config.COINALYZE_API_KEY,
-    })
-    r.raise_for_status()
-    data = r.json()
-    # Ko'p instrumentli so'rovlarda Coinalyze ro'yxat ichida ro'yxat
-    # qaytaradi ({"symbol": ..., "history": [...]}) — bitta instrument
-    # so'ralganda ham shu shaklni hisobga olamiz.
-    if isinstance(data, list) and data and isinstance(data[0], dict) and "history" in data[0]:
-        return data[0].get("history") or []
-    if isinstance(data, list):
-        return data
-    return []
-
-
 def _bucket_total(item: dict) -> float:
-    """Bir ustundagi jami likvidatsiya (long+short, USD). Aniq maydon
-    nomlari tasdiqlanmagani uchun bir nechta ehtimoliy nom sinaladi."""
+    """Bir ustundagi jami likvidatsiya (long+short, `convert_to_usd=true`
+    bo'lgani uchun USD'da). Aniq maydon nomlari rasmiy hujjatda
+    ko'rsatilmagani uchun bir nechta ehtimoliy nom sinaladi."""
     long_v = item.get("l") or item.get("long") or item.get("buy") or 0
     short_v = item.get("s") or item.get("short") or item.get("sell") or 0
     try:
@@ -71,30 +60,42 @@ def _bucket_total(item: dict) -> float:
 
 
 async def liquidation_candidates() -> list[Spike]:
-    """Kuzatilayotgan har bir instrument uchun oxirgi ustunni avvalgi
-    ustunlar o'rtachasi bilan solishtiradi. Xato bo'lgan/hajmsiz
-    instrument shunchaki o'tkazib yuboriladi — bitta instrumentning
-    muvaffaqiyatsizligi boshqalarini to'xtatmaydi."""
+    """Kuzatilayotgan BARCHA instrumentlar uchun BITTA so'rovda (Coinalyze
+    20 tagacha instrumentni bir so'rovda qabul qiladi) 5 daqiqalik
+    likvidatsiya ustunlarini oladi, har biri uchun oxirgi ustunni oldingi
+    ustunlar o'rtachasi bilan solishtiradi. Butun so'rov muvaffaqiyatsiz
+    bo'lsa (masalan tarmoq/kalit xatosi) bo'sh ro'yxat — chaqiruvchi
+    (`liquidation_scan_job`) shuni allaqachon xato sifatida logaydi."""
     if not enabled():
         return []
-    out: list[Spike] = []
+
+    now = int(time.time())
+    from_ts = now - LOOKBACK_BUCKETS * 5 * 60
     async with httpx.AsyncClient(timeout=15.0) as client:
-        for symbol in config.LIQUIDATION_SYMBOLS:
-            try:
-                buckets = await _fetch_buckets(client, symbol)
-            except Exception:
-                log.warning("Coinalyze so'rovi muvaffaqiyatsiz (%s)", symbol, exc_info=True)
-                continue
-            if len(buckets) < 5:
-                continue
-            buckets = buckets[-LOOKBACK_BUCKETS:]
-            totals = [_bucket_total(b) for b in buckets]
-            latest = totals[-1]
-            baseline = totals[:-1]
-            avg = sum(baseline) / len(baseline) if baseline else 0.0
-            if avg <= 0 or latest <= 0:
-                continue
-            ratio = latest / avg
-            if ratio >= config.LIQUIDATION_MULTIPLIER:
-                out.append(Spike(symbol=symbol, latest_usd=latest, baseline_usd=avg, ratio=ratio))
+        r = await client.get(f"{BASE_URL}/liquidation-history", params={
+            "symbols": ",".join(config.LIQUIDATION_SYMBOLS),
+            "interval": INTERVAL, "from": from_ts, "to": now,
+            "convert_to_usd": "true", "api_key": config.COINALYZE_API_KEY,
+        })
+        r.raise_for_status()
+        data = r.json()
+
+    out: list[Spike] = []
+    if not isinstance(data, list):
+        return out
+    for entry in data:
+        symbol = entry.get("symbol")
+        buckets = entry.get("history") or []
+        if not symbol or len(buckets) < 5:
+            continue
+        buckets = buckets[-LOOKBACK_BUCKETS:]
+        totals = [_bucket_total(b) for b in buckets]
+        latest = totals[-1]
+        baseline = totals[:-1]
+        avg = sum(baseline) / len(baseline) if baseline else 0.0
+        if avg <= 0 or latest <= 0:
+            continue
+        ratio = latest / avg
+        if ratio >= config.LIQUIDATION_MULTIPLIER:
+            out.append(Spike(symbol=symbol, latest_usd=latest, baseline_usd=avg, ratio=ratio))
     return out
