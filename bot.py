@@ -64,6 +64,10 @@ AWAITING_CHANNEL: dict[int, bool] = {}
 # Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
 AWAITING_BROADCAST: dict[int, bool] = {}
 PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
+# News Trade AI/surge post ostidagi "📝 Jurnalga kiritish" tugmasi orqali
+# kelgan foydalanuvchi: uid -> (symbol, shaxsiy_workspace_id). Tiker
+# allaqachon ma'lum, shuning uchun endi faqat yo'nalish/kirish/TP/SL kutiladi.
+AWAITING_JOURNAL_SYMBOL: dict[int, tuple[str, int]] = {}
 
 
 def is_admin(uid: int) -> bool:
@@ -1684,6 +1688,27 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await handle_broadcast_input(update, ctx)
         return
 
+    # News Trade AI/surge posti ostidagi "📝 Jurnalga kiritish" tugmasidan
+    # kelgan — tiker allaqachon ma'lum, xabarga QO'SHIB parsing.parse()ga
+    # beriladi (parse() tikersiz ishlamaydi, shuning uchun bu yerda oddiy
+    # matn birlashtiriladi — parsing.py'ga tegilmaydi).
+    pending_journal = AWAITING_JOURNAL_SYMBOL.get(uid)
+    if pending_journal:
+        symbol, journal_ws_id = pending_journal
+        AWAITING_JOURNAL_SYMBOL.pop(uid, None)
+        draft = parsing.parse(f"{symbol} {text}")
+        if draft is None:
+            AWAITING_JOURNAL_SYMBOL[uid] = pending_journal
+            await msg.reply_text(
+                "O'qiy olmadim. Namuna: <code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+                "Yoki /bekor yozing.", parse_mode=ParseMode.HTML)
+            return
+        ws = await db.get_workspace(journal_ws_id)
+        if not ws:
+            return
+        await show_preview(msg, ctx, draft, None, "jurnal", ws["id"])
+        return
+
     # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
     if await handle_manage_input(update, ctx):
         return
@@ -2627,6 +2652,29 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except ValueError:
             pass
 
+    # News Trade AI/surge posti ostidagi "📝 Jurnalga kiritish" tugmasi —
+    # tiker allaqachon ma'lum (postdan), shuning uchun bu yerda tikerni
+    # QAYTA SO'RAMAYMIZ: darhol tasdiqlab, keyingi xabarda faqat
+    # yo'nalish/kirish/TP/SL kutiladi (on_text_signal shu holatni tekshiradi).
+    if ctx.args and ctx.args[0].startswith("journal_"):
+        raw = ctx.args[0][len("journal_"):]
+        sym, market = await resolve_symbol([raw])
+        if not sym:
+            await update.message.reply_text(
+                f"❌ <code>{html.escape(raw)}</code> topilmadi. /new yozib qo'lda kiriting.",
+                parse_mode=ParseMode.HTML)
+            return
+        personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+        AWAITING_JOURNAL_SYMBOL[uid] = (sym, personal["id"])
+        await update.message.reply_text(
+            f"✅ <b>{html.escape(sym)}</b> — endi yo'nalish va narxlarni yozing "
+            "(tiker yozish shart emas), masalan:\n\n"
+            "<code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+            "Yoki qisqa: <code>long 65000 67000 68500 64000</code>\n\n"
+            "Bekor qilish uchun /bekor yozing.",
+            parse_mode=ParseMode.HTML)
+        return
+
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -2647,6 +2695,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_TPS.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
+    AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
     await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
 
@@ -3646,6 +3695,34 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 NEWS_MARKETS = (("crypto", exchange), ("stock", stocks), ("forex", forex))
 
 
+async def cmd_ref_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/refhavola — FAQAT super-admin. News Trade AI/surge postlaridagi
+    "💹 Savdo qilish" tugmasi uchun MEXC referal havolasini belgilaydi.
+    Belgilanmagan bo'lsa tugma umuman ko'rsatilmaydi (referalsiz oddiy
+    havola bexosdan postlanib qolmasin)."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    if not ctx.args:
+        cur = await db.get_setting("mexc_ref_url")
+        await update.message.reply_text(
+            f"Joriy MEXC referal havola: {html.escape(cur) if cur else '(belgilanmagan)'}\n\n"
+            "Belgilash: <code>/refhavola https://www.mexc.com/register?inviteCode=XXX</code>\n"
+            "Agar havolada <code>{symbol}</code> bo'lsa, u postdagi juftlik bilan "
+            "(masalan BTC_USDT) almashtiriladi.\n"
+            "O'chirish: <code>/refhavola off</code>",
+            parse_mode=ParseMode.HTML)
+        return
+    arg = ctx.args[0]
+    if arg.lower() == "off":
+        await db.set_setting("mexc_ref_url", None)
+        await update.message.reply_text("🔒 Referal havola o'chirildi.")
+        return
+    await db.set_setting("mexc_ref_url", arg)
+    await update.message.reply_text(f"✅ Saqlandi:\n{html.escape(arg)}",
+                                    parse_mode=ParseMode.HTML)
+
+
 async def _resolve_news_symbol(hint: str | None) -> tuple[str | None, str | None]:
     if not hint:
         return None, None
@@ -3657,6 +3734,31 @@ async def _resolve_news_symbol(hint: str | None) -> tuple[str | None, str | None
         if resolved:
             return resolved, market
     return None, None
+
+
+async def _signal_buttons(symbol: str, market: str,
+                          bot_username: str | None) -> InlineKeyboardMarkup | None:
+    """News Trade AI / surge posti ostidagi tugmalar:
+      1. "💹 Savdo qilish" — MEXC referal havolasi (`/refhavola` bilan
+         admin belgilaydi; belgilanmagan bo'lsa tugma UMUMAN chiqmaydi —
+         referalsiz oddiy havola postlanmaydi). Havolada `{symbol}` bo'lsa
+         "BAZA_QUOTE" shaklidagi juftlik bilan almashtiriladi (masalan
+         BTC_USDT), bo'lmasa havola o'zgarishsiz ishlatiladi.
+      2. "📝 Jurnalga kiritish" — `/start journal_<SYMBOL>` deep-link.
+         Bosilganda foydalanuvchi botning shaxsiy chatiga o'tadi va
+         tikerni QAYTA YOZMASDAN faqat yo'nalish/narxlarni kiritadi."""
+    rows = []
+    if market == "crypto":
+        ref = await db.get_setting("mexc_ref_url")
+        if ref:
+            base = symbol[:-len(config.QUOTE)] if symbol.endswith(config.QUOTE) else symbol
+            pair = f"{base}_{config.QUOTE}"
+            url = ref.replace("{symbol}", pair) if "{symbol}" in ref else ref
+            rows.append([InlineKeyboardButton("💹 Savdo qilish", url=url)])
+    if bot_username:
+        rows.append([InlineKeyboardButton(
+            "📝 Jurnalga kiritish", url=f"https://t.me/{bot_username}?start=journal_{symbol}")])
+    return InlineKeyboardMarkup(rows) if rows else None
 
 
 async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
@@ -3698,15 +3800,16 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
         if rendered:
             photo, live_pct = rendered
 
+    buttons = await _signal_buttons(symbol, market, ctx.bot.username) if symbol else None
     try:
         if photo:
             sent = await ctx.bot.send_photo(
                 config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
-                caption=caption, parse_mode=ParseMode.HTML)
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
         else:
             sent = await ctx.bot.send_message(
                 config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
+                disable_web_page_preview=True, reply_markup=buttons)
     except Exception:
         log.exception("Yangilik kanalga postlanmadi (%s)", item["external_key"])
         return
@@ -4023,15 +4126,16 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     if rendered:
         photo, live_pct = rendered
 
+    buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
     try:
         if photo:
             sent = await ctx.bot.send_photo(
                 config.NEWS_CHANNEL_ID, InputFile(photo, "surge.png"),
-                caption=caption, parse_mode=ParseMode.HTML)
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
         else:
             sent = await ctx.bot.send_message(
                 config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True)
+                disable_web_page_preview=True, reply_markup=buttons)
     except Exception:
         log.exception("Hajm portlashi postlanmadi (%s)", symbol)
         return
@@ -4104,10 +4208,11 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         insight_uz=None, event_at=now, posted=False)
 
     caption = f"🧪 <b>Sinov</b> — {html.escape(symbol)}\nHar {config.NEWS_REFRESH_SECONDS}s yangilanadi."
+    buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
     try:
         sent = await ctx.bot.send_photo(
             config.NEWS_CHANNEL_ID, InputFile(photo, "test.png"),
-            caption=caption, parse_mode=ParseMode.HTML)
+            caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
     except Exception:
         log.exception("charttest post qilinmadi (%s)", symbol)
         await update.message.reply_text("Kanalga postlab bo'lmadi (bot admin emasmi?).")
@@ -4194,6 +4299,7 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
+    app.add_handler(CommandHandler("refhavola", cmd_ref_link))
     app.add_handler(CommandHandler("hisobot", cmd_digest))
     app.add_handler(CommandHandler("sahifa", cmd_page))
     app.add_handler(CallbackQueryHandler(on_fix, pattern=r"^fix:"))

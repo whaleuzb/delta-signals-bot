@@ -257,6 +257,14 @@ CREATE TABLE IF NOT EXISTS volume_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_volume_snapshots_symbol_time
     ON volume_snapshots(symbol, recorded_at);
+
+-- Bot bo'yicha GLOBAL sozlamalar (bitta qiymat, kalit-qiymat), masalan
+-- MEXC referal havolasi — admin buyruq bilan qayta deploy qilmasdan
+-- o'zgartira olishi uchun (Railway o'zgaruvchisidan farqli).
+CREATE TABLE IF NOT EXISTS bot_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 
@@ -1070,3 +1078,17 @@ async def volume_surge_candidates(multiplier: float, exclude_hours: float,
     """
     async with pool().acquire() as c:
         return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier)
+
+
+# ───────────────── Global sozlamalar (kalit-qiymat) ─────────────────
+
+async def get_setting(key: str) -> str | None:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT value FROM bot_settings WHERE key=$1", key)
+
+
+async def set_setting(key: str, value: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO bot_settings (key, value) VALUES ($1,$2) "
+            "ON CONFLICT (key) DO UPDATE SET value=$2", key, value)

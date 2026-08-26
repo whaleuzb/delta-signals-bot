@@ -1581,3 +1581,44 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       post ketdi. `volume_snapshot_job`/`surge_scan_job` tashqi
       qatlamlari va `NEWS_CHANNEL_ID` bo'sh holati alohida tekshirildi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+
+73. **News Trade AI/surge postlari ostida tugmalar: MEXC referal havolasi
+    + tikersiz "Jurnalga kiritish".**
+    - **"💹 Savdo qilish"** — `/refhavola` bilan admin belgilagan MEXC
+      REFERAL havolasi (Railway o'zgaruvchisi emas — `bot_settings`
+      jadvalida, qayta deploy qilmasdan o'zgartirilishi uchun). Havolada
+      `{symbol}` bo'lsa `BAZA_QUOTE` shaklidagi juftlik bilan (masalan
+      `BTC_USDT` — MEXC URL formati `BTCUSDT` emas, orada `_` talab
+      qiladi) almashtiriladi. **Belgilanmagan bo'lsa tugma UMUMAN
+      chiqmaydi** — referalsiz oddiy havola bexosdan postlanib qolmasin
+      (foydalanuvchi ataylab shunday so'radi: "referal havola bo'lsin").
+    - **"📝 Jurnalga kiritish"** — `https://t.me/<bot>?start=journal_<SYMBOL>`
+      deep-link. Muhim arxitektura qarori: **wizard'ning `ConversationHandler`
+      holat mashinasiga TEGILMADI** — `/start` conversation'ning
+      `entry_points`ida emas (alohida `CommandHandler`), shuning uchun
+      `cmd_start`dan to'g'ridan-to'g'ri biror `WIZ_*` holatiga "sakrash"
+      ISHLAMAYDI (foydalanuvchi keyingi bosgan tugmasi hech qanday
+      handler'ga to'g'ri kelmay, "o'lik tugma" bo'lib qolardi — bu
+      loyihalash bosqichida aniqlanib, ataylab bu yo'ldan qaytildi).
+      Buning o'rniga: mavjud "bitta xabar" erkin-matn yo'li (`parsing.parse`)
+      qayta ishlatildi — `AWAITING_JOURNAL_SYMBOL[uid] = (symbol, ws_id)`
+      o'rnatiladi, `on_text_signal` buni EDIT/ALLOC kabi boshqa AWAITING_*
+      bilan bir qatorda tekshiradi, foydalanuvchi yozgan TIKERSIZ matnga
+      symbol OLDIGA QO'SHIB (`parsing.parse(f"{symbol} {text}")`)
+      beriladi — `parsing.py`ga sira tegilmadi. `show_preview()` baribir
+      `resolve_symbol()`ni o'zi qayta chaqiradi, shuning uchun bu yetarli.
+    - `/start journal_<SYMBOL>` — shaxsiy jurnalga (`get_or_create_personal_workspace`)
+      yo'naltiriladi, guruhga emas (bu ommaviy kanal postidan kelgan
+      shaxsiy harakat). Tiker resolve bo'lmasa AWAITING o'rnatilmaydi.
+      `/bekor` `AWAITING_JOURNAL_SYMBOL`ni ham tozalaydi (boshqa AWAITING_*
+      bilan bir xil ro'yxatda).
+    - Yangi `bot_settings(key, value)` GLOBAL jadval — bitta qiymatli
+      sozlamalar uchun qayta ishlatiladigan andoza (birinchi foydalanuvchisi
+      `mexc_ref_url`, kelajakdagi shunga o'xshash sozlamalar ham shu
+      jadvalga yozilishi mumkin).
+    - Tekshirildi (mock): `_signal_buttons` — referal yo'q/bor/`{symbol}`
+      almashtirish/bot_username yo'q holatlari; to'liq zanjir — deep-link
+      → AWAITING → noto'g'ri matn (holat SAQLANADI) → to'g'ri tikersiz
+      matn → `show_preview` chaqirilib PENDING'ga yoziladi (symbol/market
+      to'g'ri aniqlangan) → noto'g'ri tiker bilan AWAITING o'rnatilmaydi.
+      `test_tracker.py` 9/9 — o'zgarmadi.
