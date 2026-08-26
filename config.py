@@ -110,7 +110,7 @@ SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))
 #     bepul "notices" API'si orqali. Bithumb HALI QO'SHILMAGAN — rasmiy
 #     notices manzili sandbox tarmog'ida tasdiqlanmadi (apidocs.bithumb.com
 #     bloklangan edi), keyinroq production loglaridan aniqlab qo'shiladi ---
-UPBIT_NOTICES_URL = "https://api-manager.upbit.com/api/v1/notices"
+UPBIT_NOTICES_URL = "https://api-manager.upbit.com/api/v1/notices/search"
 
 # --- Yirik likvidatsiyalar: Coinalyze (bepul, lekin coinalyze.net'da
 #     ro'yxatdan o'tib olinadigan kalit kerak). Bo'sh bo'lsa funksiya

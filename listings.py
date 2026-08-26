@@ -40,8 +40,13 @@ async def upbit_scan(since: datetime) -> list[dict]:
     `None` — tiker `newsai.analyze()` bosqichida taxmin qilinadi."""
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
+            # MUHIM: `thread_name`/boshqa filtr parametrlari HALI TASDIQLANMAGAN
+            # (rasmiy hujjat yopiq) — ataylab FAQAT sahifalash beriladi, aks
+            # holda noto'g'ri qiymat butun so'rovni 404/400 bilan rad etishi
+            # mumkin (production logida `/notices` (search yo'lisiz) 404
+            # bergani allaqachon kuzatilgan va shu sabab tuzatilgan edi).
             r = await client.get(config.UPBIT_NOTICES_URL, params={
-                "page": 1, "per_page": 20, "thread_name": "general",
+                "page": 1, "per_page": 20,
             })
             r.raise_for_status()
             data = r.json()
