@@ -117,11 +117,19 @@ SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))
 #     jimgina o'chadi — boshqa hech narsa ta'sirlanmaydi ---
 COINALYZE_API_KEY = os.getenv("COINALYZE_API_KEY", "")
 # Kuzatiladigan instrumentlar — Coinalyze'ning o'z belgilash uslubi
-# (BINANCE bozori, ".A" — Coinalyze'dagi Binance kodi).
+# (BINANCE bozori, ".A" — Coinalyze'dagi Binance kodi). Faqat top-5 emas,
+# kengroq ro'yxat — foydalanuvchi kichikroq tangalardagi (masalan PUMP)
+# yirik likvidatsiyalarni ham ko'rishni so'radi. Coinalyze bitta so'rovda
+# 20 tagacha instrumentni qabul qiladi.
 LIQUIDATION_SYMBOLS = os.getenv(
     "LIQUIDATION_SYMBOLS",
-    "BTCUSDT_PERP.A,ETHUSDT_PERP.A,SOLUSDT_PERP.A,BNBUSDT_PERP.A,XRPUSDT_PERP.A",
+    "BTCUSDT_PERP.A,ETHUSDT_PERP.A,SOLUSDT_PERP.A,BNBUSDT_PERP.A,XRPUSDT_PERP.A,"
+    "DOGEUSDT_PERP.A,ADAUSDT_PERP.A,AVAXUSDT_PERP.A,LINKUSDT_PERP.A,LTCUSDT_PERP.A,"
+    "TRXUSDT_PERP.A,DOTUSDT_PERP.A,SUIUSDT_PERP.A,APTUSDT_PERP.A,ARBUSDT_PERP.A,"
+    "OPUSDT_PERP.A,NEARUSDT_PERP.A,INJUSDT_PERP.A,WIFUSDT_PERP.A,PUMPUSDT_PERP.A",
 ).split(",")
-# So'nggi 5-daqiqalik likvidatsiya hajmi bazaviy o'rtachadan necha marta
-# katta bo'lsa "yirik" deb hisoblanadi.
-LIQUIDATION_MULTIPLIER = float(os.getenv("LIQUIDATION_MULTIPLIER", "4"))
+# Oxirgi 5-daqiqalik ustunda (long yoki short tomonning biri) qancha
+# dollardan katta bo'lsa post qilinadi — foydalanuvchi "faqat 500.000$dan
+# katta likvidatsiyalar" so'radi (avvalgi o'rtachaga nisbatan ko'plik
+# mezoni chalkash edi, endi oddiy chegara).
+LIQUIDATION_MIN_USD = float(os.getenv("LIQUIDATION_MIN_USD", "500000"))

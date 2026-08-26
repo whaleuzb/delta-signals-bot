@@ -4285,6 +4285,28 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # majburiy yopilishlarni kuzatadi. `COINALYZE_API_KEY` bo'sh bo'lsa
 # `liquidations.enabled()` False qaytaradi, job hech narsa qilmaydi.
 
+def _eu_decimal(s: str) -> str:
+    """AQSH uslubi ("1,234.56") -> Yevropa/rus uslubi ("1.234,56") —
+    foydalanuvchi so'ragan aynan shu ko'rinish uchun."""
+    return s.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def _fmt_usd_k(value_usd: float) -> str:
+    """533890 -> "533,89K" (mingda, 2 xona, vergul-kasr)."""
+    return _eu_decimal(f"{value_usd / 1000:,.2f}") + "K"
+
+
+def _fmt_price(price: float) -> str:
+    """Narxni moslashuvchan aniqlik bilan chiqaradi — arzon tangalarda
+    (masalan $0,0045581) ko'proq, qimmatlarida kamroq kasr xonasi,
+    ortiqcha nollar kesib tashlanadi."""
+    s = f"{price:,.8f}"
+    int_part, frac = s.split(".")
+    frac = frac.rstrip("0")
+    s = int_part if not frac else f"{int_part}.{frac}"
+    return _eu_decimal(s)
+
+
 async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
                                      spike: liquidations.Spike) -> None:
     now = datetime.now(timezone.utc)
@@ -4294,42 +4316,33 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     if not symbol:
         return   # kuzatilayotgan instrument MEXC'da yo'q — chizib bo'lmaydi
 
-    # Dedup — 15 daqiqalik oynada bitta instrument uchun bitta post
-    # (`news_events.external_key` UNIQUE orqali, boshqa manbalar kabi).
-    window = now.minute // 15
-    external_key = f"liq:{spike.symbol}:{now:%Y-%m-%d %H}:{window}"
-    headline = (f"{base}: fyuchers likvidatsiyasi keskin oshdi "
-               f"(so'nggi 5 daqiqada ${spike.latest_usd:,.0f}, "
-               f"o'rtachadan {spike.ratio:.1f}x ko'p)")
+    # Dedup — bitta 5-daqiqalik ustun uchun bitta post (`news_events.
+    # external_key` UNIQUE orqali, boshqa manbalar kabi). Skan joyi ham
+    # har 5 daqiqada ishlaydi (`liquidation_scan_job`), shuning uchun
+    # bucket granularligi = skan granularligi.
+    bucket = now.minute - (now.minute % 5)
+    external_key = f"liq:{spike.symbol}:{now:%Y-%m-%d %H}:{bucket:02d}"
+
+    # Long ko'p yopilsa narx PASAYGANDA (longlar majburan sotilgan), short
+    # ko'p yopilsa narx KO'TARILGANDA (shortlar majburan sotib olingan)
+    # likvidatsiya bo'ladi — shuning uchun DOMINANT tomon ko'rsatiladi.
+    if spike.long_usd >= spike.short_usd:
+        side_label, side_usd, emoji, marker_color = "Long", spike.long_usd, "🔴", chart.RED
+    else:
+        side_label, side_usd, emoji, marker_color = "Short", spike.short_usd, "🟢", chart.GREEN
+
+    headline = f"{base}: {side_label} likvidatsiya ${side_usd:,.0f}"
     eid = await db.insert_news_event(
         source="liquidation", external_key=external_key, symbol=symbol, market="crypto",
         headline_en=headline, translation_uz=None, insight_uz=None,
         event_at=now, posted=False)
     if eid is None:
-        return   # shu 15 daqiqalik oyna uchun allaqachon postlangan
+        return   # shu 5 daqiqalik ustun uchun allaqachon postlangan
 
-    # Long/short taqsimoti — qaysi tomon ko'proq majburan yopilgani narx
-    # yo'nalishini bildiradi: LONG ko'p yopilsa narx PASAYGANDA (longlar
-    # majburan sotilgan), SHORT ko'p yopilsa narx KO'TARILGANDA (shortlar
-    # majburan sotib olingan) likvidatsiya bo'ladi.
-    side_total = spike.long_usd + spike.short_usd
-    marker_color = None
-    if side_total > 0 and spike.long_usd >= spike.short_usd:
-        long_pct = spike.long_usd / side_total * 100
-        direction_line = f"📉 Asosan <b>LONG</b> yopildi ({long_pct:.0f}%) — narx pasaygan bo'lishi mumkin"
-        marker_color = chart.RED
-    elif side_total > 0:
-        short_pct = spike.short_usd / side_total * 100
-        direction_line = f"📈 Asosan <b>SHORT</b> yopildi ({short_pct:.0f}%) — narx ko'tarilgan bo'lishi mumkin"
-        marker_color = chart.GREEN
-    else:
-        direction_line = ""
-
-    caption = (f"💥 <b>{html.escape(symbol)}</b> — fyuchers likvidatsiyasi keskin oshdi"
-              f"\n\nSo'nggi 5 daqiqa: <b>${spike.latest_usd:,.0f}</b> "
-              f"(o'rtachadan <b>{spike.ratio:.1f}x</b> ko'p)"
-              f"\n🔴 Long: ${spike.long_usd:,.0f}   🟢 Short: ${spike.short_usd:,.0f}"
-              + (f"\n{direction_line}" if direction_line else ""))
+    price = await exchange.last_price(symbol, fresh=True)
+    price_part = f" narx: ${_fmt_price(price)}" if price else ""
+    caption = (f"{emoji} #{html.escape(base)} Likvidlanish {side_label}: "
+              f"${_fmt_usd_k(side_usd)}{price_part} Binance")
 
     photo, live_pct = None, None
     liq_before_ms = 4 * 3_600_000   # 4 soat, 1m shamlarda

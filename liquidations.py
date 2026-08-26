@@ -1,9 +1,11 @@
-"""Yirik likvidatsiyalar — Coinalyze API orqali (Binance/Bybit/OKX kabi
-fyuchers birjalaridagi majburiy yopilishlarni jamlaydi).
+"""Yirik likvidatsiyalar — Coinalyze API orqali (Binance kabi fyuchers
+birjasidagi majburiy yopilishlarni jamlaydi).
 
-Yirik likvidatsiya to'lqini ko'pincha keskin narx harakati bilan birga
-keladi (kaskadli likvidatsiya) — News Trade AI'ning boshqa hodisalari
-(SEC, listing, hajm portlashi) kabi bitta "signal turi".
+Foydalanuvchi so'rovi: "faqat 500.000$ dan katta likvidatsiyalar
+ko'rsatilsin, kichiklari kerak emas" — avvalgi versiya "o'rtachadan necha
+marta ko'p" nisbatiga qarardi (chalkash, tushunarsiz edi). Endi mezon
+oddiy: oxirgi 5 daqiqalik ustunda long YOKI short tomonning BIRI
+`config.LIQUIDATION_MIN_USD`dan katta bo'lsa — post qilinadi.
 
 `COINALYZE_API_KEY` bo'sh bo'lsa butun modul jimgina o'chadi — boshqa
 News Trade AI manbalariga (SEC/Upbit/surge) hech qanday ta'siri yo'q.
@@ -17,7 +19,7 @@ instrumentlarni qamrab oladi (har biriga alohida so'rov SHART EMAS).
 
 MUHIM: bitta bucket ICHIDAGI aniq maydon nomlari (masalan uzun/qisqa
 likvidatsiya alohida-alohida qanday nomlanishi) rasmiy spetsifikatsiyada
-ko'rsatilmagan (`"history": []` — bo'sh namuna). Shu sabab `_bucket_total()`
+ko'rsatilmagan (`"history": []` — bo'sh namuna). Shu sabab `_bucket_sides()`
 bir nechta ehtimoliy nom bilan himoyalangan o'qiydi; aniq shakl
 production loglarida tasdiqlanadi, kerak bo'lsa moslashtiriladi."""
 import logging
@@ -32,7 +34,7 @@ log = logging.getLogger("liquidations")
 
 BASE_URL = "https://api.coinalyze.net/v1"
 INTERVAL = "5min"
-LOOKBACK_BUCKETS = 30   # ~2.5 soat (5 daqiqalik ustunlar)
+LOOKBACK_MINUTES = 15   # bir nechta ustun so'raladi, faqat OXIRGISI ishlatiladi
 
 
 def enabled() -> bool:
@@ -42,9 +44,6 @@ def enabled() -> bool:
 @dataclass
 class Spike:
     symbol: str
-    latest_usd: float
-    baseline_usd: float
-    ratio: float
     long_usd: float
     short_usd: float
 
@@ -53,8 +52,7 @@ def _bucket_sides(item: dict) -> tuple[float, float]:
     """Bir ustundagi (long, short) likvidatsiya qiymatlari alohida-alohida
     (`convert_to_usd=true` bo'lgani uchun USD'da). Aniq maydon nomlari
     rasmiy hujjatda ko'rsatilmagani uchun bir nechta ehtimoliy nom
-    sinaladi — `log.debug` orqali xom ustun ham yoziladi, production
-    logida haqiqiy maydon nomlarini tasdiqlash uchun."""
+    sinaladi."""
     long_v = item.get("l") or item.get("long") or item.get("buy") or 0
     short_v = item.get("s") or item.get("short") or item.get("sell") or 0
     try:
@@ -63,23 +61,19 @@ def _bucket_sides(item: dict) -> tuple[float, float]:
         return 0.0, 0.0
 
 
-def _bucket_total(item: dict) -> float:
-    long_v, short_v = _bucket_sides(item)
-    return long_v + short_v
-
-
 async def liquidation_candidates() -> list[Spike]:
     """Kuzatilayotgan BARCHA instrumentlar uchun BITTA so'rovda (Coinalyze
-    20 tagacha instrumentni bir so'rovda qabul qiladi) 5 daqiqalik
-    likvidatsiya ustunlarini oladi, har biri uchun oxirgi ustunni oldingi
-    ustunlar o'rtachasi bilan solishtiradi. Butun so'rov muvaffaqiyatsiz
-    bo'lsa (masalan tarmoq/kalit xatosi) bo'sh ro'yxat — chaqiruvchi
-    (`liquidation_scan_job`) shuni allaqachon xato sifatida logaydi."""
+    20 tagacha instrumentni bir so'rovda qabul qiladi) oxirgi 5-daqiqalik
+    likvidatsiya ustunini oladi, long/short tomonlardan BIRI
+    `config.LIQUIDATION_MIN_USD`dan katta bo'lgan instrumentlarni
+    qaytaradi. Butun so'rov muvaffaqiyatsiz bo'lsa (masalan tarmoq/kalit
+    xatosi) bo'sh ro'yxat — chaqiruvchi (`liquidation_scan_job`) shuni
+    allaqachon xato sifatida logaydi."""
     if not enabled():
         return []
 
     now = int(time.time())
-    from_ts = now - LOOKBACK_BUCKETS * 5 * 60
+    from_ts = now - LOOKBACK_MINUTES * 60
     async with httpx.AsyncClient(timeout=15.0) as client:
         r = await client.get(f"{BASE_URL}/liquidation-history", params={
             "symbols": ",".join(config.LIQUIDATION_SYMBOLS),
@@ -95,19 +89,10 @@ async def liquidation_candidates() -> list[Spike]:
     for entry in data:
         symbol = entry.get("symbol")
         buckets = entry.get("history") or []
-        if not symbol or len(buckets) < 5:
+        if not symbol or not buckets:
             continue
-        buckets = buckets[-LOOKBACK_BUCKETS:]
-        totals = [_bucket_total(b) for b in buckets]
-        latest = totals[-1]
-        baseline = totals[:-1]
-        avg = sum(baseline) / len(baseline) if baseline else 0.0
-        if avg <= 0 or latest <= 0:
-            continue
-        ratio = latest / avg
-        if ratio >= config.LIQUIDATION_MULTIPLIER:
-            long_usd, short_usd = _bucket_sides(buckets[-1])
+        long_usd, short_usd = _bucket_sides(buckets[-1])
+        if max(long_usd, short_usd) >= config.LIQUIDATION_MIN_USD:
             log.debug("Likvidatsiya xom ustun (%s): %r", symbol, buckets[-1])
-            out.append(Spike(symbol=symbol, latest_usd=latest, baseline_usd=avg,
-                             ratio=ratio, long_usd=long_usd, short_usd=short_usd))
+            out.append(Spike(symbol=symbol, long_usd=long_usd, short_usd=short_usd))
     return out

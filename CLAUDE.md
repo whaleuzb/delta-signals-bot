@@ -2087,3 +2087,45 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       chaqirilsa ham tirik qoladi, tugagach to'plamdan avtomatik chiqadi).
       `test_tracker.py` 9/9 — o'zgarmadi (bu kod `tracker.py`ga tegmaydi).
       Production'da deploy tasdiqlandi.
+
+85. **Likvidatsiya posti butunlay soddalashtirildi — foydalanuvchi aniq
+    namuna berdi ("avvalgisi juda chalkash").** Namuna:
+    `🔴 #PUMP Likvidlanish Long: $533,89K narx: $0,0045581 Binance`.
+    - **Mezon o'zgardi**: avvalgi "o'rtachadan necha marta ko'p" nisbati
+      (`LIQUIDATION_MULTIPLIER`) OLIB TASHLANDI — endi oddiy: oxirgi
+      5-daqiqalik ustunda long YOKI short tomonning BIRI
+      `config.LIQUIDATION_MIN_USD` (standart 500000)dan katta bo'lsa
+      post qilinadi ("faqat 500.000$dan katta... kichiklari kerak emas").
+      `liquidations.py` shu sabab soddalashtirildi: `Spike`dan
+      `ratio`/`baseline_usd` olib tashlandi, faqat `long_usd`/`short_usd`
+      qoldi; o'rtacha hisoblash mantig'i butunlay ketdi.
+    - **Kuzatiladigan ro'yxat kengaytirildi**: namunada `#PUMP` — bu
+      avvalgi 5 ta asosiy tanga (BTC/ETH/SOL/BNB/XRP) ro'yxatida yo'q
+      edi. `LIQUIDATION_SYMBOLS`ga yana 15 ta mashhur fyuchers qo'shildi
+      (DOGE/ADA/AVAX/LINK/LTC/TRX/DOT/SUI/APT/ARB/OP/NEAR/INJ/WIF/PUMP)
+      — jami 20 ta (Coinalyze'ning bitta so'rovdagi maksimal chegarasi).
+    - **Xabar formati butunlay yangi, ixcham bitta qatorga tushirildi**
+      (avvalgi ko'p qatorli, izohli caption OLIB TASHLANDI):
+      `{🔴/🟢} #{BAZA} Likvidlanish {Long/Short}: ${miqdorK} narx: ${narx} Binance`.
+      Emoji/rang mantiqi eskisi bilan bir xil qoldi (LONG ustun → qizil,
+      SHORT ustun → yashil). "Binance" qat'iy yozilgan — `.A` Coinalyze
+      kodida haqiqatan BINANCE degani (config.py'dagi izohda tasdiqlangan),
+      shuning uchun bu YOLG'ON emas.
+    - **Yangi raqam formatlash** (`_eu_decimal`/`_fmt_usd_k`/`_fmt_price`,
+      bot.py): foydalanuvchi namunasi Yevropa/rus uslubida (vergul =
+      kasr belgisi, nuqta = minglik ajratgich) — standart Python
+      `f"{x:,.2f}"` (AQSH uslubi) dan farqli. `_fmt_price()` narxni
+      moslashuvchan aniqlik bilan (8 xonagacha, ortiqcha nollarsiz)
+      chiqaradi — arzon tanga uchun ko'p kasr xonasi ($0,0045581), qimmat
+      tanga uchun kam ($101,0065), popundek son uchun kasrsiz ($100).
+      Narx `exchange.last_price(symbol, fresh=True)` orqali JONLI olinadi
+      (Coinalyze bermaydi).
+    - Dedup bucket granularligi 15 daqiqadan 5 daqiqaga tushirildi — skan
+      joyi (`liquidation_scan_job`) allaqachon har 5 daqiqada ishlaydi,
+      shunga mos.
+    - Tekshirildi (mock, haqiqiy Postgres): to'liq zanjir ($533,89K PUMP
+      long, $978,47K SOL short kabi) ishga tushirilib caption AYNAN
+      foydalanuvchi namunasiga mos chiqishi tasdiqlandi
+      (`🔴 #PUMP Likvidlanish Long: $533,89K narx: $0,0045581 Binance`);
+      $500K'dan kichik nomzod (`ETHUSDT_PERP.A`, $10K) TO'G'RI filtrlanib
+      tashlanishi ham tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
