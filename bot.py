@@ -22,7 +22,7 @@ from telegram import (
     InputFile, WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest, Forbidden, RetryAfter
+from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter, TimedOut
 from telegram.ext import (
     Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
     CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
@@ -4213,6 +4213,12 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         sent = await ctx.bot.send_photo(
             config.NEWS_CHANNEL_ID, InputFile(photo, "test.png"),
             caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+    except (TimedOut, NetworkError):
+        log.exception("charttest post qilinmadi — tarmoq (%s)", symbol)
+        await update.message.reply_text(
+            "⏱ Tarmoq vaqtincha javob bermadi (Telegram/Railway orasida uzilish). "
+            "Qayta urinib ko'ring: /charttest " + symbol)
+        return
     except Exception:
         log.exception("charttest post qilinmadi (%s)", symbol)
         await update.message.reply_text("Kanalga postlab bo'lmadi (bot admin emasmi?).")
