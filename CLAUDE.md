@@ -2630,3 +2630,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        bo'lishi mumkin, kod darajasida hozircha aniqlanmadi.
      - Diagnostika loglari (startup va har-tsiklli) tekshiruvdan keyin
        kod bazasidan olib tashlandi (vaqtinchalik edi).
+
+101. **Foydalanuvchi: "likvidatsiya bilan bog'liq xabarlar rasmi
+     yangilanmayabti"** — TOPILDI VA TUZATILDI (haqiqiy xato edi).
+     - Diagnostika (vaqtinchalik loglar): `news_live_job` likvidatsiya
+       postlarini har 4s tekshirar, `_paced_media_edit()` har safar
+       Telegram'dan "message is not modified" javobini olar edi (kod bu
+       holatni xato deb hisoblamay, jimgina "muvaffaqiyatli" deb
+       belgilaydi — shu sabab tashqaridan sezilmasdi). Solishtirish
+       uchun bir xil tsiklda boshqa manba (surge) posti HAR safar
+       HAQIQIY yangilanardi.
+     - **Ildiz sabab**: `_news_render()`dagi `limit = min(chart.MAX_CANDLES,
+       200)` QATTIQ 200ga cheklangan edi. Likvidatsiya `liq_before_ms =
+       4 soat` (1 daqiqalik shamlarda = 240 dona) ishlatadi — bu 200
+       chegaradan OSHIB ketadi. MEXC `/klines`da `startTime`+`endTime`
+       ikkalasi berilganda ham natija `limit`ga qarab START tomondan
+       kesiladi (oxirigacha YETMAYDI) — natijada qaytgan shamlar HAR
+       DOIM `start_ms`dan boshlab, "hozir"gacha yetmasdan, bir xil
+       (harakatsiz) massiv bo'lib qolar edi — grafik doim BAYT-BAYT bir
+       xil chiqib, Telegram tahrirlashni rad etardi. Boshqa manbalar
+       (SEC/listing — standart 60 daqiqa, surge — 4 kun lekin 1 SOATLIK
+       shamlarda = 96 dona) 200 chegaradan hech qachon oshmagani uchun
+       muammo faqat likvidatsiyada ko'rinardi.
+     - **Tuzatish** (`bot.py`, `_news_render()`): `limit` endi haqiqiy
+       oyna kengligidan ([start_ms, end_ms] + jonli o'sish zaxirasi)
+       DINAMIK hisoblanadi: `needed = (end_ms-start_ms)//shamDavomiyligi +
+       NEWS_LIVE_MINUTES//shamDavomiyligi + 10`, `limit = min(MAX_CANDLES,
+       max(200, needed))`. Standart holatlar (SEC/listing/surge) uchun
+       natija o'zgarmadi (baribir 200 dan kichik chiqadi — sinov bilan
+       tasdiqlandi), likvidatsiya uchun endi ~270-290 chiqadi (to'liq
+       4 soat + jonli o'sishni qamrab oladi).
+     - Tekshirildi: `chart.py`/`config.py`ni bevosita import qilib
+       (bot.py to'liq import qilinmasdan — bu muhitda `cryptography`
+       paketi buzilgan, loyihaga aloqasi yo'q) `needed`/`limit`
+       hisob-kitobi qo'lda tasdiqlandi. `test_tracker.py` 9/9 —
+       o'zgarmadi.
+     - Diagnostika loglari (barchasi) tekshiruvdan keyin olib tashlandi.
+     - **Keyingi qadam**: production'da yangi likvidatsiya posti chiqqach
+       (yoki mavjud faol posting'lar orqali) grafik endi haqiqatan
+       yangilanayotganini Railway logida ("message is not modified"
+       o'rniga haqiqiy tahrirlash) tasdiqlash kerak.

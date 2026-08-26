@@ -3957,7 +3957,18 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     start_ms = chart.align(event_ms - before_ms, tf)
     if end_ms is None:
         end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    limit = min(chart.MAX_CANDLES, 200)
+    # `limit` butun [start_ms, end_ms] oynasini qamrab olishi SHART — MEXC
+    # startTime+endTime ikkalasi berilganda ham natijani `limit`ga qarab
+    # START tomondan kesadi (oxirigacha YETMASDAN). Qattiq "200" liq_before_ms
+    # kabi keng (4 soat = 240x1m) oynalarda buzilardi: 200 < 240 bo'lgani
+    # uchun qaytgan shamlar doim start_ms'dan boshlab, event_at'gacha ham
+    # YETMAY qolardi — natija HAR safar bir xil (eskirgan) chiqib, Telegram
+    # "message is not modified" deb rad etardi (jonli yangilanish "muzlab
+    # qolgan" ko'rinardi). Live oyna (NEWS_LIVE_MINUTES) davomida yana
+    # o'sishi mumkinligi uchun ozgina zaxira ham qo'shiladi.
+    needed = (end_ms - start_ms) // (chart.TF_MINUTES[tf] * 60_000) \
+        + config.NEWS_LIVE_MINUTES // chart.TF_MINUTES[tf] + 10
+    limit = min(chart.MAX_CANDLES, max(200, needed))
     candles = await tracker.provider(market).klines(symbol, start_ms, limit=limit,
                                                      tf=tf, end_ms=end_ms)
     if not candles or len(candles) < 3:
@@ -4035,7 +4046,6 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
                                       caption=caption, parse_mode=ParseMode.HTML),
                 reply_markup=reply_markup)
             ok = True
-            log.info("DIAGNOSTIKA: HAQIQIY tahrirlash muvaffaqiyatli (chat=%s msg=%s)", chat_id, message_id)
         except RetryAfter as e:
             log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
             await asyncio.sleep(e.retry_after)
@@ -4048,7 +4058,6 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
             # yangi — shuning uchun ogohlantirish/traceback bilan
             # loglarni to'ldirmasdan jimgina o'tkazib yuboriladi.
             if "message is not modified" in str(e).lower():
-                log.info("DIAGNOSTIKA: 'message is not modified' (chat=%s msg=%s)", chat_id, message_id)
                 ok = True
             else:
                 log.warning("News xabari tahrirlanmadi (chat=%s msg=%s)",
@@ -4088,10 +4097,6 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Jonli hodisalar ro'yxati olinmadi")
         return
 
-    if any(row["source"] == "liquidation" for row in rows):
-        log.info("DIAGNOSTIKA news_live_job: %d faol qator, likvidatsiya: %s",
-                 len(rows), [(r["id"], r["symbol"], r["message_id"]) for r in rows if r["source"] == "liquidation"])
-
     for row in rows:
         try:
             rendered = await _news_render(
@@ -4103,8 +4108,6 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.warning("Jonli grafik yasalmadi (%s)", row["symbol"], exc_info=True)
             continue
         if rendered is None:
-            if row["source"] == "liquidation":
-                log.info("DIAGNOSTIKA: likvidatsiya (id=%s %s) uchun rendered=None", row["id"], row["symbol"])
             continue
         photo, live_pct = rendered
 
@@ -4112,16 +4115,6 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         kb_rows = list(buttons.inline_keyboard) if buttons else []
         kb_rows.append([_share_button(row["message_id"])])
         buttons = InlineKeyboardMarkup(kb_rows)
-
-        if row["source"] == "liquidation":
-            _edit_ok = await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
-                                               photo, buttons, row["caption"])
-            log.info("DIAGNOSTIKA: likvidatsiya (id=%s %s msg=%s) tahrirlash natijasi=%s",
-                     row["id"], row["symbol"], row["message_id"], _edit_ok)
-            deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
-            if now >= deadline:
-                await db.finalize_news_outcome(row["id"], live_pct)
-            continue
 
         await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
                                 photo, buttons, row["caption"])
