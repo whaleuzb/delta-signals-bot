@@ -1447,3 +1447,62 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `/stats`, `/open`, `/equity`.
     - Tekshirildi: 0.3 s → faqat "yozmoqda"; 2.5 s → xabar chiqdi va o'chdi;
       9 s → belgi 3 marta yangilandi, xabar bitta; xato bo'lsa ham tozalandi.
+
+70. **News Trade AI — bozorni qimirlatadigan yangiliklarni avtomatik topib,
+    alohida kanalga jonli grafik bilan joylash (1-bosqich: faqat SEC).**
+    Foydalanuvchi "NewsTrade.AI" kanalining formatini ko'rsatdi: tanga+%
+    sarlavha, shamlar grafigi + "News" belgisi, AI xulosa, vaqt o'tishi
+    bilan tahrirlanadigan xabar. `NEWS_CHANNEL_ID` bo'sh bo'lsa butun
+    funksiya jimgina o'chiq (mavjud ixtiyoriy-funksiya andozasi).
+    - Yangi modullar: `news.py` (SEC EDGAR full-text qidiruv —
+      `efts.sec.gov`, rasmiy, bepul, kalitsiz; Telegram'ga bog'liq emas),
+      `newsai.py` (`vision.py` andozasida, lekin matn uchun — tarjima/
+      qisqa xulosa/"bu bozorni qimirlatadimi" filtri/tiker taxmini).
+    - Unlock kalendari va cryptocurrencyalerting.com (listing/delisting)
+      ATAYLAB ta'sirlanmagan: unlock manbai (DefiLlama Pro $300/oy yoki
+      GitHub'dagi emissions-adapters skaneri) hali tanlanmagan;
+      listing/delisting bepul rejasi webhook bermaydi (faqat Trader
+      $19.99/oy+dan), foydalanuvchi avval bepul rejani sinab ko'rishni
+      tanladi — botning o'z kodi bilan ulanmagan, xizmatning o'z Telegram
+      integratsiyasidan foydalaniladi.
+    - `chart.py`: `_render()`ga TEGILMADI (entry/sl/tps u yerda majburiy,
+      "ixtiyoriy" qilish mavjud signal grafiklarini buzish xavfi edi).
+      Shamlar chizish qismi `_draw_candles()`ga ajratilib, ham `_render()`,
+      ham yangi `news_chart()`da ishlatiladi. `news_chart()` — Entry/SL/TP
+      yo'q, faqat "News" vertikal chizig'i + nuqta va sarlavhada joriy %.
+      **Birinchi urinishda foiz sarlavha yoniga belgilar soni bo'yicha
+      taxmin qilingan joyga qo'yilgan edi — matn ustma-ust tushib qoldi**
+      (proporsional shrift monospace emas). `_render()`dagi pnl kabi
+      o'ng burchakka (`ha="right"`) ko'chirildi — aniq ishladi.
+    - `db.py`: `news_events` — GLOBAL jadval (`required_channels` kabi,
+      workspace_id yo'q). `external_key UNIQUE` — bir xil hodisa ikki
+      marta post qilinmasin (SEC accession number). `posted` — kelajakda
+      webhook manbalari (masalan listing) `FALSE` bilan yozib qo'yishi,
+      `news_scan_job` esa navbatdagi ishlanmagan qatorni topishi uchun
+      (hozir faqat SEC bor, u o'zi darhol `TRUE` bilan yaratadi).
+    - `bot.py`: `news_scan_job` (90s) — SEC skanerdan kelgan har hodisani
+      AI tahlildan o'tkazadi. **Market-moving bo'lmagan yoki tiker
+      topilmagan hodisalar HAM bazaga yoziladi** (postlanmasa ham) — aks
+      holda keyingi skaner siklida xuddi shu hodisa qayta topilib, Claude
+      bekorga qayta chaqirilardi.
+    - Jonli yangilanish (`_live_update`) — `job_queue` emas, alohida
+      `asyncio.create_task`: bitta HODISAGA tegishli, chegaralangan
+      davomiylik (`NEWS_LIVE_MINUTES`, standart 20 daq). Har
+      `NEWS_REFRESH_SECONDS` (standart 4s) qayta chiziladi va
+      `edit_message_media` bilan yangilanadi. **Umumiy tezlik cheklovi**
+      (`_paced_media_edit`, global lock + oxirgi tahrirlash vaqti,
+      `NEWS_MIN_EDIT_GAP`): bir nechta hodisa parallel jonli bo'lsa ham
+      Telegram flood-control'ga urilmaydi — bitta hodisa yolg'iz bo'lsa
+      amalda 3-4s bilan yangilanadi, bir nechtasi bo'lsa avtomatik
+      sekinlashadi. `RetryAfter` kelsa shuncha kutib, KEYINGI siklda
+      davom etadi (darhol qayta urinmaydi, sikl o'zi qayta chaqiradi).
+    - `news_idx` (demak "kirish" narxi) `event_at`dan hisoblanadi va HAR
+      chaqiriqda bir xil qoladi (start_ms/event_ms o'zgarmas) — shuning
+      uchun % butun jonli oyna davomida bitta ONdan, barqaror hisoblanadi.
+    - Tekshirildi: to'liq zanjir (SEC → AI → resolve → grafik → post)
+      mock bilan — yangi hodisa postlanadi, takroriy hodisa Claude'ni
+      QAYTA CHAQIRMAYDI (dedup DB darajasida), rutin hodisa postlanmay
+      lekin yozilib qo'yiladi, `NEWS_CHANNEL_ID` bo'sh bo'lsa job hech
+      narsa qilmaydi. `_live_update`: yolg'iz holatda davriy tahrirlash,
+      ikkita parallel hodisada umumiy tezlik cheklovi ushlab turildi,
+      `RetryAfter`da yiqilmadi. `test_tracker.py` 9/9 — o'zgarmadi.

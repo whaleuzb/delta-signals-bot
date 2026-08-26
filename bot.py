@@ -13,12 +13,13 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from PIL import Image
 
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, WebAppInfo,
+    InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    InputFile, WebAppInfo,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
@@ -32,6 +33,8 @@ import config
 import db
 import exchange
 import forex
+import news
+import newsai
 import stocks
 import parsing
 import stats
@@ -3628,6 +3631,195 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
 
+# ─────────────────────────── News Trade AI ───────────────────────────
+# Bozorni qimirlatadigan yangilikni avtomatik topib (news.py), tahlil qilib
+# (newsai.py — tarjima/xulosa/filtr/tiker-taxmin), grafik chizib (chart.py)
+# alohida kanalga joylaydi. `config.NEWS_CHANNEL_ID` bo'sh bo'lsa butun
+# funksiya jimgina o'chiq — job hech narsa qilmaydi.
+
+# Tiker taxmin qilinganda qaysi bozor turida qidirilishi — mavjud resolve()
+# funksiyalari orqali TASDIQLANADI (modelning o'zi noto'g'ri taxmin qilishi
+# mumkin, shu sabab bu yerda ham xuddi vision.py'dagi kabi ikkinchi bosqich
+# bor). Kripto birinchi — News Trade AI'ning asosiy auditoriyasi shu.
+NEWS_MARKETS = (("crypto", exchange), ("stock", stocks), ("forex", forex))
+
+
+async def _resolve_news_symbol(hint: str | None) -> tuple[str | None, str | None]:
+    if not hint:
+        return None, None
+    for market, provider in NEWS_MARKETS:
+        try:
+            resolved = await provider.resolve(hint)
+        except Exception:
+            resolved = None
+        if resolved:
+            return resolved, market
+    return None, None
+
+
+async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
+    """Bitta topilgan hodisani AI tahlildan o'tkazadi va (loyiqligicha)
+    kanalga postlaydi. Har doim bazaga yozadi (post qilinmasa ham) — aks
+    holda keyingi skaner siklida xuddi shu hodisa qayta topilib, Claude
+    qayta chaqirilardi (bekorga xarajat)."""
+    analysis = await newsai.analyze(item["headline_en"], item.get("body_en", ""))
+    if analysis is None or not analysis.get("is_market_moving"):
+        await db.insert_news_event(
+            source=item["source"], external_key=item["external_key"],
+            symbol=None, market=None, headline_en=item["headline_en"],
+            translation_uz=None, insight_uz=None, event_at=item["event_at"],
+            posted=True)
+        return
+
+    symbol, market = await _resolve_news_symbol(analysis.get("symbol_hint"))
+
+    eid = await db.insert_news_event(
+        source=item["source"], external_key=item["external_key"],
+        symbol=symbol, market=market, headline_en=item["headline_en"],
+        translation_uz=analysis.get("translation_uz"),
+        insight_uz=analysis.get("insight_uz"), event_at=item["event_at"],
+        posted=False)
+    if eid is None:
+        return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
+
+    caption = (f"📰 <b>{html.escape(analysis.get('insight_uz') or '')}</b>\n\n"
+               f"{html.escape(analysis.get('translation_uz') or '')}\n\n"
+               f"🔗 <a href=\"{html.escape(item.get('source_url', ''))}\">Asl manba</a>")
+
+    photo, live_pct = None, None
+    if symbol:
+        try:
+            rendered = await _news_render(symbol, market, item["event_at"])
+        except Exception:
+            log.warning("Yangilik grafigi yasalmadi (%s)", symbol, exc_info=True)
+            rendered = None
+        if rendered:
+            photo, live_pct = rendered
+
+    try:
+        if photo:
+            sent = await ctx.bot.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
+                caption=caption, parse_mode=ParseMode.HTML)
+        else:
+            sent = await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True)
+    except Exception:
+        log.exception("Yangilik kanalga postlanmadi (%s)", item["external_key"])
+        return
+    await db.set_news_message(eid, sent.message_id)
+
+    # Faqat grafikli xabar jonli yangilanadi — matn-only xabarda yangilanadigan
+    # narsa yo'q (tiker topilmagan, ya'ni narx ham kuzatib bo'lmaydi).
+    if photo and symbol:
+        asyncio.create_task(_live_update(
+            ctx.bot, eid, symbol, market, item["event_at"],
+            config.NEWS_CHANNEL_ID, sent.message_id, live_pct))
+
+
+async def _news_render(symbol: str, market: str, event_at: datetime,
+                       end_ms: int | None = None) -> tuple[io.BytesIO, float] | None:
+    """Hodisa vaqti atrofidagi shamlarni olib, `news_idx`ni topadi va grafik
+    chizadi. `end_ms=None` — hozirgacha (jonli yangilanishda har safar
+    o'sib boradigan oyna). Sham topilmasa `None` — chaqiruvchi shunda
+    matn-only xabarga qaytadi (yoki jonli yangilanishni o'tkazib yuboradi)."""
+    tf = "1m"
+    span_ms = 60 * chart.TF_MINUTES[tf] * 60_000   # hodisadan OLDIN 1 soatlik zaxira
+    event_ms = int(event_at.timestamp() * 1000)
+    start_ms = chart.align(event_ms - span_ms, tf)
+    if end_ms is None:
+        end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    limit = min(chart.MAX_CANDLES, 200)
+    candles = await tracker.provider(market).klines(symbol, start_ms, limit=limit,
+                                                     tf=tf, end_ms=end_ms)
+    if not candles or len(candles) < 3:
+        return None
+    # `event_ms` va `start_ms` har chaqiriqda BIR XIL bo'lgani uchun
+    # (`event_at` o'zgarmaydi), news_idx — demak "kirish" narxi — butun jonli
+    # oyna davomida barqaror qoladi: foiz doim aynan shu ONdan hisoblanadi.
+    news_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - event_ms))
+    anchor_price = candles[news_idx].close
+    live_price = candles[-1].close
+    live_pct = (live_price - anchor_price) / anchor_price * 100
+    return chart.news_chart(candles, news_idx, symbol, live_pct), live_pct
+
+
+# Butun kanal uchun UMUMIY tezlik cheklovi: bir nechta hodisa parallel
+# jonli yangilansa ham, tahrirlashlar orasida kamida NEWS_MIN_EDIT_GAP
+# oraliq saqlanadi — aks holda Telegram "flood control" bilan bloklab
+# qo'yishi mumkin. Bitta hodisa yolg'iz bo'lsa amalda NEWS_REFRESH_SECONDS
+# bilan yangilanadi (foydalanuvchi so'ragan 3-4s), bir nechtasi bo'lsa
+# avtomatik ravishda ular orasida almashib-sekinlashadi.
+_news_edit_lock = asyncio.Lock()
+_news_last_edit = 0.0
+
+
+async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO) -> bool:
+    global _news_last_edit
+    async with _news_edit_lock:
+        wait = _news_last_edit + config.NEWS_MIN_EDIT_GAP - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        try:
+            await bot_.edit_message_media(
+                chat_id=chat_id, message_id=message_id,
+                media=InputMediaPhoto(InputFile(photo, "news.png")))
+            ok = True
+        except RetryAfter as e:
+            log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
+            await asyncio.sleep(e.retry_after)
+            ok = False
+        except Exception:
+            log.warning("News xabari tahrirlanmadi (chat=%s msg=%s)",
+                       chat_id, message_id, exc_info=True)
+            ok = False
+        _news_last_edit = time.monotonic()
+        return ok
+
+
+async def _live_update(bot_, event_id: int, symbol: str, market: str,
+                       event_at: datetime, chat_id, message_id: int,
+                       live_pct: float) -> None:
+    """Postdan keyin `NEWS_LIVE_MINUTES` davomida narxni qayta tekshirib,
+    grafikni yangilab turadi. Alohida, chegaralangan davomiylikdagi fon
+    vazifasi — `job_queue` emas, chunki bu bitta HODISAGA tegishli, doimiy
+    global jadval emas."""
+    deadline = time.monotonic() + config.NEWS_LIVE_MINUTES * 60
+    while time.monotonic() < deadline:
+        await asyncio.sleep(config.NEWS_REFRESH_SECONDS)
+        try:
+            rendered = await _news_render(symbol, market, event_at)
+        except Exception:
+            log.warning("Jonli grafik yasalmadi (%s)", symbol, exc_info=True)
+            continue
+        if rendered is None:
+            continue
+        photo, live_pct = rendered
+        await _paced_media_edit(bot_, chat_id, message_id, photo)
+
+    await db.finalize_news_outcome(event_id, live_pct)
+
+
+async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    try:
+        items = await news.sec_scan(since)
+    except Exception:
+        log.exception("Yangilik skaneri xato")
+        return
+
+    for item in items:
+        if await db.news_event_exists(item["external_key"]):
+            continue
+        try:
+            await _process_news_event(ctx, item)
+        except Exception:
+            log.exception("Yangilik ishlanmadi (%s)", item.get("external_key"))
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -3785,6 +3977,8 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
+    app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

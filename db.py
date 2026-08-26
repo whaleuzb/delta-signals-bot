@@ -201,6 +201,35 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS digest_last DATE;
 -- to'g'ri beradi. Rasm 256x256 PNG — bir necha o'n kilobayt.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo BYTEA;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS logo_at TIMESTAMPTZ;
+
+-- News Trade AI: bozorni qimirlatadigan yangiliklarni avtomatik topib,
+-- alohida kanalga grafik bilan joylash. Workspace'ga bog'liq emas —
+-- required_channels kabi GLOBAL jadval.
+--   source       — 'sec' | 'unlock' | 'listing' (keyingi bosqichlar)
+--   external_key — bir xil hodisani ikki marta post qilmaslik uchun
+--                  (masalan SEC accession number)
+--   posted       — hali qayta ishlanmagan (grafik+AI+post) qatorlar UCHUN
+--                  ishlatiladi: SEC/unlock skaner o'zi topib-postlab
+--                  TRUE bilan yozadi, lekin kelajakda webhook (masalan
+--                  listing) FALSE bilan yozib qo'yishi mumkin — shunda
+--                  news_scan_job navbatdagi ishlanmagan qatorni topadi.
+CREATE TABLE IF NOT EXISTS news_events (
+    id             SERIAL      PRIMARY KEY,
+    source         TEXT        NOT NULL,
+    external_key   TEXT        NOT NULL UNIQUE,
+    symbol         TEXT,
+    market         TEXT,
+    headline_en    TEXT        NOT NULL,
+    translation_uz TEXT,
+    insight_uz     TEXT,
+    event_at       TIMESTAMPTZ NOT NULL,
+    posted         BOOLEAN     NOT NULL DEFAULT FALSE,
+    message_id     BIGINT,
+    outcome_pct    NUMERIC,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_news_events_source ON news_events(source);
+CREATE INDEX IF NOT EXISTS idx_news_events_pending ON news_events(posted) WHERE NOT posted;
 """
 
 
@@ -906,3 +935,50 @@ async def open_signals_summary(workspace_id: int) -> dict[str, dict]:
         else:
             d["active"].append({"side": r["side"], "entry": float(r["entry"]), "market": r["market"]})
     return out
+
+
+# ─────────────────────────── News Trade AI ───────────────────────────
+
+async def news_event_exists(external_key: str) -> bool:
+    async with pool().acquire() as c:
+        return bool(await c.fetchval(
+            "SELECT 1 FROM news_events WHERE external_key=$1", external_key))
+
+
+async def insert_news_event(*, source: str, external_key: str, symbol: str | None,
+                             market: str | None, headline_en: str,
+                             translation_uz: str | None, insight_uz: str | None,
+                             event_at, posted: bool = True) -> int | None:
+    """Yangi hodisani yozadi. `external_key` UNIQUE — bir xil hodisa ikkinchi
+    marta topilsa (skaner qayta ishga tushganda) `None` qaytaradi, chaqiruvchi
+    buni qayta post qilmaslik belgisi sifatida o'qiydi."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO news_events (source, external_key, symbol, market, "
+            "headline_en, translation_uz, insight_uz, event_at, posted) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) "
+            "ON CONFLICT (external_key) DO NOTHING RETURNING id",
+            source, external_key, symbol, market, headline_en,
+            translation_uz, insight_uz, event_at, posted)
+
+
+async def pending_news_events() -> list[asyncpg.Record]:
+    """Hali post qilinmagan hodisalar (masalan kelajakdagi webhook manbalari
+    uchun) — hozircha barcha manbalar `posted=True` bilan yaratiladi, shuning
+    uchun bu ro'yxat odatda bo'sh."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM news_events WHERE NOT posted ORDER BY event_at")
+
+
+async def set_news_message(event_id: int, message_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE news_events SET posted=TRUE, message_id=$2 WHERE id=$1",
+            event_id, message_id)
+
+
+async def finalize_news_outcome(event_id: int, pct: float) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE news_events SET outcome_pct=$2 WHERE id=$1", event_id, _d(pct))

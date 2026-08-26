@@ -88,6 +88,20 @@ def _fmt(p: float) -> str:
     return f"{p:.6g}"
 
 
+def _draw_candles(ax, candles, hi: float, lo: float) -> None:
+    """Shamlarni chizadi (fitil + tana). `_render()` va `news_chart()`
+    ikkalasida ham ishlatiladi — vizual uslub bir xil bo'lishi uchun."""
+    width = 0.62
+    for i, c in enumerate(candles):
+        up = c.close >= c.open
+        col = GREEN if up else RED
+        ax.plot([i, i], [c.low, c.high], color=col, lw=0.9, zorder=2, solid_capstyle="round")
+        body_lo, body_hi = (c.open, c.close) if up else (c.close, c.open)
+        h = max(body_hi - body_lo, (hi - lo) * 0.0015)
+        ax.add_patch(Rectangle((i - width / 2, body_lo), width, h, facecolor=col,
+                                edgecolor=col, lw=0, zorder=3))
+
+
 def _render(candles, *, header: str, side: str, entry: float, sl: float,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
@@ -107,15 +121,7 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     lo -= pad
     hi += pad
 
-    width = 0.62
-    for i, c in enumerate(candles):
-        up = c.close >= c.open
-        col = GREEN if up else RED
-        ax.plot([i, i], [c.low, c.high], color=col, lw=0.9, zorder=2, solid_capstyle="round")
-        body_lo, body_hi = (c.open, c.close) if up else (c.close, c.open)
-        h = max(body_hi - body_lo, (hi - lo) * 0.0015)
-        ax.add_patch(Rectangle((i - width / 2, body_lo), width, h, facecolor=col,
-                                edgecolor=col, lw=0, zorder=3))
+    _draw_candles(ax, candles, hi, lo)
 
     # Oxirgi shamdan keyin bo'sh joy — savdo platformalaridagi kabi ("right
     # offset"). Shamlar o'ng chekkaga taqalib qolmaydi va daraja yorliqlari
@@ -366,3 +372,55 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         pnl=sig["pnl_pct"], r=sig["r_multiple"],
         ws_name=ws_name, bot_username=bot_username, tf=tf, note=None,
     )
+
+
+def news_chart(candles, news_idx: int, symbol: str, live_pct: float) -> io.BytesIO:
+    """News Trade AI grafigi — Entry/SL/TP yo'q, faqat aynan qaysi shamdan
+    yangilik chiqqanini ko'rsatuvchi belgi va joriy % o'zgarish.
+
+    `_render()`dan ataylab ALOHIDA: u yerda entry/sl majburiy parametr va
+    y-o'qi hisobiga kiradi — bu yerda ular umuman yo'q. Shamlarni chizish
+    (`_draw_candles`) ikkalasida ham baravar ishlatiladi."""
+    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    lo = min(c.low for c in candles)
+    hi = max(c.high for c in candles)
+    pad = (hi - lo) * 0.08 or hi * 0.01
+    lo -= pad
+    hi += pad
+
+    _draw_candles(ax, candles, hi, lo)
+
+    news_idx = max(0, min(news_idx, len(candles) - 1))
+    news_price = candles[news_idx].close
+    news_col = GREEN if live_pct >= 0 else RED
+    ax.axvline(news_idx, color=ACC, lw=1.1, ls="--", alpha=0.8, zorder=1)
+    ax.scatter([news_idx], [news_price], color=ACC, s=60, zorder=5,
+               edgecolor=BG, linewidth=1.3)
+    ax.annotate("News", xy=(news_idx, news_price), xytext=(0, -20),
+                textcoords="offset points", color=ACC, fontsize=10,
+                fontweight="bold", ha="center")
+
+    right_pad = max(8.0, len(candles) * 0.14)
+    x_max = len(candles) - 1 + right_pad
+    ax.set_xlim(-1.5, x_max)
+    ax.set_ylim(lo, hi)
+    ax.grid(True, color=GRID, lw=0.6, alpha=0.6)
+    ax.set_xticks([])
+    ax.tick_params(colors=TXT, labelsize=9.5)
+    for spine in ax.spines.values():
+        spine.set_color(GRID)
+
+    fig.text(0.045, 0.955, symbol, fontsize=16, fontweight="bold", color=TITLE)
+    fig.text(0.97, 0.955, f"{live_pct:+.2f}%", fontsize=17, fontweight="bold",
+              color=news_col, ha="right")
+
+    fig.subplots_adjust(left=0.062, right=0.985, top=0.88, bottom=0.08)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf

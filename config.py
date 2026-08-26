@@ -61,3 +61,21 @@ WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rs
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")
+
+# --- News Trade AI: bozorni qimirlatadigan yangiliklarni avtomatik topib,
+#     grafik bilan alohida kanalga joylaydigan funksiya. NEWS_CHANNEL_ID
+#     bo'sh bo'lsa butun funksiya o'chiq (news_scan_job hech narsa qilmaydi) ---
+NEWS_CHANNEL_ID = os.getenv("NEWS_CHANNEL_ID", "")
+# Matn-yangilikni tahlil qilish (tarjima/xulosa/filtr) uchun model — rasm
+# emas, shuning uchun VISION_MODEL'dan alohida (kelajakda arzonroq modelga
+# almashtirish mumkin bo'lishi uchun).
+NEWS_MODEL = os.getenv("NEWS_MODEL", "claude-opus-5")
+# Jonli yangilanish: har necha soniyada narx qayta tekshiriladi va bir
+# nechta hodisa parallel bo'lganda barchasi uchun umumiy minimal oraliq
+# (Telegram "flood control"ga urilmaslik uchun — bot.py'dagi _live_update
+# shu ikkalasidan kattasini ishlatadi).
+NEWS_REFRESH_SECONDS = int(os.getenv("NEWS_REFRESH_SECONDS", "4"))
+NEWS_MIN_EDIT_GAP = float(os.getenv("NEWS_MIN_EDIT_GAP", "3"))
+# Postdan keyin necha daqiqa jonli yangilanadi — bundan keyin narx harakati
+# odatda tinchiydi, xabar oddiy statik holatda qoladi.
+NEWS_LIVE_MINUTES = int(os.getenv("NEWS_LIVE_MINUTES", "20"))
