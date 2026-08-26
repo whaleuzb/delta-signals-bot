@@ -4462,7 +4462,11 @@ async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # urinadi, lekin `econ_mark_sent` bir kunda faqat BIRINCHISIGA ruxsat
     # beradi (digest_job'dagi digest_hour/digest_last andozasi bilan bir xil).
     today_key = now_local.strftime("%Y-%m-%d")
-    if now_local.hour == config.ECON_DIGEST_HOUR and not await db.econ_sent("digest", today_key):
+    _digest_already_sent = await db.econ_sent("digest", today_key)
+    log.info("DIAGNOSTIKA econ_job: now_local=%s hour=%s today_key=%s allaqachon_yuborilgan=%s events=%d",
+             now_local.strftime("%Y-%m-%d %H:%M:%S"), now_local.hour, today_key,
+             _digest_already_sent, len(events))
+    if now_local.hour == config.ECON_DIGEST_HOUR and not _digest_already_sent:
         # Kunni AVVAL belgilaymiz — yuborish yiqilsa ham keyingi tsiklda
         # qayta urinib kanalni ikki marta bezovta qilmasin.
         await db.econ_mark_sent("digest", today_key)
