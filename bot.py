@@ -36,6 +36,8 @@ import db
 import econcalendar
 import exchange
 import forex
+import liquidations
+import listings
 import news
 import newsai
 import stocks
@@ -4006,11 +4008,19 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
     since = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    # Har bir manba ALOHIDA try/except ichida — bittasi vaqtincha ishlamay
+    # qolsa (masalan SEC EDGAR javob bermasa) ikkinchisi (Upbit) baribir
+    # ishlashda davom etadi, va aksincha.
+    items: list[dict] = []
     try:
-        items = await news.sec_scan(since)
+        items += await news.sec_scan(since)
     except Exception:
-        log.exception("Yangilik skaneri xato")
-        return
+        log.exception("SEC skaneri xato")
+    try:
+        items += await listings.upbit_scan(since)
+    except Exception:
+        log.exception("Upbit skaneri xato")
 
     for item in items:
         if await db.news_event_exists(item["external_key"]):
@@ -4243,6 +4253,88 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 ctx, row["symbol"], float(row["latest_volume"]), float(row["avg_volume"]))
         except Exception:
             log.exception("Hajm portlashi ishlanmadi (%s)", row["symbol"])
+
+
+# ─────────────────────────── Yirik likvidatsiyalar ───────────────────────────
+# Coinalyze orqali (liquidations.py) — fyuchers birjalaridagi kaskadli
+# majburiy yopilishlarni kuzatadi. `COINALYZE_API_KEY` bo'sh bo'lsa
+# `liquidations.enabled()` False qaytaradi, job hech narsa qilmaydi.
+
+async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
+                                     spike: liquidations.Spike) -> None:
+    now = datetime.now(timezone.utc)
+    # "BTCUSDT_PERP.A" -> "BTC" — Coinalyze belgisidan baza aktivni ajratish.
+    base = spike.symbol.split(config.QUOTE)[0].split("_")[0].split(".")[0]
+    symbol = await exchange.resolve(base)
+    if not symbol:
+        return   # kuzatilayotgan instrument MEXC'da yo'q — chizib bo'lmaydi
+
+    # Dedup — 15 daqiqalik oynada bitta instrument uchun bitta post
+    # (`news_events.external_key` UNIQUE orqali, boshqa manbalar kabi).
+    window = now.minute // 15
+    external_key = f"liq:{spike.symbol}:{now:%Y-%m-%d %H}:{window}"
+    headline = (f"{base}: fyuchers likvidatsiyasi keskin oshdi "
+               f"(so'nggi 5 daqiqada ${spike.latest_usd:,.0f}, "
+               f"o'rtachadan {spike.ratio:.1f}x ko'p)")
+    eid = await db.insert_news_event(
+        source="liquidation", external_key=external_key, symbol=symbol, market="crypto",
+        headline_en=headline, translation_uz=None, insight_uz=None,
+        event_at=now, posted=False)
+    if eid is None:
+        return   # shu 15 daqiqalik oyna uchun allaqachon postlangan
+
+    caption = (f"💥 <b>{html.escape(symbol)}</b> — fyuchers likvidatsiyasi keskin oshdi"
+              f"\n\nSo'nggi 5 daqiqa: <b>${spike.latest_usd:,.0f}</b>"
+              f"\nO'rtachadan: <b>{spike.ratio:.1f}x</b> ko'p")
+
+    photo, live_pct = None, None
+    liq_before_ms = 4 * 3_600_000   # 4 soat, 1m shamlarda
+    try:
+        rendered = await _news_render(symbol, "crypto", now, tf="1m",
+                                      before_ms=liq_before_ms, label="Likvidatsiya")
+    except Exception:
+        log.warning("Likvidatsiya grafigi yasalmadi (%s)", symbol, exc_info=True)
+        rendered = None
+    if rendered:
+        photo, live_pct = rendered
+
+    buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
+    try:
+        if photo:
+            sent = await ctx.bot.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "liq.png"),
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+        else:
+            sent = await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True, reply_markup=buttons)
+    except Exception:
+        log.exception("Likvidatsiya postlanmadi (%s)", symbol)
+        return
+    await db.set_news_message(eid, sent.message_id)
+    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
+    if photo and live_pct is not None:
+        asyncio.create_task(_live_update(
+            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
+            sent.message_id, live_pct, tf="1m", before_ms=liq_before_ms,
+            label="Likvidatsiya", reply_markup=buttons, caption=caption))
+
+
+async def liquidation_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID or not liquidations.enabled():
+        return
+    try:
+        spikes = await liquidations.liquidation_candidates()
+    except Exception:
+        log.exception("Likvidatsiya nomzodlarini olishda xato")
+        return
+
+    for spike in spikes:
+        try:
+            await _process_liquidation_spike(ctx, spike)
+        except Exception:
+            log.exception("Likvidatsiya hodisasi ishlanmadi (%s)", spike.symbol)
 
 
 async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4495,6 +4587,9 @@ def main() -> None:
     app.job_queue.run_repeating(volume_snapshot_job,
                                 interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
     app.job_queue.run_repeating(surge_scan_job, interval=1800, first=120)
+    # Yirik likvidatsiyalar: Coinalyze 5 daqiqalik ustunlarga mos interval
+    # (COINALYZE_API_KEY bo'sh bo'lsa job o'zi hech narsa qilmaydi).
+    app.job_queue.run_repeating(liquidation_scan_job, interval=300, first=150)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

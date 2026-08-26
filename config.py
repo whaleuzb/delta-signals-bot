@@ -92,13 +92,36 @@ ECON_REMIND_MINUTES = int(os.getenv("ECON_REMIND_MINUTES", "15"))
 # o'chadi, lekin portlash SIGNALI o'zi baribir postlanadi (sababsiz).
 CRYPTOPANIC_TOKEN = os.getenv("CRYPTOPANIC_TOKEN", "")
 # Oxirgi hajm bazaviy o'rtachadan necha marta katta bo'lsa "portlash".
-SURGE_VOLUME_MULTIPLIER = float(os.getenv("SURGE_VOLUME_MULTIPLIER", "3"))
+# 3 -> 2.2: foydalanuvchi "kanalda ko'proq xabar kelishi" so'ragach
+# yumshatildi — ko'proq signal, ozroq "kuchlilik" kafolati (tabiiy savdo).
+SURGE_VOLUME_MULTIPLIER = float(os.getenv("SURGE_VOLUME_MULTIPLIER", "2.2"))
 # Bazaviy o'rtacha shu soatdan OLDINGI yozuvlardan hisoblanadi (oxirgi
 # hajmning o'zi bazaga aralashib ketmasin).
 SURGE_BASELINE_EXCLUDE_HOURS = float(os.getenv("SURGE_BASELINE_EXCLUDE_HOURS", "12"))
 # Uzoq muddatli pasayish tasdig'i: shuncha kun ichida kamida shuncha % pasaygan
 # bo'lishi kerak (aks holda "portlash" oddiy davom etayotgan o'sish bo'lishi mumkin).
+# 25 -> 15: xuddi shu sabab bilan yumshatildi.
 SURGE_DECLINE_DAYS = int(os.getenv("SURGE_DECLINE_DAYS", "30"))
-SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "25"))
+SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "15"))
 # Hajm suratga olish — har necha soatda (bazaga yozib borish).
 SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))
+
+# --- Yangi tanga listing e'lonlari: Koreys birjalari (Upbit) — kalitsiz,
+#     bepul "notices" API'si orqali. Bithumb HALI QO'SHILMAGAN — rasmiy
+#     notices manzili sandbox tarmog'ida tasdiqlanmadi (apidocs.bithumb.com
+#     bloklangan edi), keyinroq production loglaridan aniqlab qo'shiladi ---
+UPBIT_NOTICES_URL = "https://api-manager.upbit.com/api/v1/notices"
+
+# --- Yirik likvidatsiyalar: Coinalyze (bepul, lekin coinalyze.net'da
+#     ro'yxatdan o'tib olinadigan kalit kerak). Bo'sh bo'lsa funksiya
+#     jimgina o'chadi — boshqa hech narsa ta'sirlanmaydi ---
+COINALYZE_API_KEY = os.getenv("COINALYZE_API_KEY", "")
+# Kuzatiladigan instrumentlar — Coinalyze'ning o'z belgilash uslubi
+# (BINANCE bozori, ".A" — Coinalyze'dagi Binance kodi).
+LIQUIDATION_SYMBOLS = os.getenv(
+    "LIQUIDATION_SYMBOLS",
+    "BTCUSDT_PERP.A,ETHUSDT_PERP.A,SOLUSDT_PERP.A,BNBUSDT_PERP.A,XRPUSDT_PERP.A",
+).split(",")
+# So'nggi 5-daqiqalik likvidatsiya hajmi bazaviy o'rtachadan necha marta
+# katta bo'lsa "yirik" deb hisoblanadi.
+LIQUIDATION_MULTIPLIER = float(os.getenv("LIQUIDATION_MULTIPLIER", "4"))

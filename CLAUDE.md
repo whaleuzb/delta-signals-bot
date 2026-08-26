@@ -1891,3 +1891,73 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `.parse_mode` aynan mos kelishi tasdiqlandi; `/charttest` to'liq
       zanjiri (share tugmasi bilan birga) qayta ishga tushirilib
       tekshirildi — buzilish yo'q. `test_tracker.py` 9/9 — o'zgarmadi.
+
+81. **"Kanalda ko'proq xabar kelishi uchun" — surge parametrlari
+    yumshatildi, Upbit yangi listing e'lonlari va yirik likvidatsiyalar
+    qo'shildi (aksiya watchlist hali kutilmoqda — foydalanuvchi tiker
+    ro'yxatini beradi).**
+    - Avval bir nechta variant taklif qilindi (birja e'lonlari, aksiya
+      hajm portlashi, surge yumshatish, likvidatsiyalar); har birini
+      QURISHDAN OLDIN WebSearch orqali TEKSHIRILDI (sandbox tarmog'i
+      ko'p domenni bloklagani uchun to'g'ridan-to'g'ri test qilib
+      bo'lmaydi) — natijada muhim CHEKLOVLAR aniqlandi va foydalanuvchiga
+      aytilib, qamrov shunga qarab TORAYTIRILDI:
+      - **Binance/Coinbase'ning bepul, ochiq yangi-listing API'si YO'Q**
+        (faqat pullik/norasmiy scraping xizmatlar) — QOLDIRILDI.
+      - **Upbit**'ning `api-manager.upbit.com/api/v1/notices` — ochiq,
+        kalitsiz, bir nechta mustaqil manbada tasdiqlangan — QO'SHILDI.
+      - **Bithumb**'ning rasmiy notices manzili sandbox'da tekshirib
+        bo'lmadi (`apidocs.bithumb.com` butunlay bloklangan edi) —
+        noto'g'ri/taxminiy URL yozib "ishlayotgandek" ko'rsatishdan
+        ko'ra ROSHIQ QOLDIRILDI, keyinroq production loglaridan aniq
+        manzil topilsa qo'shiladi.
+      - **CoinGlass**'ning likvidatsiya API'sida BEPUL reja UMUMAN YO'Q
+        ($29/oy dan boshlanadi) — o'rniga **Coinalyze** tanlandi (bepul,
+        lekin ro'yxatdan o'tib kalit olish kerak — foydalanuvchi
+        keyinroq beradi, hozircha `COINALYZE_API_KEY` bo'sh).
+      - **Aksiya hajm portlashi**: Twelve Data bepul rejasi (daqiqasiga
+        8 so'rov) minglab tikerni skanerlashga yetmaydi — kripto kabi
+        bitta bulk so'rov (`ticker_24hr()`) yo'q. Foydalanuvchi o'zi
+        kichik watchlist (~15-20 ta tiker) berishga rozi bo'ldi, lekin
+        RO'YXATNI HALI YUBORMADI — shu qism KEYINGI bosqichga qoldirildi
+        (kod tayyor emas, kutilmoqda).
+    - **`config.py`**: `SURGE_VOLUME_MULTIPLIER` 3→2.2, `SURGE_DECLINE_PCT`
+      25→15 (ko'proq, ozroq "kafolatlangan" signal). Yangi: `UPBIT_NOTICES_URL`,
+      `COINALYZE_API_KEY` (bo'sh — jimgina o'chiq), `LIQUIDATION_SYMBOLS`
+      (BTC/ETH/SOL/BNB/XRP, Coinalyze belgilash uslubida), `LIQUIDATION_MULTIPLIER=4`.
+    - **`listings.py`** (yangi) — `upbit_scan(since)`, `news.sec_scan()`
+      bilan BIR XIL natija shakli (`{source, external_key, symbol=None,
+      market=None, headline_en, body_en, event_at, source_url}`) —
+      `news_scan_job`ga qo'shimcha manba sifatida to'g'ridan-to'g'ri
+      qo'shiladi, alohida ishlov KERAK EMAS. Notice sarlavhasi koreyscha
+      keladi — TARJIMA QILINMAYDI, xom holda `newsai.analyze()`ga
+      beriladi (Claude ko'p tilli, o'zi tarjima/tahlil/tiker-taxmin
+      qiladi). `LISTING_KEYWORDS` — koreyscha ("상장"="listing",
+      "거려지원"="savdo qo'llab-quvvatlash") + inglizcha filtr, texnik
+      ishlar kabi aloqasiz e'lonlarni chiqarib tashlaydi.
+    - **`liquidations.py`** (yangi) — `liquidation_candidates()`:
+      Coinalyze'dan har bir kuzatilayotgan instrument uchun 5 daqiqalik
+      likvidatsiya ustunlarini oladi, OXIRGI ustunni OLDINGI ustunlar
+      o'rtachasi bilan solishtiradi, `LIQUIDATION_MULTIPLIER`dan katta
+      bo'lsa `Spike` qaytaradi. **Javob shakli TASDIQLANMAGAN** (API
+      hujjatiga to'g'ridan-to'g'ri kira olmadik) — `l`/`s` maydonlarini
+      bir nechta ehtimoliy nom bilan sinab o'qiydi, aniqlik production
+      loglarida tekshirilib kerak bo'lsa moslashtiriladi (SEC/CryptoPanic
+      integratsiyalarida bo'lgani kabi).
+    - **`bot.py`**: `news_scan_job` endi SEC va Upbit'ni ALOHIDA
+      try/except ichida chaqiradi (bittasi ishlamay qolsa ikkinchisi
+      davom etadi). Yangi `_process_liquidation_spike()`/
+      `liquidation_scan_job()` (interval=300s, Coinalyze bucket
+      o'lchamiga mos) — mavjud `_news_render`/`_signal_buttons`/
+      `_add_share_button`/`_live_update` infratuzilmasini QAYTA
+      ishlatadi (`label="Likvidatsiya"`), 15 daqiqalik oynada dedup.
+      Coinalyze belgisidan (`BTCUSDT_PERP.A`) baza aktiv ajratilib
+      (`BTC`) `exchange.resolve()` bilan MEXC juftligiga aylantiriladi;
+      topilmasa (masalan MEXC'da yo'q kam tarqalgan tanga) jimgina
+      o'tkazib yuboriladi.
+    - Tekshirildi (mock): `listings.upbit_scan()` — koreyscha listing
+      sarlavhasi TO'G'RI tanlandi, texnik-ish e'loni chiqarib tashlandi;
+      `liquidations.liquidation_candidates()` — soxta 10 ta bucket
+      (oxirgisi 46x portlash) bilan to'g'ri `Spike` qaytardi;
+      `_process_liquidation_spike()` to'liq zanjiri (resolve → grafik →
+      post → baza yozuvi) tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
