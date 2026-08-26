@@ -2210,3 +2210,32 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       Anthropic kreditsiz ular ham postlamaydi. Foydalanuvchiga alohida
       aytilgan, hal qilinishi kutilmoqda (kredit qo'shish yoki ularni ham
       AI'siz qilish).
+
+88. **MarketTwits: admin panelda boshqariladigan qo'shimcha #hashtag
+    ro'yxati qo'shildi.** Foydalanuvchi: "boshqa hashtaglarni ham
+    qo'shsa bo'ladimi? Yoki qo'shadigan tugma yarataylik admin panelga" —
+    87-banddagi tiker-asosli filtr KENGROQ makro/geosiyosiy xabarlarni
+    (masalan `#Eron #Ormuz #geopolitika` — hech qanday tikerga to'g'ridan-
+    to'g'ri bog'lanmaydi) o'tkazib yubormasdi. Endi admin bunday
+    "muhim" mavzu-hashtaglarni QAYTA DEPLOY QILMASDAN qo'sha oladi.
+    - `db.py`: yangi `market_hashtags` jadvali (`hashtag TEXT PRIMARY
+      KEY`) + `list_market_hashtags()`/`add_market_hashtag()`/
+      `remove_market_hashtag()`.
+    - `bot.py`: Admin panelga "📰 MarketTwits hashtaglar" tugmasi
+      (`admin_home_kb()`), `_admin_hashtags_view()` (ro'yxat + har biriga
+      ❌ o'chirish tugmasi + ➕ qo'shish), `handle_hashtag_add()` (bitta
+      xabarda bir nechta hashtag, bo'shliq/vergul bilan ajratilgan,
+      # bilan/#siz qabul qilinadi) — xuddi mavjud "📢 Majburiy obuna"
+      bo'limi (`_admin_channels_view`/`handle_channel_add`) andozasida.
+    - `_process_markettwits_message()`: yangi `_markettwits_matches_topic()`
+      — tiker topilmasa, matndagi hashtaglardan biri `market_hashtags`
+      ro'yxatida bormi tekshiradi; topilsa post qilinadi, lekin
+      **grafiksiz, matn-only** (chizadigan tiker yo'q — jonli yangilanish
+      ham yo'q, faqat statik matn + manba havolasi).
+    - Tekshirildi (mock, haqiqiy Postgres — MIGRATE orqali yangi jadval
+      qo'shilgani ham tasdiqlandi): hashtag qo'shilgach curated-topic
+      orqali (tikersiz) matn-only post to'g'ri yuborildi; hashtag
+      o'chirilgach xuddi shu matn endi filtrlanib qolishi tasdiqlandi.
+      Ikkalasida ham `newsai.analyze` chaqirilmagani ISBOTLANDI
+      (chaqirilsa AssertionError otadigan qilib sinaldi). `test_tracker.py`
+      9/9 — o'zgarmadi.

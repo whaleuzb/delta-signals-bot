@@ -66,6 +66,8 @@ AWAITING_ALLOC: dict[int, int] = {}
 AWAITING_SIGNAL_PHOTO: dict[int, str] = {}
 # super-admin id -> True (majburiy obuna uchun kanal kutilmoqda)
 AWAITING_CHANNEL: dict[int, bool] = {}
+# super-admin id -> True (MarketTwits qo'shimcha #hashtag kutilmoqda)
+AWAITING_HASHTAG: dict[int, bool] = {}
 # Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
 AWAITING_BROADCAST: dict[int, bool] = {}
 PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
@@ -1694,6 +1696,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await handle_channel_add(update, ctx)
         return
 
+    if AWAITING_HASHTAG.pop(uid, None) and is_admin(uid):
+        await handle_hashtag_add(update, ctx)
+        return
+
     if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
         await handle_broadcast_input(update, ctx)
         return
@@ -3086,6 +3092,7 @@ def admin_home_kb() -> InlineKeyboardMarkup:
          InlineKeyboardButton("🙍 Foydalanuvchilar", callback_data="adm:users:0")],
         [InlineKeyboardButton("📢 Majburiy obuna", callback_data="adm:ch"),
          InlineKeyboardButton("🛡 Tasdiqlar", callback_data="adm:pend")],
+        [InlineKeyboardButton("📰 MarketTwits hashtaglar", callback_data="adm:mth")],
         [InlineKeyboardButton("📣 Broadcast", callback_data="adm:bc")],
         [InlineKeyboardButton("📄 Guruhlar PDF", callback_data="adm:pdfg"),
          InlineKeyboardButton("📄 Userlar PDF", callback_data="adm:pdfu")],
@@ -3318,6 +3325,47 @@ async def _admin_channels_view() -> tuple[str, InlineKeyboardMarkup]:
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
+async def _admin_hashtags_view() -> tuple[str, InlineKeyboardMarkup]:
+    """MarketTwits'da tikersiz ham "muhim" deb hisoblanadigan qo'shimcha
+    #hashtag ro'yxati (masalan #geopolitika) — `_markettwits_symbol()`
+    hech qanday tiker topmasa, shu ro'yxat orqali TEXT-ONLY post qilinadi
+    (grafiksiz, chunki tiker yo'q)."""
+    tags = await db.list_market_hashtags()
+    if tags:
+        lines = ["📰 <b>MarketTwits — qo'shimcha #hashtaglar</b>", "",
+                 "Bu hashtaglardan biri postda bo'lsa — tiker topilmasa ham "
+                 "(matn-only) kanalga postlanadi.", ""]
+        for t in tags:
+            lines.append(f"• #{html.escape(t)}")
+    else:
+        lines = ["📰 <b>MarketTwits — qo'shimcha #hashtaglar</b>", "",
+                 "Hozircha yo'q — faqat RESOLVE bo'ladigan tikerli postlar "
+                 "(masalan #BTC, #AAPL) o'tadi."]
+    rows = [[InlineKeyboardButton(f"❌ #{t}"[:40], callback_data=f"adm:mthdel:{t}")]
+            for t in tags]
+    rows.append([InlineKeyboardButton("➕ Hashtag qo'shish", callback_data="adm:mthadd")])
+    rows.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def handle_hashtag_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin yuborgan matndagi HAR BIR so'zni (bo'shliq/vergul bilan
+    ajratilgan, boshidagi # ixtiyoriy) alohida hashtag sifatida qo'shadi —
+    bir martada bir nechtasini qo'shish uchun."""
+    msg = update.effective_message
+    raw = (msg.text or "").strip()
+    tags = [t.lstrip("#").strip() for t in re.split(r"[,\s]+", raw) if t.strip("#, ")]
+    if not tags:
+        await msg.reply_text("Hashtag topilmadi. Masalan: geopolitika, hisobot",
+                             reply_markup=ADMIN_BACK_KB)
+        return
+    for t in tags:
+        await db.add_market_hashtag(t.lower())
+    txt, kb = await _admin_hashtags_view()
+    await msg.reply_text(f"✅ Qo'shildi: {', '.join('#'+t for t in tags)}\n\n{txt}",
+                         parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
 async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     if not is_admin(q.from_user.id):
@@ -3351,6 +3399,21 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await db.remove_required_channel(int(action.split(":", 1)[1]))
         _sub_ok_until.clear()
         txt, kb = await _admin_channels_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "mth":
+        txt, kb = await _admin_hashtags_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "mthadd":
+        AWAITING_HASHTAG[q.from_user.id] = True
+        await q.edit_message_text(
+            "➕ <b>Hashtag qo'shish</b>\n\n"
+            "Bitta yoki bir nechta so'z yuboring (# bilan yoki #siz, "
+            "bo'shliq/vergul bilan ajratib) — masalan:\n"
+            "<code>geopolitika, hisobot, ETF</code>",
+            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+    elif action.startswith("mthdel:"):
+        await db.remove_market_hashtag(action.split(":", 1)[1])
+        txt, kb = await _admin_hashtags_view()
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "pend":
         rows = await db.list_pending_public()
@@ -4067,10 +4130,12 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # postga qo'yadigan #HASHTAG'lardan foydalaniladi — har bir hashtag
 # `_resolve_news_symbol()` bilan (xuddi shu funksiya, avval AI symbol_hint
 # uchun ishlatilgan) sinaladi; birinchi RESOLVE bo'ladigan tiker "bu post
-# savdo-tegishli" mezoni sifatida ishlatiladi. Tarjima ham qilinmaydi —
-# xabar QANDAY kelsa (odatda ruscha) shundayligicha postlanadi. Bu SEC/
-# Upbit quvuridan (`_process_news_event`, AI tahlilga bog'liq) butunlay
-# MUSTAQIL — ular hali ham AI kerak, faqat MarketTwits AI'siz.
+# savdo-tegishli" mezoni sifatida ishlatiladi. Tikersiz hashtag (masalan
+# #geopolitika) ham `db.market_hashtags` orqali admin panelda qo'shilsa —
+# grafiksiz, matn-only post qilinadi (chunki chizadigan tiker yo'q).
+# Tarjima ham qilinmaydi — xabar QANDAY kelsa (odatda ruscha) shundayligicha
+# postlanadi. Bu SEC/Upbit quvuridan (`_process_news_event`, AI tahlilga
+# bog'liq) butunlay MUSTAQIL — ular hali ham AI kerak, faqat MarketTwits AI'siz.
 _HASHTAG_RE = re.compile(r"#(\w+)")
 
 
@@ -4080,6 +4145,16 @@ async def _markettwits_symbol(text: str) -> tuple[str | None, str | None]:
         if symbol:
             return symbol, market
     return None, None
+
+
+async def _markettwits_matches_topic(text: str) -> bool:
+    """Tikerga bog'liq bo'lmagan, lekin admin panelda "muhim" deb
+    belgilangan #hashtaglardan biri postda bormi (masalan #geopolitika)."""
+    tags = {t.lower() for t in _HASHTAG_RE.findall(text)}
+    if not tags:
+        return False
+    curated = await db.list_market_hashtags()
+    return any(c.lower() in tags for c in curated)
 
 
 async def _process_markettwits_message(bot_, channel: str, msg_id: int,
@@ -4093,9 +4168,10 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
         return
 
     symbol, market = await _markettwits_symbol(text)
-    if not symbol:
-        # Tanish (RESOLVE bo'ladigan) hashtag topilmadi — bu bizning
-        # AI'siz filtr: faqat aniq tikerga bog'liq postlar o'tadi.
+    if not symbol and not await _markettwits_matches_topic(text):
+        # Tanish (RESOLVE bo'ladigan) hashtag YO'Q va admin belgilagan
+        # qo'shimcha #hashtaglardan biri ham YO'Q — bu bizning AI'siz
+        # filtr: faqat shu ikkisidan biriga mos postlar o'tadi.
         await db.insert_news_event(
             source="markettwits", external_key=external_key, symbol=None, market=None,
             headline_en=text[:2000], translation_uz=None, insight_uz=None,
@@ -4109,19 +4185,23 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
 
-    caption = (f"📰 <b>{html.escape(symbol)}</b>\n\n{html.escape(text[:1000])}\n\n"
+    title = symbol or "MarketTwits"
+    caption = (f"📰 <b>{html.escape(title)}</b>\n\n{html.escape(text[:1000])}\n\n"
               f"🔗 <a href=\"https://t.me/{channel}/{msg_id}\">MarketTwits</a>")
 
+    # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan
+    # narsa yo'q — matn-only post, jonli yangilanishsiz (narx kuzatilmaydi).
     photo, live_pct = None, None
-    try:
-        rendered = await _news_render(symbol, market, event_at)
-    except Exception:
-        log.warning("MarketTwits grafigi yasalmadi (%s)", symbol, exc_info=True)
-        rendered = None
-    if rendered:
-        photo, live_pct = rendered
+    if symbol:
+        try:
+            rendered = await _news_render(symbol, market, event_at)
+        except Exception:
+            log.warning("MarketTwits grafigi yasalmadi (%s)", symbol, exc_info=True)
+            rendered = None
+        if rendered:
+            photo, live_pct = rendered
 
-    buttons = await _signal_buttons(symbol, market, bot_.username)
+    buttons = await _signal_buttons(symbol, market, bot_.username) if symbol else None
     try:
         if photo:
             sent = await bot_.send_photo(
@@ -4137,7 +4217,7 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     await db.set_news_message(eid, sent.message_id)
     buttons = await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
-    if photo and live_pct is not None:
+    if photo and symbol and live_pct is not None:
         _spawn_background(_live_update(
             bot_, eid, symbol, market, event_at, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, reply_markup=buttons, caption=caption))

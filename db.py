@@ -265,6 +265,16 @@ CREATE TABLE IF NOT EXISTS bot_settings (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+-- MarketTwits (tgsource.py) uchun admin-boshqariladigan qo'shimcha
+-- #hashtag ro'yxati — tikerga bog'liq bo'lmagan, lekin muhim deb
+-- topilgan mavzular (masalan #geopolitika) ham shu orqali o'tkaziladi
+-- (tiker topilmasa TEXT-ONLY post qilinadi). Admin panelda (/admin ->
+-- MarketTwits) qo'shiladi/o'chiriladi, qayta deploy shart emas.
+CREATE TABLE IF NOT EXISTS market_hashtags (
+    hashtag  TEXT PRIMARY KEY,
+    added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -1092,3 +1102,23 @@ async def set_setting(key: str, value: str | None) -> None:
         await c.execute(
             "INSERT INTO bot_settings (key, value) VALUES ($1,$2) "
             "ON CONFLICT (key) DO UPDATE SET value=$2", key, value)
+
+
+# ─────────────── MarketTwits qo'shimcha #hashtag ro'yxati ───────────────
+
+async def list_market_hashtags() -> list[str]:
+    async with pool().acquire() as c:
+        rows = await c.fetch("SELECT hashtag FROM market_hashtags ORDER BY hashtag")
+        return [r["hashtag"] for r in rows]
+
+
+async def add_market_hashtag(tag: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO market_hashtags (hashtag) VALUES ($1) "
+            "ON CONFLICT (hashtag) DO NOTHING", tag)
+
+
+async def remove_market_hashtag(tag: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("DELETE FROM market_hashtags WHERE hashtag=$1", tag)
