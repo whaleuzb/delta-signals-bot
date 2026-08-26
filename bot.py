@@ -3925,16 +3925,14 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
     except Exception:
         log.exception("Yangilik kanalga postlanmadi (%s)", item["external_key"])
         return
-    await db.set_news_message(eid, sent.message_id)
-    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-
-    # Faqat grafikli xabar jonli yangilanadi — matn-only xabarda yangilanadigan
+    # Faqat grafikli xabar jonli yangilanadi (`render_tf` to'ldirilgan bo'lsa
+    # `news_live_job` uni "aktiv" deb topadi) — matn-only xabarda yangilanadigan
     # narsa yo'q (tiker topilmagan, ya'ni narx ham kuzatib bo'lmaydi).
-    if photo and symbol:
-        _spawn_background(_live_update(
-            ctx.bot, eid, symbol, market, item["event_at"],
-            config.NEWS_CHANNEL_ID, sent.message_id, live_pct,
-            reply_markup=buttons, caption=caption))
+    await db.set_news_message(
+        eid, sent.message_id, caption,
+        render_tf="1m" if (photo and symbol) else None,
+        render_label="News" if (photo and symbol) else None)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
 async def _news_render(symbol: str, market: str, event_at: datetime,
@@ -4061,37 +4059,57 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
         return ok
 
 
-async def _live_update(bot_, event_id: int, symbol: str, market: str,
-                       event_at: datetime, chat_id, message_id: int,
-                       live_pct: float, tf: str = "1m",
-                       before_ms: int | None = None, label: str = "News",
-                       reply_markup: InlineKeyboardMarkup | None = None,
-                       caption: str | None = None,
-                       marker_color: str | None = None) -> None:
-    """Postdan keyin `NEWS_LIVE_MINUTES` davomida narxni qayta tekshirib,
-    grafikni yangilab turadi. Alohida, chegaralangan davomiylikdagi fon
-    vazifasi — `job_queue` emas, chunki bu bitta HODISAGA tegishli, doimiy
-    global jadval emas. `tf`/`before_ms`/`label`/`marker_color` — `_news_render`ga
-    o'zgarishsiz uzatiladi (surge_scan_job boshqa oyna bilan chaqiradi).
-    `reply_markup`/`caption` — postdagi tugmalar va tagidagi matnni har
-    bir tahrirlashda qayta uzatish uchun (aks holda `_paced_media_edit`
-    ularni o'chirib qo'yadi)."""
-    deadline = time.monotonic() + config.NEWS_LIVE_MINUTES * 60
-    while time.monotonic() < deadline:
-        await asyncio.sleep(config.NEWS_REFRESH_SECONDS)
+# Avvalgi versiya: HAR HODISAGA bitta fon vazifasi (`_live_update`,
+# `asyncio.sleep()` sikli bilan) — foydalanuvchi "deploy vaqtida jonli
+# yangilanish to'xtab qolyapti, bot ham ishlamayabti" deb xabar berdi.
+# Sabab: Railway deploy qilinganda konteyner qayta ishga tushadi — barcha
+# XOTIRADAGI fon vazifalari (shu jumladan bu davomida yasalgan
+# `_background_tasks`dagi kuchli referenslar ham) YO'QOLADI, chunki
+# butun jarayon o'zi qayta boshlanadi.
+#
+# Yechim: `poll_job`/`tracker.run_once()` signal-kuzatuvi qanday ishlasa
+# xuddi shunday — HECH QANDAY holat xotirada saqlanmaydi, hammasi
+# `news_events` jadvalida (`caption`/`render_*` ustunlari). Bitta umumiy
+# `job_queue` vazifasi (`news_live_job`) har safar bazadan "hali jonli
+# oynasi tugamagan" hodisalarni qayta o'qib yangilaydi — konteyner qayta
+# ishga tushsa ham, yangi konteyner shunchaki keyingi tikda xuddi shu
+# so'rovni bazadan qayta qiladi va DAVOM ETADI (hech narsa yo'qolmaydi).
+
+async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    now = datetime.now(timezone.utc)
+    try:
+        rows = await db.active_live_events(config.NEWS_LIVE_MINUTES)
+    except Exception:
+        log.exception("Jonli hodisalar ro'yxati olinmadi")
+        return
+
+    for row in rows:
         try:
-            rendered = await _news_render(symbol, market, event_at, tf=tf,
-                                          before_ms=before_ms, label=label,
-                                          marker_color=marker_color)
+            rendered = await _news_render(
+                row["symbol"], row["market"], row["event_at"],
+                tf=row["render_tf"] or "1m", before_ms=row["render_before_ms"],
+                label=row["render_label"] or "News",
+                marker_color=row["render_marker_color"])
         except Exception:
-            log.warning("Jonli grafik yasalmadi (%s)", symbol, exc_info=True)
+            log.warning("Jonli grafik yasalmadi (%s)", row["symbol"], exc_info=True)
             continue
         if rendered is None:
             continue
         photo, live_pct = rendered
-        await _paced_media_edit(bot_, chat_id, message_id, photo, reply_markup, caption)
 
-    await db.finalize_news_outcome(event_id, live_pct)
+        buttons = await _signal_buttons(row["symbol"], row["market"], ctx.bot.username)
+        kb_rows = list(buttons.inline_keyboard) if buttons else []
+        kb_rows.append([_share_button(row["message_id"])])
+        buttons = InlineKeyboardMarkup(kb_rows)
+
+        await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
+                                photo, buttons, row["caption"])
+
+        deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
+        if now >= deadline:
+            await db.finalize_news_outcome(row["id"], live_pct)
 
 
 async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4214,13 +4232,11 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     except Exception:
         log.exception("MarketTwits postlanmadi (%s)", external_key)
         return
-    await db.set_news_message(eid, sent.message_id)
-    buttons = await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-
-    if photo and symbol and live_pct is not None:
-        _spawn_background(_live_update(
-            bot_, eid, symbol, market, event_at, config.NEWS_CHANNEL_ID,
-            sent.message_id, live_pct, reply_markup=buttons, caption=caption))
+    await db.set_news_message(
+        eid, sent.message_id, caption,
+        render_tf="1m" if (photo and symbol) else None,
+        render_label="News" if (photo and symbol) else None)
+    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
 _markettwits_started = False
@@ -4437,14 +4453,12 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     except Exception:
         log.exception("Hajm portlashi postlanmadi (%s)", symbol)
         return
-    await db.set_news_message(eid, sent.message_id)
-    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-
-    if photo and live_pct is not None:
-        _spawn_background(_live_update(
-            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
-            sent.message_id, live_pct, tf="1h", before_ms=surge_before_ms,
-            label="Portlash", reply_markup=buttons, caption=caption))
+    await db.set_news_message(
+        eid, sent.message_id, caption,
+        render_tf="1h" if photo else None,
+        render_before_ms=surge_before_ms if photo else None,
+        render_label="Portlash" if photo else None)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
 async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4554,15 +4568,13 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     except Exception:
         log.exception("Likvidatsiya postlanmadi (%s)", symbol)
         return
-    await db.set_news_message(eid, sent.message_id)
-    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-
-    if photo and live_pct is not None:
-        _spawn_background(_live_update(
-            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
-            sent.message_id, live_pct, tf="1m", before_ms=liq_before_ms,
-            label="Likvidatsiya", reply_markup=buttons, caption=caption,
-            marker_color=marker_color))
+    await db.set_news_message(
+        eid, sent.message_id, caption,
+        render_tf="1m" if photo else None,
+        render_before_ms=liq_before_ms if photo else None,
+        render_label="Likvidatsiya" if photo else None,
+        render_marker_color=marker_color if photo else None)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
 async def liquidation_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4652,12 +4664,10 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Kanalga postlab bo'lmadi (bot admin emasmi?).")
         return
     if eid is not None:
-        await db.set_news_message(eid, sent.message_id)
-        buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-        _spawn_background(_live_update(
-            ctx.bot, eid, symbol, market, now, config.NEWS_CHANNEL_ID,
-            sent.message_id, live_pct, tf=tf, before_ms=before_ms, label="Sinov",
-            reply_markup=buttons, caption=caption))
+        await db.set_news_message(
+            eid, sent.message_id, caption,
+            render_tf=tf, render_before_ms=before_ms, render_label="Sinov")
+        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
     await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
 
 
@@ -4921,6 +4931,9 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
     app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
+    # Jonli yangilanish — bazadan qayta o'qib yangilaydi (Railway deploy
+    # qilsa ham davom etadi, `news_live_job` yuqoridagi izohiga qarang).
+    app.job_queue.run_repeating(news_live_job, interval=config.NEWS_REFRESH_SECONDS, first=15)
     # Iqtisodiy taqvim: 15 daqiqalik eslatma oynasini o'tkazib yubormaslik
     # uchun 60 soniyada bir tekshiradi (digest kunda bir marta, eslatma
     # dedup orqali — tez-tez tekshirish takror yuborishga olib kelmaydi).

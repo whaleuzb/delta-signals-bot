@@ -231,6 +231,17 @@ CREATE TABLE IF NOT EXISTS news_events (
 CREATE INDEX IF NOT EXISTS idx_news_events_source ON news_events(source);
 CREATE INDEX IF NOT EXISTS idx_news_events_pending ON news_events(posted) WHERE NOT posted;
 
+-- Jonli yangilanishni (bot.py'dagi news_live_job) BAZADAN qayta tiklash
+-- uchun — Railway deploy konteynerni qayta ishga tushirsa ham, yangi
+-- konteyner shu ustunlardan foydalanib DAVOM ETADI (avvalgi versiyada
+-- bularning barchasi FAQAT xotirada — `_live_update()` fon vazifasining
+-- lokal o'zgaruvchilarida — saqlanardi, shuning uchun deployda yo'qolardi).
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS caption TEXT;
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_tf TEXT;
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_before_ms BIGINT;
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_label TEXT;
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_marker_color TEXT;
+
 -- AQSH makroiqtisodiy taqvim: kunlik ro'yxat va hodisadan oldingi eslatma
 -- IKKI MARTA yuborilmasligi uchun dedup. GLOBAL jadval (workspace'siz),
 -- news_events kabi.
@@ -1016,11 +1027,37 @@ async def pending_news_events() -> list[asyncpg.Record]:
             "SELECT * FROM news_events WHERE NOT posted ORDER BY event_at")
 
 
-async def set_news_message(event_id: int, message_id: int) -> None:
+async def set_news_message(event_id: int, message_id: int, caption: str, *,
+                            render_tf: str | None = None,
+                            render_before_ms: int | None = None,
+                            render_label: str | None = None,
+                            render_marker_color: str | None = None) -> None:
+    """`render_*` faqat grafikli (jonli yangilanadigan) postlar uchun
+    to'ldiriladi — `render_tf` bo'sh bo'lsa `news_live_job` bu qatorni
+    "aktiv" deb hisoblamaydi (`active_live_events()`ga qarang)."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE news_events SET posted=TRUE, message_id=$2 WHERE id=$1",
-            event_id, message_id)
+            "UPDATE news_events SET posted=TRUE, message_id=$2, caption=$3, "
+            "render_tf=$4, render_before_ms=$5, render_label=$6, render_marker_color=$7 "
+            "WHERE id=$1",
+            event_id, message_id, caption, render_tf, render_before_ms,
+            render_label, render_marker_color)
+
+
+async def active_live_events(cutoff_minutes: float) -> list[asyncpg.Record]:
+    """`news_live_job` (bot.py) uchun — hali jonli oynasi (`event_at` +
+    `cutoff_minutes`) tugamagan hodisalar. `render_tf IS NOT NULL` —
+    faqat grafikli postlar (matn-only'lar `set_news_message`da
+    `render_tf=None` bilan yozilgan, ular hech qachon jonli yangilanmaydi).
+    Chegaraga +1 daqiqa zaxira qo'shilgan — aynan tugash payti atrofida
+    kamida BITTA yakuniy tahrirlash/finalize tiki o'tkazib yuborilmasin."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM news_events WHERE message_id IS NOT NULL "
+            "AND render_tf IS NOT NULL AND caption IS NOT NULL AND outcome_pct IS NULL "
+            "AND event_at > now() - (($1 + 1) * interval '1 minute') "
+            "ORDER BY event_at",
+            cutoff_minutes)
 
 
 async def finalize_news_outcome(event_id: int, pct: float) -> None:

@@ -2239,3 +2239,52 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       Ikkalasida ham `newsai.analyze` chaqirilmagani ISBOTLANDI
       (chaqirilsa AssertionError otadigan qilib sinaldi). `test_tracker.py`
       9/9 — o'zgarmadi.
+
+89. **Jonli yangilanish arxitekturasi TUBDAN o'zgartirildi: bazadan
+    qayta tiklanadigan, deploy'ga TO'LIQ chidamli qilindi.** Foydalanuvchi:
+    "deploy vaqtida yangilanish to'xtab qolyapti shuni deploy qilinsa ham
+    davom etadigan jarayon qilsak bo'ladimi? Bot ham deploy vaqtida
+    ishlamayabti". 84-banddagi tuzatish (`_spawn_background` — task
+    kuchli referensda saqlash) faqat GARBAGE COLLECTION muammosini
+    hal qilgan edi; Railway DEPLOY qilinganda esa butun KONTEYNER (demak
+    butun Python jarayoni, xotiradagi HAMMA narsa bilan) o'zi qayta
+    ishga tushadi — hech qanday kuchli referens buni saqlab qololmaydi,
+    chunki jarayonning o'zi yo'qoladi. Bu 82-bandda "kutilgan cheklov"
+    deb yozilgan edi, lekin foydalanuvchi buni endi ANIQ muammo sifatida
+    hal qilishni so'radi.
+    - Yechim: `poll_job`/`tracker.run_once()` signal-kuzatuvi qanday
+      qurilgan bo'lsa (har safar BAZADAN qayta o'qiydi, xotirada HECH
+      qanday holat saqlamaydi) — jonli yangilanish ham xuddi shunga
+      o'tkazildi. Avvalgi `_live_update()` (har HODISAGA bitta,
+      `asyncio.sleep()` sikli bilan uzoq ishlaydigan fon vazifasi,
+      holati FAQAT lokal o'zgaruvchilarda) BUTUNLAY OLIB TASHLANDI.
+    - `db.py`: `news_events`ga yangi ustunlar (`ALTER TABLE ADD COLUMN
+      IF NOT EXISTS`) — `caption`, `render_tf`, `render_before_ms`,
+      `render_label`, `render_marker_color`. `set_news_message()` endi
+      caption + render-holatini ham saqlaydi (grafiksiz post uchun
+      `render_tf=None` — bu "jonli yangilanish kerak emas" belgisi).
+      Yangi `active_live_events(cutoff_minutes)` — hali jonli oynasi
+      tugamagan (+1 daqiqa zaxira bilan) hodisalarni qaytaradi.
+    - `bot.py`: yangi `news_live_job()` — BITTA umumiy `job_queue`
+      vazifasi (`NEWS_REFRESH_SECONDS` interval bilan, `poll_job` kabi),
+      har safar `db.active_live_events()`dan hozir aktiv BARCHA
+      hodisalarni oladi, har birini qayta chizadi/tahrirlaydi, muddati
+      o'tganlarni `finalize_news_outcome()` bilan yakunlaydi. Tugmalar
+      (`_signal_buttons` + `_share_button`) har safar QAYTADAN
+      hisoblanadi (deterministik — saqlash shart emas). 5 ta post joyi
+      (`_process_news_event`, `_process_surge_candidate`,
+      `_process_liquidation_spike`, `cmd_charttest`,
+      `_process_markettwits_message`) endi `_spawn_background(_live_update(...))`
+      chaqirmaydi — shunchaki `db.set_news_message()`ga caption/render
+      parametrlarini uzatadi, xolos. `_spawn_background`/`_background_tasks`
+      o'zi QOLDI — Telethon tinglovchisi (`tgsource.start_listener`)
+      hali ham chinakam UZOQ ishlaydigan yagona fon vazifasi, unga
+      tegishli emas.
+    - Tekshirildi (mock, haqiqiy Postgres, ATAYLAB "xotira yo'q" holatda):
+      post qilingandek caption/render_tf/before_ms/label bazaga to'g'ri
+      yozilishi; keyin XUDDI YANGI JARAYON birinchi marta ishga
+      tushgandagidek (hech qanday oldingi Python obyekti/o'zgaruvchisiz)
+      `news_live_job()` chaqirilib, bazadan hodisani to'g'ri topib
+      `edit_message_media` chaqirilishi (= "restart-chidamlilik" real
+      isbotlandi); muddati o'tgan hodisa uchun `outcome_pct` to'g'ri
+      yozilishi (finalize). `test_tracker.py` 9/9 — o'zgarmadi.
