@@ -3943,6 +3943,19 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
             log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
             await asyncio.sleep(e.retry_after)
             ok = False
+        except BadRequest as e:
+            # Narx (demak grafik) oxirgi tekshiruvdan beri o'zgarmagan
+            # bo'lsa, yangi rasm avvalgisi bilan BAYT-BAYT bir xil chiqadi
+            # — Telegram bunday "hech narsa o'zgarmagan" tahrirlashni
+            # RAD ETADI. Bu xato emas, ko'rsatilgan tarkib ALLAQACHON
+            # yangi — shuning uchun ogohlantirish/traceback bilan
+            # loglarni to'ldirmasdan jimgina o'tkazib yuboriladi.
+            if "message is not modified" in str(e).lower():
+                ok = True
+            else:
+                log.warning("News xabari tahrirlanmadi (chat=%s msg=%s)",
+                           chat_id, message_id, exc_info=True)
+                ok = False
         except Exception:
             log.warning("News xabari tahrirlanmadi (chat=%s msg=%s)",
                        chat_id, message_id, exc_info=True)

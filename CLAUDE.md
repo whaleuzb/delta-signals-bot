@@ -1836,3 +1836,33 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       oxirgi tugma matni va havolasi (`https://t.me/share/url?url=
       https%3A%2F%2Ft.me%2Fnewstradeuz%2F<message_id>` — to'g'ri
       URL-encode bilan) tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+79. **Umumiy tekshiruv (barcha o'zgarishlardan keyin): productionda
+    kutilgan, lekin zararsiz `BadRequest` spami topildi va jimlantirildi.**
+    - `/py_compile` barcha `.py` fayllarga, `test_tracker.py` 9/9 —
+      tozalik uchun asosiy tekshiruv (o'zgarmadi).
+    - Railway loglarini kengroq oynada (faqat deploy boshlanishi emas,
+      keyingi bir necha daqiqalik ish) ko'zdan kechirishda haqiqiy
+      productiondagi News Trade AI posti (msg=21, haqiqiy yangilik,
+      sinov emas) jonli yangilanish davomida qayta-qayta
+      `telegram.error.BadRequest: Message is not modified: specified new
+      message content and reply markup are exactly the same...` xatosini
+      berayotgani, har safar TO'LIQ traceback bilan `WARNING` darajasida
+      loglanayotgani aniqlandi.
+    - **Sabab — bug EMAS**: narx ikkita `NEWS_REFRESH_SECONDS` (4s) oralig'ida
+      o'zgarmasa (shamlar ma'lumoti aynan bir xil qaytadi), qayta chizilgan
+      grafik BAYT-BAYT avvalgisi bilan bir xil chiqadi — Telegram esa
+      "hech narsa o'zgarmagan" tahrirlashni RAD ETADI. `_paced_media_edit`ning
+      mavjud `except Exception` bloki buni allaqachon to'g'ri ushlab
+      turgan edi (job HECH QACHON qulamadi, keyingi tsiklda davom etardi)
+      — funksional buzilish YO'Q, faqat keraksiz log shovqini.
+    - Tuzatildi: `except BadRequest as e` alohida qo'shildi — xabar matnida
+      "message is not modified" bo'lsa `ok=True` (mazmun ALLAQACHON
+      dolzarb) va HECH QANDAY log yozilmaydi; boshqa turdagi `BadRequest`lar
+      (masalan "Chat not found") hamon avvalgidek to'liq traceback bilan
+      `WARNING` beradi — faqat aniq zararsiz holat jimlantirildi, boshqa
+      xatolar sezilarli qolishda davom etadi.
+    - Tekshirildi (mock): "Message is not modified" `BadRequest` →
+      `ok=True`, nol warning logi; boshqa `BadRequest` ("Chat not found")
+      → `ok=False`, bitta warning logi (avvalgidek). `test_tracker.py`
+      9/9 — o'zgarmadi.
