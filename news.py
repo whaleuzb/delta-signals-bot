@@ -3,11 +3,16 @@
 Hozircha faqat SEC EDGAR: rasmiy, bepul, kalitsiz full-text qidiruv API'si
 (`efts.sec.gov`). Bu kompaniyalar TOPSHIRGAN hujjatlarni (8-K, 10-K va h.k.)
 kalit so'z bo'yicha qidiradi — "SEC X kompaniyani sudga berdi" turidagi
-alohida bosim-relizlari emas, balki kompaniyaning o'zi e'lon qilgan, kripto/
-raqamli aktivga oid muhim voqealar (masalan katta jarima, tekshiruv haqida
-xabar, yangi tartibga solish ta'siri). Amalda bu SEC yangiliklarining katta
-qismini qamrab oladi, lekin hammasini emas — ishlash sifati production
-loglarida kuzatilib, kerak bo'lsa kengaytiriladi.
+alohida bosim-relizlari emas, balki kompaniyaning o'zi e'lon qilgan, muhim
+voqealar. Ikki toifa kalit so'z bilan qidiriladi: kripto/raqamli aktivga
+oid (masalan katta jarima, tekshiruv haqida xabar) va aksiyaga katta
+ta'sir qiladigan yirik korporativ hodisalar (bankrotlik, qo'shilish/
+yutib olish, birjadan chiqarib tashlash, hisobotni qayta ko'rib chiqish).
+`symbol_hint` orqali qaysi kompaniya/token ekanligi aniqlangach, `bot.py`
+uni kripto/aksiya/forex bozorlaridan mos kelganini avtomatik topadi —
+shu sabab bitta manba ikkala toifani ham qamrab oladi. Amalda bu SEC
+yangiliklarining katta qismini qamrab oladi, lekin hammasini emas —
+ishlash sifati production loglarida kuzatilib, kerak bo'lsa kengaytiriladi.
 
 Bu modul Telegram'ga umuman bog'liq emas — faqat toza ma'lumot qaytaradi
 (`bot.py` postlaydi). Xato bo'lsa bo'sh ro'yxat qaytaradi, hech qachon
@@ -28,7 +33,29 @@ SEC_HEADERS = {"User-Agent": "TradeController contact@tradecontroller.bot"}
 
 # Kripto/raqamli aktivga oid hujjatlarni topish uchun kalit so'zlar. Keng
 # boshlangan — amalda ortiqcha shovqin chiqsa toraytiriladi.
-SEC_KEYWORDS = ["cryptocurrency", "digital asset", "digital assets"]
+SEC_CRYPTO_KEYWORDS = ["cryptocurrency", "digital asset", "digital assets"]
+
+# Aksiyaga (kompaniya qimmatli qog'ozlariga) katta ta'sir qiladigan 8-K
+# hodisa turlari — SEC'ning o'z "Item" nomlanishiga mos iboralar: Item 1.03
+# (bankrotlik), Item 3.01 (birjadan chiqarib tashlash bildirishnomasi),
+# Item 4.02 (moliyaviy hisobotni qayta ko'rib chiqish — jiddiy hisob
+# muammosi belgisi), Item 1.01/2.01 (yirik bitim/qo'shilish), moliyaviy
+# majburiyatni bajarmaslik. Kundalik/rutin hujjatlar (oddiy chorak
+# hisoboti va h.k.) ataylab QOLDIRILGAN — listing/delisting'da bo'lgani
+# kabi faqat YIRIK voqealar kerak; amalda production loglarida kuzatilib
+# kerak bo'lsa toraytiriladi/kengaytiriladi.
+SEC_STOCK_KEYWORDS = [
+    "merger agreement",
+    "definitive agreement to acquire",
+    "chapter 11",
+    "going concern",
+    "notice of delisting",
+    "restatement of previously issued financial statements",
+    "material weakness in internal control",
+    "event of default",
+]
+
+SEC_KEYWORDS = SEC_CRYPTO_KEYWORDS + SEC_STOCK_KEYWORDS
 SEC_FORMS = "8-K"   # eng "yangilik"ga o'xshash forma turi — favqulodda voqealar
 
 

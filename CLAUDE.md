@@ -1622,3 +1622,41 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       matn → `show_preview` chaqirilib PENDING'ga yoziladi (symbol/market
       to'g'ri aniqlangan) → noto'g'ri tiker bilan AWAITING o'rnatilmaydi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+
+74. **`/charttest`ning chalg'ituvchi xatosi va jonli grafikda tugmalar
+    yo'qolib qolishi tuzatildi; News Trade AI aksiyalar (stock) bilan
+    bog'liq yangiliklarni ham qamrab oldi.**
+    - Railway logida `/charttest sol` bitta martalik `httpx.ReadTimeout`
+      (`telegram.error.TimedOut`) tufayli muvaffaqiyatsiz bo'lgan, lekin
+      xabar "Kanalga postlab bo'lmadi (bot admin emasmi?)" deb ruxsat
+      xatosidek ko'rsatgan — chalg'ituvchi. `TimedOut`/`NetworkError`
+      endi alohida ushlanadi, aniq "tarmoq vaqtincha javob bermadi, qayta
+      urinib ko'ring" xabari bilan.
+    - **Jonli grafik tugmalari yo'qolib qolishi**: `edit_message_media`ga
+      `reply_markup` uzatilmasa, Telegram MAVJUD klaviaturani o'chirib
+      tashlar ekan (`editMessageCaption`dan farqli — u yerda tegilmagan
+      maydon saqlanib qoladi, `edit_message_media`da esa YO'Q). `_paced_media_edit`/
+      `_live_update` endi `reply_markup` qabul qiladi va uni har bir
+      tahrirlashda qayta uzatadi — barcha uchta chaqiruv joyida (SEC
+      yangilik, hajm portlashi, `/charttest`).
+    - **Aksiya (stock) yangiliklari**: `news.py`dagi `SEC_KEYWORDS`
+      avval FAQAT kripto iboralarini o'z ichiga olardi (`cryptocurrency`,
+      `digital asset`). Qo'shimcha `SEC_STOCK_KEYWORDS` — aksiyaga katta
+      ta'sir qiladigan 8-K "Item" turlariga mos iboralar (bankrotlik —
+      "chapter 11"/"going concern", birjadan chiqarish — "notice of
+      delisting", hisobotni qayta ko'rib chiqish — "restatement...",
+      yirik bitim — "merger agreement"/"definitive agreement to acquire",
+      moliyaviy majburiyatni bajarmaslik — "event of default"). Boshqa
+      HECH NARSA o'zgartirilmadi — pastdagi butun quvur (`newsai.analyze`,
+      `_resolve_news_symbol`, `tracker.provider(market)` orqali
+      `stocks.klines`, `chart.news_chart`) ALLAQACHON market-agnostik
+      edi (`NEWS_MARKETS = (("crypto", exchange), ("stock", stocks),
+      ("forex", forex))` — oldingi bosqichda tayyor bo'lgan), shuning
+      uchun yagona kerakli o'zgarish qidiruv kalit so'zlarini kengaytirish
+      bo'ldi. Railway `TWELVE_DATA_API_KEY` productionda ALLAQACHON
+      sozlangan (tekshirildi) — aksiya narx ma'lumoti ishlab turibdi.
+    - Tekshirildi (mock, real Postgres bilan): soxta SEC hodisasi
+      ("Boeing... chapter 11") → `newsai.analyze` mock (symbol_hint="BA")
+      → `exchange.resolve` muvaffaqiyatsiz → `stocks.resolve` muvaffaqiyatli
+      → `stocks.klines` mock → grafik bilan post, bazada `market='stock'`,
+      `symbol='BA'`. `test_tracker.py` 9/9 — o'zgarmadi.
