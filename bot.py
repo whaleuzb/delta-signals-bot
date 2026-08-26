@@ -489,6 +489,10 @@ def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
          InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
     ]
+    # News Trade AI kanaliga havola — sozlanmagan bo'lsa (NEWS_CHANNEL_ID
+    # bo'sh) butun funksiya o'chiq, tugma ham chiqmaydi.
+    if config.NEWS_CHANNEL_ID:
+        rows.append([InlineKeyboardButton("📰 News Trade AI", url="https://t.me/newstradeuz")])
     url = web_page_url(ws)
     if url:
         # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram uni

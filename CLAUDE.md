@@ -1787,3 +1787,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       FAQAT yuqori darajadagi funksiyalar orqali chaqiradi (`_render()`ga
       to'g'ridan-to'g'ri murojaat qilmaydi) — imzo o'zgarishi `bot.py`ga
       butunlay ta'sir qilmadi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+77. **Bosh menyuga "News Trade AI" tugmasi qo'shildi.**
+    - `main_menu_kb()` — Statistika/Ochiq signallar qatoridan keyin, `url=
+      "https://t.me/newstradeuz"` bilan URL tugma (channel havolasi
+      to'g'ridan-to'g'ri, callback emas — Telegram kanalni ICHKI menyuda
+      ocha olmaydi). Boshqa News Trade AI qismlari bilan bir xil andoza:
+      `config.NEWS_CHANNEL_ID` bo'sh bo'lsa tugma UMUMAN chiqmaydi (funksiya
+      o'chiq bo'lsa reklama ham chiqmasin). Havola qattiq yozilgan (mexc_ref_url
+      kabi `bot_settings`ga chiqarilmadi) — sabab: bu referal/pul havolasi
+      emas, botning o'z kanal identifikatori, tez-tez o'zgarmaydi (mexc_ref_url
+      esa foydalanuvchi tez-tez yangilashi mumkin bo'lgan tashqi referal
+      havolasi, shuning uchun u admin buyruq bilan sozlanadigan qilingan edi).
