@@ -2474,3 +2474,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       tekshiriladi (agar Binance so'rovi muvaffaqiyatsiz bo'lsa,
       "Binance hajm surati olinmadi" ogohlantirishi ko'rinadi va
       tizim baribir MEXC bilan ishlashda davom etadi).
+    - **Production'da TASDIQLANDI (deploydan 30s keyin, `volume_snapshot_job`
+      birinchi yurishida)**: Binance **Spot** API (`api.binance.com`) HAM
+      451 bilan rad etadi — xuddi ilgari Futures (`fapi.binance.com`)
+      kabi: `httpx.HTTPStatusError: Client error '451' for url
+      'https://api.binance.com/api/v3/ticker/24hr'`. Railway'ning
+      hozirgi hosting hududi Binance tomonidan TO'LIQ (Spot + Futures)
+      bloklangan degani. Fallback mexanizmi mo'ljallangandek ishladi —
+      xato ushlanib, MEXC'ga jimgina o'tdi, `volume_snapshot_job`
+      "executed successfully" bilan yakunlandi, hech narsa buzilmadi.
+      Amaliy natija: hozircha (Railway hudud o'zgarmaguncha) tizim
+      baribir MEXC ma'lumotidan foydalanadi — kod o'zgarishsiz qoldi
+      (kelajakda Binance ochilib qolsa, avtomatik ishlay boshlaydi,
+      qayta deploy shart emas).
