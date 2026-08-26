@@ -2541,3 +2541,35 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - **Hali production'da haqiqiy so'rov bilan sinalmagan** (domen
       sandbox'da bloklangan) — keyingi deploydan keyin Railway
       loglarida tasdiqlanishi kerak.
+    - **Production'da TASDIQLANDI** (keyingi deploy, `first=60`dan keyin):
+      `binance_listing_job` xatosiz ("executed successfully", "olinmadi"
+      ogohlantirishisiz) ishladi — `api.cryptocurrencyalerting.com`
+      domeni Railway'dan ochiq.
+
+98. **Coinbase va Kraken ham qo'shildi (xuddi shu sayt orqali) —
+    foydalanuvchi so'radi: "coinbase va kreken ham shu sayt orqali
+    olish imkoni bormi?"** Saytning boshqa sahifalari ("New Coinbase
+    Listings", "New Kraken Listings") ham xuddi Binance'niki kabi naqshda
+    (`{apiHost}/{birja}-new-coins`) ishlaydi deb TAXMIN qilindi — bu
+    Binance endpoint'i qanday tasdiqlanganidan FARQLI (o'sha
+    foydalanuvchi tomonidan aniq topilgan edi), hali sinalmagan taxmin.
+    - `listings.py`: `binance_scan()` UMUMIY `exchange_listing_scan(exchange,
+      since)` funksiyasiga qayta quriladi (`EXCHANGE_LISTING_URLS`
+      lug'ati — Binance/Coinbase/Kraken), uchtasi ham shu bitta
+      funksiyadan foydalanadigan yengil o'rovchilarga (`binance_scan`/
+      `coinbase_scan`/`kraken_scan`) ega. Natija itemiga `exchange`
+      maydoni qo'shildi.
+    - `bot.py`: `_process_binance_listing()` -> `_process_exchange_listing()`
+      (umumiy, `item["exchange"]` orqali sarlavha/caption/external_key
+      moslashadi — "Binance'da"/"Coinbase'da"/"Kraken'da"). `binance_listing_job()`
+      (nomi saqlanib qoldi, funksiyasi kengaydi) endi
+      `EXCHANGE_LISTING_SCANNERS` lug'ati orqali UCHALASINI ham,
+      HAR BIRINI ALOHIDA try/except bilan chaqiradi — Coinbase/Kraken
+      (hali tasdiqlanmagan) ishlamasa ham, Binance (tasdiqlangan)
+      baribir ishlashda davom etadi.
+    - Tekshirildi (mock): `_process_exchange_listing()` Coinbase itemi
+      bilan to'g'ri caption ("Coinbase'da yangi ro'yxatga olindi")
+      chiqarishi tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+    - **Coinbase/Kraken endpoint'lari hali production'da sinalmagan** —
+      keyingi deploy loglarida tasdiqlanishi kerak (Binance'dan farqli,
+      bular ENDPOINT NOMI TAXMIN qilingan, browser orqali tasdiqlanmagan).

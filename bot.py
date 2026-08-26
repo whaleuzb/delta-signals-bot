@@ -4140,28 +4140,40 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Yangilik ishlanmadi (%s)", item.get("external_key"))
 
 
-# ─────────────────────────── Binance yangi listinglari ───────────────────────────
-# `listings.binance_scan()` orqali (cryptocurrencyalerting.com'ning haqiqiy
-# JSON API'si, foydalanuvchi topib berdi). AI ISHLATILMAYDI — MarketTwits
-# qanday AI'siz bo'lsa xuddi shunday: ma'lumot allaqachon tuzilgan
-# (tiker/nom/vaqt), "muhimmi-yo'qmi" filtri kerak emas (yangi listing
-# o'zi allaqachon signal), tarjima ham shart emas (shablon matn yetarli).
-# Shu sabab `_process_news_event()`dan MUSTAQIL, alohida ishlanadi.
+# ─────────────────────────── Yirik birjalarning yangi listinglari ───────────────────────────
+# `listings.exchange_listing_scan()` orqali (cryptocurrencyalerting.com'ning
+# haqiqiy JSON API'si, foydalanuvchi topib berdi — avval faqat Binance uchun
+# tasdiqlangan, keyin "coinbase va kreken ham shu sayt orqali olish imkoni
+# bormi?" so'ralgach, saytning bir xil naqshiga tayanib Coinbase/Kraken ham
+# qo'shildi — bular HALI production'da alohida tasdiqlanmagan). AI
+# ISHLATILMAYDI — MarketTwits qanday AI'siz bo'lsa xuddi shunday: ma'lumot
+# allaqachon tuzilgan (tiker/nom/vaqt), "muhimmi-yo'qmi" filtri kerak emas
+# (yangi listing o'zi allaqachon signal), tarjima ham shart emas (shablon
+# matn yetarli). Shu sabab `_process_news_event()`dan MUSTAQIL, alohida
+# ishlanadi.
 
-async def _process_binance_listing(bot_, item: dict) -> None:
+EXCHANGE_LISTING_SCANNERS = {
+    "Binance": listings.binance_scan,
+    "Coinbase": listings.coinbase_scan,
+    "Kraken": listings.kraken_scan,
+}
+
+
+async def _process_exchange_listing(bot_, item: dict) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
     external_key = item["external_key"]
     if await db.news_event_exists(external_key):
         return
 
-    code, name = item["code"], item["name"]
+    exchange_name, code, name = item["exchange"], item["code"], item["name"]
     symbol, market = await _resolve_news_symbol(code)
 
-    headline = f"{name} ({code}) Binance'da yangi ro'yxatga olindi"
+    headline = f"{name} ({code}) {exchange_name}'da yangi ro'yxatga olindi"
     eid = await db.insert_news_event(
-        source="binance_listing", external_key=external_key, symbol=symbol, market=market,
-        headline_en=headline, translation_uz=None, insight_uz=None,
+        source=f"{exchange_name.lower()}_listing", external_key=external_key,
+        symbol=symbol, market=market, headline_en=headline,
+        translation_uz=None, insight_uz=None,
         event_at=item["event_at"], posted=False)
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
@@ -4169,7 +4181,7 @@ async def _process_binance_listing(bot_, item: dict) -> None:
     title = symbol or code
     caption = (f"🆕 <b>{html.escape(title, quote=False)}</b>\n\n"
               f"{html.escape(name, quote=False)} ({html.escape(code, quote=False)}) "
-              f"Binance'da yangi ro'yxatga olindi.")
+              f"{html.escape(exchange_name, quote=False)}'da yangi ro'yxatga olindi.")
 
     # Yangi listing ko'pincha bizning kuzatuvimizdagi birjada (MEXC)
     # HALI yo'q — shunda symbol=None, matn-only post (grafiksiz).
@@ -4178,7 +4190,7 @@ async def _process_binance_listing(bot_, item: dict) -> None:
         try:
             rendered = await _news_render(symbol, market, item["event_at"])
         except Exception:
-            log.warning("Binance listing grafigi yasalmadi (%s)", symbol, exc_info=True)
+            log.warning("%s listing grafigi yasalmadi (%s)", exchange_name, symbol, exc_info=True)
             rendered = None
         if rendered:
             photo, _ = rendered
@@ -4194,7 +4206,7 @@ async def _process_binance_listing(bot_, item: dict) -> None:
                 config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True, reply_markup=buttons)
     except Exception:
-        log.exception("Binance listing postlanmadi (%s)", external_key)
+        log.exception("%s listing postlanmadi (%s)", exchange_name, external_key)
         return
     # Faqat grafikli xabar jonli yangilanadi (`render_tf` to'ldirilgan bo'lsa
     # `news_live_job` uni "aktiv" deb topadi va o'zi davriy yangilab turadi —
@@ -4211,16 +4223,20 @@ async def binance_listing_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
     since = datetime.now(timezone.utc) - timedelta(hours=24)
-    try:
-        items = await listings.binance_scan(since)
-    except Exception:
-        log.exception("Binance listing skaneri xato")
-        return
+    # Har bir birja ALOHIDA try/except ichida — Coinbase/Kraken
+    # endpoint'lari (hali tasdiqlanmagan taxmin) ishlamasa ham, Binance
+    # (tasdiqlangan) baribir ishlashda davom etadi.
+    items: list[dict] = []
+    for exchange_name, scanner in EXCHANGE_LISTING_SCANNERS.items():
+        try:
+            items += await scanner(since)
+        except Exception:
+            log.exception("%s listing skaneri xato", exchange_name)
     for item in items:
         try:
-            await _process_binance_listing(ctx.bot, item)
+            await _process_exchange_listing(ctx.bot, item)
         except Exception:
-            log.exception("Binance listing ishlanmadi (%s)", item.get("external_key"))
+            log.exception("Listing ishlanmadi (%s)", item.get("external_key"))
 
 
 # ─────────────────────────── MarketTwits (Telegram userbot) ───────────────────────────

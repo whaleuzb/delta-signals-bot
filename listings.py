@@ -106,7 +106,7 @@ async def upbit_scan(since: datetime) -> list[dict]:
     return out
 
 
-# --- Binance yangi listing e'lonlari ---
+# --- Yirik birjalarning yangi listing e'lonlari ---
 # Foydalanuvchi cryptocurrencyalerting.com'ning "New Binance Listings"
 # sahifasi ORTIDAGI haqiqiy JSON API'ni topdi (sahifaning main.min.js
 # fayli `$.getJSON(CONSTANTS.apiHost + "/binance-new-coins")` chaqiradi).
@@ -115,26 +115,41 @@ async def upbit_scan(since: datetime) -> list[dict]:
 # ishlanadi — MarketTwits qanday AI'siz bo'lsa xuddi shunday, chunki
 # "yangi listing"ning o'zi ALLAQACHON aniq signal, "muhimmi-yo'qmi"
 # filtri kerak emas, tarjima ham shart emas — shablon matn yetarli).
-BINANCE_LISTINGS_URL = "https://api.cryptocurrencyalerting.com/binance-new-coins"
+#
+# Foydalanuvchi so'radi: "coinbase va kreken ham shu sayt orqali olish
+# imkoni bormi?" — saytning BOSHQA sahifalari ("New Coinbase Listings",
+# "New Kraken Listings") ham xuddi shu naqshda (`/coinbase-new-coins`,
+# `/kraken-new-coins`) ishlaydi deb TAXMIN qilinmoqda — bu Binance
+# endpoint'i qanday tasdiqlanganidan FARQLI, HALI production'da
+# sinalmagan (domen sandbox'da bloklangan, faqat Railway'da tekshirish
+# mumkin edi — Binance uchun shu qilingan, Coinbase/Kraken ham xuddi
+# shunday keyingi deployda tasdiqlanadi).
+EXCHANGE_LISTING_URLS = {
+    "Binance": "https://api.cryptocurrencyalerting.com/binance-new-coins",
+    "Coinbase": "https://api.cryptocurrencyalerting.com/coinbase-new-coins",
+    "Kraken": "https://api.cryptocurrencyalerting.com/kraken-new-coins",
+}
 
 
-async def binance_scan(since: datetime) -> list[dict]:
-    """`since`dan beri qo'shilgan Binance listinglarini qaytaradi.
+async def exchange_listing_scan(exchange: str, since: datetime) -> list[dict]:
+    """`since`dan beri qo'shilgan `exchange` (EXCHANGE_LISTING_URLS'dagi
+    kalit) listinglarini qaytaradi.
 
     Natija shakli Upbit/SEC bilan BIR XIL EMAS — bu yerda AI kerak
-    emasligi uchun `_process_binance_listing()` (bot.py) o'ziga xos
-    maydonlarni (`code`/`name`/`market_url`) kutadi, `_process_news_event()`
-    orqali o'TMAYDI."""
+    emasligi uchun `_process_exchange_listing()` (bot.py) o'ziga xos
+    maydonlarni (`code`/`name`/`exchange`/`market_url`) kutadi,
+    `_process_news_event()` orqali o'TMAYDI."""
+    url = EXCHANGE_LISTING_URLS[exchange]
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            r = await client.get(BINANCE_LISTINGS_URL, headers={
+            r = await client.get(url, headers={
                 "User-Agent": "Mozilla/5.0 (compatible; TradeControllerBot/1.0)",
                 "Accept": "application/json",
             })
             r.raise_for_status()
             data = r.json()
     except Exception:
-        log.warning("Binance listinglari olinmadi", exc_info=True)
+        log.warning("%s listinglari olinmadi", exchange, exc_info=True)
         return []
 
     if not isinstance(data, list):
@@ -162,10 +177,23 @@ async def binance_scan(since: datetime) -> list[dict]:
             continue
 
         out.append({
-            "external_key": f"binancelist:{alert_id}",
+            "external_key": f"{exchange.lower()}list:{alert_id}",
+            "exchange": exchange,
             "code": code,
             "name": item.get("name") or code,
             "event_at": event_at,
-            "market_url": item.get("market_url") or f"https://www.binance.com/en/trade/{code}_USDT",
+            "market_url": item.get("market_url") or "",
         })
     return out
+
+
+async def binance_scan(since: datetime) -> list[dict]:
+    return await exchange_listing_scan("Binance", since)
+
+
+async def coinbase_scan(since: datetime) -> list[dict]:
+    return await exchange_listing_scan("Coinbase", since)
+
+
+async def kraken_scan(since: datetime) -> list[dict]:
+    return await exchange_listing_scan("Kraken", since)
