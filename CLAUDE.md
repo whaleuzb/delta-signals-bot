@@ -2378,3 +2378,30 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       simulyatsiyasi bilan: `translate.to_uz()`ning o'zi `&#10;`/`&#39;`
       kabi entitylarni to'g'ri asl belgilarga (`\n`, `'`) aylantirishi
       tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+93. **Neft (WTI/Brent) tovar narxi qo'shildi — foydalanuvchi so'radi:
+    "neft bilan bog'liq aktivlar kiritilmaganmi?"** Javob: neft
+    KOMPANIYALARI (XOM, CVX kabi aksiyalar) allaqachon avtomatik
+    ishlaydi (`stocks.py` istalgan tikerni probe qiladi), lekin xom
+    neftning O'ZI (tovar narxi) ulanmagan edi — endi qo'shildi.
+    - `forex.py`: metallar (`_METALS`) qanday alohida tekshirilsa,
+      neft ham xuddi shunday — `_OIL_API_SYMBOLS = {"WTIUSD": "WTI/USD",
+      "BRENTUSD": "BRENT/USD"}` (Twelve Data'ning `/forex_pairs`
+      ro'yxatida yo'q, lekin `/time_series`/`/price` qabul qiladi).
+    - **Topilgan qo'shimcha nozik joy**: `_api_symbol()`ning standart
+      3+3 pozitsion bo'lish mantig'i ("EURUSD" -> "EUR/USD") 8 harfli
+      "BRENTUSD"ni "BRE/NTUSD" deb NOTO'G'RI bo'lardi — shu sabab neft
+      uchun ANIQ xarita ishlatildi (metallarga esa tegilmadi, ular
+      baxtlicha 6 harfli).
+    - **Topilgan qo'shimcha nozik joy #2**: `resolve()` avval faqat
+      kvota-valyutali shaklni ("XAUUSD") tekshirar edi — MarketTwits
+      hashtaglari esa odatda QISQA keladi ("#BRENT", "#XAUUSD" emas).
+      Endi `resolve()` bare nomga ("BRENT") ham "USD" qo'shib qayta
+      tekshiradi — bu METALLARGA HAM (avvaldan mavjud, lekin shu
+      kungacha bare "#XAU" ishlamas edi) foyda berdi, qo'shimcha
+      o'zgarish talab qilinmadi (bitta umumiy tuzatish).
+    - Tekshirildi (mock, `forex.price`/`enabled`/`valid_symbols`
+      soxta javob bilan): `_api_symbol("BRENTUSD")` to'g'ri "BRENT/USD"
+      berishi; `resolve("brent")` (bare, kichik harf) narx kelsa
+      "BRENTUSD" ga RESOLVE bo'lishi; narx kelmasa (probe False)
+      RESOLVE BO'LMASLIGI tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.

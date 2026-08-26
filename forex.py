@@ -61,7 +61,18 @@ def normalize(raw: str) -> str:
 # metallar ro'yxatdan tashqari, ALOHIDA tekshiriladi.
 _METALS = {"XAUUSD", "XAGUSD", "XPTUSD", "XPDUSD", "XAUEUR", "XAGEUR"}
 
-# Probe natijasi: {symbol: (vaqt, bor_yoki_yo'q)}. Ro'yxatda yo'q metall
+# Neft — xuddi metallar kabi /forex_pairs ro'yxatida YO'Q, lekin Twelve
+# Data /time_series va /price "WTI/USD"/"BRENT/USD" shaklini qabul qiladi.
+# Foydalanuvchi so'radi: "neft bilan bog'liq aktivlar kiritilmaganmi?" —
+# neft KOMPANIYALARI (XOM, CVX kabi aksiyalar) allaqachon `stocks.py`
+# orqali avtomatik ishlaydi (istalgan tiker probe qilinadi); bu yerda
+# xom neftning O'ZI (tovar narxi) qo'shiladi. Aniq xarita kerak — "BRENTUSD"
+# 8 harfli, `_api_symbol()`ning standart 3+3 bo'lish mantig'i uni
+# "BRE/NTUSD" deb noto'g'ri bo'lardi.
+_OIL_API_SYMBOLS = {"WTIUSD": "WTI/USD", "BRENTUSD": "BRENT/USD"}
+_OIL = set(_OIL_API_SYMBOLS)
+
+# Probe natijasi: {symbol: (vaqt, bor_yoki_yo'q)}. Ro'yxatda yo'q metall/neft
 # haqiqatan narx berishini BIR MARTA tekshiramiz va javobni 1 soat saqlaymiz.
 # Bu muhim: shunchaki "ro'yxatga qo'shib qo'yish" signalni qabul qilib,
 # keyin narx kelmasdan uni PENDING'da qotirib qo'yardi.
@@ -76,7 +87,7 @@ async def _probe(symbol: str) -> bool:
     try:
         ok = await price(_api_symbol(symbol), fresh=True) is not None
     except Exception:
-        log.warning("Metall tekshiruvi bajarilmadi: %s", symbol, exc_info=True)
+        log.warning("Metall/neft tekshiruvi bajarilmadi: %s", symbol, exc_info=True)
         ok = False
     _probe_cache[symbol] = (time.time(), ok)
     return ok
@@ -88,13 +99,22 @@ async def resolve(raw: str) -> str | None:
     s = normalize(raw)
     if s in await valid_symbols():
         return s
-    if s in _METALS:
+    if s in _METALS or s in _OIL:
         return s if await _probe(s) else None
+    # Kvota valyutasisiz ("XAU", "BRENT", "WTI") — MarketTwits kabi
+    # manbalardagi hashtaglar odatda shu qisqa shaklda keladi ("#BRENT",
+    # "#XAUUSD" emas). USD qo'shib qayta tekshiriladi.
+    su = s + "USD"
+    if su in _METALS or su in _OIL:
+        return su if await _probe(su) else None
     return None
 
 
 def _api_symbol(symbol: str) -> str:
-    """EURUSD -> EUR/USD — Twelve Data shu shaklni talab qiladi."""
+    """EURUSD -> EUR/USD — Twelve Data shu shaklni talab qiladi.
+    Neft kabi 6 harf bo'lmagan belgilar (`BRENTUSD`) aniq xaritadan olinadi."""
+    if symbol in _OIL_API_SYMBOLS:
+        return _OIL_API_SYMBOLS[symbol]
     return f"{symbol[:3]}/{symbol[3:]}" if len(symbol) == 6 else symbol
 
 
