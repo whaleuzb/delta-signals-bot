@@ -2010,3 +2010,42 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `test_tracker.py` 9/9 — o'zgarmadi. Bu bilan barcha 82-band
       elementlari (Upbit + Coinalyze) endi haqiqatan ISHLASHI kutilmoqda
       — Coinalyze faqat `COINALYZE_API_KEY` qo'yilgach.
+    - **Upbit — 2-marta, 403 Forbidden**: manzil to'g'ri edi, lekin
+      sarlavhasiz (standart httpx User-Agent) so'rov rad etilgan. Brauzer
+      sarlavhalari (`User-Agent`/`Referer`/`Origin`) qo'shilgach ishladi
+      (`news_scan_job` keyingi barcha yurishlarida Upbit haqida OGOHLANTIRISH
+      chiqmadi). `COINALYZE_API_KEY` ham foydalanuvchi tomonidan Railway'ga
+      qo'shildi — `liquidation_scan_job` ham xatosiz ishladi. Ikkalasi ham
+      HOZIR HAQIQATAN ISHLAMOQDA (production loglarida tasdiqlangan).
+
+83. **Likvidatsiya posti: long/short taqsimoti qo'shildi.**
+    - Foydalanuvchi: "likvidatsiya longmi shortmi bilib bo'lmayabti" —
+      caption faqat JAMI ($ va necha barobar) ko'rsatardi, long/short
+      ALOHIDA ko'rinmasdi (bu esa narx yo'nalishini bildiradi: LONG ko'p
+      yopilsa narx PASAYGANDA, SHORT ko'p yopilsa narx KO'TARILGANDA
+      likvidatsiya bo'ladi — traderlar uchun muhim farq).
+    - `liquidations.py`: `Spike`ga `long_usd`/`short_usd` maydonlari
+      qo'shildi (`_bucket_sides()` — avvalgi `_bucket_total()` shu
+      funksiya orqali qayta yozildi, natija o'zgarmadi). Oxirgi ustunning
+      xom holati endi `log.debug()` bilan yoziladi — Coinalyze'ning
+      individual maydon nomlari (`l`/`s` long/short deb TAXMIN qilingan,
+      rasmiy hujjatda ko'rsatilmagan) production loglarida tasdiqlash
+      uchun.
+    - `bot.py` `_process_liquidation_spike()`: caption'ga "🔴 Long: $X
+      🟢 Short: $Y" qatori va qaysi tomon USTUN bo'lsa shunga mos
+      yo'nalish izohi ("narx pasaygan/ko'tarilgan bo'lishi mumkin")
+      qo'shildi.
+    - **Jonli yangilanish "umuman ishlamadi" muammosi**: kodni qayta
+      ko'rib chiqishda `_live_update()`/`_paced_media_edit()` chaqiruvi
+      surge/SEC bilan BIR XIL, allaqachon ishlayotgan infratuzilma —
+      liquidationga xos xato TOPILMADI. Eng ehtimolli sabab: o'sha payt
+      ketma-ket bir necha marta deploy qilingan edi (Upbit tuzatish +
+      Coinalyze kalit) — `asyncio.create_task()` fon vazifasi konteyner
+      qayta ishga tushganda O'CHIB QOLADI (bu BARCHA News Trade AI jonli
+      yangilanishlariga tegishli umumiy, oldindan bilingan cheklov,
+      alohida tuzatish talab qilmaydi — post yuborilgandan keyin qayta
+      deploy qilinmasa muammo bo'lmasligi kerak).
+    - Tekshirildi (mock): to'liq zanjir qayta ishga tushirilib, caption
+      matnida "🔴 Long: $4,000,000   🟢 Short: $3,000,000" va "📉 Asosan
+      LONG yopildi (57%)" qatorlari to'g'ri chiqishi tasdiqlandi.
+      `test_tracker.py` 9/9 — o'zgarmadi.

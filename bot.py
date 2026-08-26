@@ -4283,9 +4283,25 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     if eid is None:
         return   # shu 15 daqiqalik oyna uchun allaqachon postlangan
 
+    # Long/short taqsimoti — qaysi tomon ko'proq majburan yopilgani narx
+    # yo'nalishini bildiradi: LONG ko'p yopilsa narx PASAYGANDA (longlar
+    # majburan sotilgan), SHORT ko'p yopilsa narx KO'TARILGANDA (shortlar
+    # majburan sotib olingan) likvidatsiya bo'ladi.
+    side_total = spike.long_usd + spike.short_usd
+    if side_total > 0 and spike.long_usd >= spike.short_usd:
+        long_pct = spike.long_usd / side_total * 100
+        direction_line = f"📉 Asosan <b>LONG</b> yopildi ({long_pct:.0f}%) — narx pasaygan bo'lishi mumkin"
+    elif side_total > 0:
+        short_pct = spike.short_usd / side_total * 100
+        direction_line = f"📈 Asosan <b>SHORT</b> yopildi ({short_pct:.0f}%) — narx ko'tarilgan bo'lishi mumkin"
+    else:
+        direction_line = ""
+
     caption = (f"💥 <b>{html.escape(symbol)}</b> — fyuchers likvidatsiyasi keskin oshdi"
-              f"\n\nSo'nggi 5 daqiqa: <b>${spike.latest_usd:,.0f}</b>"
-              f"\nO'rtachadan: <b>{spike.ratio:.1f}x</b> ko'p")
+              f"\n\nSo'nggi 5 daqiqa: <b>${spike.latest_usd:,.0f}</b> "
+              f"(o'rtachadan <b>{spike.ratio:.1f}x</b> ko'p)"
+              f"\n🔴 Long: ${spike.long_usd:,.0f}   🟢 Short: ${spike.short_usd:,.0f}"
+              + (f"\n{direction_line}" if direction_line else ""))
 
     photo, live_pct = None, None
     liq_before_ms = 4 * 3_600_000   # 4 soat, 1m shamlarda

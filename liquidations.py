@@ -45,18 +45,27 @@ class Spike:
     latest_usd: float
     baseline_usd: float
     ratio: float
+    long_usd: float
+    short_usd: float
 
 
-def _bucket_total(item: dict) -> float:
-    """Bir ustundagi jami likvidatsiya (long+short, `convert_to_usd=true`
-    bo'lgani uchun USD'da). Aniq maydon nomlari rasmiy hujjatda
-    ko'rsatilmagani uchun bir nechta ehtimoliy nom sinaladi."""
+def _bucket_sides(item: dict) -> tuple[float, float]:
+    """Bir ustundagi (long, short) likvidatsiya qiymatlari alohida-alohida
+    (`convert_to_usd=true` bo'lgani uchun USD'da). Aniq maydon nomlari
+    rasmiy hujjatda ko'rsatilmagani uchun bir nechta ehtimoliy nom
+    sinaladi — `log.debug` orqali xom ustun ham yoziladi, production
+    logida haqiqiy maydon nomlarini tasdiqlash uchun."""
     long_v = item.get("l") or item.get("long") or item.get("buy") or 0
     short_v = item.get("s") or item.get("short") or item.get("sell") or 0
     try:
-        return float(long_v) + float(short_v)
+        return float(long_v), float(short_v)
     except (TypeError, ValueError):
-        return 0.0
+        return 0.0, 0.0
+
+
+def _bucket_total(item: dict) -> float:
+    long_v, short_v = _bucket_sides(item)
+    return long_v + short_v
 
 
 async def liquidation_candidates() -> list[Spike]:
@@ -97,5 +106,8 @@ async def liquidation_candidates() -> list[Spike]:
             continue
         ratio = latest / avg
         if ratio >= config.LIQUIDATION_MULTIPLIER:
-            out.append(Spike(symbol=symbol, latest_usd=latest, baseline_usd=avg, ratio=ratio))
+            long_usd, short_usd = _bucket_sides(buckets[-1])
+            log.debug("Likvidatsiya xom ustun (%s): %r", symbol, buckets[-1])
+            out.append(Spike(symbol=symbol, latest_usd=latest, baseline_usd=avg,
+                             ratio=ratio, long_usd=long_usd, short_usd=short_usd))
     return out
