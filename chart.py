@@ -453,7 +453,8 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
 
 
 def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
-               label: str = "News", marker_color: str | None = None) -> io.BytesIO:
+               label: str = "News", marker_color: str | None = None,
+               tf: str | None = None) -> io.BytesIO:
     """News Trade AI grafigi — Entry/SL/TP yo'q, faqat aynan qaysi shamdan
     yangilik (yoki boshqa hodisa — masalan hajm portlashi) chiqqanini
     ko'rsatuvchi belgi va joriy % o'zgarish. `label` shu belgi ostidagi
@@ -461,7 +462,8 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
     `marker_color` — belgi (chiziq/nuqta/yorliq) rangi; berilmasa ACC
     (kumush, standart). Likvidatsiya kabi ANIQ yo'nalishi bor hodisalar
     uchun GREEN/RED beriladi (masalan long ustun bo'lsa RED — narx
-    pasaygani uchun).
+    pasaygani uchun). `tf` — `_render()`dagi kabi sarlavha ostida
+    ko'rsatiladi (grafik qaysi shamda chizilganini bildiradi).
 
     `_render()`dan ataylab ALOHIDA: u yerda entry/sl majburiy parametr va
     y-o'qi hisobiga kiradi — bu yerda ular umuman yo'q. Shamlarni chizish
@@ -508,6 +510,8 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
         spine.set_color(GRID)
 
     fig.text(0.045, 0.955, symbol, fontsize=16, fontweight="bold", color=TITLE)
+    if tf:
+        fig.text(0.045, 0.925, f"· {tf}", fontsize=11, color=TXT)
     fig.text(0.97, 0.955, f"{live_pct:+.2f}%", fontsize=17, fontweight="bold",
               color=news_col, ha="right")
 

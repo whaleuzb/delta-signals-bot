@@ -2693,3 +2693,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        past).
      - Tekshirildi: `test_tracker.py` 9/9 — o'zgarmadi (tracker.py'ga
        tegilmadi).
+
+103. **Foydalanuvchi: "Keyin harbir grafikda taym freym ko'rinib
+     tursin."** Signal grafigi (`chart._render()`, LONG/SHORT
+     tugmalar chizadigan asosiy grafik) allaqachon tf'ni sarlavha
+     ostida ko'rsatib kelayotgan edi ("· 1m" kabi) — lekin News Trade
+     AI/listing/likvidatsiya/hajm-portlashi grafigi (`chart.news_chart()`)
+     buni umuman ko'rsatmasdi.
+     - `chart.news_chart()`: yangi ixtiyoriy `tf: str | None = None`
+       parametri qo'shildi, berilsa `_render()`dagi bilan bir xil
+       uslubda ("· {tf}") sarlavha (symbol) ostiga chiziladi.
+     - `bot.py` `_news_render()`: `chart.news_chart(...)` chaqiruviga
+       `tf=tf` qo'shildi — bu ORTIQCHA parametr talab qilmaydi, chunki
+       `_news_render()` allaqachon `tf` argumentini oladi va endi uni
+       grafik chizuvchi funksiyaga ham uzatadi. Natijada `_news_render()`
+       orqali o'tuvchi BARCHA post turlari (SEC/listing "1m", likvidatsiya
+       "1m", hajm portlashi "1d", /charttest ixtiyoriy) avtomatik tf
+       ko'rsatadigan bo'ldi — alohida har bir chaqiruv joyini
+       o'zgartirish shart bo'lmadi.
+     - Tekshirildi: `chart.news_chart()` to'g'ridan-to'g'ri soxta
+       shamlar bilan chaqirilib (tf bilan VA tf'siz — orqaga
+       muvofiqlik uchun) PNG muvaffaqiyatli chiqishi tasdiqlandi,
+       natija rasmi foydalanuvchiga ko'rsatildi. `test_tracker.py`
+       9/9 — o'zgarmadi.

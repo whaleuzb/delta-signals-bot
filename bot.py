@@ -3981,7 +3981,7 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     live_price = candles[-1].close
     live_pct = (live_price - anchor_price) / anchor_price * 100
     return chart.news_chart(candles, news_idx, symbol, live_pct, label=label,
-                            marker_color=marker_color), live_pct
+                            marker_color=marker_color, tf=tf), live_pct
 
 
 # `asyncio.create_task()` event loop'da faqat KUCHSIZ (weak) referens
