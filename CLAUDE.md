@@ -2606,3 +2606,27 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       chiqaradi; ergashtirilgandan keyin ham natija haqiqiy JSON emas,
       404 sahifa bo'lishi mumkin — shuning uchun status/tana matnini
       ko'rmasdan "ishladi" deb xulosa chiqarib bo'lmaydi.
+
+100. **Foydalanuvchi: "economic calendar ishlamadi soat 12:00 da xabar
+     kelmadi"** — production loglari tekshirildi (Railway):
+     - Diagnostika (vaqtinchalik log): `TZ=Asia/Tashkent`,
+       `ECON_DIGEST_HOUR=12`, `NEWS_CHANNEL_ID` sozlangan — sozlamalarda
+       xato YO'Q.
+     - `econ_job` bugun (2026-08-26) soat 07:00:43 UTC (=12:00:43
+       Toshkent)da xatosiz ("executed successfully") ishlagan.
+     - Bazadagi "digest bugun yuborilganmi" bayrog'i (`econ_calendar_state`,
+       kind='digest') **True** — bu bayroq FAQAT bitta joyda (`econ_job`
+       ichida, `send_message`dan BEVOSITA OLDIN) belgilanadi, boshqa hech
+       qanday admin buyruq yoki test yo'li uni belgilamaydi.
+     - Butun kun davomidagi (barcha deploy) loglarda "Iqtisodiy taqvim
+       digest yuborilmadi" xatosi (`log.exception`, `send_message`
+       muvaffaqiyatsiz bo'lsa chiqadi) **HECH QACHON ko'rinmadi**.
+     - Xulosa: kodda xato TOPILMADI — barcha belgilar xabar 12:00'da
+       NEWS_CHANNEL_ID kanaliga MUVAFFAQIYATLI yuborilganini ko'rsatadi
+       (xuddi shu kanalga MarketTwits/listing postlari ham muammosiz
+       borayotgani allaqachon tasdiqlangan). Foydalanuvchiga shu kanalni
+       (soat 12:00 atrofida) qayta tekshirish so'raldi — agar haqiqatan
+       ham yo'q bo'lsa, muammo Telegram tomonida yoki boshqa sababda
+       bo'lishi mumkin, kod darajasida hozircha aniqlanmadi.
+     - Diagnostika loglari (startup va har-tsiklli) tekshiruvdan keyin
+       kod bazasidan olib tashlandi (vaqtinchalik edi).
