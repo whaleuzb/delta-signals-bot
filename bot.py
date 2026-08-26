@@ -4035,6 +4035,7 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
                                       caption=caption, parse_mode=ParseMode.HTML),
                 reply_markup=reply_markup)
             ok = True
+            log.info("DIAGNOSTIKA: HAQIQIY tahrirlash muvaffaqiyatli (chat=%s msg=%s)", chat_id, message_id)
         except RetryAfter as e:
             log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
             await asyncio.sleep(e.retry_after)
@@ -4047,6 +4048,7 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
             # yangi — shuning uchun ogohlantirish/traceback bilan
             # loglarni to'ldirmasdan jimgina o'tkazib yuboriladi.
             if "message is not modified" in str(e).lower():
+                log.info("DIAGNOSTIKA: 'message is not modified' (chat=%s msg=%s)", chat_id, message_id)
                 ok = True
             else:
                 log.warning("News xabari tahrirlanmadi (chat=%s msg=%s)",
