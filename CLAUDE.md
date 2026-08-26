@@ -1866,3 +1866,28 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `ok=True`, nol warning logi; boshqa `BadRequest` ("Chat not found")
       → `ok=False`, bitta warning logi (avvalgidek). `test_tracker.py`
       9/9 — o'zgarmadi.
+
+80. **Jonli grafik yangilanganda postning TAGIDAGI MATNI (caption)
+    o'chib qolishi tuzatildi.**
+    - Foydalanuvchi: "kanalda grafik yangilanganda tagidagi matn
+      yoqolib qolyabti". Xuddi 73-band (tugmalar) va 74-band
+      (`edit_message_media` haqidagi umumiy tushuncha) bilan BIR XIL
+      ILDIZ sabab, FAQAT boshqa maydonga tegishli: `_paced_media_edit`
+      `InputMediaPhoto(photo, filename="news.png")`ni `caption`SIZ
+      qurar edi — `edit_message_media` esa BUTUN media obyektini
+      (rasm + izoh) yangisi bilan ALMASHTIRADI, eskisidan HECH NARSA
+      "meros" bo'lib qolmaydi. Caption berilmasa — Telegram uni
+      shunchaki BO'SH qiladi.
+    - Tuzatish AYNAN 73-band bilan bir xil andozada: `_paced_media_edit`/
+      `_live_update`ga yangi `caption: str | None = None` parametri
+      qo'shildi, `InputMediaPhoto`ga endi `caption=caption,
+      parse_mode=ParseMode.HTML` beriladi. Barcha uchta chaqiruv joyida
+      (`_process_news_event`, `_process_surge_candidate`, `cmd_charttest`)
+      dastlab `send_photo`ga berilgan AYNAN O'SHA `caption` o'zgaruvchisi
+      `_live_update(..., caption=caption)`ga ham uzatiladi — ikkinchi
+      marta yozilmaydi, faqat qayta ishlatiladi.
+    - Tekshirildi (mock): `_paced_media_edit`ga caption berilganda
+      `edit_message_media`ga uzatilgan `InputMediaPhoto.caption`/
+      `.parse_mode` aynan mos kelishi tasdiqlandi; `/charttest` to'liq
+      zanjiri (share tugmasi bilan birga) qayta ishga tushirilib
+      tekshirildi — buzilish yo'q. `test_tracker.py` 9/9 — o'zgarmadi.

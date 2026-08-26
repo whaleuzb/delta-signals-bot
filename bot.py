@@ -3867,7 +3867,7 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
         asyncio.create_task(_live_update(
             ctx.bot, eid, symbol, market, item["event_at"],
             config.NEWS_CHANNEL_ID, sent.message_id, live_pct,
-            reply_markup=buttons))
+            reply_markup=buttons, caption=caption))
 
 
 async def _news_render(symbol: str, market: str, event_at: datetime,
@@ -3914,7 +3914,8 @@ _news_last_edit = 0.0
 
 
 async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
-                            reply_markup: InlineKeyboardMarkup | None = None) -> bool:
+                            reply_markup: InlineKeyboardMarkup | None = None,
+                            caption: str | None = None) -> bool:
     global _news_last_edit
     async with _news_edit_lock:
         wait = _news_last_edit + config.NEWS_MIN_EDIT_GAP - time.monotonic()
@@ -3934,9 +3935,15 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
             # tugmalarni O'CHIRIB TASHLAYDI (editMessageCaption'dan farqli,
             # bu metodda mavjud klaviatura avtomatik saqlanmaydi) — shuning
             # uchun postdagi tugmalar har safar qayta uzatiladi.
+            # MUHIM #3: xuddi shu sabab — `caption` ham `InputMediaPhoto`ning
+            # O'ZIGA berilishi kerak, aks holda tagidagi matn (izoh)
+            # HAR TAHRIRLASHDA O'CHIRILADI (edit_message_media butun media
+            # obyektini — rasm+izoh — YANGISI bilan ALMASHTIRADI, eskisidan
+            # HECH NARSA "meros" qilib olinmaydi).
             await bot_.edit_message_media(
                 chat_id=chat_id, message_id=message_id,
-                media=InputMediaPhoto(photo, filename="news.png"),
+                media=InputMediaPhoto(photo, filename="news.png",
+                                      caption=caption, parse_mode=ParseMode.HTML),
                 reply_markup=reply_markup)
             ok = True
         except RetryAfter as e:
@@ -3968,14 +3975,16 @@ async def _live_update(bot_, event_id: int, symbol: str, market: str,
                        event_at: datetime, chat_id, message_id: int,
                        live_pct: float, tf: str = "1m",
                        before_ms: int | None = None, label: str = "News",
-                       reply_markup: InlineKeyboardMarkup | None = None) -> None:
+                       reply_markup: InlineKeyboardMarkup | None = None,
+                       caption: str | None = None) -> None:
     """Postdan keyin `NEWS_LIVE_MINUTES` davomida narxni qayta tekshirib,
     grafikni yangilab turadi. Alohida, chegaralangan davomiylikdagi fon
     vazifasi — `job_queue` emas, chunki bu bitta HODISAGA tegishli, doimiy
     global jadval emas. `tf`/`before_ms`/`label` — `_news_render`ga
     o'zgarishsiz uzatiladi (surge_scan_job boshqa oyna bilan chaqiradi).
-    `reply_markup` — postdagi tugmalarni har bir tahrirlashda qayta
-    uzatish uchun (aks holda `_paced_media_edit` ularni o'chirib qo'yadi)."""
+    `reply_markup`/`caption` — postdagi tugmalar va tagidagi matnni har
+    bir tahrirlashda qayta uzatish uchun (aks holda `_paced_media_edit`
+    ularni o'chirib qo'yadi)."""
     deadline = time.monotonic() + config.NEWS_LIVE_MINUTES * 60
     while time.monotonic() < deadline:
         await asyncio.sleep(config.NEWS_REFRESH_SECONDS)
@@ -3988,7 +3997,7 @@ async def _live_update(bot_, event_id: int, symbol: str, market: str,
         if rendered is None:
             continue
         photo, live_pct = rendered
-        await _paced_media_edit(bot_, chat_id, message_id, photo, reply_markup)
+        await _paced_media_edit(bot_, chat_id, message_id, photo, reply_markup, caption)
 
     await db.finalize_news_outcome(event_id, live_pct)
 
@@ -4215,7 +4224,7 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         asyncio.create_task(_live_update(
             ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf="1h", before_ms=surge_before_ms,
-            label="Portlash", reply_markup=buttons))
+            label="Portlash", reply_markup=buttons, caption=caption))
 
 
 async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4312,7 +4321,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         asyncio.create_task(_live_update(
             ctx.bot, eid, symbol, market, now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf=tf, before_ms=before_ms, label="Sinov",
-            reply_markup=buttons))
+            reply_markup=buttons, caption=caption))
     await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
 
 
