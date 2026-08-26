@@ -1994,3 +1994,19 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `api_key`) to'g'ri mavjudligi tasdiqlandi; to'liq mock-zanjir
       (soxta ko'p-instrumentli javob → `Spike` → post) qayta ishga
       tushirilib tekshirildi. `test_tracker.py` 9/9 — o'zgarmadi.
+    - **Upbit — TO'G'RI manzil topildi (foydalanuvchi brauzer orqali)**:
+      uchala avvalgi urinish (ikkitasi 404, biri mavjud bo'lmagan domen)
+      muvaffaqiyatsiz bo'lgach, foydalanuvchi DevTools (Network) orqali
+      haqiqiy so'rovni tekshirib berdi — `pub-info.upbit.com/api/v1/announcements`
+      (`os=web&page=1&per_page=20&category=all`), HTTP 200, to'liq javob
+      namunasi bilan. Eskirgan manzillar (`api-manager.upbit.com`,
+      `project-team.upbit.com`) Upbit tomonidan shu ALOHIDA mikroservisga
+      ko'chirilgan ekan. `listings.py` ushbu tasdiqlangan shaklga
+      (`data.notices[]` — `id`/`title`/`listed_at`/`category`, `+09:00`
+      vaqt mintaqasi bilan) to'liq qayta yozildi. Tekshirildi (mock,
+      foydalanuvchi yuborgan aniq javob namunasi bilan): listing e'loni
+      TO'G'RI tanlandi (`external_key="upbit:6516"`), texnik-ish e'loni
+      chiqarib tashlandi, KST vaqt mintaqasi UTC'ga to'g'ri aylantirildi.
+      `test_tracker.py` 9/9 — o'zgarmadi. Bu bilan barcha 82-band
+      elementlari (Upbit + Coinalyze) endi haqiqatan ISHLASHI kutilmoqda
+      — Coinalyze faqat `COINALYZE_API_KEY` qo'yilgach.
