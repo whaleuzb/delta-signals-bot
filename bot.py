@@ -4577,16 +4577,15 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         lines.append("\n\n<i>Aniq sabab topilmadi — bozor spekulyatsiyasi bo'lishi mumkin.</i>")
     caption = "".join(lines)
 
-    # Grafik: 4 kunlik soatlik shamlar, oxirgi sham "Portlash" nuqtasi —
+    # Grafik: kunlik shamlar, `SURGE_DECLINE_DAYS` (matn ham shu son bilan
+    # "N kunlik pasayish" deydi — grafik oynasi endi shu bilan MOS) davri
+    # to'liq ko'rinadi, oxirgi sham "Portlash" nuqtasi bilan belgilanadi.
     # `_news_render`ning SEC uchun ishlatiladigani bilan bir xil funksiya,
-    # faqat kengroq oyna/timeframe va boshqa yorliq bilan. 4 kun (96 sham)
-    # ataylab `_news_render`dagi `limit=200` chegarasidan ANCHA past —
-    # aks holda so'ralgan oyna limitga sig'may, oxirgi (hozirgi) sham
-    # o'rniga eski shamlar bilan to'xtab qolardi.
+    # faqat kengroq oyna/timeframe va boshqa yorliq bilan.
     photo, live_pct = None, None
-    surge_before_ms = 4 * 86_400_000
+    surge_before_ms = config.SURGE_DECLINE_DAYS * 86_400_000
     try:
-        rendered = await _news_render(symbol, "crypto", now, tf="1h",
+        rendered = await _news_render(symbol, "crypto", now, tf="1d",
                                       before_ms=surge_before_ms, label="Portlash")
     except Exception:
         log.warning("Hajm portlashi grafigi yasalmadi (%s)", symbol, exc_info=True)
@@ -4609,7 +4608,7 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         return
     await db.set_news_message(
         eid, sent.message_id, caption,
-        render_tf="1h" if photo else None,
+        render_tf="1d" if photo else None,
         render_before_ms=surge_before_ms if photo else None,
         render_label="Portlash" if photo else None)
     await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)

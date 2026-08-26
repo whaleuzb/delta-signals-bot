@@ -2670,3 +2670,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (yoki mavjud faol posting'lar orqali) grafik endi haqiqatan
        yangilanayotganini Railway logida ("message is not modified"
        o'rniga haqiqiy tahrirlash) tasdiqlash kerak.
+
+102. **Foydalanuvchi: "Savdo hajmi keskin oshdi xabaridagi grafik taym
+     freymi 1D yoki 4h lik bo'lsin."** Ikkalasidan qaysi birini
+     tanlashini va oyna kengligini ham so'radim:
+     - Taym freym: **1D (kunlik)** tanlandi.
+     - Oyna kengligi: xabar matni "N kunlik pasayish" deydi
+       (`SURGE_DECLINE_DAYS=30`), lekin grafik oldin faqat oxirgi 4
+       kunni ko'rsatardi (matn/grafik NOMOS edi) — foydalanuvchi buni
+       ham **30 kunga kengaytirishni** tanladi (grafik endi matndagi
+       davrni to'liq qamrab oladi).
+     - `bot.py` `_process_surge_candidate()`: `_news_render(...)`
+       chaqiruvi `tf="1h"` -> `tf="1d"`, `surge_before_ms = 4 *
+       86_400_000` (qattiq 4 kun) -> `config.SURGE_DECLINE_DAYS *
+       86_400_000` (dinamik, standart 30 kun). `db.set_news_message(...,
+       render_tf=...)` ham `"1h"` -> `"1d"`ga mos yangilandi (jonli
+       yangilanish endi ham 1D shamlarda davom etadi).
+     - Eski izoh (4 kun ataylab `limit=200`dan past qoldirilgani haqida)
+       yangilandi — #101'da `_news_render()`ning `limit` chegarasi
+       dinamik hisoblanadigan qilib tuzatilgani uchun bu cheklov endi
+       muammo emas (30 kunlik shamlar soni — 30 — baribir 200dan ancha
+       past).
+     - Tekshirildi: `test_tracker.py` 9/9 — o'zgarmadi (tracker.py'ga
+       tegilmadi).
