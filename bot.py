@@ -4600,6 +4600,29 @@ async def cmd_tg_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text("✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.")
 
 
+async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Haqiqiy kanal postini kutmasdan, xohlagan matnni to'g'ridan-to'g'ri
+    MarketTwits quvuridan (AI filtr -> tarjima -> grafik -> post)
+    o'tkazib ko'radi — /tg_login/koda muvaffaqiyatli kirilganini kutmasdan
+    ham ishlaydi (bu buyruq listener'ga bog'liq emas)."""
+    if not is_admin(update.effective_user.id):
+        return
+    text = " ".join(ctx.args) if ctx.args else ""
+    if not text:
+        await update.message.reply_text(
+            "Foydalanish: /tg_test <matn>\n"
+            "Masalan: /tg_test SEC odobrila zayavku na Bitcoin ETF")
+        return
+    await update.message.reply_text("Tahlil qilinmoqda…")
+    fake_msg_id = int(datetime.now(timezone.utc).timestamp())
+    await _process_markettwits_message(
+        ctx.bot, "sinov", fake_msg_id, text, datetime.now(timezone.utc))
+    await update.message.reply_text(
+        "Tayyor. AI buni \"kuchli\" deb topsa — kanalga postlangan bo'lishi "
+        "kerak; \"oddiy/rutin\" deb topsa — hech narsa chiqmaydi (bu normal, "
+        "keyingi savolga qarang).")
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -4681,6 +4704,7 @@ def main() -> None:
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))
     app.add_handler(CommandHandler("tg_password", cmd_tg_password))
+    app.add_handler(CommandHandler("tg_test", cmd_tg_test))
     app.add_handler(CommandHandler("refhavola", cmd_ref_link))
     app.add_handler(CommandHandler("hisobot", cmd_digest))
     app.add_handler(CommandHandler("sahifa", cmd_page))
