@@ -35,6 +35,17 @@ ANNOUNCEMENTS_URL = "https://pub-info.upbit.com/api/v1/announcements"
 # sarlavha bo'yicha kalit so'z filtri ancha ishonchli.
 LISTING_KEYWORDS = ("상장", "거래지원", "신규", "listing", "market support")
 
+# Sarlavhasiz (standart httpx) so'rov 403 bilan rad etildi (production
+# logida tasdiqlangan) — Upbit'ning bu mikroservisi so'rov brauzerdan
+# kelayotganini (User-Agent) va manba sahifasidan (Referer/Origin)
+# tekshiradi shekilli. Haqiqiy brauzer sarlavhalari bilan ishlatiladi.
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    "Referer": "https://upbit.com/service_center/notice",
+    "Origin": "https://upbit.com",
+}
+
 
 async def upbit_scan(since: datetime) -> list[dict]:
     """`since`dan beri chiqqan, listing/savdo-qo'llab-quvvatlash e'loniga
@@ -45,7 +56,7 @@ async def upbit_scan(since: datetime) -> list[dict]:
     `bot.py`ning umumiy quvuriga o'zgarishsiz qo'shiladi. `symbol` doim
     `None` — tiker `newsai.analyze()` bosqichida taxmin qilinadi."""
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, headers=HEADERS) as client:
             r = await client.get(ANNOUNCEMENTS_URL, params={
                 "os": "web", "page": 1, "per_page": 20, "category": "all",
             })
