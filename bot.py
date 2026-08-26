@@ -4213,25 +4213,24 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
             event_at=event_at, posted=True)
         return
 
-    # Hashtaglar matndan ajratib olinadi va TARJIMA QILINMAYDI — ular
-    # birga tarjima qilinsa (masalan "#новости" so'z bilan aralashib)
-    # natija chalkash chiqardi (foydalanuvchi tasdiqladi: "#xabar berish"
-    # kabi noto'g'ri chiqqan). Faqat asosiy matn tarjima qilinadi,
-    # hashtaglar tepaga o'zgarishsiz qaytariladi.
-    hashtags = _HASHTAG_RE.findall(text)
+    # Hashtaglar matndan ajratib olinadi — ikki sabab: (1) TARJIMA
+    # QILINMAYDI, birga tarjima qilinsa (masalan "#новости" so'z bilan
+    # aralashib) natija chalkash chiqardi (foydalanuvchi tasdiqladi:
+    # "#xabar berish" kabi noto'g'ri chiqqan); (2) captionga UMUMAN
+    # QAYTARILMAYDI — sarlavhada aktiv nomi (masalan "BTCUSDT") allaqachon
+    # ko'rinadi, hashtaglar shunchaki ortiqcha/qatorni to'ldirar edi
+    # (foydalanuvchi: "hashtaglar ham bor ko'payib ketyabti").
     body = _HASHTAG_RE.sub("", text).strip()
     display_body = body
     if _CYRILLIC_RE.search(body):
         translated = await translate.to_uz(body)
         if translated:
             display_body = translated
-    hashtag_line = " ".join(f"#{t}" for t in hashtags)
-    display_text = f"{hashtag_line}\n\n{display_body}" if hashtag_line else display_body
 
     eid = await db.insert_news_event(
         source="markettwits", external_key=external_key, symbol=symbol, market=market,
         headline_en=text[:2000],
-        translation_uz=display_text[:2000] if display_body != body else None,
+        translation_uz=display_body[:2000] if display_body != body else None,
         insight_uz=None, event_at=event_at, posted=False)
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
@@ -4243,7 +4242,7 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     # xatosi kabi, foydalanuvchi production'da tasdiqladi), xom holda
     # ko'rinib qolardi.
     caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
-              f"{html.escape(display_text[:1000], quote=False)}")
+              f"{html.escape(display_body[:1000], quote=False)}")
 
     # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan
     # narsa yo'q — matn-only post, jonli yangilanishsiz (narx kuzatilmaydi).

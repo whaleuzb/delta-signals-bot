@@ -2405,3 +2405,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       berishi; `resolve("brent")` (bare, kichik harf) narx kelsa
       "BRENTUSD" ga RESOLVE bo'lishi; narx kelmasa (probe False)
       RESOLVE BO'LMASLIGI tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+94. **MarketTwits caption'idan hashtaglar butunlay olib tashlandi.**
+    Foydalanuvchi: "bot o'zi aktivni nomini yozyabti, yana hashtaglar
+    ham bor ko'payib ketyabti" — 92-bandda hashtaglar caption BOSHIGA
+    qaytarilardi (`#BTC #новости\n\n...`), lekin sarlavhada aktiv nomi
+    (masalan "BTCUSDT") allaqachon ko'rinadi — hashtaglar shunchaki
+    ortiqcha qator edi.
+    - `bot.py`: `hashtag_line` butunlay olib tashlandi — hashtaglar hali
+      ham matndan AJRATIB tarjima qilinadi (92-band sababiga ko'ra,
+      tarjima sifatini saqlash uchun), lekin endi captionga UMUMAN
+      qaytarilmaydi, faqat tashlab yuboriladi.
+    - Tekshirildi (mock): caption'da "#BTC"/"#новости" kabi hashtaglar
+      ENDI YO'QLIGI, faqat sarlavha+tarjima qilingan matn qolishi
+      tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
