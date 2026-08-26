@@ -2288,3 +2288,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       `edit_message_media` chaqirilishi (= "restart-chidamlilik" real
       isbotlandi); muddati o'tgan hodisa uchun `outcome_pct` to'g'ri
       yozilishi (finalize). `test_tracker.py` 9/9 — o'zgarmadi.
+
+90. **MarketTwits: AI'siz tarjima (o'zbekchaga) qo'shildi + manba
+    havolasi olib tashlandi.** Foydalanuvchi: "rus tilida qanday o'zbek
+    tiliga o'girib keyin yuborsak bo'ladi? Keyin post tagida link chiqib
+    qolyabti... uni chiqmaydigan qilish kerak".
+    - **Tarjima**: yangi `translate.py` — MyMemory
+      (`api.mymemory.translated.net`) orqali, bepul/kalitsiz. AVVAL
+      Google Translate'ning norasmiy endpoint'i (`translate.googleapis.com`)
+      sinaldi — sandbox'dan **429 "Sorry... automated queries"** bilan
+      RAD ETDI (avtomatlashtirilgan so'rovlarni faol bloklaydi). MyMemory
+      esa aynan shu maqsad uchun MAXSUS qurilgan rasmiy API — shuning
+      uchun tanlandi.
+    - `bot.py`: `_process_markettwits_message()`da yangi `_CYRILLIC_RE`
+      — matnda KIRILL harflar bo'lsagina tarjima chaqiriladi (kanal
+      aralash, ba'zan inglizcha post ham keladi — ularni "ru->uz"
+      juftligi orqali qayta "tarjima qilish" natijani buzardi). Tarjima
+      muvaffaqiyatsiz bo'lsa (`translate.to_uz()` `None` qaytarsa) — asl
+      matn ishlatiladi, POST BLOKLANMAYDI. Tarjima natijasi
+      `news_events.translation_uz`ga ham yoziladi (SEC/Upbit bilan bir
+      xil ustun, endi MarketTwits ham to'ldiradi).
+    - **Havola olib tashlandi**: caption oxiridagi
+      `🔗 <a href="t.me/...">MarketTwits</a>` qatori butunlay o'chirildi
+      — endi faqat sarlavha+matn, hech qanday manba havolasi ko'rinmaydi.
+    - MUHIM (keyingi ishlar uchun eslatma): MyMemory'ni sandbox'dan
+      real so'rov bilan sinab bo'lmadi — proxy uni ORGANIZATSIYA
+      siyosati bo'yicha 403 bilan rad etadi (Telethon/MTProto'dan FARQLI
+      — bu HTTPS, lekin domen oq ro'yxatda emas). Shuning uchun bu ham
+      (Telethon kabi) FAQAT production'da (Railway) haqiqiy so'rov bilan
+      tasdiqlanishi kerak.
+    - Tekshirildi (mock, tarjima funksiyasi soxta javob bilan): kirill
+      matn uchun `translate.to_uz()` chaqirilishi VA natija captionda
+      to'g'ri chiqishi; lotin/ingliz matn uchun `translate.to_uz()`
+      UMUMAN chaqirilmasligi (AssertionError otadigan qilib sinaldi);
+      ikkalasida ham captionda "🔗"/havola YO'QLIGI tasdiqlandi.
+      `test_tracker.py` 9/9 — o'zgarmadi.

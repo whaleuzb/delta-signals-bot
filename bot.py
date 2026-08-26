@@ -46,6 +46,7 @@ import parsing
 import stats
 import tgsource
 import tracker
+import translate
 import vision
 
 logging.basicConfig(
@@ -4151,10 +4152,14 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # savdo-tegishli" mezoni sifatida ishlatiladi. Tikersiz hashtag (masalan
 # #geopolitika) ham `db.market_hashtags` orqali admin panelda qo'shilsa —
 # grafiksiz, matn-only post qilinadi (chunki chizadigan tiker yo'q).
-# Tarjima ham qilinmaydi — xabar QANDAY kelsa (odatda ruscha) shundayligicha
-# postlanadi. Bu SEC/Upbit quvuridan (`_process_news_event`, AI tahlilga
-# bog'liq) butunlay MUSTAQIL — ular hali ham AI kerak, faqat MarketTwits AI'siz.
+# Tarjima — AI'siz, `translate.py` (MyMemory, bepul/kalitsiz) orqali.
+# Faqat matnda KIRILL harflar bo'lsa tarjima qilinadi (kanal aralash —
+# ba'zan inglizcha/o'zbekcha postlar ham bo'ladi, ularni "ru->uz" juftligi
+# orqali qayta tarjima qilish natijani buzardi). Bu SEC/Upbit quvuridan
+# (`_process_news_event`, AI tahlilga bog'liq) butunlay MUSTAQIL — ular
+# hali ham AI kerak, faqat MarketTwits AI'siz.
 _HASHTAG_RE = re.compile(r"#(\w+)")
+_CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
 
 
 async def _markettwits_symbol(text: str) -> tuple[str | None, str | None]:
@@ -4196,16 +4201,22 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
             event_at=event_at, posted=True)
         return
 
+    display_text = text
+    if _CYRILLIC_RE.search(text):
+        translated = await translate.to_uz(text)
+        if translated:
+            display_text = translated
+
     eid = await db.insert_news_event(
         source="markettwits", external_key=external_key, symbol=symbol, market=market,
-        headline_en=text[:2000], translation_uz=None, insight_uz=None,
-        event_at=event_at, posted=False)
+        headline_en=text[:2000],
+        translation_uz=display_text[:2000] if display_text != text else None,
+        insight_uz=None, event_at=event_at, posted=False)
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
 
     title = symbol or "MarketTwits"
-    caption = (f"📰 <b>{html.escape(title)}</b>\n\n{html.escape(text[:1000])}\n\n"
-              f"🔗 <a href=\"https://t.me/{channel}/{msg_id}\">MarketTwits</a>")
+    caption = f"📰 <b>{html.escape(title)}</b>\n\n{html.escape(display_text[:1000])}"
 
     # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan
     # narsa yo'q — matn-only post, jonli yangilanishsiz (narx kuzatilmaydi).
