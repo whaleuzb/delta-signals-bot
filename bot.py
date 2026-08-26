@@ -4910,6 +4910,8 @@ async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    log.info("DIAGNOSTIKA: TZ=%s ECON_DIGEST_HOUR=%s NEWS_CHANNEL_ID_bormi=%s",
+             config.TZ, config.ECON_DIGEST_HOUR, bool(config.NEWS_CHANNEL_ID))
     await app.bot.set_my_commands([
         ("start", "Bosh menyu"),
         ("new", "Yangi signal (sehrgar)"),
