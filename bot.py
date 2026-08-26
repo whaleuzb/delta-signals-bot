@@ -4163,11 +4163,20 @@ _CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
 
 
 async def _markettwits_symbol(text: str) -> tuple[str | None, str | None]:
-    for tag in _HASHTAG_RE.findall(text):
-        symbol, market = await _resolve_news_symbol(tag)
-        if symbol:
-            return symbol, market
-    return None, None
+    """Faqat BIRINCHI hashtag tekshiriladi — MarketTwits doim asosiy
+    tikerni birinchi qo'yadi, keyingilari mavzu-teglar (masalan
+    "#hisobot", "#geopolitika"). Avval HAMMA hashtagni ketma-ket sinash
+    xato chiqargan edi: birinchi tiker (masalan "#BE" — Bloom Energy)
+    vaqtinchalik xato (Twelve Data tezlik chegarasi) sabab RESOLVE
+    bo'lmay qolsa, ikkinchi, ALOQASIZ hashtag ("#cot") tasodifan boshqa
+    (kripto) tikerga to'g'ri kelib, NOTO'G'RI grafik chizilardi
+    (foydalanuvchi production'da tasdiqladi: "COTUSDT" chiqqan, aslida
+    Bloom Energy haqida edi). Endi mos kelmasa — post umuman
+    qilinmaydi, noto'g'ri grafik chizilishidan ko'ra shu yaxshiroq."""
+    tags = _HASHTAG_RE.findall(text)
+    if not tags:
+        return None, None
+    return await _resolve_news_symbol(tags[0])
 
 
 async def _markettwits_matches_topic(text: str) -> bool:

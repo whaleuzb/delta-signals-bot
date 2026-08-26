@@ -2419,3 +2419,25 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - Tekshirildi (mock): caption'da "#BTC"/"#новости" kabi hashtaglar
       ENDI YO'QLIGI, faqat sarlavha+tarjima qilingan matn qolishi
       tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+95. **MarketTwits: noto'g'ri tikerga moslashish tuzatildi — faqat
+    BIRINCHI hashtag tekshiriladi.** Foydalanuvchi production'da real
+    misol keltirdi: "#BE #cot" (Bloom Energy haqidagi xabar) —
+    kanalga **"COTUSDT"** (kripto!) grafigi bilan postlangan, garchi
+    matn Bloom Energy (NYSE: BE) aksiya opsionlari haqida bo'lsa ham.
+    - **Sabab**: `_markettwits_symbol()` HAMMA hashtagni ketma-ket
+      sinardi. Birinchi ("BE" — to'g'ri tiker) ehtimol vaqtinchalik xato
+      (Twelve Data tezlik chegarasi — `poll_job` signal kuzatuvi allaqachon
+      shu limitni faol band qilib turadi, loglarda "Twelve Data rate
+      limit — kutamiz" muntazam ko'rinadi) sabab RESOLVE bo'lmay qoldi,
+      shunda funksiya ALOQASIZ ikkinchi hashtag "cot"ga o'tib, u
+      tasodifan haqiqiy kripto tikeriga (COTUSDT) to'g'ri kelib qoldi.
+    - **Tuzatish**: endi faqat BIRINCHI hashtag tekshiriladi (MarketTwits
+      konventsiyasi — asosiy tiker doim birinchi, keyingilari mavzu-teg:
+      "#hisobot", "#geopolitika" kabi). Birinchi hashtag RESOLVE bo'lmasa
+      — post UMUMAN qilinmaydi, ALOQASIZ hashtagga sakrab NOTO'G'RI
+      grafik chizishdan ko'ra shu xavfsizroq.
+    - Tekshirildi (mock): "#BE #cot" holatida "BE" muvaffaqiyatsiz
+      bo'lganda ENDI "cot"ga o'tmasligi (symbol=None qaytishi) VA "BE"
+      muvaffaqiyatli bo'lganda to'g'ri ishlashi ikkalasi ham tasdiqlandi.
+      `test_tracker.py` 9/9 — o'zgarmadi.
