@@ -1742,3 +1742,48 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       KEYIN — aynan foydalanuvchi skrinshotidagi holat) bilan PNG qayta
       chizildi — profil endi to'liq/boy chiqdi, aniq "node"lar ko'rinadi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+
+76. **Signal grafigi (`_render()`) — "pozitsiya izi" uslubi, qisqa
+    ikonka-yorliqlar, kattaroq bo'sh joy.**
+    - Foydalanuvchi productionda TLMUSDT signal grafigi skrinshotini
+      yubordi: "Entry 0.00157" kabi yorliqlar shamlar ustiga tushib,
+      "chartga aralashib ketyabti" (aralashib/xalaqit berib). Ikkinchi
+      referens sifatida boshqa botning dizaynini ko'rsatdi — so'zsiz,
+      faqat kirish/chiqish nuqtalarida ikonka (uchburchak) belgilar,
+      shamlar ustida to'g'ridan-to'g'ri.
+    - **Yorliqlar qisqartirildi, ikonkaga almashtirildi** (foydalanuvchi
+      "so'zlar o'rniga ikonkalar bo'lsa ham roziman" dedi): "Entry X" →
+      "● X", "SL X" → "✕ X", "TPn X" → "▲n X" — matplotlib STANDART
+      shrifti (DejaVu Sans) qo'llab-quvvatlaydigan oddiy geometrik
+      belgilar ishlatildi (emoji EMAS — 🎯🛑 kabi rangli emoji matplotlib
+      standart renderida ko'pincha "bo'sh katakcha" bo'lib chiqadi,
+      shrift qo'llab-quvvatlamasa).
+    - **Bo'sh joy kattalashtirildi** (`right_pad`: `len(candles)*0.10` →
+      `*0.45`, ham `_render()`da ham `news_chart()`da) — foydalanuvchi
+      "chart yana ham orqaroqqa surish kerak, hozirgi shamni ramka
+      markaziga chiqarish kerak" dedi. Natijada oxirgi/joriy sham ramka
+      markaziga ANCHA yaqinroq chiqadi, yorliqlar esa keng bo'sh joyda
+      shamlarga tegmasdan joylashadi.
+    - **"Pozitsiya izi" (position trace)**: YOPILGAN savdolarda (`entry_idx`
+      ma'lum bo'lganda — `signal_chart()` `opened_at`dan hisoblaydi, xuddi
+      `exit_idx` qanday topilsa shunday) kirish endi BUTUN KENGLIKDAGI
+      chiziq+yorliq EMAS — aynan o'sha shamning USTIGA yo'nalishga mos
+      uchburchak belgi qo'yiladi (LONG — "^" yuqoriga, SHORT — "v" pastga;
+      chiqish belgisi teskari yo'nalishda, xuddi shu andozada, allaqachon
+      bor edi). Natijada kirish→chiqish "iz"i shamlar ustida ko'rinadi —
+      referens dizaynga o'xshash. Hali OCHILMAGAN signalda (`setup_chart`,
+      `entry_idx=None`) — kirish shami yo'q, shuning uchun avvalgidek
+      butun kenglikdagi chiziq+qisqa yorliq qoladi (yagona mantiqiy variant).
+      SL/TP chiziqlari HAR IKKALA holatda ham qoladi (ochiq/yopiq) — bular
+      rejalashtirilgan darajalar, savdo holatidan qat'iy nazar foydali.
+    - Chiqish annotatsiyasidan ham "Chiqish" so'zi olib tashlandi — endi
+      faqat narx+foiz (masalan "518  (+6.80%)").
+    - Tekshirildi: uchta stsenariy (yopilgan savdo — kirish/chiqish
+      uchburchaklar bilan, hali ochilmagan — kirish chizig'i bilan,
+      news_chart) uchun haqiqiy PNG chizildi va vizual ko'zdan kechirildi —
+      yorliqlar endi shamlardan aniq ajratilgan, joriy sham markazga
+      yaqinroq, uchburchak belgilar to'g'ri yo'nalish va joyda chiqdi.
+      `bot.py` `chart.signal_chart()`/`setup_chart()`/`news_chart()`ni
+      FAQAT yuqori darajadagi funksiyalar orqali chaqiradi (`_render()`ga
+      to'g'ridan-to'g'ri murojaat qilmaydi) — imzo o'zgarishi `bot.py`ga
+      butunlay ta'sir qilmadi. `test_tracker.py` 9/9 — o'zgarmadi.

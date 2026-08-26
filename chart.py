@@ -154,7 +154,8 @@ def _draw_volume_profile(ax, candles, lo: float, hi: float,
 def _render(candles, *, header: str, side: str, entry: float, sl: float,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
-            bot_username: str | None, tf: str, note: str | None) -> io.BytesIO:
+            bot_username: str | None, tf: str, note: str | None,
+            entry_idx: int | None = None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
@@ -173,38 +174,52 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     _draw_candles(ax, candles, hi, lo)
 
     # Oxirgi shamdan keyin bo'sh joy — savdo platformalaridagi kabi ("right
-    # offset"). Shamlar o'ng chekkaga taqalib qolmaydi va daraja yorliqlari
-    # aynan shu bo'sh joyga tushadi, ya'ni narx harakatini to'smaydi. Undan
-    # KEYIN — alohida, doimiy ko'rinadigan hajm profili zonasi (o'ng
-    # chekkaning o'ziga tirab chizilgan gorizontal ustunlar). Grafik shu
-    # ikkalasi bilan birga to'liqroq/markazlashganroq ko'rinsin deb bo'sh
-    # joy avvalgidan bir oz qisqartirildi.
-    right_pad = max(6.0, len(candles) * 0.10)
+    # offset"), YIRIKROQ qilingan (0.10 -> 0.45): joriy sham ramka
+    # markaziga yaqinroq chiqishi, yorliqlar esa shamlar bilan ustma-ust
+    # tushmasligi uchun (foydalanuvchi: "yozuvlar chartga aralashib
+    # ketyabti", "hozirgi shamni ramka markaziga chiqarish kerak"). Undan
+    # KEYIN — alohida, doimiy ko'rinadigan hajm profili zonasi.
+    right_pad = max(10.0, len(candles) * 0.45)
     vp_width = max(10.0, len(candles) * 0.22)
     gap_end = len(candles) - 1 + right_pad
     x_max = gap_end + vp_width
     _draw_volume_profile(ax, candles, lo, hi, vp_left=gap_end, vp_right=x_max)
 
+    # Yorliqlar QISQA — so'z o'rniga belgi (Entry ●, SL ✕, TP ▲{n}) —
+    # "Entry 0.00157" o'rniga "● 0.00157" kabi (foydalanuvchi so'zlarni
+    # ikonkaga almashtirishga rozi bo'ldi).
     def hline(y, color, label, ls="--", lw=1.3, alpha=1.0):
         ax.axhline(y, color=color, lw=lw, ls=ls, alpha=alpha, zorder=1)
-        ax.text(gap_end - right_pad * 0.08, y, label, color=color, fontsize=9,
+        ax.text(gap_end - right_pad * 0.06, y, label, color=color, fontsize=8.5,
                 fontweight="bold", va="center", ha="right", zorder=6,
-                bbox=dict(facecolor=BG, edgecolor="none", alpha=0.72, pad=1.6))
+                bbox=dict(facecolor=BG, edgecolor="none", alpha=0.72, pad=1.4))
 
-    hline(entry, ACC, f"Entry {_fmt(entry)}")
-    hline(sl, RED, f"SL {_fmt(sl)}", alpha=0.85)
+    # Kirish: agar ANIQ qaysi shamda ochilgani ma'lum bo'lsa (yopilgan
+    # savdo) — "pozitsiya izi" uslubida, o'sha shamning O'ZIGA yo'nalish
+    # ko'rsatkichi (uchburchak) qo'yiladi, butun kenglikdagi chiziq/yorliq
+    # YO'Q (TradingView referensidagi kabi — kirish/chiqish nuqtalari
+    # to'g'ridan-to'g'ri shamlar ustida). Hali OCHILMAGAN (setup) signalda
+    # kirish shami yo'q — o'sha holda avvalgidek butun kenglikdagi chiziq.
+    if entry_idx is not None:
+        entry_marker = "^" if side == "LONG" else "v"
+        ax.scatter([entry_idx], [entry], marker=entry_marker, color=ACC, s=85,
+                   zorder=5, edgecolor=BG, linewidth=1.3)
+    else:
+        hline(entry, ACC, f"● {_fmt(entry)}")
+    hline(sl, RED, f"✕ {_fmt(sl)}", alpha=0.85)
     for n, tp in enumerate(tps, start=1):
         hit = n <= tp_hit
-        hline(tp, GREEN, f"TP{n} {_fmt(tp)}", alpha=1.0 if hit else 0.4,
+        hline(tp, GREEN, f"▲{n} {_fmt(tp)}", alpha=1.0 if hit else 0.4,
               ls="--" if hit else ":")
 
     if exit_idx is not None and exit_price is not None:
         exit_col = GREEN if (pnl or 0) >= 0 else RED
-        ax.scatter([exit_idx], [exit_price], color=exit_col, s=70, zorder=5,
-                   edgecolor=BG, linewidth=1.5)
+        exit_marker = "v" if side == "LONG" else "^"
+        ax.scatter([exit_idx], [exit_price], marker=exit_marker, color=exit_col,
+                   s=85, zorder=5, edgecolor=BG, linewidth=1.3)
         pnl_txt = f"{pnl:+.2f}%" if pnl is not None else ""
         ax.annotate(
-            f"  Chiqish {_fmt(exit_price)}  ({pnl_txt})", xy=(exit_idx, exit_price),
+            f"  {_fmt(exit_price)}  ({pnl_txt})", xy=(exit_idx, exit_price),
             xytext=(0, -22 if side == "LONG" else 18), textcoords="offset points",
             color=exit_col, fontsize=10, fontweight="bold", ha="center",
         )
@@ -420,6 +435,12 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         closed_ms = int(closed_at.timestamp() * 1000)
         exit_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - closed_ms))
 
+    # Kirish shami — "pozitsiya izi" uslubi uchun: kirish TO'LIQ KENGLIKDAGI
+    # chiziq o'rniga aynan shu shamning ustiga qo'yilgan belgi bilan
+    # ko'rsatiladi (`_render()`ga qarang).
+    opened_ms = int(opened_at.timestamp() * 1000)
+    entry_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - opened_ms))
+
     return _render(
         candles, header=f"#{sig['id']} {sig['symbol']}", side=sig["side"],
         entry=float(sig["entry"]), sl=float(sig["sl_initial"]),
@@ -427,6 +448,7 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         exit_idx=exit_idx, exit_price=exit_price,
         pnl=sig["pnl_pct"], r=sig["r_multiple"],
         ws_name=ws_name, bot_username=bot_username, tf=tf, note=None,
+        entry_idx=entry_idx,
     )
 
 
@@ -462,10 +484,11 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
                 textcoords="offset points", color=ACC, fontsize=10,
                 fontweight="bold", ha="center")
 
-    # Sham blokidan keyin bo'sh joy, so'ng — doimiy hajm profili zonasi
-    # (BUTUN ko'rinadigan oyna bo'yicha, `_render()` bilan bir xil
-    # andozada — pastdagi `_draw_volume_profile` izohiga qarang).
-    right_pad = max(6.0, len(candles) * 0.10)
+    # Sham blokidan keyin bo'sh joy (kattalashtirildi — `_render()`dagi
+    # bilan bir xil sabab: joriy sham ramka markaziga yaqinroq chiqsin),
+    # so'ng — doimiy hajm profili zonasi (BUTUN ko'rinadigan oyna bo'yicha,
+    # pastdagi `_draw_volume_profile` izohiga qarang).
+    right_pad = max(10.0, len(candles) * 0.45)
     vp_width = max(10.0, len(candles) * 0.22)
     gap_end = len(candles) - 1 + right_pad
     x_max = gap_end + vp_width
