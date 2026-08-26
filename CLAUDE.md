@@ -2061,3 +2061,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       Tekshirildi: haqiqiy PNG chizilib (qizil — LONG ustun stsenariysi),
       belgi/chiziq/yorliq rangi to'g'ri RED chiqishi vizual tasdiqlandi;
       to'liq mock-zanjir qayta ishga tushirildi. `test_tracker.py` 9/9.
+
+84. **Jonli yangilanish "umuman ishlamaydi" — HAQIQIY sabab topildi va
+    tuzatildi (83-band'dagi "deploy vaqti" taxmini YETARLI emas edi).**
+    - Foydalanuvchi 83-banddagi tuzatishdan KEYIN ham, oraliqda faqat
+      BITTA deploy bo'lgan holda, "rasmlar yangilanmayabti" deb yana
+      xabar berdi — bu deploy-vaqti taxminini yetarsiz qildi, chunki bu
+      qadar kam deploy fonida muammo shunchalik tez-tez qaytmasligi kerak.
+    - Haqiqiy sabab: Python hujjatlariga ko'ra `asyncio.create_task()`
+      event loop'da qaytgan Task obyektiga faqat KUCHSIZ (weak) referens
+      saqlaydi — chaqiruvchi natijani hech qayerda ushlab turmasa, Python
+      uni ISHLASH DAVOMIDA, hech qanday xato bermay, kutilmagan payt
+      "garbage collect" qilib yuborishi mumkin. `bot.py`da to'rtta joyda
+      (`_process_news_event`, `_process_surge_candidate`,
+      `_process_liquidation_spike`, `/charttest`) xuddi shu xato bor
+      edi — qaytgan Task hech qayerga saqlanmagan.
+    - Tuzatish: modul darajasida `_background_tasks: set[asyncio.Task]`
+      to'plami va `_spawn_background(coro)` yordamchisi qo'shildi — Task
+      to'plamda KUCHLI referens sifatida ushlab turiladi, tugagach
+      `add_done_callback` orqali o'zi to'plamdan chiqib ketadi. Barcha
+      to'rtta `asyncio.create_task(_live_update(...))` chaqiruvi
+      `_spawn_background(_live_update(...))`ga almashtirildi.
+    - Tekshirildi: standalone skriptda `_spawn_background` mexanizmi
+      ishlashi tasdiqlandi (vazifa ishlayotganda to'plamda BOR, `gc.collect()`
+      chaqirilsa ham tirik qoladi, tugagach to'plamdan avtomatik chiqadi).
+      `test_tracker.py` 9/9 — o'zgarmadi (bu kod `tracker.py`ga tegmaydi).
+      Production'da deploy tasdiqlandi.
