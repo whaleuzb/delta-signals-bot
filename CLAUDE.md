@@ -1674,3 +1674,55 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       Tekshirildi (mock): `/charttest TSLA` → `stocks.resolve` orqali
       topildi, `tf="1h"` bilan chaqirildi, bazada `market='stock'`
       yozildi; topilmaydigan tiker bilan aniq xato xabari qaytdi.
+
+75. **Barcha grafiklarga (signal, News Trade AI, /charttest) doimiy
+    Anchored Volume Profile qo'shildi.**
+    - Foydalanuvchi TradingView'dan misol rasm yubordi: shamlardan keyin
+      bo'sh joy, so'ng grafik pane'ning O'NG CHEKKASIGA tirab, ICHKARIGA
+      qarab o'sadigan (kattaroq hajm — uzunroq ustun) gorizontal ustunlar
+      zonasi — anchor nuqtadan (o'sha rasmda "NEWS") buyon narx darajalari
+      bo'yicha hajm taqsimoti. Aynan shu format takrorlandi.
+    - **Hajm ma'lumoti yo'q edi**: `exchange.Candle`/`forex.Candle`da
+      (`stocks.Candle = forex.Candle`) `volume` maydoni umuman yo'q edi.
+      Ikkalasiga ham `volume: float = 0.0` default bilan qo'shildi (eski
+      pozitsion `Candle(...)` chaqiruvlari — testlarda, `tracker.py`da
+      ham — buzilmadi). `exchange.klines()` MEXC kline massividan `k[5]`ni
+      o'qiydi; `forex.time_series()` Twelve Data javobidagi `"volume"`
+      kalitini (bor bo'lsa) o'qiydi — YO'Q bo'lsa (forex — markazlashtirilmagan
+      bozor, ko'pincha hajm yo'q) `0.0`, AVP shunda shunchaki chizilmaydi
+      (yolg'on "hajm 0" ko'rsatishdan ko'ra to'g'rirog'i).
+    - **`chart.py`**: yangi umumiy `_draw_anchored_vp(ax, candles, anchor_idx,
+      lo, hi, vp_left, vp_right)` — `anchor_idx`dan OXIRIGACHA bo'lgan
+      shamlarning hajmini 60 ta narx-bin'ga taqsimlaydi, har bir bin uchun
+      `vp_right` chekkasiga tirab, ICHKARIGA (`vp_left` tomon) o'sadigan
+      `barh` chizadi; uzunlik VA shaffoflik (alpha) ikkalasi ham nisbiy
+      hajmga qarab o'zgaradi (ko'proq savdo qilingan narx — uzunroq VA
+      yorqinroq). Yangi `VP_COLOR` (oltin/amber) — shamlardan (yashil/
+      qizil) va ACC (kumush, Entry chizig'i)dan ANIQ ajralib turishi uchun.
+      `_render()`/`news_chart()` ikkalasida ham `right_pad`dan KEYIN,
+      ALOHIDA doimiy zona sifatida (`vp_width`, "chartni o'rtaroqqa surish"
+      — bo'sh joy avvalgidan bir oz qisqartirilib, o'rniga shu zona
+      qo'shildi, natijada grafik butunligi to'liqroq/markazlashganroq
+      ko'rinadi). Daraja yorliqlari (`Entry`/`SL`/`TP`) endi `gap_end`ga
+      (VP zonasidan OLDIN) bog'langan — avval ular `x_max`ga bog'liq edi,
+      VP zonasi qo'shilgach ular VP ustiga tushib qolardi.
+    - **Anchor nuqtasi grafik turiga qarab**: `news_chart()` — `news_idx`
+      (News/Portlash belgisi, allaqachon bor edi). `signal_chart()` —
+      YANGI hisoblanadigan `entry_idx` (kirish shami, `exit_idx` qanday
+      topilsa xuddi shunday — `opened_at`ga eng yaqin `close_ms`).
+      `setup_chart()` (hali OCHILMAGAN signal — kirish shami yo'q) — anchor
+      berilmaydi, `_render()` ichida `0`ga (butun ko'rinadigan oyna) tushadi.
+      `mini_chart()`ga ATAYLAB TEGILMADI — bu sham chizmaydi, faqat kichik
+      chiziq (320×110, ro'yxat kartochkasi uchun soddalashtirilgan grafik,
+      docstring'ida "o'q ham, yozuv ham yo'q" deb ATAYLAB loyihalangan) —
+      AVP tushunchasi bu yerda strukturaviy jihatdan qo'llanmaydi.
+    - Tekshirildi: sun'iy shamlar (tasodifiy narx + tanlangan narx
+      zonalarida 3x ko'proq hajm) bilan haqiqiy PNG chizildi va vizual
+      ko'zdan kechirildi — `news_chart()` va `_render()` (Entry/SL/TP/
+      Chiqish bilan) ikkalasida ham VP zonasi to'g'ri joyda, yorliqlar
+      VP bilan ustma-ust tushmadi, "node" (ko'p savdo qilingan narx)
+      joylarida ustunlar aniq uzunroq/yorqinroq chiqdi — TradingView
+      namunasiga o'xshash natija. `_process_news_event`/`_process_surge_candidate`/
+      `/charttest` to'liq zanjirlari (avvalgi bosqichlarda yozilgan mock
+      skriptlar) qayta ishga tushirilib tekshirildi — buzilish yo'q.
+      `test_tracker.py` 9/9 — o'zgarmadi.

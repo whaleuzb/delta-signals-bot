@@ -35,6 +35,7 @@ GREEN = "#26a69a"
 RED = "#ef5350"
 ACC = "#DADDE2"     # kumush — kirish darajasi chizig'i
 SILVER = "#8a8f99"
+VP_COLOR = "#d4a636"    # kumush emas, mo''jaz oltin — hajm profili shamlardan ajralib turishi uchun
 
 # Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
 TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
@@ -102,10 +103,52 @@ def _draw_candles(ax, candles, hi: float, lo: float) -> None:
                                 edgecolor=col, lw=0, zorder=3))
 
 
+def _draw_anchored_vp(ax, candles, anchor_idx: int, lo: float, hi: float,
+                      vp_left: float, vp_right: float) -> None:
+    """Anchored Volume Profile — `anchor_idx` shamidan (kirish/News/Portlash
+    nuqtasi) OXIRIGACHA bo'lgan hajmning narx darajalari bo'yicha taqsimoti,
+    savdo platformalaridagi kabi o'ng chekkaga tirab, ichkariga qarab
+    o'sadigan gorizontal ustunlar bilan. `_render()`/`news_chart()`
+    ikkalasida ham ishlatiladi — grafik doim shu chapqirog'da (o'ng chetda)
+    ko'rinsin uchun ATAYLAB alohida, mustaqil "zona" (candle'lardan keyingi
+    bo'sh joydan SO'NG), ular bilan aralashib ketmasligi uchun.
+
+    Hajm ma'lumoti yo'q bo'lsa (masalan forex — markazlashtirilmagan bozor,
+    Twelve Data ko'pincha 0/yo'q qaytaradi) HECH NARSA chizilmaydi — bo'sh
+    zona qoldirish, "hajm 0" degan yolg'on taassurot berishdan yaxshiroq."""
+    segment = candles[max(0, min(anchor_idx, len(candles) - 1)):]
+    if not segment:
+        return
+    total_vol = sum(c.volume for c in segment)
+    if total_vol <= 0:
+        return
+    n_bins = 60
+    bin_size = (hi - lo) / n_bins or 1.0
+    bins = [0.0] * n_bins
+    for c in segment:
+        idx = int((c.close - lo) / bin_size)
+        idx = max(0, min(n_bins - 1, idx))
+        bins[idx] += c.volume
+    peak = max(bins) or 1.0
+    width_span = vp_right - vp_left
+    for i, v in enumerate(bins):
+        if v <= 0:
+            continue
+        frac = v / peak
+        y0 = lo + i * bin_size
+        w = frac * width_span
+        # Alpha ham hajmga qarab o'zgaradi — ko'p savdo qilingan narxlar
+        # (nodalar) yorqinroq, kamlari xiraroq ko'rinadi (gradient taassurot).
+        ax.barh(y0 + bin_size / 2, w, height=bin_size * 0.96, left=vp_right - w,
+                color=VP_COLOR, alpha=0.22 + 0.5 * frac, zorder=0.5,
+                edgecolor="none")
+
+
 def _render(candles, *, header: str, side: str, entry: float, sl: float,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
-            bot_username: str | None, tf: str, note: str | None) -> io.BytesIO:
+            bot_username: str | None, tf: str, note: str | None,
+            entry_idx: int | None = None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
@@ -125,13 +168,21 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
 
     # Oxirgi shamdan keyin bo'sh joy — savdo platformalaridagi kabi ("right
     # offset"). Shamlar o'ng chekkaga taqalib qolmaydi va daraja yorliqlari
-    # aynan shu bo'sh joyga tushadi, ya'ni narx harakatini to'smaydi.
-    right_pad = max(8.0, len(candles) * 0.14)
-    x_max = len(candles) - 1 + right_pad
+    # aynan shu bo'sh joyga tushadi, ya'ni narx harakatini to'smaydi. Undan
+    # KEYIN — alohida, doimiy ko'rinadigan Anchored Volume Profile zonasi
+    # (o'ng chekkaning o'ziga tirab chizilgan gorizontal ustunlar).
+    # Grafik shu ikkalasi bilan birga to'liqroq/markazlashganroq ko'rinsin
+    # deb bo'sh joy avvalgidan bir oz qisqartirildi.
+    right_pad = max(6.0, len(candles) * 0.10)
+    vp_width = max(10.0, len(candles) * 0.22)
+    gap_end = len(candles) - 1 + right_pad
+    x_max = gap_end + vp_width
+    _draw_anchored_vp(ax, candles, entry_idx if entry_idx is not None else 0,
+                      lo, hi, vp_left=gap_end, vp_right=x_max)
 
     def hline(y, color, label, ls="--", lw=1.3, alpha=1.0):
         ax.axhline(y, color=color, lw=lw, ls=ls, alpha=alpha, zorder=1)
-        ax.text(x_max - right_pad * 0.08, y, label, color=color, fontsize=9,
+        ax.text(gap_end - right_pad * 0.08, y, label, color=color, fontsize=9,
                 fontweight="bold", va="center", ha="right", zorder=6,
                 bbox=dict(facecolor=BG, edgecolor="none", alpha=0.72, pad=1.6))
 
@@ -364,6 +415,11 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         closed_ms = int(closed_at.timestamp() * 1000)
         exit_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - closed_ms))
 
+    # Anchored Volume Profile — savdo OCHILGAN nuqtadan (kirish shami)
+    # YOPILGUNGA qadar bo'lgan hajm taqsimoti, xuddi "News" belgisi kabi.
+    opened_ms = int(opened_at.timestamp() * 1000)
+    entry_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - opened_ms))
+
     return _render(
         candles, header=f"#{sig['id']} {sig['symbol']}", side=sig["side"],
         entry=float(sig["entry"]), sl=float(sig["sl_initial"]),
@@ -371,6 +427,7 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         exit_idx=exit_idx, exit_price=exit_price,
         pnl=sig["pnl_pct"], r=sig["r_multiple"],
         ws_name=ws_name, bot_username=bot_username, tf=tf, note=None,
+        entry_idx=entry_idx,
     )
 
 
@@ -406,8 +463,15 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
                 textcoords="offset points", color=ACC, fontsize=10,
                 fontweight="bold", ha="center")
 
-    right_pad = max(8.0, len(candles) * 0.14)
-    x_max = len(candles) - 1 + right_pad
+    # Sham blokidan keyin bo'sh joy, so'ng — doimiy Anchored Volume Profile
+    # zonasi (News/Portlash nuqtasidan buyon hajm taqsimoti), `_render()`
+    # bilan bir xil andozada (pastdagi izohga qarang).
+    right_pad = max(6.0, len(candles) * 0.10)
+    vp_width = max(10.0, len(candles) * 0.22)
+    gap_end = len(candles) - 1 + right_pad
+    x_max = gap_end + vp_width
+    _draw_anchored_vp(ax, candles, news_idx, lo, hi, vp_left=gap_end, vp_right=x_max)
+
     ax.set_xlim(-1.5, x_max)
     ax.set_ylim(lo, hi)
     ax.grid(True, color=GRID, lw=0.6, alpha=0.6)

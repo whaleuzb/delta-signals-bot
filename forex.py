@@ -28,6 +28,7 @@ class Candle:
     low: float
     close: float
     close_ms: int
+    volume: float = 0.0
 
 
 def enabled() -> bool:
@@ -153,8 +154,14 @@ async def time_series(api_symbol: str, start_ms: int, limit: int = 500,
         open_ms = int(ts.timestamp() * 1000)
         if open_ms < start_ms:
             continue
+        # "volume" — aksiyada odatda bor, forexda ko'pincha yo'q/0 (markazlashtirilmagan
+        # bozor — yagona "hajm" tushunchasi yo'q). Yo'q bo'lsa 0 — Anchored Volume
+        # Profile shunda chizilmaydi (pastga qarang), boshqa hech narsa buzilmaydi.
+        vol_raw = row.get("volume")
+        volume = float(vol_raw) if vol_raw not in (None, "") else 0.0
         out.append(Candle(open_ms, float(row["open"]), float(row["high"]),
-                           float(row["low"]), float(row["close"]), open_ms + dur - 1))
+                           float(row["low"]), float(row["close"]), open_ms + dur - 1,
+                           volume))
     out.sort(key=lambda c: c.open_ms)
     return out
 

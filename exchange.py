@@ -27,6 +27,7 @@ class Candle:
     low: float
     close: float
     close_ms: int
+    volume: float = 0.0
 
 
 async def valid_symbols() -> set[str]:
@@ -110,8 +111,12 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
     out = []
     for k in r.json():
         open_ms = int(k[0])
+        # k[5] — sham hajmi (baza aktivda, masalan BTC, USDT'da emas). Hajm
+        # profili (Anchored Volume Profile) uchun ishlatiladi — narx emas,
+        # shuning uchun MEXC/Binance formatidagi joylashuvi barqaror.
+        volume = float(k[5]) if len(k) > 5 else 0.0
         out.append(Candle(open_ms, float(k[1]), float(k[2]), float(k[3]), float(k[4]),
-                          open_ms + dur - 1))
+                          open_ms + dur - 1, volume))
     return out
 
 
