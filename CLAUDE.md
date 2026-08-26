@@ -2323,3 +2323,23 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       UMUMAN chaqirilmasligi (AssertionError otadigan qilib sinaldi);
       ikkalasida ham captionda "🔗"/havola YO'QLIGI tasdiqlandi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+
+91. **Tarjima haqiqiy ishlatilganda 429 (juda ko'p so'rov) bilan
+    rad etayotgani aniqlandi va tuzatildi.** Foydalanuvchi ekran
+    skrinshotini yubordi — real kanal posti to'g'ri tarjima qilingan
+    (birinchi so'rov), lekin keyingi (`/tg_test`) so'rov ruscha holida
+    qoldi. Production loglarida sabab aniq: `httpx.HTTPStatusError:
+    429 Too Many Requests` — MyMemory'ning email'siz (kalitsiz) so'rov
+    chegarasi tez tugab qolar ekan.
+    - MyMemory hujjatiga ko'ra so'rovga ISTALGAN email qo'shilsa
+      (tasdiqlanishi shart EMAS) kunlik limit sezilarli ko'tariladi —
+      `config.TRANSLATE_EMAIL` (standart: loyihaga xos umumiy manzil,
+      foydalanuvchining shaxsiy emaili EMAS — shunday so'ralgan/tanlangan).
+      `translate.py`da har bir so'rovga `de=<email>` parametri qo'shildi.
+    - Qo'shimcha: 429 kelsa 3 soniya kutib BIR MARTA qayta uriniladi
+      (vaqtinchalik tirbandlikni yengish uchun — doimiy limit tugashini
+      "davolamaydi", faqat burst holatlarda yordam beradi).
+    - Tekshirildi (mock, soxta HTTP javob bilan): birinchi so'rov 429
+      qaytarsa, IKKINCHI (qayta) so'rov muvaffaqiyatli natija berishi va
+      HAR IKKALA so'rovda ham `de` parametri to'g'ri qo'shilgani
+      tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.

@@ -148,3 +148,10 @@ TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", "")
 TELEGRAM_NEWS_CHANNELS = [
     c.strip() for c in os.getenv("TELEGRAM_NEWS_CHANNELS", "markettwits").split(",") if c.strip()
 ]
+
+# `translate.py` (MyMemory) — kalitsiz so'rov tez-tez 429 (juda ko'p
+# so'rov) bilan rad etilardi (production loglarida tasdiqlangan). MyMemory
+# hujjatiga ko'ra so'rovga ISTALGAN email qo'shilsa (tasdiqlanishi shart
+# EMAS) kunlik limit ~50,000 so'zgacha ko'tariladi. Shaxsiy email emas —
+# faqat shu loyiha uchun umumiy/tasodifiy manzil.
+TRANSLATE_EMAIL = os.getenv("TRANSLATE_EMAIL", "newstradeai.bot@tradecontroller.app")
