@@ -4086,6 +4086,10 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Jonli hodisalar ro'yxati olinmadi")
         return
 
+    if any(row["source"] == "liquidation" for row in rows):
+        log.info("DIAGNOSTIKA news_live_job: %d faol qator, likvidatsiya: %s",
+                 len(rows), [(r["id"], r["symbol"], r["message_id"]) for r in rows if r["source"] == "liquidation"])
+
     for row in rows:
         try:
             rendered = await _news_render(
@@ -4097,6 +4101,8 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.warning("Jonli grafik yasalmadi (%s)", row["symbol"], exc_info=True)
             continue
         if rendered is None:
+            if row["source"] == "liquidation":
+                log.info("DIAGNOSTIKA: likvidatsiya (id=%s %s) uchun rendered=None", row["id"], row["symbol"])
             continue
         photo, live_pct = rendered
 
@@ -4104,6 +4110,16 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         kb_rows = list(buttons.inline_keyboard) if buttons else []
         kb_rows.append([_share_button(row["message_id"])])
         buttons = InlineKeyboardMarkup(kb_rows)
+
+        if row["source"] == "liquidation":
+            _edit_ok = await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
+                                               photo, buttons, row["caption"])
+            log.info("DIAGNOSTIKA: likvidatsiya (id=%s %s msg=%s) tahrirlash natijasi=%s",
+                     row["id"], row["symbol"], row["message_id"], _edit_ok)
+            deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
+            if now >= deadline:
+                await db.finalize_news_outcome(row["id"], live_pct)
+            continue
 
         await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
                                 photo, buttons, row["caption"])
