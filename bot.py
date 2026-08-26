@@ -14,6 +14,7 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 from PIL import Image
 
@@ -492,7 +493,8 @@ def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
     # News Trade AI kanaliga havola — sozlanmagan bo'lsa (NEWS_CHANNEL_ID
     # bo'sh) butun funksiya o'chiq, tugma ham chiqmaydi.
     if config.NEWS_CHANNEL_ID:
-        rows.append([InlineKeyboardButton("📰 News Trade AI", url="https://t.me/newstradeuz")])
+        rows.append([InlineKeyboardButton("📰 News Trade AI",
+                                          url=f"https://t.me/{NEWS_CHANNEL_USERNAME}")])
     url = web_page_url(ws)
     if url:
         # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram uni
@@ -3698,6 +3700,45 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # bor). Kripto birinchi — News Trade AI'ning asosiy auditoriyasi shu.
 NEWS_MARKETS = (("crypto", exchange), ("stock", stocks), ("forex", forex))
 
+# Kanalning ochiq (public) username'i — "Do'stlarga yuborish" tugmasi va
+# bosh menyudagi "News Trade AI" havolasi shundan foydalanadi. `NEWS_CHANNEL_ID`
+# (Railway o'zgaruvchisi) faqat RAQAMLI chat id — postlash uchun yetarli,
+# lekin `t.me/...` ochiq havola qurish uchun username kerak (u o'zgarmasa
+# kerak, shuning uchun qattiq yozilgan — `mexc_ref_url`dan farqli, bu
+# botning o'z identifikatori, tashqi referal havolasi emas).
+NEWS_CHANNEL_USERNAME = "newstradeuz"
+
+
+def _share_button(message_id: int) -> InlineKeyboardButton:
+    """Telegram'ning rasmiy "share" chuqur-havolasi (`t.me/share/url?url=...`)
+    — bosilganda foydalanuvchiga ICHKI Telegram chat tanlash oynasi ochiladi,
+    o'sha aynan shu postni istalgan chatga/do'stiga OLDINGA yuboradi. Bot
+    tomonidan qo'shimcha kod YOZILMAYDI — Telegram'ning o'zi bajaradi,
+    faqat postning ochiq havolasi (`t.me/<kanal>/<message_id>`) kerak."""
+    post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{message_id}"
+    share_url = "https://t.me/share/url?" + urlencode({"url": post_url})
+    return InlineKeyboardButton("↗️ Do'stlarga yuborish", url=share_url)
+
+
+async def _add_share_button(bot_, chat_id, message_id: int,
+                            buttons: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
+    """Postni yuborgandan KEYIN chaqiriladi — havola `message_id`ga
+    bog'liq, u esa faqat `send_photo`/`send_message` qaytargandan so'ng
+    ma'lum bo'ladi (tugmani boshidanoq qo'shib bo'lmaydi). Shuning uchun
+    avval ODDIY tugmalar bilan postlanadi, so'ng shu funksiya "Do'stlarga
+    yuborish"ni qo'shib, xabarni DARHOL tahrirlaydi — foydalanuvchi buni
+    sezmaydi (bir necha soniya ham o'tmaydi)."""
+    rows = list(buttons.inline_keyboard) if buttons else []
+    rows.append([_share_button(message_id)])
+    full = InlineKeyboardMarkup(rows)
+    try:
+        await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
+    except Exception:
+        log.warning("Do'stlarga yuborish tugmasi qo'shilmadi (msg=%s)", message_id,
+                    exc_info=True)
+        return buttons if buttons else InlineKeyboardMarkup([])
+    return full
+
 
 async def cmd_ref_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """/refhavola — FAQAT super-admin. News Trade AI/surge postlaridagi
@@ -3818,6 +3859,7 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
         log.exception("Yangilik kanalga postlanmadi (%s)", item["external_key"])
         return
     await db.set_news_message(eid, sent.message_id)
+    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
     # Faqat grafikli xabar jonli yangilanadi — matn-only xabarda yangilanadigan
     # narsa yo'q (tiker topilmagan, ya'ni narx ham kuzatib bo'lmaydi).
@@ -4154,6 +4196,7 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         log.exception("Hajm portlashi postlanmadi (%s)", symbol)
         return
     await db.set_news_message(eid, sent.message_id)
+    buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
     if photo and live_pct is not None:
         asyncio.create_task(_live_update(
@@ -4252,6 +4295,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if eid is not None:
         await db.set_news_message(eid, sent.message_id)
+        buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
         asyncio.create_task(_live_update(
             ctx.bot, eid, symbol, market, now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf=tf, before_ms=before_ms, label="Sinov",

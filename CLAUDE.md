@@ -1790,12 +1790,49 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 
 77. **Bosh menyuga "News Trade AI" tugmasi qo'shildi.**
     - `main_menu_kb()` — Statistika/Ochiq signallar qatoridan keyin, `url=
-      "https://t.me/newstradeuz"` bilan URL tugma (channel havolasi
-      to'g'ridan-to'g'ri, callback emas — Telegram kanalni ICHKI menyuda
-      ocha olmaydi). Boshqa News Trade AI qismlari bilan bir xil andoza:
-      `config.NEWS_CHANNEL_ID` bo'sh bo'lsa tugma UMUMAN chiqmaydi (funksiya
-      o'chiq bo'lsa reklama ham chiqmasin). Havola qattiq yozilgan (mexc_ref_url
-      kabi `bot_settings`ga chiqarilmadi) — sabab: bu referal/pul havolasi
-      emas, botning o'z kanal identifikatori, tez-tez o'zgarmaydi (mexc_ref_url
-      esa foydalanuvchi tez-tez yangilashi mumkin bo'lgan tashqi referal
+      f"https://t.me/{NEWS_CHANNEL_USERNAME}"` bilan URL tugma (channel
+      havolasi to'g'ridan-to'g'ri, callback emas — Telegram kanalni ICHKI
+      menyuda ocha olmaydi). Boshqa News Trade AI qismlari bilan bir xil
+      andoza: `config.NEWS_CHANNEL_ID` bo'sh bo'lsa tugma UMUMAN chiqmaydi
+      (funksiya o'chiq bo'lsa reklama ham chiqmasin). Havola qattiq yozilgan
+      (mexc_ref_url kabi `bot_settings`ga chiqarilmadi) — sabab: bu referal/
+      pul havolasi emas, botning o'z kanal identifikatori, tez-tez
+      o'zgarmaydi (mexc_ref_url esa foydalanuvchi tez-tez yangilashi mumkin
+      bo'lgan tashqi referal
       havolasi, shuning uchun u admin buyruq bilan sozlanadigan qilingan edi).
+
+78. **News Trade AI/surge/`/charttest` postlariga "↗️ Do'stlarga yuborish"
+    tugmasi qo'shildi.**
+    - Telegram'ning RASMIY "share" chuqur-havolasidan foydalanildi:
+      `https://t.me/share/url?url=<postning ochiq havolasi>` — bosilganda
+      Telegram o'zi ICHKI chat-tanlash oynasini ochadi, foydalanuvchi
+      istalgan do'stiga/guruhga OLDINGA yuboradi. Botda HECH QANDAY
+      qo'shimcha logika (forward buyrug'i, inline mode va h.k.) YOZILMADI —
+      bu to'liq Telegram'ning tayyor mexanizmi, faqat to'g'ri havola
+      qurish kifoya.
+    - **Arxitekturaviy qiyinchilik**: postning ochiq havolasi
+      (`t.me/<kanal>/<message_id>`) `message_id`ga muhtoj, u esa faqat
+      `send_photo`/`send_message` QAYTARGANDAN keyin ma'lum bo'ladi —
+      ya'ni boshidanoq (`reply_markup=` bilan birga yuborishda) bu
+      tugmani qo'sha olmaymiz. Yechim: yangi `_add_share_button(bot_,
+      chat_id, message_id, buttons)` — post yuborilgach DARHOL
+      chaqiriladi, mavjud tugmalarga ("Savdo qilish"/"Jurnalga kiritish")
+      yangisini qo'shib, `edit_message_reply_markup` bilan xabarni
+      tahrirlaydi (foydalanuvchi buni sezmaydi — bir necha millisoniya).
+      Barcha uchta postlash joyida (`_process_news_event`,
+      `_process_surge_candidate`, `cmd_charttest`) ishlatiladi; qaytgan
+      YANGILANGAN `buttons` keyin `_live_update()`ga `reply_markup=`
+      sifatida uzatiladi — aks holda birinchi jonli tahrirlashda
+      "Do'stlarga yuborish" tugmasi yo'qolib qolardi (73-bandda
+      hujjatlashtirilgan `edit_message_media` xatti-harakati bilan bir xil
+      sabab).
+    - Yangi `NEWS_CHANNEL_USERNAME = "newstradeuz"` konstantasi — kanal
+      ochiq (public) username'i, `t.me/...` havola qurish uchun (raqamli
+      `NEWS_CHANNEL_ID`dan farqli — u faqat postlash uchun). Bosh
+      menyudagi "News Trade AI" tugmasi (77-band) ham shu konstantaga
+      o'tkazildi — ikki joyda bir xil qiymat yozilmasligi uchun.
+    - Tekshirildi (mock, real Postgres bilan): `/charttest btc` to'liq
+      zanjiri — post yuborilgach `edit_message_reply_markup` chaqirilgani,
+      oxirgi tugma matni va havolasi (`https://t.me/share/url?url=
+      https%3A%2F%2Ft.me%2Fnewstradeuz%2F<message_id>` — to'g'ri
+      URL-encode bilan) tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
