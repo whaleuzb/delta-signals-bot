@@ -1725,4 +1725,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       namunasiga o'xshash natija. `_process_news_event`/`_process_surge_candidate`/
       `/charttest` to'liq zanjirlari (avvalgi bosqichlarda yozilgan mock
       skriptlar) qayta ishga tushirilib tekshirildi — buzilish yo'q.
+    - **DARHOL TUZATILDI (foydalanuvchi productionda skrinshot yubordi)**:
+      dastlabki versiya profilni FAQAT anchor nuqtasidan (News/Portlash/
+      Entry) OXIRIGACHA hisoblardi — "haqiqiy Anchored VP" semantikasi.
+      Amalda muammoli chiqdi: yangi post qilingan `/charttest`/News Trade AI
+      xabarida anchordan keyin hali 1-2 ta sham bo'lgani uchun profil
+      deyarli bo'sh/yupqa ko'rinardi ("nega bunaqa volume kam?").
+      Foydalanuvchi "avvalgi charti volumesini ham olish kerak" dedi —
+      shuning uchun `_draw_anchored_vp` → `_draw_volume_profile`ga
+      o'zgartirildi: endi ANCHORDAN QAT'IY NAZAR, GRAFIKDA KO'RINAYOTGAN
+      BARCHA shamlarning hajmi hisoblanadi (haqiqiy "Anchored" emas,
+      "Visible Range Volume Profile"ga yaqinroq). `_render()`dagi
+      `entry_idx` parametri va `signal_chart()`dagi hisoblash shu bilan
+      ORTIQCHA bo'lib qoldi — OLIB TASHLANDI (o'lik kod qoldirilmadi).
+      Tekshirildi: sun'iy stsenariy (60 sham anchordan OLDIN, FAQAT 2 ta
+      KEYIN — aynan foydalanuvchi skrinshotidagi holat) bilan PNG qayta
+      chizildi — profil endi to'liq/boy chiqdi, aniq "node"lar ko'rinadi.
       `test_tracker.py` 9/9 — o'zgarmadi.
