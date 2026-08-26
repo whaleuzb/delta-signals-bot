@@ -4053,6 +4053,64 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Hajm portlashi ishlanmadi (%s)", row["symbol"])
 
 
+async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/charttest TLM — FAQAT super-admin. News Trade AI jonli grafik
+    mexanizmini (post + har necha soniyada qayta chizish) haqiqiy tanga
+    bilan sinaydi — surge (hajm/pasayish) yoki SEC mantig'i ISHTIROKISIZ.
+    Doimiy diagnostika vositasi sifatida qoldirildi, foydalanuvchilar
+    ro'yxatiga (set_my_commands) ataylab qo'shilmagan."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /charttest TLM")
+        return
+    if not config.NEWS_CHANNEL_ID:
+        await update.message.reply_text("NEWS_CHANNEL_ID sozlanmagan.")
+        return
+
+    raw = ctx.args[0]
+    symbol = await exchange.resolve(raw)
+    if not symbol:
+        await update.message.reply_text(f"Tiker MEXC'da topilmadi: {html.escape(raw)}")
+        return
+
+    now = datetime.now(timezone.utc)
+    await update.message.reply_text(f"⏳ {symbol} — grafik chizilyapti...")
+    try:
+        rendered = await _news_render(symbol, "crypto", now, tf="1m",
+                                      before_ms=60 * 60_000, label="Sinov")
+    except Exception:
+        log.exception("charttest render xato (%s)", symbol)
+        rendered = None
+    if rendered is None:
+        await update.message.reply_text("Grafik chizib bo'lmadi — bu tikerda so'nggi shamlar topilmadi.")
+        return
+    photo, live_pct = rendered
+
+    external_key = f"test:{symbol}:{now.isoformat()}"
+    eid = await db.insert_news_event(
+        source="test", external_key=external_key, symbol=symbol, market="crypto",
+        headline_en=f"Manual chart test: {symbol}", translation_uz=None,
+        insight_uz=None, event_at=now, posted=False)
+
+    caption = f"🧪 <b>Sinov</b> — {html.escape(symbol)}\nHar {config.NEWS_REFRESH_SECONDS}s yangilanadi."
+    try:
+        sent = await ctx.bot.send_photo(
+            config.NEWS_CHANNEL_ID, InputFile(photo, "test.png"),
+            caption=caption, parse_mode=ParseMode.HTML)
+    except Exception:
+        log.exception("charttest post qilinmadi (%s)", symbol)
+        await update.message.reply_text("Kanalga postlab bo'lmadi (bot admin emasmi?).")
+        return
+    if eid is not None:
+        await db.set_news_message(eid, sent.message_id)
+        asyncio.create_task(_live_update(
+            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
+            sent.message_id, live_pct, tf="1m", before_ms=60 * 60_000, label="Sinov"))
+    await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -4126,6 +4184,7 @@ def main() -> None:
     # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
+    app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("hisobot", cmd_digest))
     app.add_handler(CommandHandler("sahifa", cmd_page))
     app.add_handler(CallbackQueryHandler(on_fix, pattern=r"^fix:"))
