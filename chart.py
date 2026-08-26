@@ -453,11 +453,15 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
 
 
 def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
-               label: str = "News") -> io.BytesIO:
+               label: str = "News", marker_color: str | None = None) -> io.BytesIO:
     """News Trade AI grafigi — Entry/SL/TP yo'q, faqat aynan qaysi shamdan
     yangilik (yoki boshqa hodisa — masalan hajm portlashi) chiqqanini
     ko'rsatuvchi belgi va joriy % o'zgarish. `label` shu belgi ostidagi
     matn — surge.py "Portlash" kabi boshqa so'z bilan ham ishlatadi.
+    `marker_color` — belgi (chiziq/nuqta/yorliq) rangi; berilmasa ACC
+    (kumush, standart). Likvidatsiya kabi ANIQ yo'nalishi bor hodisalar
+    uchun GREEN/RED beriladi (masalan long ustun bo'lsa RED — narx
+    pasaygani uchun).
 
     `_render()`dan ataylab ALOHIDA: u yerda entry/sl majburiy parametr va
     y-o'qi hisobiga kiradi — bu yerda ular umuman yo'q. Shamlarni chizish
@@ -474,14 +478,15 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
 
     _draw_candles(ax, candles, hi, lo)
 
+    mark_col = marker_color or ACC
     news_idx = max(0, min(news_idx, len(candles) - 1))
     news_price = candles[news_idx].close
     news_col = GREEN if live_pct >= 0 else RED
-    ax.axvline(news_idx, color=ACC, lw=1.1, ls="--", alpha=0.8, zorder=1)
-    ax.scatter([news_idx], [news_price], color=ACC, s=60, zorder=5,
+    ax.axvline(news_idx, color=mark_col, lw=1.1, ls="--", alpha=0.8, zorder=1)
+    ax.scatter([news_idx], [news_price], color=mark_col, s=60, zorder=5,
                edgecolor=BG, linewidth=1.3)
     ax.annotate(label, xy=(news_idx, news_price), xytext=(0, -20),
-                textcoords="offset points", color=ACC, fontsize=10,
+                textcoords="offset points", color=mark_col, fontsize=10,
                 fontweight="bold", ha="center")
 
     # Sham blokidan keyin bo'sh joy (kattalashtirildi — `_render()`dagi

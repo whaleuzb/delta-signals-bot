@@ -3875,7 +3875,8 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
 async def _news_render(symbol: str, market: str, event_at: datetime,
                        end_ms: int | None = None, tf: str = "1m",
                        before_ms: int | None = None,
-                       label: str = "News") -> tuple[io.BytesIO, float] | None:
+                       label: str = "News",
+                       marker_color: str | None = None) -> tuple[io.BytesIO, float] | None:
     """Hodisa vaqti atrofidagi shamlarni olib, `news_idx`ni topadi va grafik
     chizadi. `end_ms=None` — hozirgacha (jonli yangilanishda har safar
     o'sib boradigan oyna). Sham topilmasa `None` — chaqiruvchi shunda
@@ -3883,7 +3884,9 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
 
     `tf`/`before_ms`/`label` — News Trade AI (SEC) standart qiymatlarda
     ishlatadi (1m, 60 daqiqa oldin, "News"); `surge_scan_job` uzoqroq
-    oyna va boshqa yorliq bilan XUDDI SHU funksiyani qayta ishlatadi."""
+    oyna va boshqa yorliq bilan XUDDI SHU funksiyani qayta ishlatadi.
+    `marker_color` — `chart.news_chart()`ga o'zgarishsiz uzatiladi
+    (likvidatsiya uchun long/short ustunligiga qarab RED/GREEN)."""
     if before_ms is None:
         before_ms = 60 * chart.TF_MINUTES[tf] * 60_000   # hodisadan OLDIN 60 sham
     event_ms = int(event_at.timestamp() * 1000)
@@ -3902,7 +3905,8 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     anchor_price = candles[news_idx].close
     live_price = candles[-1].close
     live_pct = (live_price - anchor_price) / anchor_price * 100
-    return chart.news_chart(candles, news_idx, symbol, live_pct, label=label), live_pct
+    return chart.news_chart(candles, news_idx, symbol, live_pct, label=label,
+                            marker_color=marker_color), live_pct
 
 
 # Butun kanal uchun UMUMIY tezlik cheklovi: bir nechta hodisa parallel
@@ -3978,11 +3982,12 @@ async def _live_update(bot_, event_id: int, symbol: str, market: str,
                        live_pct: float, tf: str = "1m",
                        before_ms: int | None = None, label: str = "News",
                        reply_markup: InlineKeyboardMarkup | None = None,
-                       caption: str | None = None) -> None:
+                       caption: str | None = None,
+                       marker_color: str | None = None) -> None:
     """Postdan keyin `NEWS_LIVE_MINUTES` davomida narxni qayta tekshirib,
     grafikni yangilab turadi. Alohida, chegaralangan davomiylikdagi fon
     vazifasi — `job_queue` emas, chunki bu bitta HODISAGA tegishli, doimiy
-    global jadval emas. `tf`/`before_ms`/`label` — `_news_render`ga
+    global jadval emas. `tf`/`before_ms`/`label`/`marker_color` — `_news_render`ga
     o'zgarishsiz uzatiladi (surge_scan_job boshqa oyna bilan chaqiradi).
     `reply_markup`/`caption` — postdagi tugmalar va tagidagi matnni har
     bir tahrirlashda qayta uzatish uchun (aks holda `_paced_media_edit`
@@ -3992,7 +3997,8 @@ async def _live_update(bot_, event_id: int, symbol: str, market: str,
         await asyncio.sleep(config.NEWS_REFRESH_SECONDS)
         try:
             rendered = await _news_render(symbol, market, event_at, tf=tf,
-                                          before_ms=before_ms, label=label)
+                                          before_ms=before_ms, label=label,
+                                          marker_color=marker_color)
         except Exception:
             log.warning("Jonli grafik yasalmadi (%s)", symbol, exc_info=True)
             continue
@@ -4288,12 +4294,15 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     # majburan sotilgan), SHORT ko'p yopilsa narx KO'TARILGANDA (shortlar
     # majburan sotib olingan) likvidatsiya bo'ladi.
     side_total = spike.long_usd + spike.short_usd
+    marker_color = None
     if side_total > 0 and spike.long_usd >= spike.short_usd:
         long_pct = spike.long_usd / side_total * 100
         direction_line = f"📉 Asosan <b>LONG</b> yopildi ({long_pct:.0f}%) — narx pasaygan bo'lishi mumkin"
+        marker_color = chart.RED
     elif side_total > 0:
         short_pct = spike.short_usd / side_total * 100
         direction_line = f"📈 Asosan <b>SHORT</b> yopildi ({short_pct:.0f}%) — narx ko'tarilgan bo'lishi mumkin"
+        marker_color = chart.GREEN
     else:
         direction_line = ""
 
@@ -4307,7 +4316,8 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     liq_before_ms = 4 * 3_600_000   # 4 soat, 1m shamlarda
     try:
         rendered = await _news_render(symbol, "crypto", now, tf="1m",
-                                      before_ms=liq_before_ms, label="Likvidatsiya")
+                                      before_ms=liq_before_ms, label="Likvidatsiya",
+                                      marker_color=marker_color)
     except Exception:
         log.warning("Likvidatsiya grafigi yasalmadi (%s)", symbol, exc_info=True)
         rendered = None
@@ -4334,7 +4344,8 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
         asyncio.create_task(_live_update(
             ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf="1m", before_ms=liq_before_ms,
-            label="Likvidatsiya", reply_markup=buttons, caption=caption))
+            label="Likvidatsiya", reply_markup=buttons, caption=caption,
+            marker_color=marker_color))
 
 
 async def liquidation_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:

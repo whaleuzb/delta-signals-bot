@@ -2049,3 +2049,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       matnida "🔴 Long: $4,000,000   🟢 Short: $3,000,000" va "📉 Asosan
       LONG yopildi (57%)" qatorlari to'g'ri chiqishi tasdiqlandi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+    - **Grafikdagi belgi rangi ham qo'shildi** ("stikerlar bo'lsin,
+      likvidatsiyada qizil yashil"): `chart.news_chart()`ga yangi
+      `marker_color: str | None = None` parametri — berilmasa avvalgidek
+      ACC (kumush, SEC/Upbit/Portlash/Sinov uchun o'zgarishsiz). Likvidatsiya
+      uchun `_process_liquidation_spike()` LONG ustun bo'lsa `chart.RED`,
+      SHORT ustun bo'lsa `chart.GREEN` hisoblab, buni `_news_render()` va
+      `_live_update()` orqali OXIRIGACHA (jonli yangilanish davomida ham
+      BARQAROR — narx o'zgarsa ham rang o'zgarmaydi, chunki yo'nalish
+      likvidatsiya PAYTIDA aniqlangan, joriy narxdan emas) uzatadi.
+      Tekshirildi: haqiqiy PNG chizilib (qizil — LONG ustun stsenariysi),
+      belgi/chiziq/yorliq rangi to'g'ri RED chiqishi vizual tasdiqlandi;
+      to'liq mock-zanjir qayta ishga tushirildi. `test_tracker.py` 9/9.
