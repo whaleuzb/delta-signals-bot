@@ -3770,9 +3770,18 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO) -
         if wait > 0:
             await asyncio.sleep(wait)
         try:
+            # MUHIM: bu yerga tayyor InputFile emas, XOM BytesIO uzatiladi.
+            # InputMediaPhoto o'zi ichida parse_file_input(..., attach=True)
+            # chaqirib, faylni "attach://" havolasi bilan to'g'ri bog'laydi —
+            # lekin FAQAT o'zi bytes/file obyektini o'rasa. Agar oldindan
+            # InputFile() bilan o'ralgan bo'lsa, parse_file_input uni
+            # o'zgarishsiz qaytaradi va `attach=True` HECH QACHON qo'llanmaydi
+            # — natijada Telegram "Can't parse inputmedia: media not found"
+            # deb rad etadi (send_photo'da muammo yo'q, chunki u butunlay
+            # boshqa yo'l bilan yuklaydi).
             await bot_.edit_message_media(
                 chat_id=chat_id, message_id=message_id,
-                media=InputMediaPhoto(InputFile(photo, "news.png")))
+                media=InputMediaPhoto(photo, filename="news.png"))
             ok = True
         except RetryAfter as e:
             log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
