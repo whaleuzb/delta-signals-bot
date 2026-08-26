@@ -1660,3 +1660,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       → `exchange.resolve` muvaffaqiyatsiz → `stocks.resolve` muvaffaqiyatli
       → `stocks.klines` mock → grafik bilan post, bazada `market='stock'`,
       `symbol='BA'`. `test_tracker.py` 9/9 — o'zgarmadi.
+    - **`/charttest` ham kriptoga cheklanmasin deb kengaytirildi**:
+      foydalanuvchi `/charttest TSLA` sinab ko'rganda avvalgi versiya
+      faqat `exchange.resolve` (MEXC)ni chaqirardi va "Tiker MEXC'da
+      topilmadi: TSLA" deb chalg'ituvchi javob berardi — aslida TSLA
+      MEXC'da yo'q, lekin aksiya sifatida ishlashi kerak edi. Endi
+      `cmd_charttest` xuddi haqiqiy yangilik pipeline'i ishlatadigan
+      `_resolve_news_symbol()` orqali kripto→aksiya→forex bo'ylab
+      qidiradi. Market kripto bo'lmasa (aksiya/forex bozori yopiq
+      bo'lishi mumkin — kecha/dam olish kuni) `tf`/`before_ms` ham
+      `surge_scan_job`dagidek kengroq oynaga (1h, 4 kun) o'tkaziladi,
+      aks holda oxirgi 60 daqiqada hech qanday 1m sham topilmasdi.
+      Tekshirildi (mock): `/charttest TSLA` → `stocks.resolve` orqali
+      topildi, `tf="1h"` bilan chaqirildi, bazada `market='stock'`
+      yozildi; topilmaydigan tiker bilan aniq xato xabari qaytdi.

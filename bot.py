@@ -4177,9 +4177,12 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """/charttest TLM — FAQAT super-admin. News Trade AI jonli grafik
-    mexanizmini (post + har necha soniyada qayta chizish) haqiqiy tanga
-    bilan sinaydi — surge (hajm/pasayish) yoki SEC mantig'i ISHTIROKISIZ.
+    """/charttest TLM (yoki TSLA, EURUSD) — FAQAT super-admin. News Trade AI
+    jonli grafik mexanizmini (post + har necha soniyada qayta chizish)
+    haqiqiy tiker bilan sinaydi — surge (hajm/pasayish) yoki SEC mantig'i
+    ISHTIROKISIZ. Tiker `NEWS_MARKETS` bo'yicha kripto/aksiya/forex
+    orasida avtomatik topiladi (xuddi haqiqiy yangilik pipeline'idagi
+    kabi `_resolve_news_symbol` orqali) — faqat kriptoga cheklanmagan.
     Doimiy diagnostika vositasi sifatida qoldirildi, foydalanuvchilar
     ro'yxatiga (set_my_commands) ataylab qo'shilmagan."""
     uid = update.effective_user.id
@@ -4193,32 +4196,42 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     raw = ctx.args[0]
-    symbol = await exchange.resolve(raw)
+    symbol, market = await _resolve_news_symbol(raw)
     if not symbol:
-        await update.message.reply_text(f"Tiker MEXC'da topilmadi: {html.escape(raw)}")
+        await update.message.reply_text(
+            f"Tiker topilmadi (kripto/aksiya/forex — hech birida): {html.escape(raw)}")
         return
 
+    # Kripto 24/7 savdo qiladi — oxirgi 60 daqiqa yetarli. Aksiya/forex
+    # bozori yopiq bo'lishi mumkin (kecha/dam olish kuni) — 1m sham
+    # oxirgi 60 daqiqada umuman bo'lmasligi mumkin, shuning uchun
+    # surge_scan_job'dagi kabi kengroq oyna (1h, 4 kun) ishlatiladi —
+    # bu oxirgi savdo sessiyasini deyarli har doim qamrab oladi.
+    tf, before_ms = ("1m", 60 * 60_000) if market == "crypto" else ("1h", 4 * 86_400_000)
+
     now = datetime.now(timezone.utc)
-    await update.message.reply_text(f"⏳ {symbol} — grafik chizilyapti...")
+    await update.message.reply_text(f"⏳ {symbol} ({market}) — grafik chizilyapti...")
     try:
-        rendered = await _news_render(symbol, "crypto", now, tf="1m",
-                                      before_ms=60 * 60_000, label="Sinov")
+        rendered = await _news_render(symbol, market, now, tf=tf,
+                                      before_ms=before_ms, label="Sinov")
     except Exception:
         log.exception("charttest render xato (%s)", symbol)
         rendered = None
     if rendered is None:
-        await update.message.reply_text("Grafik chizib bo'lmadi — bu tikerda so'nggi shamlar topilmadi.")
+        await update.message.reply_text(
+            "Grafik chizib bo'lmadi — bu tikerda so'nggi shamlar topilmadi "
+            "(bozor yopiq bo'lishi ham mumkin).")
         return
     photo, live_pct = rendered
 
     external_key = f"test:{symbol}:{now.isoformat()}"
     eid = await db.insert_news_event(
-        source="test", external_key=external_key, symbol=symbol, market="crypto",
+        source="test", external_key=external_key, symbol=symbol, market=market,
         headline_en=f"Manual chart test: {symbol}", translation_uz=None,
         insight_uz=None, event_at=now, posted=False)
 
     caption = f"🧪 <b>Sinov</b> — {html.escape(symbol)}\nHar {config.NEWS_REFRESH_SECONDS}s yangilanadi."
-    buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
+    buttons = await _signal_buttons(symbol, market, ctx.bot.username)
     try:
         sent = await ctx.bot.send_photo(
             config.NEWS_CHANNEL_ID, InputFile(photo, "test.png"),
@@ -4227,7 +4240,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("charttest post qilinmadi — tarmoq (%s)", symbol)
         await update.message.reply_text(
             "⏱ Tarmoq vaqtincha javob bermadi (Telegram/Railway orasida uzilish). "
-            "Qayta urinib ko'ring: /charttest " + symbol)
+            "Qayta urinib ko'ring: /charttest " + raw)
         return
     except Exception:
         log.exception("charttest post qilinmadi (%s)", symbol)
@@ -4236,8 +4249,8 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if eid is not None:
         await db.set_news_message(eid, sent.message_id)
         asyncio.create_task(_live_update(
-            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
-            sent.message_id, live_pct, tf="1m", before_ms=60 * 60_000, label="Sinov",
+            ctx.bot, eid, symbol, market, now, config.NEWS_CHANNEL_ID,
+            sent.message_id, live_pct, tf=tf, before_ms=before_ms, label="Sinov",
             reply_markup=buttons))
     await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
 
