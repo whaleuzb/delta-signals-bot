@@ -141,7 +141,7 @@ async def exchange_listing_scan(exchange: str, since: datetime) -> list[dict]:
     `_process_news_event()` orqali o'TMAYDI."""
     url = EXCHANGE_LISTING_URLS[exchange]
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             r = await client.get(url, headers={
                 "User-Agent": "Mozilla/5.0 (compatible; TradeControllerBot/1.0)",
                 "Accept": "application/json",
