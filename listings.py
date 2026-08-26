@@ -147,6 +147,8 @@ async def exchange_listing_scan(exchange: str, since: datetime) -> list[dict]:
                 "Accept": "application/json",
             })
             r.raise_for_status()
+            log.info("%s javobi: url=%s status=%s len=%s body=%r",
+                     exchange, r.url, r.status_code, len(r.content), r.text[:300])
             data = r.json()
     except Exception:
         log.warning("%s listinglari olinmadi", exchange, exc_info=True)
