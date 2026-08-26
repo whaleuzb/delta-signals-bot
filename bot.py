@@ -4154,8 +4154,6 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 EXCHANGE_LISTING_SCANNERS = {
     "Binance": listings.binance_scan,
-    "Coinbase": listings.coinbase_scan,
-    "Kraken": listings.kraken_scan,
 }
 
 

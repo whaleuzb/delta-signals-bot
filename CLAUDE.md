@@ -2573,3 +2573,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
     - **Coinbase/Kraken endpoint'lari hali production'da sinalmagan** —
       keyingi deploy loglarida tasdiqlanishi kerak (Binance'dan farqli,
       bular ENDPOINT NOMI TAXMIN qilingan, browser orqali tasdiqlanmagan).
+
+99. **Coinbase/Kraken taxmini production'da SINALDI VA NOTO'G'RI chiqdi —
+    ikkalasi ham kod bazasidan OLIB TASHLANDI, faqat Binance qoldi.**
+    #98'dagi taxmin ikki bosqichda tekshirildi (Railway logi):
+    - 1-urinish: `httpx.AsyncClient(follow_redirects=True)` YO'Q holda
+      `/coinbase-new-coins` va `/kraken-new-coins` — ikkalasi ham
+      **301 Moved Permanently** qaytardi (`raise_for_status()` buni ham
+      xato deb hisoblaydi). `follow_redirects=True` qo'shib qayta
+      deploy qilindi.
+    - 2-urinish: redirect endi ergashildi, lekin javob TANASI BO'SH —
+      `JSONDecodeError: Expecting value`. Sababni aniqlash uchun
+      vaqtinchalik `log.info(url/status/len/body)` qo'shildi, qayta
+      deploy qilindi — natija: ikkalasi ham `.../404` manziliga redirect
+      bo'lib, saytning STANDART Rails 404 HTML sahifasini qaytargan
+      ekan. Xulosa: `/coinbase-new-coins` va `/kraken-new-coins`
+      MANZILLARI UMUMAN MAVJUD EMAS — cryptocurrencyalerting.com'da
+      Binance uchungina shu naqshdagi ochiq endpoint bor, Coinbase/
+      Kraken uchun YO'Q (ehtimol ular boshqa mexanizm — masalan faqat
+      to'lovli Trader reja/webhook — talab qiladi).
+    - Tuzatish: `listings.py`dagi `EXCHANGE_LISTING_URLS`dan Coinbase/
+      Kraken o'chirildi (faqat Binance qoldi), `coinbase_scan()`/
+      `kraken_scan()` o'rovchilari va vaqtinchalik diagnostika logi
+      olib tashlandi. `bot.py`dagi `EXCHANGE_LISTING_SCANNERS`dan ham
+      ikkalasi o'chirildi — endi faqat Binance skanerlanadi (avvalgi
+      per-birja try/except arxitekturasi tufayli bu ham bitta qatorlik
+      o'zgarish bo'ldi).
+    - **Saboq**: taxmin qilingan API manzillarini HAR DOIM production
+      logida haqiqiy javob (status+tana) bilan tekshirish kerak — "xato
+      chiqmasligi" (masalan 301) hali "ishlayapti" degani emas, chunki
+      httpx standart holatda redirectga ergashmaydi va uni xatoga
+      chiqaradi; ergashtirilgandan keyin ham natija haqiqiy JSON emas,
+      404 sahifa bo'lishi mumkin — shuning uchun status/tana matnini
+      ko'rmasdan "ishladi" deb xulosa chiqarib bo'lmaydi.

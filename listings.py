@@ -117,17 +117,13 @@ async def upbit_scan(since: datetime) -> list[dict]:
 # filtri kerak emas, tarjima ham shart emas — shablon matn yetarli).
 #
 # Foydalanuvchi so'radi: "coinbase va kreken ham shu sayt orqali olish
-# imkoni bormi?" — saytning BOSHQA sahifalari ("New Coinbase Listings",
-# "New Kraken Listings") ham xuddi shu naqshda (`/coinbase-new-coins`,
-# `/kraken-new-coins`) ishlaydi deb TAXMIN qilinmoqda — bu Binance
-# endpoint'i qanday tasdiqlanganidan FARQLI, HALI production'da
-# sinalmagan (domen sandbox'da bloklangan, faqat Railway'da tekshirish
-# mumkin edi — Binance uchun shu qilingan, Coinbase/Kraken ham xuddi
-# shunday keyingi deployda tasdiqlanadi).
+# imkoni bormi?" — SINALDI (production, Railway loglari): `/coinbase-
+# new-coins` va `/kraken-new-coins` bunday manzillar UMUMAN MAVJUD EMAS,
+# saytning o'zi ularni `/404` (Rails standart xato sahifasi)ga redirect
+# qiladi. Faqat Binance uchun shu naqshda haqiqiy endpoint bor —
+# Coinbase/Kraken shu sayt orqali OLINMAYDI.
 EXCHANGE_LISTING_URLS = {
     "Binance": "https://api.cryptocurrencyalerting.com/binance-new-coins",
-    "Coinbase": "https://api.cryptocurrencyalerting.com/coinbase-new-coins",
-    "Kraken": "https://api.cryptocurrencyalerting.com/kraken-new-coins",
 }
 
 
@@ -147,8 +143,6 @@ async def exchange_listing_scan(exchange: str, since: datetime) -> list[dict]:
                 "Accept": "application/json",
             })
             r.raise_for_status()
-            log.info("%s javobi: url=%s status=%s len=%s body=%r",
-                     exchange, r.url, r.status_code, len(r.content), r.text[:300])
             data = r.json()
     except Exception:
         log.warning("%s listinglari olinmadi", exchange, exc_info=True)
@@ -191,11 +185,3 @@ async def exchange_listing_scan(exchange: str, since: datetime) -> list[dict]:
 
 async def binance_scan(since: datetime) -> list[dict]:
     return await exchange_listing_scan("Binance", since)
-
-
-async def coinbase_scan(since: datetime) -> list[dict]:
-    return await exchange_listing_scan("Coinbase", since)
-
-
-async def kraken_scan(since: datetime) -> list[dict]:
-    return await exchange_listing_scan("Kraken", since)
