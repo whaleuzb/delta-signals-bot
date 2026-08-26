@@ -107,10 +107,10 @@ SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "15"))
 SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))
 
 # --- Yangi tanga listing e'lonlari: Koreys birjalari (Upbit) — kalitsiz,
-#     bepul "notices" API'si orqali. Bithumb HALI QO'SHILMAGAN — rasmiy
-#     notices manzili sandbox tarmog'ida tasdiqlanmadi (apidocs.bithumb.com
-#     bloklangan edi), keyinroq production loglaridan aniqlab qo'shiladi ---
-UPBIT_NOTICES_URL = "https://api-manager.upbit.com/api/v1/notices/search"
+#     bepul, manzili listings.py'da (DISCLOSURE_URL). Bithumb HALI
+#     QO'SHILMAGAN — rasmiy notices manzili sandbox tarmog'ida
+#     tasdiqlanmadi (apidocs.bithumb.com bloklangan edi), keyinroq
+#     production loglaridan aniqlab qo'shiladi ---
 
 # --- Yirik likvidatsiyalar: Coinalyze (bepul, lekin coinalyze.net'da
 #     ro'yxatdan o'tib olinadigan kalit kerak). Bo'sh bo'lsa funksiya
