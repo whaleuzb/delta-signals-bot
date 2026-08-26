@@ -243,6 +243,20 @@ CREATE TABLE IF NOT EXISTS econ_calendar_state (
     sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (kind, event_key)
 );
+
+-- Hajm portlashini kuzatish uchun tarix: har bir juftlikning 24 soatlik
+-- savdo hajmi davriy yozib boriladi (bot.py'dagi volume_snapshot_job).
+-- Bugungi hajmni O'TGAN kunlar bilan solishtirish uchun kerak — bitta
+-- so'nggi qiymatning o'zi "portladimi yo'qmi"ni bilib bo'lmaydi.
+-- PRIMARY KEY yo'q: sof vaqt qatori (append-only), eskilari
+-- volume_snapshot_job ichida davriy tozalanadi.
+CREATE TABLE IF NOT EXISTS volume_snapshots (
+    symbol      TEXT        NOT NULL,
+    volume      NUMERIC     NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_volume_snapshots_symbol_time
+    ON volume_snapshots(symbol, recorded_at);
 """
 
 
@@ -1011,3 +1025,48 @@ async def econ_mark_sent(kind: str, event_key: str) -> None:
         await c.execute(
             "INSERT INTO econ_calendar_state (kind, event_key) VALUES ($1,$2) "
             "ON CONFLICT (kind, event_key) DO NOTHING", kind, event_key)
+
+
+# ───────────────── Hajm portlashi (volume surge) ─────────────────
+
+async def insert_volume_snapshots(rows: list[tuple[str, float]]) -> None:
+    """`rows`: [(symbol, volume), ...] — bitta chaqiriqda barcha juftliklar.
+    Shu yerda ESKI yozuvlar ham tozalanadi (14 kundan katta) — alohida
+    tozalash job'i kerak emas, bu funksiya baribir har safar chaqiriladi."""
+    if not rows:
+        return
+    async with pool().acquire() as c:
+        async with c.transaction():
+            await c.executemany(
+                "INSERT INTO volume_snapshots (symbol, volume) VALUES ($1,$2)",
+                [(sym, _d(vol)) for sym, vol in rows])
+            await c.execute(
+                "DELETE FROM volume_snapshots WHERE recorded_at < now() - interval '14 days'")
+
+
+async def volume_surge_candidates(multiplier: float, exclude_hours: float,
+                                   min_snapshots: int = 3) -> list[asyncpg.Record]:
+    """Oxirgi hajm o'zining (`exclude_hours`dan OLDINGI) o'rtacha hajmidan
+    kamida `multiplier` marta katta bo'lgan juftliklar. `min_snapshots` —
+    ishonchli o'rtacha uchun tarixda kamida shuncha eski yozuv bo'lishi
+    kerak (aks holda bot yangi ishga tushgan bo'lishi mumkin, hali baza
+    yig'ilmagan — bunday holatda hech narsa qaytmaydi, xato ham emas)."""
+    q = """
+    WITH latest AS (
+        SELECT DISTINCT ON (symbol) symbol, volume AS latest_volume
+        FROM volume_snapshots
+        ORDER BY symbol, recorded_at DESC
+    ),
+    baseline AS (
+        SELECT symbol, AVG(volume) AS avg_volume, COUNT(*) AS n
+        FROM volume_snapshots
+        WHERE recorded_at < now() - ($1 || ' hours')::interval
+        GROUP BY symbol
+    )
+    SELECT l.symbol, l.latest_volume, b.avg_volume
+    FROM latest l JOIN baseline b ON b.symbol = l.symbol
+    WHERE b.n >= $2 AND b.avg_volume > 0 AND l.latest_volume > b.avg_volume * $3
+    ORDER BY (l.latest_volume / b.avg_volume) DESC
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier)

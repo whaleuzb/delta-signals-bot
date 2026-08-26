@@ -85,3 +85,20 @@ NEWS_LIVE_MINUTES = int(os.getenv("NEWS_LIVE_MINUTES", "20"))
 #     kabi NEWS_CHANNEL_ID kanaliga postlanadi (alohida kanal kerak emas) ---
 ECON_DIGEST_HOUR = int(os.getenv("ECON_DIGEST_HOUR", "12"))    # mahalliy vaqt (TZ)
 ECON_REMIND_MINUTES = int(os.getenv("ECON_REMIND_MINUTES", "15"))
+
+# --- Hajm portlashi (volume surge): uzoq pasaygan, keyin savdo hajmi
+#     keskin oshgan tangalarni topib, CryptoPanic'dan sababini qidiradi ---
+# CryptoPanic — tanga bo'yicha yangilik qidirish. Bo'sh bo'lsa qidiruv
+# o'chadi, lekin portlash SIGNALI o'zi baribir postlanadi (sababsiz).
+CRYPTOPANIC_TOKEN = os.getenv("CRYPTOPANIC_TOKEN", "")
+# Oxirgi hajm bazaviy o'rtachadan necha marta katta bo'lsa "portlash".
+SURGE_VOLUME_MULTIPLIER = float(os.getenv("SURGE_VOLUME_MULTIPLIER", "3"))
+# Bazaviy o'rtacha shu soatdan OLDINGI yozuvlardan hisoblanadi (oxirgi
+# hajmning o'zi bazaga aralashib ketmasin).
+SURGE_BASELINE_EXCLUDE_HOURS = float(os.getenv("SURGE_BASELINE_EXCLUDE_HOURS", "12"))
+# Uzoq muddatli pasayish tasdig'i: shuncha kun ichida kamida shuncha % pasaygan
+# bo'lishi kerak (aks holda "portlash" oddiy davom etayotgan o'sish bo'lishi mumkin).
+SURGE_DECLINE_DAYS = int(os.getenv("SURGE_DECLINE_DAYS", "30"))
+SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "25"))
+# Hajm suratga olish — har necha soatda (bazaga yozib borish).
+SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))

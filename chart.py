@@ -374,9 +374,12 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     )
 
 
-def news_chart(candles, news_idx: int, symbol: str, live_pct: float) -> io.BytesIO:
+def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
+               label: str = "News") -> io.BytesIO:
     """News Trade AI grafigi — Entry/SL/TP yo'q, faqat aynan qaysi shamdan
-    yangilik chiqqanini ko'rsatuvchi belgi va joriy % o'zgarish.
+    yangilik (yoki boshqa hodisa — masalan hajm portlashi) chiqqanini
+    ko'rsatuvchi belgi va joriy % o'zgarish. `label` shu belgi ostidagi
+    matn — surge.py "Portlash" kabi boshqa so'z bilan ham ishlatadi.
 
     `_render()`dan ataylab ALOHIDA: u yerda entry/sl majburiy parametr va
     y-o'qi hisobiga kiradi — bu yerda ular umuman yo'q. Shamlarni chizish
@@ -399,7 +402,7 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float) -> io.Bytes
     ax.axvline(news_idx, color=ACC, lw=1.1, ls="--", alpha=0.8, zorder=1)
     ax.scatter([news_idx], [news_price], color=ACC, s=60, zorder=5,
                edgecolor=BG, linewidth=1.3)
-    ax.annotate("News", xy=(news_idx, news_price), xytext=(0, -20),
+    ax.annotate(label, xy=(news_idx, news_price), xytext=(0, -20),
                 textcoords="offset points", color=ACC, fontsize=10,
                 fontweight="bold", ha="center")
 

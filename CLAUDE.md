@@ -1536,3 +1536,48 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       vaqtdagi ikkita hodisa BITTA guruh xabarida, 15 daqiqadan uzoqroq
       hodisa hali chiqarilmagan, `NEWS_CHANNEL_ID` bo'sh bo'lsa job hech
       narsa qilmaydi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+72. **Hajm portlashi (surge) — uzoq pasaygan, keyin hajmi keskin oshgan
+    tangalarni topib, CryptoPanic'dan sababini qidirish.**
+    Foydalanuvchi: "uzoq vaqtdan beri pasayib kelgan token birdaniga
+    savdo hajmi oshib ketishi va u bilan bog'liq yangilikni real vaqtda
+    qo'shsak-chi". Binance emas, **MEXC**da qolindi — Binance Futures
+    Railway hududini 451 bilan bloklagan (loyiha shu sabab MEXC'ga
+    o'tgan), va aynan shu funksiya uchun MEXC'da kichik tangalar ko'proq.
+    - **Sovuq boshlanish ochiq aytilgan**: "portladimi yo'qmi"ni bilish
+      uchun bot O'ZI hajm tarixini yig'ib borishi kerak (`volume_snapshots`,
+      har `SURGE_SNAPSHOT_HOURS` — standart 4 soat). Bot yangi ishga
+      tushgan kuni HECH NARSA aniqlanmaydi — bu kutilgan holat, xato emas.
+    - `exchange.ticker_24hr()` — MEXC'ning BITTA so'rovi BARCHA USDT
+      juftliklarining 24 soatlik hajmini beradi (minglab alohida so'rov
+      o'rniga). `db.volume_surge_candidates()` — bitta SQL bilan "oxirgi
+      hajm > bazaviy o'rtacha × multiplier" bo'lgan barcha nomzodlarni
+      qaytaradi (har juftlik uchun alohida so'rov emas).
+    - **Ikki bosqichli tekshiruv**: (1) hajm nomzodi arzon SQL so'rov bilan
+      topiladi, (2) FAQAT nomzodlar uchun kunlik shamlar so'raladi (`exchange.
+      klines(tf="1d")`) — uzoq muddatli pasayish (`SURGE_DECLINE_PCT`,
+      standart -25%/`SURGE_DECLINE_DAYS` kunda) TASDIQLANMASA (masalan bu
+      oddiy davom etayotgan o'sish edi) — post qilinmaydi VA bazaga
+      yozilmaydi (keyingi siklda yangi ma'lumot bilan qayta baholanishi
+      mumkin — `news_events.external_key` UNIQUE bilan dedup faqat
+      POST QILINGANDA ishga tushadi).
+    - `cryptonews.py` — CryptoPanic (`?currencies=TICKER`, bepul token,
+      `vision.py`/`news.py` andozasida ixtiyoriy). **Yangilik topilmasa
+      ham post ketadi** ("aniq sabab topilmadi — spekulyatsiya bo'lishi
+      mumkin") — kichik tanga portlashining aksariyati haqiqatan
+      yangiliksiz bo'ladi, bu botning KAMCHILIGI emas.
+    - `chart.news_chart()`ga `label` parametri qo'shildi ("News" ->
+      surge uchun "Portlash"); `_news_render()`/`_live_update()`ga
+      `tf`/`before_ms`/`label` — SEC standart qiymatlarda (1m, 60 daqiqa,
+      "News") ISHLAYVERADI, surge esa BOSHQA oyna bilan (1h, 4 kun oldin,
+      "Portlash") XUDDI SHU funksiyalarni qayta ishlatadi. `before_ms`
+      ataylab `_news_render`dagi `limit=200` chegarasidan ANCHA past
+      (4 kun = 96 sham) — aks holda so'ralgan oyna limitga sig'may,
+      "hozirgi" sham o'rniga eski shamda to'xtab qolardi.
+    - Tekshirildi (mock): to'liq zanjir (nomzod → pasayish tasdig'i →
+      CryptoPanic → grafik → post) ishladi; bir xil tanga/kun QAYTA
+      postlanmadi; pasayish tasdiqlanmasa POST HAM, BAZA YOZUVI HAM
+      bo'lmadi; yangilik topilmasa ham "spekulyatsiya" matni bilan
+      post ketdi. `volume_snapshot_job`/`surge_scan_job` tashqi
+      qatlamlari va `NEWS_CHANNEL_ID` bo'sh holati alohida tekshirildi.
+      `test_tracker.py` 9/9 — o'zgarmadi.

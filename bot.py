@@ -30,6 +30,7 @@ from telegram.ext import (
 
 import chart
 import config
+import cryptonews
 import db
 import econcalendar
 import exchange
@@ -3720,15 +3721,21 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
 
 
 async def _news_render(symbol: str, market: str, event_at: datetime,
-                       end_ms: int | None = None) -> tuple[io.BytesIO, float] | None:
+                       end_ms: int | None = None, tf: str = "1m",
+                       before_ms: int | None = None,
+                       label: str = "News") -> tuple[io.BytesIO, float] | None:
     """Hodisa vaqti atrofidagi shamlarni olib, `news_idx`ni topadi va grafik
     chizadi. `end_ms=None` — hozirgacha (jonli yangilanishda har safar
     o'sib boradigan oyna). Sham topilmasa `None` — chaqiruvchi shunda
-    matn-only xabarga qaytadi (yoki jonli yangilanishni o'tkazib yuboradi)."""
-    tf = "1m"
-    span_ms = 60 * chart.TF_MINUTES[tf] * 60_000   # hodisadan OLDIN 1 soatlik zaxira
+    matn-only xabarga qaytadi (yoki jonli yangilanishni o'tkazib yuboradi).
+
+    `tf`/`before_ms`/`label` — News Trade AI (SEC) standart qiymatlarda
+    ishlatadi (1m, 60 daqiqa oldin, "News"); `surge_scan_job` uzoqroq
+    oyna va boshqa yorliq bilan XUDDI SHU funksiyani qayta ishlatadi."""
+    if before_ms is None:
+        before_ms = 60 * chart.TF_MINUTES[tf] * 60_000   # hodisadan OLDIN 60 sham
     event_ms = int(event_at.timestamp() * 1000)
-    start_ms = chart.align(event_ms - span_ms, tf)
+    start_ms = chart.align(event_ms - before_ms, tf)
     if end_ms is None:
         end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     limit = min(chart.MAX_CANDLES, 200)
@@ -3743,7 +3750,7 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     anchor_price = candles[news_idx].close
     live_price = candles[-1].close
     live_pct = (live_price - anchor_price) / anchor_price * 100
-    return chart.news_chart(candles, news_idx, symbol, live_pct), live_pct
+    return chart.news_chart(candles, news_idx, symbol, live_pct, label=label), live_pct
 
 
 # Butun kanal uchun UMUMIY tezlik cheklovi: bir nechta hodisa parallel
@@ -3781,16 +3788,19 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO) -
 
 async def _live_update(bot_, event_id: int, symbol: str, market: str,
                        event_at: datetime, chat_id, message_id: int,
-                       live_pct: float) -> None:
+                       live_pct: float, tf: str = "1m",
+                       before_ms: int | None = None, label: str = "News") -> None:
     """Postdan keyin `NEWS_LIVE_MINUTES` davomida narxni qayta tekshirib,
     grafikni yangilab turadi. Alohida, chegaralangan davomiylikdagi fon
     vazifasi — `job_queue` emas, chunki bu bitta HODISAGA tegishli, doimiy
-    global jadval emas."""
+    global jadval emas. `tf`/`before_ms`/`label` — `_news_render`ga
+    o'zgarishsiz uzatiladi (surge_scan_job boshqa oyna bilan chaqiradi)."""
     deadline = time.monotonic() + config.NEWS_LIVE_MINUTES * 60
     while time.monotonic() < deadline:
         await asyncio.sleep(config.NEWS_REFRESH_SECONDS)
         try:
-            rendered = await _news_render(symbol, market, event_at)
+            rendered = await _news_render(symbol, market, event_at, tf=tf,
+                                          before_ms=before_ms, label=label)
         except Exception:
             log.warning("Jonli grafik yasalmadi (%s)", symbol, exc_info=True)
             continue
@@ -3914,6 +3924,133 @@ async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 parse_mode=ParseMode.HTML)
         except Exception:
             log.exception("Iqtisodiy taqvim eslatmasi yuborilmadi")
+
+
+# ─────────────────────────── Hajm portlashi (surge) ───────────────────────────
+# Uzoq muddat pasaygan, keyin savdo hajmi keskin oshgan tangalarni topib,
+# CryptoPanic'dan sababini qidiradi va NEWS_CHANNEL_ID kanaliga postlaydi.
+# Ikki alohida job: `volume_snapshot_job` faqat bazaga hajm yozib boradi
+# (tarix to'planishi uchun — bot yangi ishga tushgan bo'lsa dastlabki
+# kun-ikki kunda hech narsa aniqlanmaydi, bu KUTILGAN holat), `surge_scan_job`
+# esa shu tarixdan nomzod qidiradi.
+
+async def volume_snapshot_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    try:
+        volumes = await exchange.ticker_24hr()
+    except Exception:
+        log.exception("MEXC hajm suratini olishda xato")
+        return
+    try:
+        await db.insert_volume_snapshots(list(volumes.items()))
+    except Exception:
+        log.exception("Hajm surati bazaga yozilmadi")
+
+
+async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
+                                   latest_vol: float, avg_vol: float) -> None:
+    """Bitta nomzodni tekshiradi: uzoq muddatli pasayish TASDIQLANMASA
+    (masalan bu shunchaki davom etayotgan o'sish, pasayish emas) —
+    hech narsa qilinmaydi, dedup yozuvi ham qo'yilmaydi (keyingi
+    siklda, yangi hajm ma'lumoti bilan qayta tekshirilishi mumkin)."""
+    now = datetime.now(timezone.utc)
+    now_ms = int(now.timestamp() * 1000)
+    start_ms = now_ms - config.SURGE_DECLINE_DAYS * 86_400_000
+    daily = await exchange.klines(symbol, start_ms, limit=config.SURGE_DECLINE_DAYS + 5, tf="1d")
+    if len(daily) < 5:
+        return   # yetarli tarix yo'q (yangi listing va h.k.) — baholab bo'lmaydi
+    decline_pct = (daily[-1].close - daily[0].close) / daily[0].close * 100
+    if decline_pct > -config.SURGE_DECLINE_PCT:
+        return   # uzoq muddatli pasayish tasdiqlanmadi
+
+    # Dedup — kuniga bitta tanga uchun bitta post (`news_events.external_key`
+    # UNIQUE cheklovi orqali, xuddi SEC hodisalaridagi kabi).
+    ratio = latest_vol / avg_vol if avg_vol else 0.0
+    external_key = f"surge:{symbol}:{now:%Y-%m-%d}"
+    headline = (f"{symbol}: {config.SURGE_DECLINE_DAYS} kunlik pasayishdan "
+               f"keyin hajm {ratio:.1f}x oshdi")
+    eid = await db.insert_news_event(
+        source="surge", external_key=external_key, symbol=symbol, market="crypto",
+        headline_en=headline, translation_uz=None, insight_uz=None,
+        event_at=now, posted=False)
+    if eid is None:
+        return   # bugun bu tanga uchun allaqachon post qilingan
+
+    ticker = symbol[:-len(config.QUOTE)] if symbol.endswith(config.QUOTE) else symbol
+    try:
+        news_items = await cryptonews.search(ticker)
+    except Exception:
+        log.warning("CryptoPanic qidiruvi xato (%s)", ticker, exc_info=True)
+        news_items = []
+
+    lines = [f"🚀 <b>{html.escape(symbol)}</b> — savdo hajmi keskin oshdi",
+            f"\n{config.SURGE_DECLINE_DAYS} kunlik narx: <b>{decline_pct:+.1f}%</b>",
+            f"\nHajm: o'rtachadan <b>{ratio:.1f}x</b> ko'p"]
+    if news_items:
+        lines.append("\n\n📰 Bog'liq yangiliklar:")
+        for item in news_items[:3]:
+            title = html.escape(item["title"] or ticker)
+            url = html.escape(item["url"] or "")
+            lines.append(f"\n• <a href=\"{url}\">{title}</a>" if url else f"\n• {title}")
+    else:
+        lines.append("\n\n<i>Aniq sabab topilmadi — bozor spekulyatsiyasi bo'lishi mumkin.</i>")
+    caption = "".join(lines)
+
+    # Grafik: 4 kunlik soatlik shamlar, oxirgi sham "Portlash" nuqtasi —
+    # `_news_render`ning SEC uchun ishlatiladigani bilan bir xil funksiya,
+    # faqat kengroq oyna/timeframe va boshqa yorliq bilan. 4 kun (96 sham)
+    # ataylab `_news_render`dagi `limit=200` chegarasidan ANCHA past —
+    # aks holda so'ralgan oyna limitga sig'may, oxirgi (hozirgi) sham
+    # o'rniga eski shamlar bilan to'xtab qolardi.
+    photo, live_pct = None, None
+    surge_before_ms = 4 * 86_400_000
+    try:
+        rendered = await _news_render(symbol, "crypto", now, tf="1h",
+                                      before_ms=surge_before_ms, label="Portlash")
+    except Exception:
+        log.warning("Hajm portlashi grafigi yasalmadi (%s)", symbol, exc_info=True)
+        rendered = None
+    if rendered:
+        photo, live_pct = rendered
+
+    try:
+        if photo:
+            sent = await ctx.bot.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "surge.png"),
+                caption=caption, parse_mode=ParseMode.HTML)
+        else:
+            sent = await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True)
+    except Exception:
+        log.exception("Hajm portlashi postlanmadi (%s)", symbol)
+        return
+    await db.set_news_message(eid, sent.message_id)
+
+    if photo and live_pct is not None:
+        asyncio.create_task(_live_update(
+            ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
+            sent.message_id, live_pct, tf="1h", before_ms=surge_before_ms,
+            label="Portlash"))
+
+
+async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    try:
+        candidates = await db.volume_surge_candidates(
+            config.SURGE_VOLUME_MULTIPLIER, config.SURGE_BASELINE_EXCLUDE_HOURS)
+    except Exception:
+        log.exception("Hajm portlashi nomzodlarini olishda xato")
+        return
+
+    for row in candidates:
+        try:
+            await _process_surge_candidate(
+                ctx, row["symbol"], float(row["latest_volume"]), float(row["avg_volume"]))
+        except Exception:
+            log.exception("Hajm portlashi ishlanmadi (%s)", row["symbol"])
 
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────
@@ -4079,6 +4216,11 @@ def main() -> None:
     # uchun 60 soniyada bir tekshiradi (digest kunda bir marta, eslatma
     # dedup orqali — tez-tez tekshirish takror yuborishga olib kelmaydi).
     app.job_queue.run_repeating(econ_job, interval=60, first=20)
+    # Hajm portlashi: hajm suratini SURGE_SNAPSHOT_HOURS soatda bir (bazaga
+    # tarix yig'ish), nomzodlarni esa har 30 daqiqada tekshiradi.
+    app.job_queue.run_repeating(volume_snapshot_job,
+                                interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
+    app.job_queue.run_repeating(surge_scan_job, interval=1800, first=120)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

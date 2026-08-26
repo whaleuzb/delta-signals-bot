@@ -141,5 +141,23 @@ async def last_price(symbol: str, fresh: bool = False) -> float | None:
     return price
 
 
+async def ticker_24hr() -> dict[str, float]:
+    """BARCHA USDT juftliklarining 24 soatlik savdo hajmi (USDT'da),
+    BITTA so'rovda. Hajm portlashini kuzatish uchun — minglab juftlikning
+    har biriga alohida so'rov yubormaslik kerak (surge.py shuni ishlatadi)."""
+    r = await _client.get("/api/v3/ticker/24hr")
+    r.raise_for_status()
+    out: dict[str, float] = {}
+    for t in r.json():
+        sym = t.get("symbol", "")
+        if not sym.endswith(config.QUOTE):
+            continue
+        try:
+            out[sym] = float(t["quoteVolume"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
 async def close() -> None:
     await _client.aclose()
