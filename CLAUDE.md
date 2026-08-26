@@ -1506,3 +1506,33 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       narsa qilmaydi. `_live_update`: yolg'iz holatda davriy tahrirlash,
       ikkita parallel hodisada umumiy tezlik cheklovi ushlab turildi,
       `RetryAfter`da yiqilmadi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+71. **Iqtisodiy taqvim — AQSH makro yangiliklari (`econcalendar.py`).**
+    Har kuni `ECON_DIGEST_HOUR`da (standart 12:00, mahalliy vaqt) kunlik
+    ro'yxat, har hodisadan `ECON_REMIND_MINUTES` (standart 15) oldin
+    eslatma — News Trade AI bilan bir xil `NEWS_CHANNEL_ID` kanaliga.
+    - Manba: Forex Factory'ning ochiq, kalitsiz JSON eksporti
+      (`nfs.faireconomy.media/ff_calendar_thisweek.json`) — ko'plab MT4/5
+      indikatorlari shundan foydalanadi, lekin RASMIY EMAS. Shu sabab
+      hamma maydon `.get()` bilan, keng `try/except` bilan o'qiladi.
+      Manba o'zi 5 daqiqada 2 so'rovga cheklagan — natija 30 daqiqa
+      keshlanadi (`_econ_events_cached`), bo'sh javob ESKI keshni
+      o'chirmaydi (vaqtincha uzilish eslatmalarni butunlay
+      to'xtatmasin).
+    - Faqat `country=="USD"` va `impact` "High"/"Medium" (foydalanuvchi
+      "faqat AQSH" dedi; "Low" va bayramlar chiqarib tashlanadi — PMI,
+      iste'molchi ishonchi kabi ko'p e'tiborli hodisalar odatda "Medium"
+      bo'lgani uchun faqat "High" bilan chegaralanmadi).
+    - **Bir xil vaqtdagi hodisalar BITTA eslatma xabarida birlashadi**
+      (masalan ikkita PMI bir vaqtda chiqsa) — foydalanuvchi ko'rsatgan
+      namuna shunday edi. `due: dict[when, list[hodisa]]` bilan guruhlanadi.
+    - Dedup — `news_events`ga o'xshamaydi (u yerda UNIQUE tashqi kalit),
+      bu yerda alohida GLOBAL jadval `econ_calendar_state(kind, event_key)`
+      — `kind='digest'` uchun kalit `YYYY-MM-DD`, `kind='reminder'` uchun
+      hodisa vaqtining ISO satri. `digest_job`dagi kabi: kun/hodisa AVVAL
+      belgilanadi, keyin yuboriladi — yuborish yiqilsa ham qayta-qayta
+      urinib bezovta qilmaydi.
+    - Tekshirildi (mock): digest bir marta (2-o'tishda 0 xabar), bir xil
+      vaqtdagi ikkita hodisa BITTA guruh xabarida, 15 daqiqadan uzoqroq
+      hodisa hali chiqarilmagan, `NEWS_CHANNEL_ID` bo'sh bo'lsa job hech
+      narsa qilmaydi. `test_tracker.py` 9/9 — o'zgarmadi.

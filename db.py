@@ -230,6 +230,19 @@ CREATE TABLE IF NOT EXISTS news_events (
 );
 CREATE INDEX IF NOT EXISTS idx_news_events_source ON news_events(source);
 CREATE INDEX IF NOT EXISTS idx_news_events_pending ON news_events(posted) WHERE NOT posted;
+
+-- AQSH makroiqtisodiy taqvim: kunlik ro'yxat va hodisadan oldingi eslatma
+-- IKKI MARTA yuborilmasligi uchun dedup. GLOBAL jadval (workspace'siz),
+-- news_events kabi.
+--   kind      — 'digest' (kunlik ro'yxat) | 'reminder' (hodisadan oldin)
+--   event_key — digest: 'YYYY-MM-DD'; reminder: hodisa nomi+vaqti
+CREATE TABLE IF NOT EXISTS econ_calendar_state (
+    id         SERIAL      PRIMARY KEY,
+    kind       TEXT        NOT NULL,
+    event_key  TEXT        NOT NULL,
+    sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (kind, event_key)
+);
 """
 
 
@@ -982,3 +995,19 @@ async def finalize_news_outcome(event_id: int, pct: float) -> None:
     async with pool().acquire() as c:
         await c.execute(
             "UPDATE news_events SET outcome_pct=$2 WHERE id=$1", event_id, _d(pct))
+
+
+# ─────────────────── Iqtisodiy taqvim (digest/eslatma dedup) ───────────────────
+
+async def econ_sent(kind: str, event_key: str) -> bool:
+    async with pool().acquire() as c:
+        return bool(await c.fetchval(
+            "SELECT 1 FROM econ_calendar_state WHERE kind=$1 AND event_key=$2",
+            kind, event_key))
+
+
+async def econ_mark_sent(kind: str, event_key: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO econ_calendar_state (kind, event_key) VALUES ($1,$2) "
+            "ON CONFLICT (kind, event_key) DO NOTHING", kind, event_key)

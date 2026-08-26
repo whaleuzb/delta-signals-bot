@@ -31,6 +31,7 @@ from telegram.ext import (
 import chart
 import config
 import db
+import econcalendar
 import exchange
 import forex
 import news
@@ -3820,6 +3821,101 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Yangilik ishlanmadi (%s)", item.get("external_key"))
 
 
+# ─────────────────────────── Iqtisodiy taqvim ───────────────────────────
+# Har kuni `ECON_DIGEST_HOUR`da AQSH makro yangiliklari ro'yxati, har bir
+# hodisadan `ECON_REMIND_MINUTES` oldin eslatma. Xuddi News Trade AI kabi
+# NEWS_CHANNEL_ID kanaliga postlanadi.
+
+# Manba (Forex Factory) kuniga bir necha marta so'raladigan darajada
+# tez-tez o'zgarmaydi (haftalik jadval), shuning uchun natija bir muddat
+# keshlanadi — bu ham manbaning o'zi qo'ygan tezlik chegarasini
+# hurmat qiladi (5 daqiqada 2 so'rov), ham har 60 soniyalik `econ_job`
+# tsiklida bekorga tarmoqqa chiqmaydi.
+_econ_cache: list[dict] = []
+_econ_cache_at = 0.0
+ECON_CACHE_TTL = 1800   # 30 daqiqa
+
+
+async def _econ_events_cached() -> list[dict]:
+    global _econ_cache, _econ_cache_at
+    if time.monotonic() - _econ_cache_at > ECON_CACHE_TTL:
+        fresh = await econcalendar.fetch_week()
+        if fresh:
+            _econ_cache = fresh
+        # Bo'sh javob ESKI keshni O'CHIRMAYDI — manba vaqtincha ishlamay
+        # qolsa ham eslatmalar butunlay yo'qolib qolmasin.
+        _econ_cache_at = time.monotonic()
+    return _econ_cache
+
+
+def _flag_country(code: str) -> str:
+    return "🇺🇸" if code == "USD" else code
+
+
+def _econ_digest_text(events: list[dict], now_local: datetime) -> str:
+    off_h = int(now_local.utcoffset().total_seconds() // 3600)
+    head = (f"📅 <b>Iqtisodiy taqvim {now_local:%d.%m.%Y}</b>\n"
+            f"Hozirgi vaqt: {now_local:%H:%M} (GMT{off_h:+d})\n")
+    if not events:
+        return head + "\nBugun AQSH bo'yicha muhim iqtisodiy yangilik yo'q."
+    lines = [head]
+    for e in sorted(events, key=lambda e: e["when"]):
+        t = e["when"].astimezone(stats.TZ)
+        lines.append(f"\n{t:%H:%M}: {_flag_country('USD')} {html.escape(e['title'])}")
+    return "".join(lines)
+
+
+def _econ_remind_text(group: list[dict]) -> str:
+    lines = [f"⏰ <b>Diqqat, {config.ECON_REMIND_MINUTES} daqiqa keyin:</b>"]
+    for e in group:
+        lines.append(f"{_flag_country('USD')} {html.escape(e['title'])}")
+    return "\n".join(lines)
+
+
+async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    events = await _econ_events_cached()
+    now = datetime.now(timezone.utc)
+    now_local = now.astimezone(stats.TZ)
+
+    # 1) Kunlik ro'yxat — soat ECON_DIGEST_HOUR bo'lgan har bir tekshiruvda
+    # urinadi, lekin `econ_mark_sent` bir kunda faqat BIRINCHISIGA ruxsat
+    # beradi (digest_job'dagi digest_hour/digest_last andozasi bilan bir xil).
+    today_key = now_local.strftime("%Y-%m-%d")
+    if now_local.hour == config.ECON_DIGEST_HOUR and not await db.econ_sent("digest", today_key):
+        # Kunni AVVAL belgilaymiz — yuborish yiqilsa ham keyingi tsiklda
+        # qayta urinib kanalni ikki marta bezovta qilmasin.
+        await db.econ_mark_sent("digest", today_key)
+        todays = [e for e in events if e["when"].astimezone(stats.TZ).date() == now_local.date()]
+        try:
+            await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, _econ_digest_text(todays, now_local),
+                parse_mode=ParseMode.HTML)
+        except Exception:
+            log.exception("Iqtisodiy taqvim digest yuborilmadi")
+
+    # 2) Eslatmalar — bir xil vaqtdagi hodisalar BITTA xabarda birlashadi
+    # (masalan ikkita PMI bir vaqtda chiqsa, ikkita alohida xabar emas).
+    due: dict[datetime, list[dict]] = {}
+    for e in events:
+        delta = (e["when"] - now).total_seconds()
+        if 0 <= delta <= config.ECON_REMIND_MINUTES * 60:
+            due.setdefault(e["when"], []).append(e)
+
+    for when, group in due.items():
+        key = when.isoformat()
+        if await db.econ_sent("reminder", key):
+            continue
+        await db.econ_mark_sent("reminder", key)
+        try:
+            await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, _econ_remind_text(group),
+                parse_mode=ParseMode.HTML)
+        except Exception:
+            log.exception("Iqtisodiy taqvim eslatmasi yuborilmadi")
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -3979,6 +4075,10 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
     app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
+    # Iqtisodiy taqvim: 15 daqiqalik eslatma oynasini o'tkazib yubormaslik
+    # uchun 60 soniyada bir tekshiradi (digest kunda bir marta, eslatma
+    # dedup orqali — tez-tez tekshirish takror yuborishga olib kelmaydi).
+    app.job_queue.run_repeating(econ_job, interval=60, first=20)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
     app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)

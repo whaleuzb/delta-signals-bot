@@ -79,3 +79,9 @@ NEWS_MIN_EDIT_GAP = float(os.getenv("NEWS_MIN_EDIT_GAP", "3"))
 # Postdan keyin necha daqiqa jonli yangilanadi — bundan keyin narx harakati
 # odatda tinchiydi, xabar oddiy statik holatda qoladi.
 NEWS_LIVE_MINUTES = int(os.getenv("NEWS_LIVE_MINUTES", "20"))
+
+# --- Iqtisodiy taqvim: har kuni belgilangan mahalliy soatda AQSH makro
+#     yangiliklari ro'yxati + hodisadan oldin eslatma. Xuddi News Trade AI
+#     kabi NEWS_CHANNEL_ID kanaliga postlanadi (alohida kanal kerak emas) ---
+ECON_DIGEST_HOUR = int(os.getenv("ECON_DIGEST_HOUR", "12"))    # mahalliy vaqt (TZ)
+ECON_REMIND_MINUTES = int(os.getenv("ECON_REMIND_MINUTES", "15"))
