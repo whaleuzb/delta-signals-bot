@@ -2487,3 +2487,57 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       baribir MEXC ma'lumotidan foydalanadi — kod o'zgarishsiz qoldi
       (kelajakda Binance ochilib qolsa, avtomatik ishlay boshlaydi,
       qayta deploy shart emas).
+
+97. **Binance yangi listinglari qo'shildi — foydalanuvchi haqiqiy
+    JSON API'ni topib berdi.** Ilgari cryptocurrencyalerting.com'ning
+    bepul rejasi webhook bermasligi sabab listing manbai "hozircha kod
+    tashqarisida" qoldirilgan edi. Foydalanuvchi shu sayt sahifasi
+    (`binance-new-listings.html`) ORTIDAGI haqiqiy, kalitsiz JSON
+    endpoint'ni (`main.min.js` faylidan) topib, standalone Python
+    skript namunasi bilan taqdim etdi: `GET
+    https://api.cryptocurrencyalerting.com/binance-new-coins` —
+    `[{"code","name","exchange","alert_id","created_at","type",
+    "market_url"}, ...]`.
+    - **AI ISHLATILMAYDI** — MarketTwits qanday AI'siz bo'lsa xuddi
+      shunday, lekin sababi BOSHQA: bu yerda ma'lumot ALLAQACHON
+      tuzilgan (aniq tiker/nom/vaqt) — "muhimmi-yo'qmi" filtri kerak
+      emas (yangi listing o'zi allaqachon signal), tarjima ham shart
+      emas (shablon matn: "{nom} ({tiker}) Binance'da yangi ro'yxatga
+      olindi").
+    - `listings.py`: yangi `binance_scan(since)` — Upbit bilan BIR XIL
+      shakl EMAS (AI kerak emasligi uchun `_process_news_event()`dan
+      MUSTAQIL); `code`/`name`/`event_at`/`market_url` maydonlari bilan
+      qaytaradi. `since` filtri MUHIM — API oylar oldingi tarixni ham
+      qaytaradi, filtrsiz birinchi ishga tushishda o'nlab eski post
+      "toshib ketardi".
+    - `bot.py`: yangi `_process_binance_listing()` + `binance_listing_job()`
+      (har 90s, `news_scan_job` bilan bir xil davriylik). Tiker
+      `exchange.resolve()` orqali MEXC'da qidiriladi — YANGI listing
+      ko'pincha bizning kuzatuvimizdagi birjada HALI yo'q, shunda
+      matn-only post (grafiksiz, lekin baribir foydali — "yangi tanga
+      qo'shildi" xabari).
+    - **MUHIM tuzatish shu band paytida topildi**: birinchi yozganda
+      ESKIRGAN naqsh (`_spawn_background(_live_update(...))`)
+      ishlatilgan edi — bu funksiya ENDI MAVJUD EMAS (avvalroq, 83-90
+      bandlar oralig'idagi ishda, "deploy vaqtida yangilanish to'xtab
+      qolyabti" muammosi butunlay YANGI arxitektura — `news_live_job`,
+      DB'dagi `render_tf`/`render_label` ustunlari orqali — bilan hal
+      qilingan, `_live_update` o'chirilgan). Kod `py_compile`da xato
+      bermadi (chunki `_spawn_background`ning o'zi hali mavjud, faqat
+      `_live_update` yo'q edi — bu `NameError` sifatida FAQAT ishga
+      tushganda chiqardi), lekin `db.set_news_message()`ning yangi
+      imzosi (`caption` MAJBURIY parametr) mock testda DARHOL
+      `TypeError` berdi — shu orqali xato ishlab chiqarishdan OLDIN
+      ushlandi. To'g'rilanib, boshqa 6 ta chaqiruv joyi (SEC/Upbit,
+      likvidatsiya, surge, MarketTwits, /charttest) bilan BIR XIL
+      naqshga (`db.set_news_message(eid, msg_id, caption, render_tf=...,
+      render_label=...)`, spawn YO'Q) moslashtirildi.
+    - Tekshirildi (mock, haqiqiy Postgres): `binance_scan()` 24 soatdan
+      eski yozuvni to'g'ri filtrlashi; tiker MEXC'da topilmasa matn-only
+      post to'g'ri chiqishi; tiker topilsa GRAFIKLI post va bazada
+      `render_tf='1m'`/`render_label='Listing'` to'g'ri saqlanishi
+      (`news_live_job` buni "aktiv" deb topishi uchun MUHIM); dedup
+      ishlashi — barchasi tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+    - **Hali production'da haqiqiy so'rov bilan sinalmagan** (domen
+      sandbox'da bloklangan) — keyingi deploydan keyin Railway
+      loglarida tasdiqlanishi kerak.

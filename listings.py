@@ -16,7 +16,10 @@ baribir `.get()` bilan himoyalangan (kelajakda yana o'zgarishi mumkin).
 Notice sarlavhasi ko'pincha KOREYS tilida keladi — buni bu yerda TARJIMA
 QILISHGA urinilmaydi: xom sarlavha to'g'ridan-to'g'ri `newsai.analyze()`ga
 beriladi (Claude ko'p tilli — tarjima/tahlil/tiker-taxminni o'zi
-bajaradi), xuddi SEC hujjatlari qanday ishlansa shunday."""
+bajaradi), xuddi SEC hujjatlari qanday ishlansa shunday.
+
+Bundan tashqari `binance_scan()` — Binance yangi listinglari, pastga
+qarang."""
 import logging
 from datetime import datetime, timezone
 
@@ -99,5 +102,70 @@ async def upbit_scan(since: datetime) -> list[dict]:
             "body_en": title,
             "event_at": event_at,
             "source_url": f"https://upbit.com/service_center/notice?id={notice_id}",
+        })
+    return out
+
+
+# --- Binance yangi listing e'lonlari ---
+# Foydalanuvchi cryptocurrencyalerting.com'ning "New Binance Listings"
+# sahifasi ORTIDAGI haqiqiy JSON API'ni topdi (sahifaning main.min.js
+# fayli `$.getJSON(CONSTANTS.apiHost + "/binance-new-coins")` chaqiradi).
+# Kalitsiz, bepul, tayyor tuzilgan (tiker+nom+vaqt) — shu sabab bu manba
+# Upbit'dan farqli AI orqali O'TMAYDI (bot.py'da alohida, AI'siz
+# ishlanadi — MarketTwits qanday AI'siz bo'lsa xuddi shunday, chunki
+# "yangi listing"ning o'zi ALLAQACHON aniq signal, "muhimmi-yo'qmi"
+# filtri kerak emas, tarjima ham shart emas — shablon matn yetarli).
+BINANCE_LISTINGS_URL = "https://api.cryptocurrencyalerting.com/binance-new-coins"
+
+
+async def binance_scan(since: datetime) -> list[dict]:
+    """`since`dan beri qo'shilgan Binance listinglarini qaytaradi.
+
+    Natija shakli Upbit/SEC bilan BIR XIL EMAS — bu yerda AI kerak
+    emasligi uchun `_process_binance_listing()` (bot.py) o'ziga xos
+    maydonlarni (`code`/`name`/`market_url`) kutadi, `_process_news_event()`
+    orqali o'TMAYDI."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(BINANCE_LISTINGS_URL, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; TradeControllerBot/1.0)",
+                "Accept": "application/json",
+            })
+            r.raise_for_status()
+            data = r.json()
+    except Exception:
+        log.warning("Binance listinglari olinmadi", exc_info=True)
+        return []
+
+    if not isinstance(data, list):
+        return []
+
+    out: list[dict] = []
+    for item in data:
+        alert_id = item.get("alert_id")
+        code = item.get("code")
+        if not alert_id or not code:
+            continue
+
+        created_at = item.get("created_at") or ""
+        event_at = None
+        if created_at:
+            try:
+                event_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except ValueError:
+                event_at = None
+        if event_at is None:
+            event_at = datetime.now(timezone.utc)
+        elif event_at.tzinfo is not None:
+            event_at = event_at.astimezone(timezone.utc)
+        if event_at < since:
+            continue
+
+        out.append({
+            "external_key": f"binancelist:{alert_id}",
+            "code": code,
+            "name": item.get("name") or code,
+            "event_at": event_at,
+            "market_url": item.get("market_url") or f"https://www.binance.com/en/trade/{code}_USDT",
         })
     return out

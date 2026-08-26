@@ -4140,6 +4140,89 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Yangilik ishlanmadi (%s)", item.get("external_key"))
 
 
+# ─────────────────────────── Binance yangi listinglari ───────────────────────────
+# `listings.binance_scan()` orqali (cryptocurrencyalerting.com'ning haqiqiy
+# JSON API'si, foydalanuvchi topib berdi). AI ISHLATILMAYDI — MarketTwits
+# qanday AI'siz bo'lsa xuddi shunday: ma'lumot allaqachon tuzilgan
+# (tiker/nom/vaqt), "muhimmi-yo'qmi" filtri kerak emas (yangi listing
+# o'zi allaqachon signal), tarjima ham shart emas (shablon matn yetarli).
+# Shu sabab `_process_news_event()`dan MUSTAQIL, alohida ishlanadi.
+
+async def _process_binance_listing(bot_, item: dict) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    external_key = item["external_key"]
+    if await db.news_event_exists(external_key):
+        return
+
+    code, name = item["code"], item["name"]
+    symbol, market = await _resolve_news_symbol(code)
+
+    headline = f"{name} ({code}) Binance'da yangi ro'yxatga olindi"
+    eid = await db.insert_news_event(
+        source="binance_listing", external_key=external_key, symbol=symbol, market=market,
+        headline_en=headline, translation_uz=None, insight_uz=None,
+        event_at=item["event_at"], posted=False)
+    if eid is None:
+        return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
+
+    title = symbol or code
+    caption = (f"🆕 <b>{html.escape(title, quote=False)}</b>\n\n"
+              f"{html.escape(name, quote=False)} ({html.escape(code, quote=False)}) "
+              f"Binance'da yangi ro'yxatga olindi.")
+
+    # Yangi listing ko'pincha bizning kuzatuvimizdagi birjada (MEXC)
+    # HALI yo'q — shunda symbol=None, matn-only post (grafiksiz).
+    photo = None
+    if symbol:
+        try:
+            rendered = await _news_render(symbol, market, item["event_at"])
+        except Exception:
+            log.warning("Binance listing grafigi yasalmadi (%s)", symbol, exc_info=True)
+            rendered = None
+        if rendered:
+            photo, _ = rendered
+
+    buttons = await _signal_buttons(symbol, market, bot_.username) if symbol else None
+    try:
+        if photo:
+            sent = await bot_.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+        else:
+            sent = await bot_.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True, reply_markup=buttons)
+    except Exception:
+        log.exception("Binance listing postlanmadi (%s)", external_key)
+        return
+    # Faqat grafikli xabar jonli yangilanadi (`render_tf` to'ldirilgan bo'lsa
+    # `news_live_job` uni "aktiv" deb topadi va o'zi davriy yangilab turadi —
+    # bu yerda alohida fon vazifasi YARATILMAYDI, restart-chidamli DB-asosli
+    # mexanizm, `_process_news_event()` bilan bir xil andoza).
+    await db.set_news_message(
+        eid, sent.message_id, caption,
+        render_tf="1m" if (photo and symbol) else None,
+        render_label="Listing" if (photo and symbol) else None)
+    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
+
+async def binance_listing_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    try:
+        items = await listings.binance_scan(since)
+    except Exception:
+        log.exception("Binance listing skaneri xato")
+        return
+    for item in items:
+        try:
+            await _process_binance_listing(ctx.bot, item)
+        except Exception:
+            log.exception("Binance listing ishlanmadi (%s)", item.get("external_key"))
+
+
 # ─────────────────────────── MarketTwits (Telegram userbot) ───────────────────────────
 # `tgsource.py` orqali — SEC/Upbit kabi PULL emas, real-vaqtli PUSH manba
 # (Telethon userbot yangi xabarni darhol yetkazadi).
@@ -4977,6 +5060,7 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
     app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
+    app.job_queue.run_repeating(binance_listing_job, interval=90, first=60)
     # Jonli yangilanish — bazadan qayta o'qib yangilaydi (Railway deploy
     # qilsa ham davom etadi, `news_live_job` yuqoridagi izohiga qarang).
     app.job_queue.run_repeating(news_live_job, interval=config.NEWS_REFRESH_SECONDS, first=15)
