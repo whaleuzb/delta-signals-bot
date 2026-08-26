@@ -133,3 +133,18 @@ LIQUIDATION_SYMBOLS = os.getenv(
 # katta likvidatsiyalar" so'radi (avvalgi o'rtachaga nisbatan ko'plik
 # mezoni chalkash edi, endi oddiy chegara).
 LIQUIDATION_MIN_USD = float(os.getenv("LIQUIDATION_MIN_USD", "500000"))
+
+# --- MarketTwits (va shunga o'xshash) Telegram kanallari — Telethon
+#     userbot orqali (oddiy Bot API bunday begona kanallarni "eshita"
+#     olmaydi, faqat o'zi ADMIN qilingan kanallarni). my.telegram.org'da
+#     ro'yxatdan o'tib olinadigan api_id/api_hash kerak; ikkalasi ham
+#     bo'sh bo'lsa funksiya butunlay o'chiq. Login (bir martalik, telefon
+#     kodi bilan) tgsource.py orqali admin buyruqlari bilan (/tg_login
+#     /tg_code /tg_password) amalga oshiriladi, sessiya keyin Postgres'da
+#     saqlanadi (fayl emas — Railway konteyneri qayta ishga tushganda
+#     fayl yo'qoladi).
+TELETHON_API_ID = int(os.getenv("TELETHON_API_ID", "0") or "0")
+TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", "")
+TELEGRAM_NEWS_CHANNELS = [
+    c.strip() for c in os.getenv("TELEGRAM_NEWS_CHANNELS", "markettwits").split(",") if c.strip()
+]

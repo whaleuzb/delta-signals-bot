@@ -43,6 +43,7 @@ import newsai
 import stocks
 import parsing
 import stats
+import tgsource
 import tracker
 import vision
 
@@ -4056,6 +4057,63 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Yangilik ishlanmadi (%s)", item.get("external_key"))
 
 
+# ─────────────────────────── MarketTwits (Telegram userbot) ───────────────────────────
+# `tgsource.py` orqali — SEC/Upbit kabi PULL emas, real-vaqtli PUSH manba
+# (Telethon userbot yangi xabarni darhol yetkazadi). `_process_news_event`
+# aynan shu shaklidagi (`headline_en`/`body_en`/...) itemni kutadi —
+# SEC/Upbit bilan bir xil quvurdan (AI tahlil -> grafik -> post -> jonli
+# yangilanish) o'tadi, faqat manbasi boshqa.
+
+class _BotCtx:
+    """`_process_news_event` faqat `ctx.bot`dan foydalanadi.
+    Telethon tinglovchisi `ContextTypes.DEFAULT_TYPE` emas, oddiy `Bot`
+    obyektini beradi — shuning uchun yengil o'rovchi."""
+    def __init__(self, bot_):
+        self.bot = bot_
+
+
+async def _process_markettwits_message(bot_, channel: str, msg_id: int,
+                                       text: str, event_at: datetime) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    if event_at.tzinfo is None:
+        event_at = event_at.replace(tzinfo=timezone.utc)
+    item = {
+        "source": "markettwits",
+        "external_key": f"markettwits:{channel}:{msg_id}",
+        "symbol": None,
+        "market": None,
+        "headline_en": text[:2000],
+        "body_en": "",
+        "event_at": event_at,
+        "source_url": f"https://t.me/{channel}/{msg_id}",
+    }
+    if await db.news_event_exists(item["external_key"]):
+        return
+    try:
+        await _process_news_event(_BotCtx(bot_), item)
+    except Exception:
+        log.exception("MarketTwits xabari ishlanmadi (%s)", item["external_key"])
+
+
+_markettwits_started = False
+
+
+async def _start_markettwits_listener(bot_) -> None:
+    """Login qilingan bo'lsa (`/tg_login` orqali) tinglovchini fon
+    vazifasi sifatida ishga tushiradi. Idempotent — ikki marta
+    chaqirilsa (masalan `/tg_code` muvaffaqiyatli bo'lgach QAYTA
+    chaqirilganda) ikkinchi marta hech narsa qilmaydi."""
+    global _markettwits_started
+    if _markettwits_started or not tgsource.enabled():
+        return
+    if not await tgsource.is_authorized():
+        return
+    _markettwits_started = True
+    _spawn_background(tgsource.start_listener(
+        lambda ch, mid, text, dt: _process_markettwits_message(bot_, ch, mid, text, dt)))
+
+
 # ─────────────────────────── Iqtisodiy taqvim ───────────────────────────
 # Har kuni `ECON_DIGEST_HOUR`da AQSH makro yangiliklari ro'yxati, har bir
 # hodisadan `ECON_REMIND_MINUTES` oldin eslatma. Xuddi News Trade AI kabi
@@ -4476,6 +4534,72 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
 
 
+# ─────────────────────────── Telethon login (admin) ───────────────────────────
+# MarketTwits kabi begona kanallarni tinglash uchun userbot bir martalik
+# telefon-kod bilan login qilinishi kerak — buni admin shu uchta buyruq
+# bilan, TO'G'RIDAN-TO'G'RI shu botga yozib amalga oshiradi (kod
+# rivojlantirish muhitida emas, jonli serverda ishlaydi — tgsource.py
+# yuqoridagi izohiga qarang).
+
+async def cmd_tg_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(update.effective_user.id):
+        return
+    if not tgsource.enabled():
+        await update.message.reply_text(
+            "TELETHON_API_ID/TELETHON_API_HASH sozlanmagan (Railway o'zgaruvchisi).")
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /tg_login +998901234567")
+        return
+    phone = ctx.args[0]
+    try:
+        await tgsource.login_send_code(phone)
+    except Exception:
+        log.exception("Telethon kod so'ralmadi")
+        await update.message.reply_text("Kod so'rashda xato — loglarni tekshiring.")
+        return
+    await update.message.reply_text(
+        "Kod yuborildi, Telegram ilovangizni tekshiring. Keyin: /tg_code 12345")
+
+
+async def cmd_tg_code(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /tg_code 12345")
+        return
+    try:
+        result = await tgsource.login_submit_code(ctx.args[0])
+    except Exception:
+        log.exception("Telethon kod tasdiqlanmadi")
+        await update.message.reply_text(
+            "Kod xato yoki muddati tugagan — /tg_login bilan qayta boshlang.")
+        return
+    if result == "need_password":
+        await update.message.reply_text(
+            "Akkauntda 2FA parol bor. Yuboring: /tg_password <parol>")
+        return
+    await _start_markettwits_listener(ctx.bot)
+    await update.message.reply_text("✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.")
+
+
+async def cmd_tg_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(update.effective_user.id):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /tg_password <parol>")
+        return
+    password = " ".join(ctx.args)
+    try:
+        await tgsource.login_submit_password(password)
+    except Exception:
+        log.exception("Telethon parol tasdiqlanmadi")
+        await update.message.reply_text("Parol xato — qayta urinib ko'ring.")
+        return
+    await _start_markettwits_listener(ctx.bot)
+    await update.message.reply_text("✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.")
+
+
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -4503,6 +4627,10 @@ async def post_init(app: Application) -> None:
         ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
         ("bekor", "Joriy amalni bekor qilish"),
     ])
+    # Avvalgi ishga tushirishda /tg_login bilan allaqachon login qilingan
+    # bo'lsa (sessiya Postgres'da saqlangan) — qayta login talab qilinmasdan
+    # darhol tinglashni boshlaydi.
+    await _start_markettwits_listener(app.bot)
 
 
 async def post_shutdown(app: Application) -> None:
@@ -4550,6 +4678,9 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
+    app.add_handler(CommandHandler("tg_login", cmd_tg_login))
+    app.add_handler(CommandHandler("tg_code", cmd_tg_code))
+    app.add_handler(CommandHandler("tg_password", cmd_tg_password))
     app.add_handler(CommandHandler("refhavola", cmd_ref_link))
     app.add_handler(CommandHandler("hisobot", cmd_digest))
     app.add_handler(CommandHandler("sahifa", cmd_page))

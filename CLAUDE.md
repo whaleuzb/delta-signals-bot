@@ -2129,3 +2129,47 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       (`🔴 #PUMP Likvidlanish Long: $533,89K narx: $0,0045581 Binance`);
       $500K'dan kichik nomzod (`ETHUSDT_PERP.A`, $10K) TO'G'RI filtrlanib
       tashlanishi ham tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+86. **MarketTwits (Telegram kanali) — Telethon userbot orqali yangi
+    manba qo'shildi.** Foydalanuvchi: "telegram kanallardagi
+    yangiliklardan qanday foydalansak bo'ladi?" -> "markettwits".
+    - **Nega oddiy Bot API emas**: bot faqat O'ZI ADMIN qilingan
+      kanallarni "eshitadi" — MarketTwits kabi begona ommaviy kanal
+      bizni admin qilmaydi. Yechim: `tgsource.py` — Telethon (MTProto,
+      foydalanuvchi-akkaunt) orqali kanalga oddiy A'ZO sifatida qo'shilib,
+      barcha postlarni jonli o'qiydi.
+    - **MUHIM sandbox cheklovi**: MTProto — HTTPS emas, xom TCP protokol;
+      bu rivojlantirish sandbox'ining tarmoq siyosati tomonidan
+      BLOKLANGAN (`curl .../__agentproxy/status` orqali tasdiqlandi —
+      faqat HTTPS CONNECT qo'llab-quvvatlanadi, "raw-TCP" YO'Q). Shu
+      sabab Telethon login/tinglash **faqat production'da (Railway)**
+      ishlaydi va sinaladi — bu yerda faqat kod yozildi, ishga tushirish
+      sinalmadi (`py_compile` va to'liq `import bot` orqali sintaksis/
+      import xatolari yo'qligi tekshirildi, xolos).
+    - **Login oqimi butunlay admin-buyruqlar orqali** (`/tg_login
+      +998...` -> `/tg_code 12345` -> kerak bo'lsa `/tg_password ...`) —
+      bevosita JONLI botga yozib amalga oshiriladi (bu yerda EMAS, sabab
+      yuqorida). Sessiya `telethon.sessions.StringSession` bilan STRING
+      sifatida Postgres'ga (`bot_settings`, `db.get_setting/set_setting`
+      — mavjud kalit-qiymat jadvali qayta ishlatildi) saqlanadi — FAYL
+      emas, chunki Railway konteyneri qayta ishga tushganda fayl
+      yo'qoladi, baza esa yo'q.
+    - `config.py`: `TELETHON_API_ID`/`TELETHON_API_HASH` (foydalanuvchi
+      my.telegram.org'dan olib berdi — kodga YOZILMADI, faqat Railway
+      maxfiy o'zgaruvchisiga), `TELEGRAM_NEWS_CHANNELS` (standart:
+      `markettwits`, vergul bilan bir nechtasi qo'shilishi mumkin).
+    - `bot.py`: `_process_markettwits_message()` kelgan xabarni SEC/Upbit
+      bilan BIR XIL shaklga (`headline_en`/`external_key`/...) o'rab,
+      mavjud `_process_news_event()` quvuridan (AI tahlil -> grafik ->
+      post -> jonli yangilanish) o'tkazadi — yangi post-mantiq YOZILMADI,
+      to'liq qayta ishlatildi. `_BotCtx` — yengil o'rovchi (`_process_
+      news_event` faqat `ctx.bot`dan foydalanadi, Telethon tinglovchisi
+      esa oddiy `Bot` obyekti beradi). `_start_markettwits_listener()`
+      idempotent — `post_init`da (avval login qilingan bo'lsa) VA
+      `/tg_code`/`/tg_password` muvaffaqiyatidan keyin (qayta deploy
+      kutmasdan) chaqiriladi.
+    - Tekshirildi (mock, haqiqiy Postgres): to'liq zanjir ("SEC
+      Bitcoin ETF arizasini tasdiqladi" kabi matn) `_process_news_event`
+      orqali to'g'ri postlanishi VA xuddi shu `external_key` bilan
+      IKKINCHI marta kelsa dedup ishlashi (qayta postlanmasligi)
+      tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
