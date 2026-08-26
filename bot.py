@@ -3866,7 +3866,7 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
     # Faqat grafikli xabar jonli yangilanadi — matn-only xabarda yangilanadigan
     # narsa yo'q (tiker topilmagan, ya'ni narx ham kuzatib bo'lmaydi).
     if photo and symbol:
-        asyncio.create_task(_live_update(
+        _spawn_background(_live_update(
             ctx.bot, eid, symbol, market, item["event_at"],
             config.NEWS_CHANNEL_ID, sent.message_id, live_pct,
             reply_markup=buttons, caption=caption))
@@ -3907,6 +3907,25 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     live_pct = (live_price - anchor_price) / anchor_price * 100
     return chart.news_chart(candles, news_idx, symbol, live_pct, label=label,
                             marker_color=marker_color), live_pct
+
+
+# `asyncio.create_task()` event loop'da faqat KUCHSIZ (weak) referens
+# saqlaydi — qaytgan Task obyekti hech qayerda ushlab turilmasa, Python
+# uni ISHLASH DAVOMIDA, hech qanday xatosiz, kutilmagan payt yig'ib
+# tashlashi (garbage collect) mumkin. Aynan shu sabab jonli yangilanish
+# "bitta xabar keldi-yu, keyin umuman yangilanmadi" holatiga tushgan —
+# Railway qayta deploy qilinishi emas (bu ham bo'lishi mumkin, lekin
+# alohida muammo). Rasmiy tavsiya: qaytgan Task'ni biror joyda kuchli
+# referens sifatida saqlash. `_background_tasks` shu maqsadda — vazifa
+# tugagach `add_done_callback` orqali o'zi to'plamdan chiqib ketadi.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_background(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
 
 
 # Butun kanal uchun UMUMIY tezlik cheklovi: bir nechta hodisa parallel
@@ -4237,7 +4256,7 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
     if photo and live_pct is not None:
-        asyncio.create_task(_live_update(
+        _spawn_background(_live_update(
             ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf="1h", before_ms=surge_before_ms,
             label="Portlash", reply_markup=buttons, caption=caption))
@@ -4341,7 +4360,7 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
     buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
     if photo and live_pct is not None:
-        asyncio.create_task(_live_update(
+        _spawn_background(_live_update(
             ctx.bot, eid, symbol, "crypto", now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf="1m", before_ms=liq_before_ms,
             label="Likvidatsiya", reply_markup=buttons, caption=caption,
@@ -4437,7 +4456,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if eid is not None:
         await db.set_news_message(eid, sent.message_id)
         buttons = await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
-        asyncio.create_task(_live_update(
+        _spawn_background(_live_update(
             ctx.bot, eid, symbol, market, now, config.NEWS_CHANNEL_ID,
             sent.message_id, live_pct, tf=tf, before_ms=before_ms, label="Sinov",
             reply_markup=buttons, caption=caption))
