@@ -14,6 +14,12 @@ import config
 
 log = logging.getLogger(__name__)
 _client = httpx.AsyncClient(base_url=config.EXCHANGE_BASE, timeout=15)
+# Faqat `volume_ticker_24hr()` uchun — Binance Futures (fapi.binance.com)
+# ilgari Railway hududini 451 bilan bloklagan edi (yuqoridagi izohga
+# qarang), lekin bu SPOT API (api.binance.com), boshqa domen — foydalanuvchi
+# so'rovi bilan sinaladi ("Binance'da pul ko'p aylanadi" — savdo hajmi
+# portlashini Binance ma'lumotidan aniqlash MEXC'dan ancha aniqroq).
+_binance_client = httpx.AsyncClient(base_url="https://api.binance.com", timeout=15)
 
 _symbols: set[str] = set()
 _symbols_ts: float = 0.0
@@ -146,14 +152,12 @@ async def last_price(symbol: str, fresh: bool = False) -> float | None:
     return price
 
 
-async def ticker_24hr() -> dict[str, float]:
-    """BARCHA USDT juftliklarining 24 soatlik savdo hajmi (USDT'da),
-    BITTA so'rovda. Hajm portlashini kuzatish uchun — minglab juftlikning
-    har biriga alohida so'rov yubormaslik kerak (surge.py shuni ishlatadi)."""
-    r = await _client.get("/api/v3/ticker/24hr")
-    r.raise_for_status()
+def _parse_ticker_24hr(data: list) -> dict[str, float]:
+    """MEXC va Binance spot API'lari `/api/v3/ticker/24hr` uchun bir xil
+    maydon nomlarini (`symbol`/`quoteVolume`) qaytaradi — shu sabab ikkalasi
+    ham shu bitta funksiyadan foydalanadi."""
     out: dict[str, float] = {}
-    for t in r.json():
+    for t in data:
         sym = t.get("symbol", "")
         if not sym.endswith(config.QUOTE):
             continue
@@ -164,5 +168,32 @@ async def ticker_24hr() -> dict[str, float]:
     return out
 
 
+async def ticker_24hr() -> dict[str, float]:
+    """BARCHA USDT juftliklarining 24 soatlik savdo hajmi (USDT'da),
+    BITTA so'rovda — MEXC'dan. Hajm portlashini kuzatish uchun — minglab
+    juftlikning har biriga alohida so'rov yubormaslik kerak."""
+    r = await _client.get("/api/v3/ticker/24hr")
+    r.raise_for_status()
+    return _parse_ticker_24hr(r.json())
+
+
+async def volume_ticker_24hr() -> dict[str, float]:
+    """Hajm portlashini kuzatish (`surge_scan_job`) uchun — imkon qadar
+    Binance'dan (dunyodagi eng katta savdo hajmi — "pul qayerda ko'p
+    aylanishi" shu yerda eng aniq ko'rinadi). Binance so'rovi
+    muvaffaqiyatsiz bo'lsa (masalan Railway hududi 451 bilan bloklasa —
+    Futures API'da bu ilgari tasdiqlangan, Spot API boshqa domen bo'lgani
+    uchun alohida sinaladi) — MEXC'ga jimgina qaytadi, hech narsa
+    to'xtamaydi."""
+    try:
+        r = await _binance_client.get("/api/v3/ticker/24hr")
+        r.raise_for_status()
+        return _parse_ticker_24hr(r.json())
+    except Exception:
+        log.warning("Binance hajm surati olinmadi, MEXC'ga qaytilmoqda", exc_info=True)
+        return await ticker_24hr()
+
+
 async def close() -> None:
+    await _binance_client.aclose()
     await _client.aclose()

@@ -2441,3 +2441,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       bo'lganda ENDI "cot"ga o'tmasligi (symbol=None qaytishi) VA "BE"
       muvaffaqiyatli bo'lganda to'g'ri ishlashi ikkalasi ham tasdiqlandi.
       `test_tracker.py` 9/9 — o'zgarmadi.
+
+96. **Savdo hajmi portlashi endi (imkon qadar) Binance ma'lumotidan.**
+    Foydalanuvchi: "Binance datalarini topishimiz kerak bo'lyabti
+    baribir... Likvidatsiya, Savdo hajmi oshishi binanceda pul ko'p
+    aylanadi" — ya'ni "pul qayerda ko'p aylanishi" eng aniq Binance'da
+    ko'rinadi, MEXC'da emas.
+    - **Muhim tarixiy topilma** (`exchange.py`ning boshidagi izohdan):
+      Binance **Futures** API (`fapi.binance.com`) Railway serverining
+      hududini ILGARI 451 (huquqiy sabab bilan bloklash) bilan rad
+      etgan — shu sabab bu loyihada MEXC ishlatiladi. Foydalanuvchiga
+      shu tarix ochiq aytildi (AskUserQuestion orqali) — u baribir
+      Binance **Spot** API'sini (boshqa domen, ehtimol bloklanmagan)
+      sinashni tanladi.
+    - **Likvidatsiya allaqachon Binance'dan** — `liquidations.py`
+      (Coinalyze, `.A` = Binance market kodi) o'zgarishsiz qoldi,
+      bu band shunchaki tasdiqlash edi.
+    - `exchange.py`: yangi `volume_ticker_24hr()` — avval Binance Spot
+      (`api.binance.com/api/v3/ticker/24hr`) sinaydi, XATO bo'lsa
+      (masalan 451 yana chiqsa) JIMGINA mavjud `ticker_24hr()`
+      (MEXC)ga qaytadi — hech narsa to'xtamaydi. Ikkala API bir xil
+      maydon nomlarini (`symbol`/`quoteVolume`) qaytargani uchun
+      umumiy `_parse_ticker_24hr()` ga chiqarildi (nusxa ko'paytirilmadi).
+    - `bot.py`: `volume_snapshot_job()` endi `exchange.ticker_24hr()`
+      o'rniga `exchange.volume_ticker_24hr()` chaqiradi.
+    - Tekshirildi (mock, `httpx` client'lar soxta javob bilan): Binance
+      muvaffaqiyatli bo'lganda undan foydalanilishi; Binance xato
+      (masalan "451 Blocked") qaytarganda JIMGINA MEXC'ga o'tilishi
+      ikkalasi ham tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+      **Haqiqiy Binance Spot'ning Railway'dan ochiqligi hali
+      production'da tasdiqlanmagan** — keyingi deploy loglarida
+      tekshiriladi (agar Binance so'rovi muvaffaqiyatsiz bo'lsa,
+      "Binance hajm surati olinmadi" ogohlantirishi ko'rinadi va
+      tizim baribir MEXC bilan ishlashda davom etadi).

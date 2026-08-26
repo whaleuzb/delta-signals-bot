@@ -4410,9 +4410,9 @@ async def volume_snapshot_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
     try:
-        volumes = await exchange.ticker_24hr()
+        volumes = await exchange.volume_ticker_24hr()
     except Exception:
-        log.exception("MEXC hajm suratini olishda xato")
+        log.exception("Hajm suratini olishda xato")
         return
     try:
         await db.insert_volume_snapshots(list(volumes.items()))
