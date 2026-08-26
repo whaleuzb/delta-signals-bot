@@ -4190,6 +4190,18 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     if await db.news_event_exists(external_key):
         return
 
+    if "🇷🇺" in text:
+        # Foydalanuvchi: "Rossiya bayrog'i bor xabarlar kelmasin" — Rossiya
+        # iqtisodiyoti bilan bog'liq postlar butunlay o'tkazib yuboriladi
+        # (tiker/hashtag mos kelsa ham — masalan "#T" MOEX'dagi rus
+        # kompaniyasi bo'lsa ham, tasodifan AT&T (NYSE: T)ga o'xshab
+        # RESOLVE bo'lib qolgan holatlar shu bilan ham oldi olinadi).
+        await db.insert_news_event(
+            source="markettwits", external_key=external_key, symbol=None, market=None,
+            headline_en=text[:2000], translation_uz=None, insight_uz=None,
+            event_at=event_at, posted=True)
+        return
+
     symbol, market = await _markettwits_symbol(text)
     if not symbol and not await _markettwits_matches_topic(text):
         # Tanish (RESOLVE bo'ladigan) hashtag YO'Q va admin belgilagan
@@ -4201,22 +4213,37 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
             event_at=event_at, posted=True)
         return
 
-    display_text = text
-    if _CYRILLIC_RE.search(text):
-        translated = await translate.to_uz(text)
+    # Hashtaglar matndan ajratib olinadi va TARJIMA QILINMAYDI — ular
+    # birga tarjima qilinsa (masalan "#новости" so'z bilan aralashib)
+    # natija chalkash chiqardi (foydalanuvchi tasdiqladi: "#xabar berish"
+    # kabi noto'g'ri chiqqan). Faqat asosiy matn tarjima qilinadi,
+    # hashtaglar tepaga o'zgarishsiz qaytariladi.
+    hashtags = _HASHTAG_RE.findall(text)
+    body = _HASHTAG_RE.sub("", text).strip()
+    display_body = body
+    if _CYRILLIC_RE.search(body):
+        translated = await translate.to_uz(body)
         if translated:
-            display_text = translated
+            display_body = translated
+    hashtag_line = " ".join(f"#{t}" for t in hashtags)
+    display_text = f"{hashtag_line}\n\n{display_body}" if hashtag_line else display_body
 
     eid = await db.insert_news_event(
         source="markettwits", external_key=external_key, symbol=symbol, market=market,
         headline_en=text[:2000],
-        translation_uz=display_text[:2000] if display_text != text else None,
+        translation_uz=display_text[:2000] if display_body != body else None,
         insight_uz=None, event_at=event_at, posted=False)
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
 
     title = symbol or "MarketTwits"
-    caption = f"📰 <b>{html.escape(title)}</b>\n\n{html.escape(display_text[:1000])}"
+    # `quote=False` — Telegram HTML rejimida bu oddiy matn (atribut emas),
+    # standart `html.escape()` esa '/" belgilarni ham `&#x27;`/`&quot;`ga
+    # aylantirardi — Telegram buni ORQAGA parafrazamaydi (xuddi `&#10;`
+    # xatosi kabi, foydalanuvchi production'da tasdiqladi), xom holda
+    # ko'rinib qolardi.
+    caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
+              f"{html.escape(display_text[:1000], quote=False)}")
 
     # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan
     # narsa yo'q — matn-only post, jonli yangilanishsiz (narx kuzatilmaydi).

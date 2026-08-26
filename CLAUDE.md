@@ -2343,3 +2343,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       qaytarsa, IKKINCHI (qayta) so'rov muvaffaqiyatli natija berishi va
       HAR IKKALA so'rovda ham `de` parametri to'g'ri qo'shilgani
       tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+92. **MarketTwits: Rossiya bayrog'i filtri + tarjima sifati (hashtag
+    aralashmasligi + HTML entity leak) tuzatildi.** Foydalanuvchi
+    haqiqiy postni misol keltirdi: "#T" (MOEX'dagi T-Technologies)
+    tasodifan AT&T (NYSE: T)ga o'xshab RESOLVE bo'lib qolgan (soxta
+    musbat), va tarjima natijasida xom `&#10;` matni ko'rinib qoldi.
+    - **Rossiya filtri**: matnda 🇷🇺 bo'lsa — tiker/hashtag mos kelsa
+      HAM post UMUMAN qilinmaydi ("Rossiya bayrog'i bor xabarlar
+      kelmasin" — aniq so'ralgan). Bu tekshiruv symbol/topic filtridan
+      OLDIN, dedup tekshiruvidan keyin joylashtirildi.
+    - **HTML entity leak** (`&#10;` xom holda ko'rinib qolishi):
+      MyMemory ko'p qatorli matndagi qator ko'chirishlarni ba'zan
+      `&#10;` (HTML son-entity) sifatida qaytar ekan — `translate.py`
+      endi natijani darhol `html.unescape()` qiladi (Telegram bu kabi
+      entitylarni ORQAGA dekodlamaydi, xom matn sifatida ko'rsatadi —
+      production'da tasdiqlangan).
+    - **Bog'liq topilgan xato** (shu tekshiruv paytida): `html.escape()`
+      standart holda `'`/`"` belgilarni ham `&#x27;`/`&quot;`ga
+      aylantiradi — Telegram buni HAM orqaga dekodlamaydi (xuddi
+      `&#10;` kabi). MarketTwits caption qurilishida `quote=False`
+      qo'shildi (faqat matn, HTML atribut EMAS — xavfsiz).
+    - **Tarjima sifati**: hashtaglar endi matndan AJRATIB olinadi va
+      TARJIMA QILINMAYDI — birga yuborilganda (masalan "#новости" so'z
+      bilan aralashib) natija chalkash chiqardi (foydalanuvchi
+      tasdiqlagan "#xabar berish" kabi noto'g'ri natija). Endi faqat
+      asosiy matn tarjima qilinadi, hashtaglar captionning boshiga
+      o'zgarishsiz qaytariladi.
+    - Tekshirildi (mock): 🇷🇺 bilan post UMUMAN yuborilmasligi (RESOLVE
+      bo'ladigan "#T" bo'lsa ham); hashtaglar tarjima so'roviga
+      YUBORILMAGANI (`translate.to_uz` ga uzatilgan matnda yo'qligi
+      tekshirildi) va captionda saqlanib qolgani; apostrof to'g'ri
+      chiqishi (`e'lon`, `&#x27;lon` EMAS). Alohida, haqiqiy HTTP javob
+      simulyatsiyasi bilan: `translate.to_uz()`ning o'zi `&#10;`/`&#39;`
+      kabi entitylarni to'g'ri asl belgilarga (`\n`, `'`) aylantirishi
+      tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.

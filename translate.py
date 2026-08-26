@@ -12,8 +12,16 @@ MUHIM (production loglarida tasdiqlangan): email'siz so'rov ham tez-tez
 so'rovga ISTALGAN email qo'shilsa (tasdiqlanishi shart EMAS) kunlik
 limit sezilarli ko'tariladi — `config.TRANSLATE_EMAIL` shu maqsadda.
 429 kelsa bir marta qisqa kutib qayta urinib ko'riladi (vaqtinchalik
-tirbandlikni yengish uchun, doimiy limit tugashini emas)."""
+tirbandlikni yengish uchun, doimiy limit tugashini emas).
+
+MUHIM: MyMemory ko'p qatorli matndagi qator ko'chirishlarni ba'zan
+HTML SON-ENTITY sifatida (`&#10;`) qaytaradi — natijani `html.unescape()`
+qilmasdan ishlatilsa, keyinroq `bot.py`dagi `html.escape()` uni ikki marta
+kodlab, foydalanuvchiga xom `&#10;` matni ko'rinib qolardi (production'da
+tasdiqlangan xato). Shu sabab natija shu yerning o'zida darhol
+`html.unescape()` qilinadi."""
 import asyncio
+import html
 import logging
 
 import httpx
@@ -56,4 +64,4 @@ async def to_uz(text: str, source: str = "ru") -> str | None:
     if not translated or "MYMEMORY WARNING" in translated.upper():
         log.warning("Tarjima natijasi yaroqsiz: %r", translated)
         return None
-    return translated
+    return html.unescape(translated)
