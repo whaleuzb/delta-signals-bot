@@ -10,6 +10,7 @@ import html
 import io
 import os
 import logging
+import re
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -4059,17 +4060,26 @@ async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── MarketTwits (Telegram userbot) ───────────────────────────
 # `tgsource.py` orqali — SEC/Upbit kabi PULL emas, real-vaqtli PUSH manba
-# (Telethon userbot yangi xabarni darhol yetkazadi). `_process_news_event`
-# aynan shu shaklidagi (`headline_en`/`body_en`/...) itemni kutadi —
-# SEC/Upbit bilan bir xil quvurdan (AI tahlil -> grafik -> post -> jonli
-# yangilanish) o'tadi, faqat manbasi boshqa.
+# (Telethon userbot yangi xabarni darhol yetkazadi).
+#
+# AI ISHLATILMAYDI (Anthropic kredit tugagach, foydalanuvchi so'ragan
+# arzon/bepul muqobil): filtr o'rniga MarketTwits o'zi deyarli har bir
+# postga qo'yadigan #HASHTAG'lardan foydalaniladi — har bir hashtag
+# `_resolve_news_symbol()` bilan (xuddi shu funksiya, avval AI symbol_hint
+# uchun ishlatilgan) sinaladi; birinchi RESOLVE bo'ladigan tiker "bu post
+# savdo-tegishli" mezoni sifatida ishlatiladi. Tarjima ham qilinmaydi —
+# xabar QANDAY kelsa (odatda ruscha) shundayligicha postlanadi. Bu SEC/
+# Upbit quvuridan (`_process_news_event`, AI tahlilga bog'liq) butunlay
+# MUSTAQIL — ular hali ham AI kerak, faqat MarketTwits AI'siz.
+_HASHTAG_RE = re.compile(r"#(\w+)")
 
-class _BotCtx:
-    """`_process_news_event` faqat `ctx.bot`dan foydalanadi.
-    Telethon tinglovchisi `ContextTypes.DEFAULT_TYPE` emas, oddiy `Bot`
-    obyektini beradi — shuning uchun yengil o'rovchi."""
-    def __init__(self, bot_):
-        self.bot = bot_
+
+async def _markettwits_symbol(text: str) -> tuple[str | None, str | None]:
+    for tag in _HASHTAG_RE.findall(text):
+        symbol, market = await _resolve_news_symbol(tag)
+        if symbol:
+            return symbol, market
+    return None, None
 
 
 async def _process_markettwits_message(bot_, channel: str, msg_id: int,
@@ -4078,22 +4088,59 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
         return
     if event_at.tzinfo is None:
         event_at = event_at.replace(tzinfo=timezone.utc)
-    item = {
-        "source": "markettwits",
-        "external_key": f"markettwits:{channel}:{msg_id}",
-        "symbol": None,
-        "market": None,
-        "headline_en": text[:2000],
-        "body_en": "",
-        "event_at": event_at,
-        "source_url": f"https://t.me/{channel}/{msg_id}",
-    }
-    if await db.news_event_exists(item["external_key"]):
+    external_key = f"markettwits:{channel}:{msg_id}"
+    if await db.news_event_exists(external_key):
         return
+
+    symbol, market = await _markettwits_symbol(text)
+    if not symbol:
+        # Tanish (RESOLVE bo'ladigan) hashtag topilmadi — bu bizning
+        # AI'siz filtr: faqat aniq tikerga bog'liq postlar o'tadi.
+        await db.insert_news_event(
+            source="markettwits", external_key=external_key, symbol=None, market=None,
+            headline_en=text[:2000], translation_uz=None, insight_uz=None,
+            event_at=event_at, posted=True)
+        return
+
+    eid = await db.insert_news_event(
+        source="markettwits", external_key=external_key, symbol=symbol, market=market,
+        headline_en=text[:2000], translation_uz=None, insight_uz=None,
+        event_at=event_at, posted=False)
+    if eid is None:
+        return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
+
+    caption = (f"📰 <b>{html.escape(symbol)}</b>\n\n{html.escape(text[:1000])}\n\n"
+              f"🔗 <a href=\"https://t.me/{channel}/{msg_id}\">MarketTwits</a>")
+
+    photo, live_pct = None, None
     try:
-        await _process_news_event(_BotCtx(bot_), item)
+        rendered = await _news_render(symbol, market, event_at)
     except Exception:
-        log.exception("MarketTwits xabari ishlanmadi (%s)", item["external_key"])
+        log.warning("MarketTwits grafigi yasalmadi (%s)", symbol, exc_info=True)
+        rendered = None
+    if rendered:
+        photo, live_pct = rendered
+
+    buttons = await _signal_buttons(symbol, market, bot_.username)
+    try:
+        if photo:
+            sent = await bot_.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+        else:
+            sent = await bot_.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True, reply_markup=buttons)
+    except Exception:
+        log.exception("MarketTwits postlanmadi (%s)", external_key)
+        return
+    await db.set_news_message(eid, sent.message_id)
+    buttons = await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
+    if photo and live_pct is not None:
+        _spawn_background(_live_update(
+            bot_, eid, symbol, market, event_at, config.NEWS_CHANNEL_ID,
+            sent.message_id, live_pct, reply_markup=buttons, caption=caption))
 
 
 _markettwits_started = False
@@ -4602,25 +4649,27 @@ async def cmd_tg_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Haqiqiy kanal postini kutmasdan, xohlagan matnni to'g'ridan-to'g'ri
-    MarketTwits quvuridan (AI filtr -> tarjima -> grafik -> post)
-    o'tkazib ko'radi — /tg_login/koda muvaffaqiyatli kirilganini kutmasdan
-    ham ishlaydi (bu buyruq listener'ga bog'liq emas)."""
+    MarketTwits quvuridan (hashtag -> tiker -> grafik -> post) o'tkazib
+    ko'radi — /tg_login/koda muvaffaqiyatli kirilganini kutmasdan ham
+    ishlaydi (bu buyruq listener'ga bog'liq emas). Matnda RESOLVE
+    bo'ladigan #hashtag bo'lishi shart (masalan #BTC, #SUI, #AAPL)."""
     if not is_admin(update.effective_user.id):
         return
     text = " ".join(ctx.args) if ctx.args else ""
     if not text:
         await update.message.reply_text(
             "Foydalanish: /tg_test <matn>\n"
-            "Masalan: /tg_test SEC odobrila zayavku na Bitcoin ETF")
+            "Matnda tanish #hashtag bo'lsin, masalan:\n"
+            "/tg_test #BTC ETF arizasi tasdiqlandi")
         return
-    await update.message.reply_text("Tahlil qilinmoqda…")
+    await update.message.reply_text("Tekshirilmoqda…")
     fake_msg_id = int(datetime.now(timezone.utc).timestamp())
     await _process_markettwits_message(
         ctx.bot, "sinov", fake_msg_id, text, datetime.now(timezone.utc))
     await update.message.reply_text(
-        "Tayyor. AI buni \"kuchli\" deb topsa — kanalga postlangan bo'lishi "
-        "kerak; \"oddiy/rutin\" deb topsa — hech narsa chiqmaydi (bu normal, "
-        "keyingi savolga qarang).")
+        "Tayyor. Matndagi #hashtaglardan biri tanish tikerga to'g'ri kelsa — "
+        "kanalga postlangan bo'lishi kerak; hech biri topilmasa — hech narsa "
+        "chiqmaydi (bu normal, filtr shunday ishlaydi).")
 
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────

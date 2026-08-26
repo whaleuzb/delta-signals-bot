@@ -2173,3 +2173,40 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
       orqali to'g'ri postlanishi VA xuddi shu `external_key` bilan
       IKKINCHI marta kelsa dedup ishlashi (qayta postlanmasligi)
       tasdiqlandi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+87. **MarketTwits: AI'siz (hashtag-asosli) filtrga o'tkazildi —
+    Anthropic kredit tugagani sabab.** Foydalanuvchi `/tg_test` bilan 3
+    ta xabar sinadi, birortasi ham postlanmadi — Railway loglarida sabab
+    aniq ko'rindi: `anthropic.BadRequestError: Your credit balance is
+    too low`. Bu MarketTwits'ga xos emas edi — `newsai.analyze()` orqali
+    o'tuvchi HAMMA manba (SEC/Upbit ham) o'sha payt AI xatosi bilan
+    jimgina hech narsa postlamayotgan edi. Foydalanuvchi: "AI siz o'zimiz
+    filtr yaratsak o'sha filtr bilan ishlansa bo'lmaydimi?" — MarketTwits
+    uchun HA, chunki manba o'zi deyarli har bir postga #HASHTAG qo'yadi
+    (masalan `#ASTR #hisobot`, `#Sui`) — bu tayyor, bepul signal.
+    - `bot.py`: `_process_markettwits_message()` endi `_process_news_event()`/
+      `newsai.analyze()`ni UMUMAN chaqirmaydi (SEC/Upbit hali ham AI
+      kerak — ular o'zgarmadi, faqat MarketTwits AI'siz). Yangi
+      `_markettwits_symbol()` — matndagi har bir `#hashtag`ni
+      `_resolve_news_symbol()` bilan (avval AI symbol_hint uchun
+      ishlatilgan, o'sha funksiya qayta ishlatildi) sinab, birinchi
+      RESOLVE bo'ladigan tikerni qaytaradi. Tiker topilmasa — post
+      QILINMAYDI (bu AI'siz "kuchli yangilikmi" filtri — faqat aniq
+      tikerga bog'liq postlar o'tadi, kengroq makro/geosiyosiy xabarlar
+      esa STIKER YO'Q sabab tabiiy ravishda chiqarib tashlanadi — bu
+      cheklov, ongli qabul qilindi).
+    - Tarjima ham AI'siz — xabar QANDAY kelsa (odatda ruscha) shundayligicha
+      postlanadi, faqat manba havolasi (`t.me/<kanal>/<msg_id>`) qo'shiladi.
+      Grafik/jonli-yangilanish qismi o'zgarmadi (bu allaqachon AI'siz,
+      faqat birja narx ma'lumoti).
+    - `/tg_test` yordam matni yangilandi ("AI kuchli deb topsa" o'rniga
+      "matnda tanish #hashtag bo'lsa").
+    - Tekshirildi (mock, haqiqiy Postgres, `newsai.analyze` chaqirilsa
+      AssertionError otadigan qilib ataylab sinov qilindi — ya'ni AI
+      chaqirilmaganini ISBOTLAB): `#BTC` bilan post to'g'ri yuborildi;
+      `#Eron #Ormuz #geopolitika` (tanish tiker yo'q) to'g'ri filtrlandi.
+      `test_tracker.py` 9/9 — o'zgarmadi.
+    - **Ochiq savol**: SEC/Upbit hali ham `newsai.analyze()`ga bog'liq —
+      Anthropic kreditsiz ular ham postlamaydi. Foydalanuvchiga alohida
+      aytilgan, hal qilinishi kutilmoqda (kredit qo'shish yoki ularni ham
+      AI'siz qilish).
