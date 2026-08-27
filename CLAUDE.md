@@ -2933,3 +2933,51 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Hali production'da haqiqiy hajm portlashi/jurnal signali bilan
        tasdiqlanmagan** — keyingi haqiqiy surge hodisasi yoki jurnal
        signalida Railway logi orqali tekshirilishi kerak.
+
+109. **Foydalanuvchi (ARIAUSDT misolidan keyin): "O'zi taym freym tanlansa
+     natija ham o'sha taymda keladimi?" -> "Yoq, buni tuzatish kerak.
+     Tanlangan taym freymda natijani yuborishi kerak."** AskUserQuestion
+     orqali aniqlashtirildi: foydalanuvchi XAVFSIZ variantni tanladi —
+     TP/SL ANIQLASH hamon 1 daqiqalik aniqlikda qoladi (`tracker.py`ga
+     tegilmadi, #37'dagi qaror to'g'ri edi), FAQAT ko'RSATISH (yopilish
+     grafigi) izchil bo'lishi kerak edi.
+     - **Topilgan haqiqiy bo'shliq**: `preview_kb()`da UCHTA tanlov bor —
+       "🖼 Yuborgan rasmim bilan"/"🖼 Rasm yuklash" (pic), "📈 Bot grafikni
+       aniqlasin" (okc -> tf_kb), "📝 Rasmsiz davom etish" (nopic). Taym
+       freym FAQAT "okc" yo'lida so'ralardi. Lekin **yopilish grafigi
+       (`chart.signal_chart()`) HAR DOIM avtomatik chiziladi**, foydalanuvchi
+       ochilishda "pic"/"nopic" tanlagan bo'lsa ham — bu holatlarda
+       `chart_tf` NULL qolib, standart 15m'ga tushib qolardi (aynan
+       ARIAUSDT holati).
+     - **Tuzatish**: "pic" (mavjud fayl bilan), "nopic" va rasm-yuklash
+       (`AWAITING_SIGNAL_PHOTO`) yo'llarining HAMMASI endi ham `tf_kb()`
+       ko'rsatadi ("Yopilgandagi natija grafigi qaysi taym freymda
+       chizilsin?" matni bilan) — FARQI: yangi `item["want_bot_chart"]`
+       bayrog'i `False` qilib belgilanadi (faqat "okc" yo'lida `True`).
+       `"tf"` handler'ida endi shu bayroq tekshiriladi: `True` bo'lsa
+       OCHILISH uchun ham bot grafigi chiziladi (`chart.setup_chart()`),
+       `False` bo'lsa faqat `chart_tf` saqlanadi va OCHILISH grafigisiz
+       (yoki foydalanuvchi rasmi bilan) davom etadi — YOPILISH grafigi
+       baribir keyinroq shu saqlangan `chart_tf`da chiziladi.
+     - Natija: endi QANDAY variant tanlansa ham, `chart_tf` HECH QACHON
+       NULL qolmaydi (standart 15m'ga tayanish yo'qoladi) — yopilish
+       grafigi doim foydalanuvchi bilib tanlagan taym freymda chiqadi.
+
+110. **Foydalanuvchi: "shaxsiy kabinetda nega natija grafik bilan
+     kelmayabti? Buni tuzatgan edikku?"** — aniqlashtirildi: Telegram'dagi
+     ShAXSIY chat (bot bilan DM) haqida, "yopish" TUGMASINI QO'LDA
+     bosilgandagi holat.
+     - **Haqiqiy xato topildi**: avtomatik yopilish (TP/SL tekkanda,
+       `poll_job`/`tracker` orqali) shaxsiy workspace uchun grafikni
+       TO'G'RI yuborardi (`elif ws["type"] == "personal":` shoxchasi bor
+       edi) — LEKIN **qo'lda yopish** (`on_close_confirm()`, "Yopish"
+       tugmasi) faqat `if ws["type"] == "group" and ws["group_chat_id"]:`
+       shoxchasiga ega edi — shaxsiy workspace uchun HECH QANDAY qo'shimcha
+       xabar/grafik yuborilmasdi, faqat asl xabar matni tahrirlanardi.
+     - **Tuzatish**: `on_close_confirm()`da endi `ws["type"] in ("group",
+       "personal")` ikkalasi uchun ham grafik (`chart.signal_chart()`)
+       tayyorlanadi; keyin ICHKARIDA `if.../elif ws["type"] == "personal"`
+       orqali guruh yoki `ws["owner_id"]`ga (shaxsiy DM) mos ravishda
+       yuboriladi — bu naqsh avtomatik-yopilish yo'lidagi (`on_button`
+       ichidagi poll_job hodisa handleri, ~qator 2426) mavjud "personal"
+       shoxchasi bilan BIR XIL uslubda yozildi.

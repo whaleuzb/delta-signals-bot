@@ -1039,7 +1039,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
         f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
 
-    if ws["type"] == "group" and ws["group_chat_id"]:
+    if ws["type"] in ("group", "personal"):
         txt = (f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
                f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}")
         # close_now() endi natijani bazaga yozib bo'lgan — yangilangan yozuv
@@ -1052,19 +1052,40 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
                 photo = await chart.signal_chart(sig2, ws["name"], ctx.bot.username)
             except Exception:
                 log.warning("Grafik yasalmadi (qo'lda yopish, #%s)", sig_id, exc_info=True)
-        try:
-            if photo:
-                await ctx.bot.send_photo(
-                    ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
-                    parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
-                    allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
-            else:
-                await ctx.bot.send_message(
-                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
-                    reply_to_message_id=sig["group_msg_id"],
-                    allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
-        except Exception:
-            log.exception("Guruhga yuborilmadi (qo'lda yopish)")
+        if ws["type"] == "group" and ws["group_chat_id"]:
+            try:
+                if photo:
+                    await ctx.bot.send_photo(
+                        ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
+                        parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
+                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+                else:
+                    await ctx.bot.send_message(
+                        ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                        reply_to_message_id=sig["group_msg_id"],
+                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
+            except Exception:
+                log.exception("Guruhga yuborilmadi (qo'lda yopish)")
+        elif ws["type"] == "personal":
+            # Avtomatik (TP/SL) yopilishda shaxsiy chatga grafik ALLAQACHON
+            # yuborilardi (news_scan_job'dagi emas, tracker/poll_job orqali
+            # ishlovchi yo'lda) — lekin QO'LDA yopishda bu shoxcha umuman
+            # yozilmagan edi (faqat matn tahrirlanardi, qo'shimcha xabar/
+            # grafik yo'q). Foydalanuvchi: "shaxsiy kabinetda natija grafik
+            # bilan kelmayabti" — aynan shu qo'lda yopish yo'li edi.
+            try:
+                if photo:
+                    await ctx.bot.send_photo(
+                        ws["owner_id"], InputFile(photo, "signal.png"), caption=txt,
+                        parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
+                        allow_sending_without_reply=True)
+                else:
+                    await ctx.bot.send_message(
+                        ws["owner_id"], txt, parse_mode=ParseMode.HTML,
+                        reply_to_message_id=sig["group_msg_id"],
+                        allow_sending_without_reply=True)
+            except Exception:
+                log.exception("Shaxsiy xabar yuborilmadi (qo'lda yopish)")
 
 
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1648,7 +1669,10 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             return
         item["file_id"] = msg.photo[-1].file_id
         item["gen"] = None
-        await send_final_preview(msg, ctx, token)
+        item["want_bot_chart"] = False
+        await msg.reply_text(
+            "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
+            reply_markup=tf_kb(token))
         return
 
     ws = await get_ws_or_prompt(update, ctx)
@@ -1880,7 +1904,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         PENDING.pop(next(iter(PENDING)), None)
     PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id,
                        "workspace_id": workspace_id, "warn": warn,
-                       "chart_tf": None, "ready_file_id": None}
+                       "chart_tf": None, "ready_file_id": None, "want_bot_chart": False}
 
     body = draft_text(draft)
     if warn:
@@ -2085,6 +2109,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # signalga saqlanadi va YOPILGANDAGI natija grafigi ham aynan shunda
         # chiziladi — signal qaysi masshtabda rejalashtirilgan bo'lsa, natija
         # ham shunda ko'rinsin.
+        item["want_bot_chart"] = True
         await q.edit_message_reply_markup(reply_markup=tf_kb(token))
         return
 
@@ -2094,10 +2119,18 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if action == "pic":
-        # Rasm allaqachon biriktirilgan bo'lsa qayta so'ramaymiz.
+        # Rasm allaqachon biriktirilgan bo'lsa qayta so'ramaymiz — LEKIN
+        # taym freym baribir so'raladi: signal YOPILGANDA natija grafigi
+        # (chart.signal_chart()) doim BOT tomonidan avtomatik chiziladi,
+        # foydalanuvchi ochilishda o'z rasmini tanlagan bo'lsa ham. Bu
+        # taym freym so'ralmasa `chart_tf` NULL qolib, yopilish grafigi
+        # standart 15m'da chiqib, tez/keskin savdolarda (masalan portlash-
+        # qulash) chalkash ko'rinishi mumkin edi (foydalanuvchi ARIAUSDT
+        # misolida ko'rsatdi).
         if item["file_id"]:
-            await _clear_kb(q)
-            await send_final_preview(q.message, ctx, token)
+            item["want_bot_chart"] = False
+            await _edit(q, "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
+                       reply_markup=tf_kb(token))
         else:
             AWAITING_SIGNAL_PHOTO[q.from_user.id] = token
             await _clear_kb(q)
@@ -2107,31 +2140,42 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if action == "nopic":
+        # "pic" (yuqorida) bilan bir xil sabab — yopilish grafigi baribir
+        # avtomatik chiziladi, shuning uchun taym freym baribir kerak.
         item["gen"] = None
-        await _clear_kb(q)
-        await send_final_preview(q.message, ctx, token)
+        item["want_bot_chart"] = False
+        await _edit(q, "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
+                   reply_markup=tf_kb(token))
         return
 
     if action == "tf":
         item["chart_tf"] = chart_tf
         await _clear_kb(q)
-        note = await q.message.reply_text(f"📈 {chart_tf} grafigi chizilmoqda…")
-        ws_row = await db.get_workspace(item["workspace_id"])
-        try:
-            buf = await chart.setup_chart(item["draft"], ws_row["name"] if ws_row else "",
-                                           ctx.bot.username, tf=chart_tf)
-        except Exception:
-            log.warning("Signal grafigi yasalmadi", exc_info=True)
-            buf = None
-        item["gen"] = buf.getvalue() if buf else None
-        try:
-            await note.delete()
-        except Exception:
-            pass
-        if not item["gen"]:
-            await q.message.reply_text(
-                "⚠️ Grafik chizilmadi (birja javob bermadi). "
-                "Signal rasmsiz yuboriladi.")
+        # `want_bot_chart` — faqat "📈 Bot grafikni aniqlasin" yo'lida True:
+        # o'sha holatda OCHILISH posti uchun ham bot grafigi chiziladi.
+        # "pic"/"nopic"/rasm-yuklash yo'llarida foydalanuvchi ochilishda
+        # o'z rasmini yoki rasmsiz variantni tanlagan — bu yerda faqat
+        # `chart_tf` saqlanadi (YOPILGANDAGI natija grafigi uchun kerak,
+        # u har doim avtomatik chiziladi), OCHILISH posti uchun qayta
+        # bot grafigi CHIZILMAYDI.
+        if item.get("want_bot_chart"):
+            note = await q.message.reply_text(f"📈 {chart_tf} grafigi chizilmoqda…")
+            ws_row = await db.get_workspace(item["workspace_id"])
+            try:
+                buf = await chart.setup_chart(item["draft"], ws_row["name"] if ws_row else "",
+                                               ctx.bot.username, tf=chart_tf)
+            except Exception:
+                log.warning("Signal grafigi yasalmadi", exc_info=True)
+                buf = None
+            item["gen"] = buf.getvalue() if buf else None
+            try:
+                await note.delete()
+            except Exception:
+                pass
+            if not item["gen"]:
+                await q.message.reply_text(
+                    "⚠️ Grafik chizilmadi (birja javob bermadi). "
+                    "Signal rasmsiz yuboriladi.")
         await send_final_preview(q.message, ctx, token)
         return
 
