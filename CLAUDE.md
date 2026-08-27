@@ -2842,3 +2842,31 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        orqali production'da chindan ishlashini tasdiqlash (sandbox
        `api.coinank.com`ni bloklagani uchun bu yerdan sinab bo'lmadi —
        `curl` "CONNECT tunnel failed, response 403" bilan rad etdi).
+
+107. **CoinAnk ham ishlamadi — production'da 403 "system error" qaytardi
+     (server/datacenter IP bloklangan ko'rinadi, Binance 451'iga
+     o'xshash, lekin geografik emas — botga qarshi himoya). Brauzerga
+     o'xshash `Origin`/`Referer`/Chrome User-Agent sarlavhalari
+     qo'shib ko'rildi — YORDAM BERMADI, xato o'zgarmadi. Foydalanuvchi:
+     "shamda qolaqolsin" — heatmap g'oyasidan BUTUNLAY voz kechildi.**
+     - `coinank.py` o'chirildi, `chart.py`dagi `liquidation_heatmap_chart()`
+       (va faqat shu yerda ishlatilgan `import numpy as np`) olib
+       tashlandi, `config.py`dagi `COINANK_API_KEY`/`COINANK_INTERVAL`
+       o'chirildi, `bot.py`dagi barcha izlar (`import coinank`,
+       `_liquidation_heatmap_photo()`, ikkala chaqiruv joyi —
+       `_process_liquidation_spike()` va `news_live_job()`,
+       `/heatmaptest` buyrug'i va uning handler ro'yxatdan
+       o'tkazilishi) butunlay olib tashlandi. `COINANK_API_KEY`
+       Railway'da bo'shatildi.
+     - Likvidatsiya posti #101'dagi (klines `limit` dinamik hisoblash
+       tuzatilgandan keyingi) holatiga to'liq qaytdi — faqat oddiy
+       shamli grafik, hech qanday heatmap.
+     - **To'liq saboq (#98-#107 yo'li)**: CoinGlass ($699/oy) ->
+       Hyblock Capital (amalda pullik) -> CoinAnk (bepul ko'rindi,
+       lekin server IP bloklandi) — UCHALASI HAM ishlamadi, ikkitasi
+       narx, bittasi botga qarshi himoya sababli. Xulosa: "brauzerda
+       bepul ko'ringan narsa" serverdan (Railway) doim ham ishlayvermaydi
+       — buni ANIQ tasdiqlash uchun albatta production'da (sandbox'da
+       emas) sinash kerak, xuddi shu holatda ham bo'lgani kabi.
+     - `test_tracker.py` 9/9 — o'zgarmadi (bu butun epizod davomida
+       hech qachon buzilmagan).
