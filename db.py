@@ -1148,6 +1148,16 @@ async def volume_surge_candidates(multiplier: float, exclude_hours: float,
         return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier)
 
 
+async def latest_volume_snapshot(symbol: str) -> float | None:
+    """`whale_scan_job` (bot.py) uchun — bitta juftlikning eng so'nggi
+    yozilgan 24 soatlik (USDT) hajmi. Yozuv yo'q bo'lsa `None`."""
+    async with pool().acquire() as c:
+        v = await c.fetchval(
+            "SELECT volume FROM volume_snapshots WHERE symbol=$1 "
+            "ORDER BY recorded_at DESC LIMIT 1", symbol)
+        return float(v) if v is not None else None
+
+
 # ───────────────── Global sozlamalar (kalit-qiymat) ─────────────────
 
 async def get_setting(key: str) -> str | None:

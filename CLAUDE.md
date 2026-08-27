@@ -3158,3 +3158,54 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        hodisasida Railway logi + kanaldagi rasmning o'zi orqali
        tekshirilishi kerak (news_idx to'g'ri shamda, grafik tiqilib
        qolmagan, kechikish kamaygan).
+
+116. **Foydalanuvchi: boshqa bir botning "Big Whales Buy Activity" xabar
+     namunasini yuborib, "Kunlik savdo hajmidan 10% baland summa kirsa
+     buyga ham sellga ham xabar keladigan" funksiya so'radi.** AskUserQuestion
+     orqali qamrov aniqlashtirildi: (1) FAQAT portlash nomzodlarida
+     (butun bozor EMAS — MEXC individual savdolarni HAR juftlik uchun
+     ALOHIDA so'rov talab qiladi, yuzlab juftlikda bu tezlik chegarasiga
+     zarba berardi; portlash nomzodlari esa bir vaqtda kam sonli bo'ladi,
+     xavfsiz), (2) mavjud News Trade AI kanaliga (alohida kanal shart emas).
+     - **Arxitektura — deyarli hech qanday YANGI infratuzilma shart
+       bo'lmadi**: `db.active_live_events()` (allaqachon `news_live_job`
+       ishlatadigan, `source`ga qaramaydigan so'rov) orqali "hozir jonli
+       kuzatilayotgan portlash hodisalari" ro'yxati olinadi (yangi so'rov
+       shart emas), `exchange._agg_trades()` (#114'da tuzatilgan, MEXC
+       1-soatlik oyna cheklovini hisobga oluvchi) orqali so'nggi
+       `WHALE_WINDOW_MINUTES` (15) daqiqalik savdolar olinadi, `m`
+       (isBuyerMaker) maydoni orqali xarid/sotuv ajratiladi.
+     - **`db.py`**: yangi `latest_volume_snapshot(symbol)` — bitta
+       juftlikning eng so'nggi USDT hajmi (`volume_snapshots`dan, allaqachon
+       `exchange.volume_ticker_24hr()`ning `quoteVolume`i — USDT, aynan
+       kerakli birlik).
+     - **`bot.py` — yangi `whale_scan_job()`** (`WHALE_SCAN_SECONDS=120`da
+       bir): aktiv portlash tangalarini oladi, har biri uchun 24s hajm +
+       so'nggi 15 daqiqalik savdolarni oladi, xarid VA sotuv summasini
+       (USDT) ALOHIDA hisoblaydi; qaysi tomon 24s hajmning `WHALE_MIN_
+       PCT=10` foizidan OSHSA — o'sha tomon uchun ALOHIDA xabar (grafiksiz,
+       oddiy matn, foydalanuvchi namunasiga o'xshash format: miqdor+tanga,
+       narx+% o'zgarish, hajm+% ulush, davomiylik, 24s hajm). Ikkalasi
+       ham chegaradan oshsa — ikkita alohida xabar (buy va sell).
+     - **Dedup**: `news_events.source="whale"`, `external_key=
+       "whale:{symbol}:{sana}:{buy|sell}"` — mavjud UNIQUE cheklov orqali
+       (SEC/surge bilan bir xil naqsh), kuniga bitta tanga+tomon uchun
+       bitta xabar. `active_live_events()`ga ta'sir qilmasligi uchun
+       `message_id`/`render_tf` ATAYLAB o'rnatilmaydi (faqat dedup uchun
+       yozuv, jonli yangilanish shart emas — bu bir martalik matn xabar).
+     - **`config.py`**: `WHALE_MIN_PCT=10`, `WHALE_WINDOW_MINUTES=15`,
+       `WHALE_SCAN_SECONDS=120`.
+     - Miqdor formatlash (`_fmt_usd_k` — #113'dagi M/K tuzatishi) va narx
+       formatlash (`_fmt_price`) — mavjud yordamchilar QAYTA ishlatildi,
+       yangi funksiya yozilmadi.
+     - Tekshirildi (mock): (1) faqat 10% chegaradan OSHGAN tomon (buy)
+       uchun xabar yozilishi, sotuv (chegaradan past) e'tiborga
+       olinmasligi, boshqa `source` (SEC) va `symbol=None` qatorlar
+       chetlab o'tilishi; (2) xabar matni to'g'ri formatlanishi (miqdor,
+       narx%, hajm%, davomiylik, 24s hajm barchasi to'g'ri hisoblangan);
+       (3) dedup — `insert_news_event` `None` qaytarsa qayta yubormaslik;
+       (4) 24s hajm topilmasa xavfsiz o'tkazib yuborish. `test_tracker.py`
+       9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy kit faolligi bilan tasdiqlanmagan** —
+       birinchi haqiqiy portlash+kit faolligi to'qnashganda Railway logi
+       orqali tekshirilishi kerak.

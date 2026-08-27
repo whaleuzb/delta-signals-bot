@@ -120,6 +120,16 @@ SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "15"))
 SURGE_SNAPSHOT_HOURS = float(os.getenv("SURGE_SNAPSHOT_HOURS", "0.25"))
 SURGE_SCAN_SECONDS = int(os.getenv("SURGE_SCAN_SECONDS", "300"))
 
+# --- Kit (whale) faolligi: FAQAT portlash nomzodlarida (foydalanuvchi
+#     qarori — butun bozorni HAR individual savdo darajasida kuzatish
+#     MEXC tezlik chegarasiga zarba beradi, portlash nomzodlari esa
+#     odatda bir vaqtda bittа-ikkitа bo'ladi) — so'nggi WHALE_WINDOW_
+#     MINUTES ichida xarid YOKI sotuv hajmi 24 soatlik hajmning
+#     WHALE_MIN_PCT foizidan oshsa, alohida xabar (grafiksiz) ---
+WHALE_MIN_PCT = float(os.getenv("WHALE_MIN_PCT", "10"))
+WHALE_WINDOW_MINUTES = int(os.getenv("WHALE_WINDOW_MINUTES", "15"))
+WHALE_SCAN_SECONDS = int(os.getenv("WHALE_SCAN_SECONDS", "120"))
+
 # --- Yangi tanga listing e'lonlari: Koreys birjalari (Upbit) — kalitsiz,
 #     bepul, manzili listings.py'da (DISCLOSURE_URL). Bithumb HALI
 #     QO'SHILMAGAN — rasmiy notices manzili sandbox tarmog'ida

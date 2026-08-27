@@ -4824,6 +4824,103 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Hajm portlashi ishlanmadi (%s)", row["symbol"])
 
 
+# ─────────────────────────── Kit (whale) faolligi ───────────────────────────
+# Foydalanuvchi so'rovi (namuna: "KERNEL/USDT ... Big Whales Buy Activity ...
+# 1.12M KERNEL have been bought ... Order Size: 46.5K USDT (5.13%) ...
+# Duration: 8 minutes ... 24h Vol: 906.29K USDT"): FAQAT portlash
+# nomzodlarida (butun bozorni HAR individual savdo darajasida kuzatish
+# MEXC'ga yuzlab alohida so'rov talab qiladi — tezlik chegarasiga zarba
+# beradi; portlash nomzodlari esa odatda bir vaqtda bitta-ikkita bo'ladi,
+# shu bois xavfsiz) — so'nggi `WHALE_WINDOW_MINUTES` ichidagi xarid YOKI
+# sotuv hajmi 24 soatlik hajmning `WHALE_MIN_PCT` foizidan oshsa,
+# ALOHIDA (grafiksiz, matn) xabar. `db.active_live_events()` (`news_
+# live_job` ham ishlatadigan, `source`ga qaramaydigan so'rov) orqali
+# "hozir jonli kuzatilayotgan portlash hodisalari" ro'yxati olinadi —
+# yangi so'rov shart emas.
+
+async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID:
+        return
+    try:
+        rows = await db.active_live_events(config.NEWS_LIVE_MINUTES)
+    except Exception:
+        log.exception("Kit faolligi uchun aktiv hodisalar olinmadi")
+        return
+    surge_symbols = {r["symbol"] for r in rows if r["source"] == "surge" and r["symbol"]}
+    if not surge_symbols:
+        return
+
+    now = datetime.now(timezone.utc)
+    now_ms = int(now.timestamp() * 1000)
+    window_ms = config.WHALE_WINDOW_MINUTES * 60_000
+
+    for symbol in surge_symbols:
+        try:
+            vol24h = await db.latest_volume_snapshot(symbol)
+        except Exception:
+            log.warning("Kit faolligi uchun 24s hajm olinmadi (%s)", symbol, exc_info=True)
+            continue
+        if not vol24h:
+            continue
+        try:
+            trades = await exchange._agg_trades(symbol, now_ms - window_ms, now_ms)
+        except Exception:
+            log.warning("Kit faolligi uchun savdolar olinmadi (%s)", symbol, exc_info=True)
+            continue
+        if not trades:
+            continue
+
+        buys, sells = [], []
+        for t in trades:
+            try:
+                price = float(t["p"]); qty = float(t["q"]); ts = int(t["T"])
+                is_sell = bool(t["m"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            (sells if is_sell else buys).append((ts, price, qty))
+
+        threshold_usd = vol24h * config.WHALE_MIN_PCT / 100
+        for side_label, side_trades, emoji, verb_head, verb in (
+            ("buy", buys, "✳", "Yirik xaridorlar faolligi", "sotib olindi"),
+            ("sell", sells, "🔻", "Yirik sotuvchilar faolligi", "sotildi"),
+        ):
+            if not side_trades:
+                continue
+            usd = sum(p * q for _, p, q in side_trades)
+            if usd < threshold_usd:
+                continue
+
+            today_key = now.strftime("%Y-%m-%d")
+            external_key = f"whale:{symbol}:{today_key}:{side_label}"
+            eid = await db.insert_news_event(
+                source="whale", external_key=external_key, symbol=symbol, market="crypto",
+                headline_en=f"{symbol}: whale {side_label} {usd:.0f} USDT",
+                translation_uz=None, insight_uz=None, event_at=now, posted=True)
+            if eid is None:
+                continue   # shu tanga/tomon uchun bugun allaqachon xabar berilgan
+
+            base_qty = sum(q for _, _, q in side_trades)
+            first_ts, first_price, _ = min(side_trades, key=lambda x: x[0])
+            last_ts, last_price, _ = max(side_trades, key=lambda x: x[0])
+            duration_min = max(1, round((last_ts - first_ts) / 60_000))
+            price_chg = (last_price - first_price) / first_price * 100 if first_price else 0.0
+            ticker = symbol[:-len(config.QUOTE)] if symbol.endswith(config.QUOTE) else symbol
+
+            text = (
+                f"<b>{html.escape(symbol)}</b> [MEXC]\n"
+                f"{emoji} {html.escape(verb_head)}\n"
+                f"{_fmt_usd_k(base_qty)} {html.escape(ticker)} {verb}\n"
+                f"💰Narx: {_fmt_price(last_price)} USDT ({price_chg:+.2f}%)\n"
+                f"🚨Hajm: {_fmt_usd_k(usd)} USDT ({usd / vol24h * 100:.2f}%)\n"
+                f"⏳Davomiyligi: {duration_min} daqiqa\n"
+                f"📊24 soatlik hajm: {_fmt_usd_k(vol24h)} USDT"
+            )
+            try:
+                await ctx.bot.send_message(config.NEWS_CHANNEL_ID, text, parse_mode=ParseMode.HTML)
+            except Exception:
+                log.exception("Kit faolligi postlanmadi (%s)", external_key)
+
+
 # ─────────────────────────── Yirik likvidatsiyalar ───────────────────────────
 # Coinalyze orqali (liquidations.py) — fyuchers birjalaridagi kaskadli
 # majburiy yopilishlarni kuzatadi. `COINALYZE_API_KEY` bo'sh bo'lsa
@@ -5294,6 +5391,9 @@ def main() -> None:
                                 interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
     app.job_queue.run_repeating(surge_scan_job,
                                 interval=config.SURGE_SCAN_SECONDS, first=120)
+    # Kit (whale) faolligi — faqat portlash nomzodlarida (WHALE_SCAN_SECONDS).
+    app.job_queue.run_repeating(whale_scan_job,
+                                interval=config.WHALE_SCAN_SECONDS, first=100)
     # Yirik likvidatsiyalar: Coinalyze 5 daqiqalik ustunlarga mos interval
     # (COINALYZE_API_KEY bo'sh bo'lsa job o'zi hech narsa qilmaydi).
     app.job_queue.run_repeating(liquidation_scan_job, interval=300, first=150)
