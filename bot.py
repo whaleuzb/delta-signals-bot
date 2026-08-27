@@ -4017,7 +4017,21 @@ async def _news_candles(symbol: str, market: str, event_at: datetime,
     # `event_ms` va `start_ms` har chaqiriqda BIR XIL bo'lgani uchun
     # (`event_at` o'zgarmaydi), news_idx — demak "kirish" narxi — butun jonli
     # oyna davomida barqaror qoladi: foiz doim aynan shu ONdan hisoblanadi.
-    news_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - event_ms))
+    #
+    # MUHIM: avval `close_ms`ga ENG YAQIN shamni izlardik — lekin HALI
+    # TUGAMAGAN (joriy) sham uchun `close_ms` davr OXIRINI bildiradi (masalan
+    # "1d"da BUGUNGI kun oxiri, hali kelmagan — kelajakdagi vaqt), `event_ms`
+    # esa deyarli doim HOZIR. Kunning ilk soatlarida "bugun oxiri"gacha bo'lgan
+    # masofa "kecha oxiri"gacha bo'lgan masofadan KATTA chiqib, `news_idx`
+    # NOTO'G'RI — bir sham OLDINGI (kechagi) sham deb tanlanardi (foydalanuvchi:
+    # "bu kechagi kunni xisoblayabtiyu?" — portlash belgisi TACUSDT'ning eng
+    # oxirgi emas, undan OLDINGI shamida chiqqan edi). Endi TO'G'RI: `event_ms`
+    # qaysi shamning [open_ms, close_ms) oynasiga tushishini qidiramiz — joriy
+    # (hali tugamagan) sham uchun ham bu TO'G'RI ishlaydi, chunki `open_ms` allaqachon
+    # o'tgan, `close_ms` esa hali kelmagan bo'lsa ham `event_ms` shu oraliqda.
+    news_idx = next((i for i, c in enumerate(candles) if c.open_ms <= event_ms < c.close_ms), None)
+    if news_idx is None:
+        news_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - event_ms))
     anchor_price = candles[news_idx].close
     live_price = candles[-1].close
     live_pct = (live_price - anchor_price) / anchor_price * 100
@@ -5275,10 +5289,11 @@ def main() -> None:
     # dedup orqali — tez-tez tekshirish takror yuborishga olib kelmaydi).
     app.job_queue.run_repeating(econ_job, interval=60, first=20)
     # Hajm portlashi: hajm suratini SURGE_SNAPSHOT_HOURS soatda bir (bazaga
-    # tarix yig'ish), nomzodlarni esa har 30 daqiqada tekshiradi.
+    # tarix yig'ish), nomzodlarni esa SURGE_SCAN_SECONDS'da bir tekshiradi.
     app.job_queue.run_repeating(volume_snapshot_job,
                                 interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
-    app.job_queue.run_repeating(surge_scan_job, interval=1800, first=120)
+    app.job_queue.run_repeating(surge_scan_job,
+                                interval=config.SURGE_SCAN_SECONDS, first=120)
     # Yirik likvidatsiyalar: Coinalyze 5 daqiqalik ustunlarga mos interval
     # (COINALYZE_API_KEY bo'sh bo'lsa job o'zi hech narsa qilmaydi).
     app.job_queue.run_repeating(liquidation_scan_job, interval=300, first=150)

@@ -703,7 +703,12 @@ def surge_profile_chart(candles, news_idx: int, symbol: str, live_pct: float,
                       textcoords="offset points", color=mark_col, fontsize=10,
                       fontweight="bold", ha="center")
 
-    ax_price.set_xlim(-1.5, len(candles) - 0.3)
+    # O'ng tomonda bo'sh joy (`_render()`/`news_chart()`dagi `right_pad` bilan
+    # bir xil sabab) — buni QO'YMASAK oxirgi (joriy) sham va "Portlash" yorlig'i
+    # to'g'ridan-to'g'ri Volume panelining chetiga TIQILIB qolardi (foydalanuvchi:
+    # "hammasi tiqilib qolgan, chartni o'rtaroqqa surish kerak").
+    right_pad = max(6.0, len(candles) * 0.3)
+    ax_price.set_xlim(-1.5, len(candles) - 1 + right_pad)
     ax_price.set_ylim(lo, hi)
     ax_price.grid(True, color=GRID, lw=0.6, alpha=0.6)
     ax_price.tick_params(colors=TXT, labelsize=9.5)

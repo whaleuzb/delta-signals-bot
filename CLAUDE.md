@@ -3114,3 +3114,47 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        tasdiqlanmagan** — keyingi surge postida Railway logi orqali
        (yoki rasmning o'zida Volume+Delta ikki panel ko'rinishi bilan)
        tekshirilishi kerak.
+
+115. **Foydalanuvchi (TACUSDT surge skrinshoti bilan): "Bu kechagi kungini
+     xisoblayabtiyu? Nega bunaqa? Keyin chartni o'rtaroqqa surish kerak
+     hammasi tiqlib qolgan. Portlash schemasini jiddiy o'zgartirishimiz
+     kerak. Kech kelgan xabar hechkimga foyda bermaydi."** Uchta alohida
+     narsa: (1) "Portlash" belgisi noto'g'ri shamda, (2) grafik joylashuvi
+     tiqilib qolgan, (3) umuman kechikish hali ham katta.
+     - **(1) "Kechagi kun" xatosi — ildiz sabab topildi**: `_news_candles()`
+       (bot.py, barcha post turlari — SEC/surge/likvidatsiya/econ uchun
+       UMUMIY) `news_idx`ni shamning `close_ms` (davr OXIRI)ga ENG YAQINini
+       qidirib topardi. Lekin HALI TUGAMAGAN (joriy) sham uchun `close_ms`
+       — davr OXIRI, ya'ni "1d"da BUGUN KECHQURUN (KELAJAKDA). Kunning ilk
+       soatlarida "hozir"gacha bo'lgan masofa "bugun oxiri"gacha nisbatan
+       "kecha oxiri"gacha YAQINROQ chiqib, `news_idx` bir sham OLDINGA
+       (kechagiga) siljib qolardi — aynan TACUSDT'da ko'ringan xato.
+       **Tuzatish**: endi `event_ms` qaysi shamning `[open_ms, close_ms)`
+       oralig'iga TUSHISHINI qidiradi (joriy tugamagan sham uchun ham
+       to'g'ri — `open_ms` allaqachon o'tgan, `event_ms` shu oraliqda),
+       eski masofaviy usul faqat FALLBACK sifatida qoladi.
+     - **(2) Tiqilib qolish**: `chart.surge_profile_chart()` narx panelida
+       O'NG TOMONDA umuman bo'sh joy yo'q edi (`xlim` to'g'ridan-to'g'ri
+       oxirgi shamda tugardi) — boshqa barcha grafik funksiyalarida
+       (`_render()`/`news_chart()`) bor `right_pad` shu yerda YO'Q edi.
+       Endi qo'shildi (`max(6.0, len(candles)*0.3)`), oxirgi sham va
+       "Portlash" yorlig'i Volume panelidan ajralib turadi.
+     - **(3) Kechikish — foydalanuvchi tafsilot berishni istamadi
+       ("yuqorida bergan variantga o'zgartiraylik"), shuning uchun o'zim
+       qaror qildim**: `SURGE_SNAPSHOT_HOURS` yana qisqartirildi (1 -> 0.25,
+       ya'ni 15 daqiqa — bitta bulk so'rov bo'lgani uchun hamon xavfsiz),
+       `surge_scan_job`ning qattiq yozilgan 1800s (30 daqiqa) intervali
+       endi yangi `config.SURGE_SCAN_SECONDS=300` (5 daqiqa) bilan
+       almashtirildi. Eng yomon holatda kechikish: ~4.5 soat (#108 oldin)
+       -> ~1.5 soat (#112) -> endi **~20 daqiqa**.
+     - Tekshirildi (mock): `news_idx` tuzatishi — sun'iy "joriy kun ertalab
+       soat 02:00" holatida ESKI kod kechagi shamni tanlashi, YANGI kod
+       to'g'ri BUGUNGI (oxirgi) shamni tanlashi isbotlandi. Vizual: mock
+       ma'lumot bilan qayta chizilgan rasm foydalanuvchiga yuborildi —
+       "Portlash" endi oxirgi shamda, o'ng tomonda bo'sh joy bor. Eski
+       profil/pagination testlari (#108, #114) o'zgarishsiz o'tdi.
+       `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da tasdiqlanmagan** — keyingi haqiqiy portlash
+       hodisasida Railway logi + kanaldagi rasmning o'zi orqali
+       tekshirilishi kerak (news_idx to'g'ri shamda, grafik tiqilib
+       qolmagan, kechikish kamaygan).
