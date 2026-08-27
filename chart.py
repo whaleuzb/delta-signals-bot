@@ -524,36 +524,37 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
     return buf
 
 
-# --- Likvidatsiya heatmap (Hyblock Capital) ---
+# --- Likvidatsiya heatmap ---
 # CoinGlass'ning mashhur narx-klaster heatmap'i Professional tarifdan
-# ($699/oy) boshlab ochiladi — foydalanuvchi buni to'lashni xohlamadi.
-# Hyblock Capital'ning BEPUL tarifida xuddi shu turdagi (`/liquidationHeatmap`)
-# endpoint ochiq ekan (foydalanuvchi o'zi hisob ochib tekshirdi va rasmiy
-# OpenAPI spetsifikatsiyasini yubordi). Javob — narx darajasi (`startingPrice`/
-# `endingPrice`) va vaqt (`timestamp`) bo'yicha "size" (taxminiy majburan
-# yopilish hajmi) qatorlari — oddiy shamli grafik EMAS, shuning uchun
-# `_draw_candles`/`news_chart`dan butunlay ALOHIDA chiziladi.
+# ($699/oy) boshlab ochiladi, Hyblock Capital ham amalda pullik bo'lib
+# chiqdi — ikkalasi ham rad etildi. Foydalanuvchi keyin CoinAnk'ning
+# (coinank.com) bepul veb-sahifasi ortidagi ichki JSON so'rovini
+# DevTools orqali topdi (`coinank.py`) — bu funksiya manba QAYSI
+# bo'lishidan qat'i nazar bir xil oddiy shaklni kutadi: `{startingPrice,
+# timestamp, size}` (narx darajasi, vaqt, taxminiy majburan yopilish
+# hajmi) — oddiy shamli grafik EMAS, shuning uchun `_draw_candles`/
+# `news_chart`dan butunlay ALOHIDA chiziladi.
 import numpy as np
 
 HEATMAP_CMAP = "inferno"
 
 
 def liquidation_heatmap_chart(buckets: list[dict], coin: str,
-                              lookback: str) -> io.BytesIO | None:
-    """`buckets` — Hyblock `/liquidationHeatmap` javobidagi `data` ro'yxati:
-    `{startingPrice, endingPrice, side, size, timestamp}`. Narx (Y) va vaqt
-    (X) bo'yicha panjara yasab, `size`ni rang intensivligi sifatida chizadi
-    (bir xil narx+vaqt katagida ikkala tomon — long va short — bo'lsa,
-    ikkalasi QO'SHILADI: bu yerda yo'nalish emas, UMUMIY klaster zichligi
-    ko'rsatiladi). Ma'lumot yetarli bo'lmasa (masalan barcha `size=0`
-    yoki bo'sh ro'yxat) `None` — chaqiruvchi shunda oddiy shamli grafikka
-    qaytadi."""
+                              interval: str) -> io.BytesIO | None:
+    """`buckets` — `{startingPrice, timestamp, size}` ro'yxati (manba
+    modul — `coinank.py` va h.k. — shu shaklga o'giradi). Narx (Y) va
+    vaqt (X) bo'yicha panjara yasab, `size`ni rang intensivligi
+    sifatida chizadi (bir xil narx+vaqt katagida bir nechta qator
+    bo'lsa, ularning `size`lari QO'SHILADI — bu yerda yo'nalish emas,
+    UMUMIY klaster zichligi ko'rsatiladi). Ma'lumot yetarli bo'lmasa
+    (masalan barcha `size=0` yoki bo'sh ro'yxat) `None` — chaqiruvchi
+    shunda oddiy shamli grafikka qaytadi."""
     if not buckets:
         return None
 
     times = sorted({int(b["timestamp"]) for b in buckets})
     # Narx darajasi kaliti sifatida `startingPrice` ishlatiladi (har bir
-    # bucket kengligi bir xil deb taxmin qilinadi — Hyblock javobida shunday).
+    # bucket kengligi bir xil deb taxmin qilinadi).
     prices = sorted({float(b["startingPrice"]) for b in buckets})
     if len(times) < 2 or len(prices) < 2:
         return None
@@ -598,7 +599,7 @@ def liquidation_heatmap_chart(buckets: list[dict], coin: str,
     cbar.outline.set_edgecolor(GRID)
 
     fig.text(0.045, 0.955, coin, fontsize=16, fontweight="bold", color=TITLE)
-    fig.text(0.045, 0.925, f"· Likvidatsiya heatmap · {lookback}", fontsize=11, color=TXT)
+    fig.text(0.045, 0.925, f"· Likvidatsiya heatmap · {interval}", fontsize=11, color=TXT)
 
     fig.subplots_adjust(left=0.062, right=0.93, top=0.88, bottom=0.08)
 

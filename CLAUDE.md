@@ -2776,3 +2776,55 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        — foydalanuvchidan `HYBLOCK_API_KEY`/`HYBLOCK_CLIENT_ID`/
        `HYBLOCK_CLIENT_SECRET` so'ralmoqda (Railway o'zgaruvchisi
        sifatida, kodga/CLAUDE.md'ga yozilmaydi).
+
+105. **#104'dagi Hyblock Capital PULLIK bo'lib chiqdi (foydalanuvchi
+     o'zi tekshirdi: "pullik ekan") — CoinAnk bilan ALMASHTIRILDI.**
+     AskUserQuestion orqali yo'l so'ralganda foydalanuvchi savolni
+     rad etib, o'zi "upbitdagidek malumotni olib kormaymizmi?" taklif
+     qildi — ya'ni Upbit/cryptocurrencyalerting.com'da qanday qilingan
+     bo'lsa, brauzer DevTools orqali biror bepul veb-sahifa ortidagi
+     ICHKI JSON so'rovini topish. Foydalanuvchi **Claude in Chrome**
+     orqali (29 ta amal) buni bajardi: `coinank.com`ning bepul heatmap
+     sahifasi ortida `api.coinank.com/api/liqMap/getLiqHeatMap`
+     endpoint'ini topdi va **login/token'siz (guest) holatda ham
+     Python orqali to'g'ridan-to'g'ri ishlashini shaxsan tekshirdi**
+     (200 OK).
+     - `hyblock.py` BUTUNLAY O'CHIRILDI (o'rniga endi ishlatilmaydigan,
+       pullik xizmat kodini saqlash ma'nosiz), o'rniga **`coinank.py`**
+       yozildi — ancha SODDA (OAuth2 yo'q, faqat statik
+       `coinank-apikey` header'i). `GET /getLiqHeatMap?exchangeName=
+       Binance&symbol=...&interval=...` so'raydi, javobdagi
+       `data.liqHeatMap.{data,chartTimeArray,priceArray}` uchligini
+       `chart.liquidation_heatmap_chart()` kutgan umumiy `{startingPrice,
+       timestamp, size}` shakliga o'giradi (shu sabab `chart.py`ga
+       HECH QANDAY o'zgarish kerak bo'lmadi — faqat izohlar/parametr
+       nomi `lookback`->`interval`ga yangilandi, mantiq bir xil qoldi).
+     - **MUHIM OGOHLANTIRISH** (kodda ham yozilgan): bu RASMIY,
+       hujjatlashtirilgan ochiq API EMAS — saytning frontend'i
+       ishlatadigan ICHKI chaqiruv. `coinank-apikey` sayt darajasidagi
+       STATIK kalit (shaxsiy hisob emas) — istalgan payt CoinAnk
+       tomonidan o'zgartirilishi yoki bloklanishi mumkin. Shu sabab
+       qattiq kodga yozilmadi, `COINANK_API_KEY` (Railway o'zgaruvchisi)
+       orqali beriladi — agar kelajakda ishlamay qolsa, xuddi shu
+       usulda (DevTools -> Network -> `getLiqHeatMap`) qayta olib,
+       FAQAT o'zgaruvchini yangilash kifoya (qayta deploy shart emas).
+     - `config.py`: `HYBLOCK_*` o'chirildi, `COINANK_API_KEY`/
+       `COINANK_INTERVAL` (standart `"1d"`) qo'shildi.
+     - `bot.py`: `import hyblock` -> `import coinank`,
+       `_liquidation_heatmap_photo()` endi ikkita parametr oladi
+       (`symbol` — CoinAnk so'rovi uchun to'liq juftlik, `base` —
+       grafik sarlavhasi uchun) — CoinAnk'ning `symbol` parametri
+       Hyblock'ning `coin`idan farqli, quote QO'SHILGAN holda kerak
+       (masalan "ETHUSDT", "BTC" emas).
+     - Tekshirildi (mock, foydalanuvchi yuborgan haqiqiy javob
+       namunasiga asoslanib): to'g'ri parametrlar (`symbol`,
+       `exchangeName=Binance`, `coinank-apikey` header) bilan so'ralishi,
+       `size=0` nuqtalarning chiqarib tashlanishi, `[xIndex,yIndex,size]`
+       uchliklarning `chartTimeArray`/`priceArray` orqali to'g'ri
+       narx/vaqtga o'girilishi, o'chirilgan holatda so'rov umuman
+       yubormasligi, `success:false` javobida `None` qaytarishi va
+       yakuniy PNG chiqishi — barchasi tasdiqlandi (rasm foydalanuvchiga
+       ko'rsatildi). `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy `coinank-apikey` bilan sinalmagan**
+       — foydalanuvchi yuborgan kalit Railway'ga qo'yilgach keyingi
+       deployda tasdiqlanadi.
