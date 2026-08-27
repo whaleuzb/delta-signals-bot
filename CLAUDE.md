@@ -3061,3 +3061,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        `min_snapshots=3`) mantig'iga tegilmadi — faqat ko'proq/tezroq
        yozuv to'planadi, kechikish endi ~4.5 soat o'rniga ~1.5 soatgacha.
      - `test_tracker.py` 9/9 — o'zgarmadi (`tracker.py`ga tegilmadi).
+
+113. **Foydalanuvchi (likvidatsiya post skrinshoti bilan): "1 million
+     dollorni 1.123,64K qilib yuboryabti tog'irlash kerak."** Xato
+     topildi: `_fmt_usd_k()` HAR DOIM 1000ga bo'lib "K" qo'shardi —
+     $1.123.640 kabi million miqdorlar "1.123,64K" bo'lib chiqib, "1
+     mingga yaqin" deb chalkash o'qilardi.
+     - **Tuzatish**: `value_usd >= 1_000_000` bo'lsa endi 1 000 000ga
+       bo'linib "M" qo'shiladi (masalan "1,12M"), aks holda eskicha "K"
+       (mingda). Yagona chaqiruvchi joyi — `_process_liquidation_spike()`
+       likvidatsiya xabari.
+     - Tekshirildi: 1.123.640 -> "1,12M", 533.890 -> "533,89K" (o'zgarmadi),
+       chegara holatlari (999.999 -> "1.000,00K", 1.000.000 -> "1,00M").
+       `test_tracker.py` 9/9 — o'zgarmadi.

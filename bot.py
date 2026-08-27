@@ -4822,7 +4822,12 @@ def _eu_decimal(s: str) -> str:
 
 
 def _fmt_usd_k(value_usd: float) -> str:
-    """533890 -> "533,89K" (mingda, 2 xona, vergul-kasr)."""
+    """533890 -> "533,89K" (mingda), 1123640 -> "1,12M" (millionda) — 1
+    million va undan katta bo'lsa "K" o'rniga "M" ishlatiladi, aks holda
+    "1.123,64K" kabi chalkash (million miqdorini ming deb o'qitadigan)
+    ko'rinish chiqardi."""
+    if value_usd >= 1_000_000:
+        return _eu_decimal(f"{value_usd / 1_000_000:,.2f}") + "M"
     return _eu_decimal(f"{value_usd / 1000:,.2f}") + "K"
 
 
