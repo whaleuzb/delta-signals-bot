@@ -194,6 +194,96 @@ async def volume_ticker_24hr() -> dict[str, float]:
         return await ticker_24hr()
 
 
+# --- Xarid/sotuv (Volume Delta) profili haqiqiy savdolardan ---
+# Shamlarning umumiy hajmi (Candle.volume) xarid va sotuvni AJRATMAYDI —
+# buning uchun har bir savdoning "agressor tomoni" kerak, bu faqat
+# individual savdolar (`/aggTrades`) darajasida bor. MUHIM CHEKLOV:
+# MEXC bir so'rovda MAKSIMUM 1000 ta savdo qaytaradi — likvid tangada
+# 30 kun (foydalanuvchi avval so'ragan) MINGLAB so'rov (yuz minglab-
+# millionlab savdo) talab qilardi, bu IMKONSIZ (MEXC IP tezlik
+# chegarasiga zarba berib, botning boshqa qismlarini — narx kuzatuvi,
+# signal skaneri — buzib qo'yardi). Shu sabab foydalanuvchi bilan
+# kelishilgan holda oyna 48 SOATGA cheklandi (portlash nomzodlari
+# odatda kichikroq hajmli tangalar bo'lgani uchun bu amalda ham
+# yetarlicha tez). `max_trades` — qo'shimcha xavfsizlik devori.
+AGG_TRADES_MAX = 60_000
+
+
+async def _agg_trades(symbol: str, start_ms: int, end_ms: int) -> list[dict]:
+    """`start_ms`/`end_ms` oralig'idagi BARCHA agregatsiyalangan
+    savdolarni sahifalab (`startTime`ni oxirgi olingan savdodan keyingiga
+    surib) oladi. Tarmoq xatosi, tezlik chegarasi (429) yoki
+    `AGG_TRADES_MAX`ga yetish — QISMAN natija bilan JIMGINA to'xtaydi
+    (chaqiruvchi buni "yetarli" deb hisoblaydi, xato emas)."""
+    out: list[dict] = []
+    cur_start = start_ms
+    while cur_start < end_ms and len(out) < AGG_TRADES_MAX:
+        try:
+            r = await _client.get("/api/v3/aggTrades", params={
+                "symbol": symbol, "startTime": cur_start, "endTime": end_ms,
+                "limit": 1000,
+            })
+        except Exception:
+            log.warning("MEXC aggTrades so'rovi xato (%s)", symbol, exc_info=True)
+            break
+        if r.status_code == 429:
+            log.warning("MEXC rate limit (aggTrades, %s) — %d savdo bilan to'xtatildi",
+                       symbol, len(out))
+            break
+        if 400 <= r.status_code < 500:
+            break
+        r.raise_for_status()
+        batch = r.json()
+        if not batch:
+            break
+        out.extend(batch)
+        try:
+            last_ts = int(batch[-1]["T"])
+        except (KeyError, TypeError, ValueError):
+            break
+        if last_ts < cur_start:
+            break   # kutilmagan/orqaga ketuvchi vaqt — cheksiz halqadan himoya
+        cur_start = last_ts + 1
+        if len(batch) < 1000:
+            break   # oxirgi sahifa
+    return out
+
+
+async def volume_delta_profile(symbol: str, start_ms: int, end_ms: int,
+                               lo: float, hi: float,
+                               n_bins: int = 40) -> tuple[list[float], list[float]] | None:
+    """Narx darajasi (`lo`..`hi`, `n_bins` ustunga bo'lingan) bo'yicha
+    HAQIQIY xarid/sotuv hajmi profili. `aggTrades`ning `m` maydoni
+    (`isBuyerMaker`) — Binance/MEXC standart konventsiyasi: `True` bo'lsa
+    xaridor MARKET-MAKER, ya'ni bu savdoni SOTUVCHI boshlagan (bozor
+    sotuvi); `False` bo'lsa xaridor boshlagan (bozor xaridi). Natija:
+    `(vol_bins, delta_bins)` — ikkalasi ham `n_bins` uzunlikda,
+    `delta_bins[i] = xarid_hajmi[i] - sotuv_hajmi[i]`. Savdo topilmasa
+    yoki oraliq noto'g'ri (`hi <= lo`) bo'lsa `None`."""
+    if hi <= lo:
+        return None
+    trades = await _agg_trades(symbol, start_ms, end_ms)
+    if not trades:
+        return None
+    bin_size = (hi - lo) / n_bins
+    vol_bins = [0.0] * n_bins
+    delta_bins = [0.0] * n_bins
+    for t in trades:
+        try:
+            price = float(t["p"])
+            qty = float(t["q"])
+            is_sell = bool(t["m"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        idx = int((price - lo) / bin_size)
+        idx = max(0, min(n_bins - 1, idx))
+        vol_bins[idx] += qty
+        delta_bins[idx] += -qty if is_sell else qty
+    if not any(vol_bins):
+        return None
+    return vol_bins, delta_bins
+
+
 async def close() -> None:
     await _binance_client.aclose()
     await _client.aclose()

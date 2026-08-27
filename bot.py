@@ -8,6 +8,7 @@ bir-birining ma'lumotini ko'rmaydi (db.py'dagi workspace_id orqali ajratilgan).
 import asyncio
 import html
 import io
+import json
 import os
 import logging
 import re
@@ -3936,21 +3937,17 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
     await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
-async def _news_render(symbol: str, market: str, event_at: datetime,
-                       end_ms: int | None = None, tf: str = "1m",
-                       before_ms: int | None = None,
-                       label: str = "News",
-                       marker_color: str | None = None) -> tuple[io.BytesIO, float] | None:
-    """Hodisa vaqti atrofidagi shamlarni olib, `news_idx`ni topadi va grafik
-    chizadi. `end_ms=None` — hozirgacha (jonli yangilanishda har safar
-    o'sib boradigan oyna). Sham topilmasa `None` — chaqiruvchi shunda
-    matn-only xabarga qaytadi (yoki jonli yangilanishni o'tkazib yuboradi).
+async def _news_candles(symbol: str, market: str, event_at: datetime,
+                        end_ms: int | None = None, tf: str = "1m",
+                        before_ms: int | None = None
+                        ) -> tuple[list, int, float] | None:
+    """`_news_render()`/hajm portlashi (surge) profilli grafigi uchun
+    UMUMIY — shamlarni olib, `news_idx`/`live_pct`ni hisoblaydi, LEKIN
+    rasm CHIZMAYDI (chaqiruvchi o'zi `chart.news_chart()` yoki
+    `chart.surge_profile_chart()`ni tanlaydi). Sham topilmasa `None`.
 
-    `tf`/`before_ms`/`label` — News Trade AI (SEC) standart qiymatlarda
-    ishlatadi (1m, 60 daqiqa oldin, "News"); `surge_scan_job` uzoqroq
-    oyna va boshqa yorliq bilan XUDDI SHU funksiyani qayta ishlatadi.
-    `marker_color` — `chart.news_chart()`ga o'zgarishsiz uzatiladi
-    (likvidatsiya uchun long/short ustunligiga qarab RED/GREEN)."""
+    `end_ms=None` — hozirgacha (jonli yangilanishda har safar o'sib
+    boradigan oyna)."""
     if before_ms is None:
         before_ms = 60 * chart.TF_MINUTES[tf] * 60_000   # hodisadan OLDIN 60 sham
     event_ms = int(event_at.timestamp() * 1000)
@@ -3980,6 +3977,27 @@ async def _news_render(symbol: str, market: str, event_at: datetime,
     anchor_price = candles[news_idx].close
     live_price = candles[-1].close
     live_pct = (live_price - anchor_price) / anchor_price * 100
+    return candles, news_idx, live_pct
+
+
+async def _news_render(symbol: str, market: str, event_at: datetime,
+                       end_ms: int | None = None, tf: str = "1m",
+                       before_ms: int | None = None,
+                       label: str = "News",
+                       marker_color: str | None = None) -> tuple[io.BytesIO, float] | None:
+    """`_news_candles()`ning oddiy shamli grafik (`chart.news_chart()`)
+    chizuvchi qatlami — News Trade AI (SEC), listing, likvidatsiya kabi
+    barcha standart post turlari shuni ishlatadi. `tf`/`before_ms`/`label` —
+    standart qiymatlarda ishlatadi (1m, 60 daqiqa oldin, "News");
+    `marker_color` — likvidatsiya uchun long/short ustunligiga qarab
+    RED/GREEN. Hajm portlashi (surge) esa PROFILLI grafik uchun
+    `_news_candles()`ni TO'G'RIDAN-TO'G'RI chaqiradi (bu funksiyani
+    chetlab o'tadi) — pastdagi `_process_surge_candidate()`ga qarang."""
+    result = await _news_candles(symbol, market, event_at, end_ms=end_ms, tf=tf,
+                                 before_ms=before_ms)
+    if result is None:
+        return None
+    candles, news_idx, live_pct = result
     return chart.news_chart(candles, news_idx, symbol, live_pct, label=label,
                             marker_color=marker_color, tf=tf), live_pct
 
@@ -4098,18 +4116,43 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for row in rows:
+        # Hajm portlashi (surge) uchun bir marta (post vaqtida) hisoblangan
+        # Volume/Volume Delta profili bo'lsa — QAYTA SO'RALMAYDI (MEXC
+        # tezlik chegarasiga xavf), bazadan o'qilib qayta ishlatiladi,
+        # faqat shamlar/narx yangilanadi.
+        profile = None
+        if row["profile_data"]:
+            try:
+                profile = json.loads(row["profile_data"])
+            except (TypeError, ValueError):
+                log.warning("profile_data o'qib bo'lmadi (%s)", row["symbol"], exc_info=True)
+                profile = None
+
         try:
-            rendered = await _news_render(
-                row["symbol"], row["market"], row["event_at"],
-                tf=row["render_tf"] or "1m", before_ms=row["render_before_ms"],
-                label=row["render_label"] or "News",
-                marker_color=row["render_marker_color"])
+            if profile:
+                result = await _news_candles(
+                    row["symbol"], row["market"], row["event_at"],
+                    tf=row["render_tf"] or "1d", before_ms=row["render_before_ms"])
+                if result is None:
+                    continue
+                candles, news_idx, live_pct = result
+                photo = chart.surge_profile_chart(
+                    candles, news_idx, row["symbol"], live_pct,
+                    profile["vol_bins"], profile["delta_bins"],
+                    profile["bin_lo"], profile["bin_size"],
+                    label=row["render_label"] or "Portlash", tf=row["render_tf"])
+            else:
+                rendered = await _news_render(
+                    row["symbol"], row["market"], row["event_at"],
+                    tf=row["render_tf"] or "1m", before_ms=row["render_before_ms"],
+                    label=row["render_label"] or "News",
+                    marker_color=row["render_marker_color"])
+                if rendered is None:
+                    continue
+                photo, live_pct = rendered
         except Exception:
             log.warning("Jonli grafik yasalmadi (%s)", row["symbol"], exc_info=True)
             continue
-        if rendered is None:
-            continue
-        photo, live_pct = rendered
 
         buttons = await _signal_buttons(row["symbol"], row["market"], ctx.bot.username)
         kb_rows = list(buttons.inline_keyboard) if buttons else []
@@ -4580,18 +4623,41 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     # Grafik: kunlik shamlar, `SURGE_DECLINE_DAYS` (matn ham shu son bilan
     # "N kunlik pasayish" deydi — grafik oynasi endi shu bilan MOS) davri
     # to'liq ko'rinadi, oxirgi sham "Portlash" nuqtasi bilan belgilanadi.
-    # `_news_render`ning SEC uchun ishlatiladigani bilan bir xil funksiya,
-    # faqat kengroq oyna/timeframe va boshqa yorliq bilan.
+    # Foydalanuvchi so'rovi (Hyblock Capital veb-sahifasi uslubi) bilan
+    # endi HAQIQIY MEXC savdolaridan Volume/Volume Delta panellari ham
+    # qo'shiladi — faqat BIR MARTA (post vaqtida) hisoblanadi va bazaga
+    # saqlanadi (`db.set_news_profile`), jonli yangilanish uni QAYTA
+    # SO'RAMASDAN qayta ishlatadi (`news_live_job`ga qarang) — MEXC
+    # tezlik chegarasiga xavf tug'dirmasligi uchun.
     photo, live_pct = None, None
+    profile_bins: tuple[list[float], list[float], float, float] | None = None
     surge_before_ms = config.SURGE_DECLINE_DAYS * 86_400_000
     try:
-        rendered = await _news_render(symbol, "crypto", now, tf="1d",
-                                      before_ms=surge_before_ms, label="Portlash")
+        result = await _news_candles(symbol, "crypto", now, tf="1d", before_ms=surge_before_ms)
     except Exception:
         log.warning("Hajm portlashi grafigi yasalmadi (%s)", symbol, exc_info=True)
-        rendered = None
-    if rendered:
-        photo, live_pct = rendered
+        result = None
+    if result:
+        candles, news_idx, live_pct = result
+        p_lo = min(c.low for c in candles)
+        p_hi = max(c.high for c in candles)
+        delta_result = None
+        try:
+            delta_result = await exchange.volume_delta_profile(
+                symbol, now_ms - chart.DELTA_WINDOW_MS, now_ms, p_lo, p_hi,
+                n_bins=chart.DELTA_BINS)
+        except Exception:
+            log.warning("Portlash uchun volume delta profili olinmadi (%s)", symbol, exc_info=True)
+        if delta_result:
+            vol_bins, delta_bins = delta_result
+            bin_size = (p_hi - p_lo) / chart.DELTA_BINS
+            profile_bins = (vol_bins, delta_bins, p_lo, bin_size)
+            photo = chart.surge_profile_chart(candles, news_idx, symbol, live_pct,
+                                              vol_bins, delta_bins, p_lo, bin_size,
+                                              label="Portlash", tf="1d")
+        else:
+            photo = chart.news_chart(candles, news_idx, symbol, live_pct,
+                                     label="Portlash", tf="1d")
 
     buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
     try:
@@ -4611,6 +4677,8 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         render_tf="1d" if photo else None,
         render_before_ms=surge_before_ms if photo else None,
         render_label="Portlash" if photo else None)
+    if profile_bins:
+        await db.set_news_profile(eid, *profile_bins)
     await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 

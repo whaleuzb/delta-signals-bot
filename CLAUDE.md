@@ -2870,3 +2870,66 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        emas) sinash kerak, xuddi shu holatda ham bo'lgani kabi.
      - `test_tracker.py` 9/9 — o'zgarmadi (bu butun epizod davomida
        hech qachon buzilmagan).
+
+108. **Foydalanuvchi Hyblock Capital veb-sahifasidagi ko'rinishni
+     yoqtirib, "jurnaldagi kiritilgan signallarga ham qoysak bo'ladimi?"
+     so'radi — HAQIQIY MEXC savdo ma'lumotidan Volume + Volume Delta
+     panellari endi HAM hajm portlashi (surge) postida, HAM jurnal
+     signal grafiklarida (`setup_chart()`/`signal_chart()`) ishlaydi.**
+     - Foydalanuvchi tasdiqladi: jurnal grafiklari (`_render()` orqali,
+       `setup_chart()` — signal E'LON QILINGANDA, `signal_chart()` —
+       YOPILGANDA) FAQAT BIR MARTA chiziladi, News Trade AI'ning har-
+       4-soniyalik jonli yangilanishidek TAKROR emas — shuning uchun
+       MEXC tezlik chegarasi xavfi bu yerda YO'Q, xavfsiz qo'shildi.
+     - `exchange.py`: `_agg_trades(symbol, start_ms, end_ms)` — MEXC
+       `/aggTrades`ni SAHIFALAB (`startTime`ni oxirgi savdodan keyingiga
+       surib) oladi, 429/tarmoq xatosida QISMAN natija bilan jimgina
+       to'xtaydi, `AGG_TRADES_MAX=60000` xavfsizlik devori bilan.
+       `volume_delta_profile(symbol, start_ms, end_ms, lo, hi, n_bins)` —
+       `m` (`isBuyerMaker`) maydoni orqali xarid/sotuvni ajratib, narx
+       darajasi bo'yicha `(vol_bins, delta_bins)` qaytaradi.
+     - `chart.py`: `_draw_side_profiles()` — Volume/Volume Delta
+       panellarini chizuvchi UMUMIY yordamchi (`_render()` va
+       `surge_profile_chart()` ikkalasida ham ishlatiladi, kod
+       takrorlanishining oldini olish uchun). `_render()`ga ixtiyoriy
+       `vol_bins`/`delta_bins`/`bin_lo`/`bin_size` parametrlari qo'shildi
+       — berilsa uch ustunli (GridSpec: narx+Volume+Volume Delta)
+       joylashuvga o'tadi, berilmasa (barcha ESKI chaqiruvlar) xatti-
+       harakat BUTUNLAY O'ZGARMAYDI (bitta o'qli, ichki hajm profili
+       bilan). `_delta_profile()` — `setup_chart()`/`signal_chart()`
+       uchun umumiy: FAQAT kripto uchun (aksiya/forex'da tarixiy savdo
+       ma'lumoti yo'q), oxirgi `DELTA_WINDOW_MS` (48 soat — #107'dagi
+       MEXC `limit=1000` cheklovi sababli 30 kun EMAS) ichidan hisoblaydi,
+       har qanday xato — `None` (chaqiruvchi ODDIY, profilsiz grafikka
+       xatarsiz qaytadi).
+     - `db.py`: yangi `profile_data JSONB` ustuni (`news_events`) +
+       `set_news_profile(event_id, vol_bins, delta_bins, bin_lo,
+       bin_size)` — surge posti uchun BIR MARTA hisoblangan profilni
+       saqlaydi. Haqiqiy Postgres bilan JSONB yozish/o'qish (`$2::jsonb`
+       cast, asyncpg bu ustunni xom JSON matni sifatida qaytaradi)
+       TASDIQLANDI.
+     - `bot.py`: `_news_render()` ikkiga bo'lindi — `_news_candles()`
+       (shamlar/`news_idx`/`live_pct`ni hisoblaydi, RASM CHIZMAYDI) va
+       yupqa `_news_render()` (`chart.news_chart()` chizadi, BARCHA ESKI
+       chaqiruvchilar — SEC/listing/likvidatsiya — o'zgarishsiz davom
+       etadi). `_process_surge_candidate()`: endi `_news_candles()` +
+       `exchange.volume_delta_profile()` (48 soat) chaqiradi, muvaffaqiyatli
+       bo'lsa `chart.surge_profile_chart()`, aks holda oddiy
+       `chart.news_chart()` (fallback) — natija `db.set_news_profile()`
+       bilan saqlanadi. `news_live_job()`: `row["profile_data"]` mavjud
+       bo'lsa CACHED bin'lar + YANGI shamlar bilan `chart.surge_profile_
+       chart()` chaqiradi (exchange'ga QAYTA so'rov YO'Q), aks holda
+       eski `_news_render()` yo'li.
+     - Tekshirildi: (1) `_agg_trades()` sahifalash (2 sahifa, `startTime`
+       to'g'ri surilishi), 429'da qisman natija; (2) xarid/sotuv `m`
+       maydoni orqali to'g'ri ajratilishi; (3) `chart._delta_profile()`
+       faqat kripto uchun ishlashi va MEXC xatosida `None` qaytarishi;
+       (4) `setup_chart()`/`signal_chart()` profilli VA profilsiz
+       (forex, xato) holatlarda PNG chiqarishi; (5) haqiqiy Postgres
+       bilan `profile_data` JSONB round-trip. Barcha natija rasmlari
+       foydalanuvchiga ko'rsatildi (2 marta — birinchi versiyada
+       "volume juda noaniq" fikri bo'yicha soxta test ma'lumoti
+       realroq qilib qayta chizildi). `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy hajm portlashi/jurnal signali bilan
+       tasdiqlanmagan** — keyingi haqiqiy surge hodisasi yoki jurnal
+       signalida Railway logi orqali tekshirilishi kerak.

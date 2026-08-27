@@ -7,6 +7,7 @@ Multi-tenant: har bir signal bitta workspace'ga tegishli.
   - type='personal' — shaxsiy jurnal, hech qayerga e'lon qilinmaydi,
                        faqat owner_id o'zi ko'ra oladi.
 """
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -241,6 +242,12 @@ ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_tf TEXT;
 ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_before_ms BIGINT;
 ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_label TEXT;
 ALTER TABLE news_events ADD COLUMN IF NOT EXISTS render_marker_color TEXT;
+-- Hajm portlashi (surge) uchun HAQIQIY Volume/Volume Delta profili
+-- (exchange.volume_delta_profile(), MEXC savdolaridan) — POST vaqtida
+-- BIR MARTA hisoblanadi va shu yerda saqlanadi, `news_live_job` har
+-- jonli tikda uni QAYTA SO'RAMASDAN qayta ishlatadi (faqat shamlar/narx
+-- yangilanadi) — MEXC tezlik chegarasiga xavf tug'dirmasligi uchun.
+ALTER TABLE news_events ADD COLUMN IF NOT EXISTS profile_data JSONB;
 
 -- AQSH makroiqtisodiy taqvim: kunlik ro'yxat va hodisadan oldingi eslatma
 -- IKKI MARTA yuborilmasligi uchun dedup. GLOBAL jadval (workspace'siz),
@@ -1042,6 +1049,20 @@ async def set_news_message(event_id: int, message_id: int, caption: str, *,
             "WHERE id=$1",
             event_id, message_id, caption, render_tf, render_before_ms,
             render_label, render_marker_color)
+
+
+async def set_news_profile(event_id: int, vol_bins: list[float], delta_bins: list[float],
+                           bin_lo: float, bin_size: float) -> None:
+    """Hajm portlashi (surge) uchun HAQIQIY MEXC savdolaridan hisoblangan
+    Volume/Volume Delta profilini saqlaydi — BIR MARTA, post vaqtida.
+    `news_live_job` buni har jonli tikda O'QIYDI (qayta hisoblamaydi) —
+    MEXC tezlik chegarasiga xavf tug'dirmasligi uchun (CLAUDE.md #108)."""
+    payload = json.dumps({"vol_bins": vol_bins, "delta_bins": delta_bins,
+                          "bin_lo": bin_lo, "bin_size": bin_size})
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE news_events SET profile_data=$2::jsonb WHERE id=$1",
+            event_id, payload)
 
 
 async def active_live_events(cutoff_minutes: float) -> list[asyncpg.Record]:

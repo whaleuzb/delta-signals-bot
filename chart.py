@@ -20,6 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
+import exchange
 import tracker
 
 log = logging.getLogger("chart")
@@ -47,6 +48,20 @@ SETUP_BARS = 120       # yangi signal grafigida ko'rsatiladigan sham soni
 PAD_BARS = 8           # yopilgan signalda kirish/chiqish atrofidagi zaxira shamlar
 MIN_BARS = 40          # natija grafigi juda "yalang'och" bo'lib qolmasligi uchun
 MAX_CANDLES = 1000     # bitta klines chaqiruvidagi eng ko'p sham
+
+# Volume/Volume Delta panellari (foydalanuvchi so'rovi — Hyblock Capital
+# veb-sahifasi uslubi) uchun — HAQIQIY MEXC savdolaridan (`exchange.
+# volume_delta_profile()`). Faqat KRIPTO uchun (aksiya/forex'da bunday
+# ochiq tarixiy savdo ma'lumoti yo'q) va faqat JURNAL signal grafiklari
+# (`setup_chart()`/`signal_chart()`) uchun — bular signal ochilganda va
+# yopilganda BIR MARTA chiziladi, News Trade AI'ning har-4-soniyalik
+# jonli yangilanishidek TAKROR chaqirilmaydi, shuning uchun MEXC tezlik
+# chegarasiga xavf yo'q. 48 soat — 30 kunlik oynadan farqli, bu chinakam
+# amalga oshiriladigan chegara (MEXC bir so'rovda MAKSIMUM 1000 savdo
+# qaytaradi — 30 kun minglab so'rov talab qilardi, CLAUDE.md #107'ga
+# qarang).
+DELTA_WINDOW_MS = 48 * 3_600_000
+DELTA_BINS = 30
 
 
 def norm_tf(tf: str | None) -> str:
@@ -151,12 +166,68 @@ def _draw_volume_profile(ax, candles, lo: float, hi: float,
                 edgecolor="none")
 
 
+def _draw_side_profiles(ax_vol, ax_delta, vol_bins: list[float], delta_bins: list[float],
+                        bin_lo: float, bin_size: float, lo: float, hi: float) -> None:
+    """`_render()`/`surge_profile_chart()` uchun umumiy — HAQIQIY MEXC
+    savdolaridan (`exchange.volume_delta_profile()`) olingan narx darajasi
+    bo'yicha Volume va Volume Delta (xarid-sotuv) panellari, alohida
+    o'qlarga (`ax_vol`/`ax_delta`) chiziladi — ikkalasi ham chaqiruvchi
+    tomonidan narx (`ax_price`) bilan BIR XIL `sharey` ga ega bo'lishi
+    kerak."""
+    peak_vol = max(vol_bins) or 1.0
+    for i, v in enumerate(vol_bins):
+        if v <= 0:
+            continue
+        y0 = bin_lo + i * bin_size
+        ax_vol.barh(y0 + bin_size / 2, v, height=bin_size * 0.92, color=VP_COLOR,
+                   alpha=0.25 + 0.55 * (v / peak_vol), edgecolor="none")
+    ax_vol.set_xlim(0, peak_vol * 1.08)
+    ax_vol.set_ylim(lo, hi)
+    ax_vol.tick_params(colors=TXT, labelsize=8)
+    ax_vol.set_title("Volume", color=TXT, fontsize=10, pad=6)
+
+    peak_delta = max((abs(d) for d in delta_bins), default=0.0) or 1.0
+    for i, d in enumerate(delta_bins):
+        if d == 0:
+            continue
+        y0 = bin_lo + i * bin_size
+        color = GREEN if d >= 0 else RED
+        ax_delta.barh(y0 + bin_size / 2, d, height=bin_size * 0.92, color=color, alpha=0.8)
+    ax_delta.axvline(0, color=GRID, lw=0.8)
+    ax_delta.set_xlim(-peak_delta * 1.1, peak_delta * 1.1)
+    ax_delta.set_ylim(lo, hi)
+    ax_delta.tick_params(colors=TXT, labelsize=8)
+    ax_delta.set_title("Volume Delta", color=TXT, fontsize=10, pad=6)
+
+
 def _render(candles, *, header: str, side: str, entry: float, sl: float,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
             bot_username: str | None, tf: str, note: str | None,
-            entry_idx: int | None = None) -> io.BytesIO:
-    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+            entry_idx: int | None = None,
+            vol_bins: list[float] | None = None, delta_bins: list[float] | None = None,
+            bin_lo: float | None = None, bin_size: float | None = None) -> io.BytesIO:
+    """`vol_bins`/`delta_bins`/`bin_lo`/`bin_size` — ixtiyoriy, berilsa
+    (`exchange.volume_delta_profile()`dan, faqat kripto uchun) narx
+    grafigi yoniga HAQIQIY Volume/Volume Delta panellari (uch ustunli
+    joylashuv, `surge_profile_chart()`dagi bilan bir xil uslub)
+    qo'shiladi — berilmasa (standart, aksariyat chaqiruvlar), avvalgidek
+    BITTA o'qli, ichki hajm profili bilan chiziladi (xatti-harakat
+    o'ZGARMAYDI)."""
+    has_profile = vol_bins is not None and delta_bins is not None
+    if has_profile:
+        fig = plt.figure(figsize=(11, 5.6), dpi=160)
+        gs = fig.add_gridspec(1, 3, width_ratios=[5, 1.15, 1.15], wspace=0.05)
+        ax = fig.add_subplot(gs[0])
+        ax_vol = fig.add_subplot(gs[1], sharey=ax)
+        ax_delta = fig.add_subplot(gs[2], sharey=ax)
+        for extra_ax in (ax_vol, ax_delta):
+            extra_ax.set_facecolor(BG)
+            extra_ax.set_xticks([])
+            for spine in extra_ax.spines.values():
+                spine.set_color(GRID)
+    else:
+        fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
 
@@ -167,6 +238,9 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
         levels.append(exit_price)
     lo = min(lo, *levels)
     hi = max(hi, *levels)
+    if has_profile:
+        lo = min(lo, bin_lo)
+        hi = max(hi, bin_lo + len(vol_bins) * bin_size)
     pad = (hi - lo) * 0.08 or hi * 0.01
     lo -= pad
     hi += pad
@@ -178,12 +252,17 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     # markaziga yaqinroq chiqishi, yorliqlar esa shamlar bilan ustma-ust
     # tushmasligi uchun (foydalanuvchi: "yozuvlar chartga aralashib
     # ketyabti", "hozirgi shamni ramka markaziga chiqarish kerak"). Undan
-    # KEYIN — alohida, doimiy ko'rinadigan hajm profili zonasi.
+    # KEYIN — alohida, doimiy ko'rinadigan hajm profili zonasi — FAQAT
+    # `has_profile=False` bo'lganda shu o'qning ICHIDA (aks holda haqiqiy
+    # Volume/Delta panellari ALOHIDA o'qlarda chiziladi, pastga qarang).
     right_pad = max(10.0, len(candles) * 0.45)
-    vp_width = max(10.0, len(candles) * 0.22)
     gap_end = len(candles) - 1 + right_pad
-    x_max = gap_end + vp_width
-    _draw_volume_profile(ax, candles, lo, hi, vp_left=gap_end, vp_right=x_max)
+    if has_profile:
+        x_max = gap_end
+    else:
+        vp_width = max(10.0, len(candles) * 0.22)
+        x_max = gap_end + vp_width
+        _draw_volume_profile(ax, candles, lo, hi, vp_left=gap_end, vp_right=x_max)
 
     # Yorliqlar QISQA — so'z o'rniga belgi (Entry ●, SL ✕, TP ▲{n}) —
     # "Entry 0.00157" o'rniga "● 0.00157" kabi (foydalanuvchi so'zlarni
@@ -232,6 +311,9 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     for spine in ax.spines.values():
         spine.set_color(GRID)
 
+    if has_profile:
+        _draw_side_profiles(ax_vol, ax_delta, vol_bins, delta_bins, bin_lo, bin_size, lo, hi)
+
     side_col = GREEN if side == "LONG" else RED
     fig.text(0.045, 0.955, header, fontsize=16, fontweight="bold", color=TITLE)
     fig.text(0.045, 0.925, side, fontsize=11, fontweight="bold", color=side_col)
@@ -261,6 +343,29 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
     return buf
 
 
+async def _delta_profile(market: str, symbol: str, lo: float, hi: float,
+                         end_ms: int) -> tuple[list[float], list[float], float, float] | None:
+    """`setup_chart()`/`signal_chart()` uchun umumiy — faqat KRIPTO uchun
+    (aksiya/forex'da bunday tarixiy savdo darajasidagi ma'lumot yo'q),
+    oxirgi `DELTA_WINDOW_MS` (48 soat) ichidagi HAQIQIY MEXC savdolaridan
+    Volume/Volume Delta profilini hisoblaydi. Har qanday xato yoki mos
+    kelmaslik — `None` (chaqiruvchi shunda ODDIY, profilsiz grafikka
+    qaytadi, xato hech qachon ko'tarilmaydi)."""
+    if market != "crypto" or hi <= lo:
+        return None
+    try:
+        result = await exchange.volume_delta_profile(
+            symbol, end_ms - DELTA_WINDOW_MS, end_ms, lo, hi, n_bins=DELTA_BINS)
+    except Exception:
+        log.warning("Volume delta profili olinmadi (%s)", symbol, exc_info=True)
+        return None
+    if result is None:
+        return None
+    vol_bins, delta_bins = result
+    bin_size = (hi - lo) / DELTA_BINS
+    return vol_bins, delta_bins, lo, bin_size
+
+
 async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
                        tf: str | None = None) -> io.BytesIO | None:
     """Yangi e'lon qilinayotgan signal uchun grafik: oxirgi shamlar va
@@ -284,6 +389,11 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     # ko'rish uchun chiziladi — raqam hali mavjud emas. Raqam xabar matnida
     # (draft_text) baribir ko'rinadi.
     mode = draft.get("entry_mode", "limit")
+    lo = min(c.low for c in candles)
+    hi = max(c.high for c in candles)
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    profile = await _delta_profile(market, symbol, lo, hi, now_ms)
+    vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
     return _render(
         candles, header=symbol, side=draft["side"],
         entry=float(draft["entry"]), sl=float(draft["sl"]),
@@ -291,6 +401,7 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
         exit_idx=None, exit_price=None, pnl=None, r=None,
         ws_name=ws_name, bot_username=bot_username, tf=tf,
         note="ochildi" if mode == "market" else "kutilmoqda",
+        vol_bins=vol_bins, delta_bins=delta_bins, bin_lo=bin_lo, bin_size=bin_size,
     )
 
 
@@ -441,6 +552,12 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     opened_ms = int(opened_at.timestamp() * 1000)
     entry_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - opened_ms))
 
+    lo = min(c.low for c in candles)
+    hi = max(c.high for c in candles)
+    profile = await _delta_profile(sig["market"], sig["symbol"], lo, hi,
+                                   int(closed_at.timestamp() * 1000))
+    vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
+
     return _render(
         candles, header=f"#{sig['id']} {sig['symbol']}", side=sig["side"],
         entry=float(sig["entry"]), sl=float(sig["sl_initial"]),
@@ -449,6 +566,7 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
         pnl=sig["pnl_pct"], r=sig["r_multiple"],
         ws_name=ws_name, bot_username=bot_username, tf=tf, note=None,
         entry_idx=entry_idx,
+        vol_bins=vol_bins, delta_bins=delta_bins, bin_lo=bin_lo, bin_size=bin_size,
     )
 
 
@@ -516,6 +634,89 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
               color=news_col, ha="right")
 
     fig.subplots_adjust(left=0.062, right=0.985, top=0.88, bottom=0.08)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+# --- Hajm portlashi uchun: Volume + Volume Delta panellari ---
+# Foydalanuvchi Hyblock Capital'ning veb-sahifasidagi ko'rinishni
+# yoqtirdi (narx grafigi yonida, bir xil narx o'qini baham ko'ruvchi
+# Volume/Volume Delta panellari). Likvidatsiya/Liquidations Delta
+# panellarini narx darajasi bo'yicha bepul olib bo'lmagani uchun
+# (uchta manba ham muvaffaqiyatsiz — CLAUDE.md #98-#107) ULAR
+# QURILMAYDI — faqat Volume/Volume Delta, chunki bular HAQIQIY MEXC
+# savdo ma'lumotidan (`exchange.volume_delta_profile()`) hisoblanadi.
+# Foydalanuvchi qarori bo'yicha bu FAQAT "hajm portlashi" postida
+# ishlatiladi (har 4s yangilanadigan boshqa post turlarida emas —
+# MEXC tezlik chegarasi xavfi).
+def surge_profile_chart(candles, news_idx: int, symbol: str, live_pct: float,
+                        vol_bins: list[float], delta_bins: list[float],
+                        bin_lo: float, bin_size: float,
+                        label: str = "Portlash", tf: str | None = None) -> io.BytesIO:
+    """`vol_bins`/`delta_bins` — `exchange.volume_delta_profile()` natijasi,
+    BIR MARTA (post vaqtida) hisoblanadi va bazada saqlanadi — har jonli
+    yangilanish tikida QAYTA so'ralmaydi (faqat shamlar/narx yangilanadi,
+    savdo profili o'zgarmasdan qoladi). `bin_lo`/`bin_size` — profil
+    ustunlarining narx chegaralari (`bin_lo + i*bin_size` — i-ustun
+    boshlanishi).
+
+    Uch ustunli (GridSpec) joylashuv: narx (shamlar), Volume, Volume
+    Delta — barchasi BIR XIL narx (Y) o'qini baham ko'radi. `news_chart()`
+    dan ATAYLAB ALOHIDA — u yerdagi ichki (bitta o'qli) hajm profilidan
+    farqli, bu yerda alohida pastki o'qlar (subplot'lar) kerak."""
+    n_bins = len(vol_bins)
+    hi_bin = bin_lo + n_bins * bin_size
+
+    lo = min(min(c.low for c in candles), bin_lo)
+    hi = max(max(c.high for c in candles), hi_bin)
+    pad = (hi - lo) * 0.04 or hi * 0.01
+    lo -= pad
+    hi += pad
+
+    fig = plt.figure(figsize=(11, 5.6), dpi=160)
+    fig.patch.set_facecolor(BG)
+    gs = fig.add_gridspec(1, 3, width_ratios=[5, 1.15, 1.15], wspace=0.05)
+    ax_price = fig.add_subplot(gs[0])
+    ax_vol = fig.add_subplot(gs[1], sharey=ax_price)
+    ax_delta = fig.add_subplot(gs[2], sharey=ax_price)
+
+    for ax in (ax_price, ax_vol, ax_delta):
+        ax.set_facecolor(BG)
+        ax.set_xticks([])
+        for spine in ax.spines.values():
+            spine.set_color(GRID)
+
+    _draw_candles(ax_price, candles, hi, lo)
+
+    mark_col = ACC
+    news_idx = max(0, min(news_idx, len(candles) - 1))
+    news_price = candles[news_idx].close
+    news_col = GREEN if live_pct >= 0 else RED
+    ax_price.axvline(news_idx, color=mark_col, lw=1.1, ls="--", alpha=0.8, zorder=1)
+    ax_price.scatter([news_idx], [news_price], color=mark_col, s=60, zorder=5,
+                     edgecolor=BG, linewidth=1.3)
+    ax_price.annotate(label, xy=(news_idx, news_price), xytext=(0, -20),
+                      textcoords="offset points", color=mark_col, fontsize=10,
+                      fontweight="bold", ha="center")
+
+    ax_price.set_xlim(-1.5, len(candles) - 0.3)
+    ax_price.set_ylim(lo, hi)
+    ax_price.grid(True, color=GRID, lw=0.6, alpha=0.6)
+    ax_price.tick_params(colors=TXT, labelsize=9.5)
+
+    _draw_side_profiles(ax_vol, ax_delta, vol_bins, delta_bins, bin_lo, bin_size, lo, hi)
+
+    fig.text(0.045, 0.965, symbol, fontsize=16, fontweight="bold", color=TITLE)
+    if tf:
+        fig.text(0.045, 0.935, f"· {tf}", fontsize=11, color=TXT)
+    fig.text(0.35, 0.965, f"{live_pct:+.2f}%", fontsize=17, fontweight="bold",
+             color=news_col)
+
+    fig.subplots_adjust(left=0.05, right=0.985, top=0.86, bottom=0.06)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
