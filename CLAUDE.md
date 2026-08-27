@@ -2828,3 +2828,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Hali production'da haqiqiy `coinank-apikey` bilan sinalmagan**
        — foydalanuvchi yuborgan kalit Railway'ga qo'yilgach keyingi
        deployda tasdiqlanadi.
+
+106. **`/heatmaptest` admin buyrug'i qo'shildi** — CoinAnk heatmap
+     zanjirini haqiqiy likvidatsiya hodisasini kutmasdan sinash uchun
+     (`/charttest`ning heatmap versiyasi). `/heatmaptest ETH` — tikerni
+     MEXC orqali tasdiqlaydi, `_liquidation_heatmap_photo()`ni
+     to'g'ridan-to'g'ri chaqiradi, natijani (rasm yoki xato sababi)
+     SHU CHATGA yuboradi — kanalga POSTLAMAYDI. `set_my_commands`ga
+     ataylab qo'shilmagan (faqat super-admin, `/charttest` qanday
+     bo'lsa xuddi shunday).
+     - Haqiqiy `COINANK_API_KEY` (foydalanuvchi yuborgan) Railway
+       o'zgaruvchisiga qo'yildi. Keyingi tekshiruv: `/heatmaptest`
+       orqali production'da chindan ishlashini tasdiqlash (sandbox
+       `api.coinank.com`ni bloklagani uchun bu yerdan sinab bo'lmadi —
+       `curl` "CONNECT tunnel failed, response 403" bilan rad etdi).

@@ -4853,6 +4853,42 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             eid, sent.message_id, caption,
             render_tf=tf, render_before_ms=before_ms, render_label="Sinov")
         await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
+
+async def cmd_heatmaptest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/heatmaptest ETH — FAQAT super-admin. CoinAnk likvidatsiya
+    heatmap so'rovini haqiqiy likvidatsiya hodisasini KUTMASDAN sinaydi
+    — kanalga postlamaydi, natijani to'g'ridan-to'g'ri shu chatga
+    yuboradi. `/charttest` shamli grafik uchun bo'lgani kabi, bu —
+    heatmap zanjiri (`coinank.py` -> `chart.liquidation_heatmap_chart()`)
+    uchun tezkor diagnostika vositasi."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /heatmaptest ETH")
+        return
+    if not coinank.enabled():
+        await update.message.reply_text("COINANK_API_KEY sozlanmagan.")
+        return
+
+    raw = ctx.args[0].upper()
+    base = raw[:-len(config.QUOTE)] if raw.endswith(config.QUOTE) else raw
+    symbol = await exchange.resolve(base)
+    if not symbol:
+        await update.message.reply_text(f"Tiker MEXC'da topilmadi: {html.escape(base)}")
+        return
+
+    await update.message.reply_text(f"⏳ {symbol} — CoinAnk heatmap so'ralyapti...")
+    photo = await _liquidation_heatmap_photo(symbol, base)
+    if photo is None:
+        await update.message.reply_text(
+            "Heatmap olinmadi — Railway loglarida sababi ko'rinadi "
+            "(\"CoinAnk heatmap olinmadi\" yoki \"muvaffaqiyatsiz javob\").")
+        return
+    await update.message.reply_photo(
+        InputFile(photo, "heatmap_test.png"),
+        caption=f"🧪 CoinAnk heatmap sinovi — {html.escape(symbol)}")
     await update.message.reply_text(f"✅ Postlandi, {config.NEWS_LIVE_MINUTES} daqiqa jonli yangilanadi.")
 
 
@@ -5025,6 +5061,7 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
+    app.add_handler(CommandHandler("heatmaptest", cmd_heatmaptest))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))
     app.add_handler(CommandHandler("tg_password", cmd_tg_password))
