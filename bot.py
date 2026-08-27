@@ -37,6 +37,7 @@ import db
 import econcalendar
 import exchange
 import forex
+import hyblock
 import liquidations
 import listings
 import news
@@ -4111,6 +4112,13 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         photo, live_pct = rendered
 
+        if row["source"] == "liquidation":
+            base = row["symbol"][:-len(config.QUOTE)] \
+                if row["symbol"].endswith(config.QUOTE) else row["symbol"]
+            heatmap = await _liquidation_heatmap_photo(base)
+            if heatmap:
+                photo = heatmap
+
         buttons = await _signal_buttons(row["symbol"], row["market"], ctx.bot.username)
         kb_rows = list(buttons.inline_keyboard) if buttons else []
         kb_rows.append([_share_button(row["message_id"])])
@@ -4659,6 +4667,24 @@ def _fmt_price(price: float) -> str:
     return _eu_decimal(s)
 
 
+async def _liquidation_heatmap_photo(base: str) -> io.BytesIO | None:
+    """Hyblock Capital narx-klaster heatmap'i (foydalanuvchi so'rovi:
+    "likvidatsiya xabarida oddiy chart emas heatmap chiqishini
+    xohlayabman" — CoinGlass'nikidan farqli, BEPUL). `hyblock` moduli
+    o'chirilgan yoki so'rov muvaffaqiyatsiz bo'lsa `None` — chaqiruvchi
+    shunda oddiy shamli grafikka (`_news_render()`) qaytadi."""
+    if not hyblock.enabled():
+        return None
+    buckets = await hyblock.liquidation_heatmap(base, lookback=config.HYBLOCK_LOOKBACK)
+    if not buckets:
+        return None
+    try:
+        return chart.liquidation_heatmap_chart(buckets, base, config.HYBLOCK_LOOKBACK)
+    except Exception:
+        log.warning("Likvidatsiya heatmap grafigi chizilmadi (%s)", base, exc_info=True)
+        return None
+
+
 async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
                                      spike: liquidations.Spike) -> None:
     now = datetime.now(timezone.utc)
@@ -4707,6 +4733,9 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
         rendered = None
     if rendered:
         photo, live_pct = rendered
+        heatmap = await _liquidation_heatmap_photo(base)
+        if heatmap:
+            photo = heatmap   # live_pct/finalize hisobi baribir shamli grafikdan olingan bo'lib qoladi
 
     buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
     try:

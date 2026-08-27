@@ -134,6 +134,18 @@ LIQUIDATION_SYMBOLS = os.getenv(
 # mezoni chalkash edi, endi oddiy chegara).
 LIQUIDATION_MIN_USD = float(os.getenv("LIQUIDATION_MIN_USD", "500000"))
 
+# --- Likvidatsiya heatmap: Hyblock Capital (bepul tarif, ro'yxatdan o'tib
+#     olinadigan API kalit + OAuth2 client_id/secret kerak). CoinGlass'ning
+#     narx-klaster heatmap'i $699/oydan boshlanadi, Hyblock esa buni bepul
+#     beradi. Uchalasidan BIRI bo'sh bo'lsa ham funksiya jimgina o'chadi —
+#     likvidatsiya posti o'sha holda oddiy shamli grafikka qaytadi ---
+HYBLOCK_API_KEY = os.getenv("HYBLOCK_API_KEY", "")
+HYBLOCK_CLIENT_ID = os.getenv("HYBLOCK_CLIENT_ID", "")
+HYBLOCK_CLIENT_SECRET = os.getenv("HYBLOCK_CLIENT_SECRET", "")
+# Heatmap qancha orqaga qarab ko'rsatsin — Hyblock'ning qo'llab-quvvatlaydigan
+# qiymatlaridan biri (12h, 1d, 3d, 7d, 1m, 3m, 6m, 1y, 2y).
+HYBLOCK_LOOKBACK = os.getenv("HYBLOCK_LOOKBACK", "12h")
+
 # --- MarketTwits (va shunga o'xshash) Telegram kanallari — Telethon
 #     userbot orqali (oddiy Bot API bunday begona kanallarni "eshita"
 #     olmaydi, faqat o'zi ADMIN qilingan kanallarni). my.telegram.org'da

@@ -2716,3 +2716,63 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        muvofiqlik uchun) PNG muvaffaqiyatli chiqishi tasdiqlandi,
        natija rasmi foydalanuvchiga ko'rsatildi. `test_tracker.py`
        9/9 — o'zgarmadi.
+
+104. **Foydalanuvchi: "men likvidatsiya xabarida oddiy chart emas
+     heatmap chiqishini xoxlayabman"** — CoinGlass uslubidagi narx-
+     klaster heatmap kerakligi aniqlashtirildi (AskUserQuestion orqali:
+     CoinGlass uslubi vs o'zimizning vaqt-asosli heatmap — birinchisi
+     tanlandi).
+     - **CoinGlass'ning o'zi**: WebSearch+WebFetch bilan tekshirildi —
+       `/liquidation-heatmap` endpoint'i FAQAT Professional ($699/oy)
+       yoki Enterprise tarifda ochiq (GitHub'dagi rasmiy API docs
+       mirror'ida ✅/❌ jadvali bilan tasdiqlangan) — Hobbyist/Startup/
+       Standard'da YOPIQ. Juda qimmat, mos emas.
+     - Foydalanuvchi "boshqa saytdan izlab koramizmi?" so'radi —
+       WebSearch orqali muqobillar qidirildi: Hyblock Capital eng
+       istiqbolli chiqdi (bepul tarifda shu turdagi endpoint bor
+       ko'rinardi), lekin ularning docs sahifalari sandbox'da
+       bloklangan edi. **Foydalanuvchi o'zi Hyblock'da bepul hisob
+       ochib**, avval OAuth2 autentifikatsiya hujjatini, keyin
+       `/liquidationHeatmap` endpoint'ining TO'LIQ rasmiy OpenAPI
+       spetsifikatsiyasini (YAML) yuborib berdi — bu ilgari
+       cryptocurrencyalerting.com bilan bo'lgan holatga o'xshash
+       ("foydalanuvchi sandbox yeta olmagan joyni o'zi tekshiradi").
+     - **`hyblock.py`** (yangi modul): OAuth2 Client Credentials oqimi
+       — `POST /oauth2/token` (`x-api-key` header + Basic Auth
+       `client_id:client_secret`) orqali `access_token` olinadi,
+       xotirada `expires_in`ga qarab keshlanadi (60s zaxira bilan),
+       401 kelsa BIR marta majburiy yangilanadi. `liquidation_heatmap
+       (coin, lookback)` — `GET /liquidationHeatmap?coin=BTC&lookback=
+       12h` so'raydi, `data` ro'yxatini (`{startingPrice, endingPrice,
+       side, size, timestamp}`) qaytaradi. `HYBLOCK_API_KEY`/
+       `_CLIENT_ID`/`_CLIENT_SECRET` (Railway'da, bo'sh bo'lsa modul
+       jimgina o'chadi) — `config.py`ga qo'shildi.
+     - **`chart.py`**: yangi `liquidation_heatmap_chart(buckets, coin,
+       lookback)` — narx (Y) va vaqt (X) panjarasida `pcolormesh`
+       (`inferno` rang xaritasi) bilan issiqlik xaritasi chizadi (bir
+       xil narx+vaqt katagida ikkala tomon — long/short — `size`lari
+       QO'SHILADI, chunki bu yerda yo'nalish emas, UMUMIY klaster
+       zichligi ko'rsatiladi). `news_chart()`dan/`_draw_candles`dan
+       BUTUNLAY ALOHIDA (mavjud shamli grafiklarga tegilmadi).
+     - **`bot.py`**: yangi `_liquidation_heatmap_photo(base)` yordamchisi
+       — Hyblock heatmap muvaffaqiyatli bo'lsa PNG qaytaradi, aks holda
+       `None` (chaqiruvchi shunda MAVJUD shamli grafikka qaytadi —
+       xatarsiz fallback, xuddi boshqa manbalar 451/404 bo'lganda
+       qanday ishlagan bo'lsa). `_process_liquidation_spike()`: avval
+       odatdagidek `_news_render()` chaqiriladi (bu `live_pct`/keyinги
+       `finalize_news_outcome` hisobi UCHUN saqlanib qoladi —
+       O'ZGARTIRILMADI), so'ng heatmap muvaffaqiyatli bo'lsa faqat
+       YUBORILADIGAN RASM heatmap bilan ALMASHTIRILADI. `news_live_job()`:
+       `row["source"] == "liquidation"` bo'lsa xuddi shunday heatmap'ga
+       urinadi (jonli yangilanish davomida ham heatmap davom etadi).
+     - Tekshirildi (mock, production kalitlarisiz): token olish, token
+       keshlash (ikkinchi chaqiruvda POST QAYTA yubormasligi), 401'dan
+       keyin BIR marta qayta token olish, kalitlar bo'sh bo'lganda
+       so'rov umuman yubormaslik, `chart.liquidation_heatmap_chart()`
+       haqiqiy PNG chiqarishi (foydalanuvchiga ko'rsatildi) va bo'sh/
+       nol ma'lumotda `None` qaytarishi — barchasi tasdiqlandi.
+       `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy Hyblock kalitlari bilan sinalmagan**
+       — foydalanuvchidan `HYBLOCK_API_KEY`/`HYBLOCK_CLIENT_ID`/
+       `HYBLOCK_CLIENT_SECRET` so'ralmoqda (Railway o'zgaruvchisi
+       sifatida, kodga/CLAUDE.md'ga yozilmaydi).

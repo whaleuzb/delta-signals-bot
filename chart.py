@@ -522,3 +522,88 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
     plt.close(fig)
     buf.seek(0)
     return buf
+
+
+# --- Likvidatsiya heatmap (Hyblock Capital) ---
+# CoinGlass'ning mashhur narx-klaster heatmap'i Professional tarifdan
+# ($699/oy) boshlab ochiladi — foydalanuvchi buni to'lashni xohlamadi.
+# Hyblock Capital'ning BEPUL tarifida xuddi shu turdagi (`/liquidationHeatmap`)
+# endpoint ochiq ekan (foydalanuvchi o'zi hisob ochib tekshirdi va rasmiy
+# OpenAPI spetsifikatsiyasini yubordi). Javob — narx darajasi (`startingPrice`/
+# `endingPrice`) va vaqt (`timestamp`) bo'yicha "size" (taxminiy majburan
+# yopilish hajmi) qatorlari — oddiy shamli grafik EMAS, shuning uchun
+# `_draw_candles`/`news_chart`dan butunlay ALOHIDA chiziladi.
+import numpy as np
+
+HEATMAP_CMAP = "inferno"
+
+
+def liquidation_heatmap_chart(buckets: list[dict], coin: str,
+                              lookback: str) -> io.BytesIO | None:
+    """`buckets` — Hyblock `/liquidationHeatmap` javobidagi `data` ro'yxati:
+    `{startingPrice, endingPrice, side, size, timestamp}`. Narx (Y) va vaqt
+    (X) bo'yicha panjara yasab, `size`ni rang intensivligi sifatida chizadi
+    (bir xil narx+vaqt katagida ikkala tomon — long va short — bo'lsa,
+    ikkalasi QO'SHILADI: bu yerda yo'nalish emas, UMUMIY klaster zichligi
+    ko'rsatiladi). Ma'lumot yetarli bo'lmasa (masalan barcha `size=0`
+    yoki bo'sh ro'yxat) `None` — chaqiruvchi shunda oddiy shamli grafikka
+    qaytadi."""
+    if not buckets:
+        return None
+
+    times = sorted({int(b["timestamp"]) for b in buckets})
+    # Narx darajasi kaliti sifatida `startingPrice` ishlatiladi (har bir
+    # bucket kengligi bir xil deb taxmin qilinadi — Hyblock javobida shunday).
+    prices = sorted({float(b["startingPrice"]) for b in buckets})
+    if len(times) < 2 or len(prices) < 2:
+        return None
+    t_idx = {t: i for i, t in enumerate(times)}
+    p_idx = {p: i for i, p in enumerate(prices)}
+
+    grid = np.zeros((len(prices), len(times)))
+    for b in buckets:
+        try:
+            size = float(b.get("size") or 0)
+        except (TypeError, ValueError):
+            continue
+        if size <= 0:
+            continue
+        ti = t_idx.get(int(b["timestamp"]))
+        pi = p_idx.get(float(b["startingPrice"]))
+        if ti is None or pi is None:
+            continue
+        grid[pi, ti] += size
+
+    if not grid.any():
+        return None
+
+    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    # `pcolormesh` chegaralari kataklar SONIDAN bittaga ko'p bo'lishi kerak
+    # — shuning uchun har ikki o'qqa ham bitta qo'shimcha "yakuniy chegara"
+    # qo'shiladi (oxirgi katak kengligi avvalgisi bilan bir xil deb olinadi).
+    t_edges = list(times) + [times[-1] + (times[-1] - times[-2] if len(times) > 1 else 1)]
+    p_edges = list(prices) + [prices[-1] + (prices[-1] - prices[-2] if len(prices) > 1 else 1)]
+    mesh = ax.pcolormesh(t_edges, p_edges, grid, cmap=HEATMAP_CMAP, shading="flat")
+
+    ax.set_xticks([])
+    ax.tick_params(colors=TXT, labelsize=9.5)
+    for spine in ax.spines.values():
+        spine.set_color(GRID)
+
+    cbar = fig.colorbar(mesh, ax=ax, pad=0.012, fraction=0.035)
+    cbar.ax.tick_params(colors=TXT, labelsize=8)
+    cbar.outline.set_edgecolor(GRID)
+
+    fig.text(0.045, 0.955, coin, fontsize=16, fontweight="bold", color=TITLE)
+    fig.text(0.045, 0.925, f"· Likvidatsiya heatmap · {lookback}", fontsize=11, color=TXT)
+
+    fig.subplots_adjust(left=0.062, right=0.93, top=0.88, bottom=0.08)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf
