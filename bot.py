@@ -4906,7 +4906,7 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             price_chg = (last_price - first_price) / first_price * 100 if first_price else 0.0
             ticker = symbol[:-len(config.QUOTE)] if symbol.endswith(config.QUOTE) else symbol
 
-            text = (
+            caption = (
                 f"<b>{html.escape(symbol)}</b> [MEXC]\n"
                 f"{emoji} {html.escape(verb_head)}\n"
                 f"{_fmt_usd_k(base_qty)} {html.escape(ticker)} {verb}\n"
@@ -4915,10 +4915,44 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 f"⏳Davomiyligi: {duration_min} daqiqa\n"
                 f"📊24 soatlik hajm: {_fmt_usd_k(vol24h)} USDT"
             )
+
+            # Foydalanuvchi so'rovi: "Bunga ham 1D grafik bo'lishi kerak" —
+            # boshqa barcha post turlari (SEC/surge/likvidatsiya) kabi,
+            # `_news_render()` (1d, portlashdagi bilan bir xil oyna) orqali,
+            # keyin `news_live_job()` uni AVTOMATIK jonli yangilaydi (matn
+            # o'zgarmaydi, faqat grafik/% — boshqa turlar bilan bir xil).
+            whale_before_ms = config.SURGE_DECLINE_DAYS * 86_400_000
+            marker_color = chart.GREEN if side_label == "buy" else chart.RED
+            chart_label = "Xarid" if side_label == "buy" else "Sotuv"
             try:
-                await ctx.bot.send_message(config.NEWS_CHANNEL_ID, text, parse_mode=ParseMode.HTML)
+                rendered = await _news_render(symbol, "crypto", now, tf="1d",
+                                              before_ms=whale_before_ms,
+                                              label=chart_label, marker_color=marker_color)
+            except Exception:
+                log.warning("Kit faolligi grafigi yasalmadi (%s)", symbol, exc_info=True)
+                rendered = None
+            photo = rendered[0] if rendered else None
+
+            buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
+            try:
+                if photo:
+                    sent = await ctx.bot.send_photo(
+                        config.NEWS_CHANNEL_ID, InputFile(photo, "whale.png"),
+                        caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+                else:
+                    sent = await ctx.bot.send_message(
+                        config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                        reply_markup=buttons)
             except Exception:
                 log.exception("Kit faolligi postlanmadi (%s)", external_key)
+                continue
+            await db.set_news_message(
+                eid, sent.message_id, caption,
+                render_tf="1d" if photo else None,
+                render_before_ms=whale_before_ms if photo else None,
+                render_label=chart_label if photo else None,
+                render_marker_color=marker_color if photo else None)
+            await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
 # ─────────────────────────── Yirik likvidatsiyalar ───────────────────────────

@@ -3209,3 +3209,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Hali production'da haqiqiy kit faolligi bilan tasdiqlanmagan** —
        birinchi haqiqiy portlash+kit faolligi to'qnashganda Railway logi
        orqali tekshirilishi kerak.
+
+117. **Foydalanuvchi: "Bunga ham 1D grafik bo'lishi kerak."** (#116'dagi
+     kit faolligi xabariga nisbatan — u matn-only edi.) Boshqa BARCHA post
+     turlari (SEC/surge/likvidatsiya/econ) grafik bilan keladi, kit
+     faolligi shu naqshdan chiqib qolgan edi.
+     - **Tuzatish**: `whale_scan_job()` endi `_news_render()` (mavjud,
+       barcha oddiy — profilsiz — post turlari ishlatadigan umumiy
+       funksiya) orqali "1d" grafik chizadi, portlashdagi bilan bir xil
+       oyna (`SURGE_DECLINE_DAYS` kunlik). Belgi rangi/yorlig'i tomonga
+       qarab: xarid — YASHIL "Xarid", sotuv — QIZIL "Sotuv" (likvidatsiya
+       postidagi `marker_color` naqshi bilan bir xil). Matn (`caption`)
+       o'zgarishsiz qoladi, `db.set_news_message(render_tf="1d", ...)`
+       orqali endi `news_live_job()` grafikni BOSHQA hech qanday
+       o'zgarishsiz avtomatik jonli yangilaydi (boshqa turlar bilan bir xil).
+       Grafik yasalmasa (`_news_render()` `None`/xato qaytarsa) — avvalgidek
+       matn-only postga xavfsiz qaytadi.
+     - Tekshirildi (mock): (1) grafik muvaffaqiyatli bo'lsa `send_photo` +
+       `set_news_message(render_tf="1d", render_label="Xarid", ...)` to'g'ri
+       chaqirilishi; (2) grafik topilmasa matn-only (`send_message`)
+       fallback ishlashi. Vizual: mock ma'lumot bilan chizilgan namuna
+       (KERNELUSDT, YASHIL "Xarid" belgisi, +12.00%) News Trade AI
+       uslubiga mos ekanligi tasdiqlandi. `test_tracker.py` 9/9 —
+       o'zgarmadi.
