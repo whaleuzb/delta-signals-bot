@@ -3044,3 +3044,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        Railway logi orqali tekshirilishi kerak: `actual` maydoni
        haqiqatan kelayaptimi, Claude formatlash to'g'rimi, BTC grafigi
        to'g'ri postlanayaptimi.
+
+112. **Foydalanuvchi (MOVRUSDT surge post skrinshoti bilan): "nega movr
+     tokenini kech yubordi?"** Sabab topildi: `volume_snapshot_job` 24
+     soatlik hajmni bazaga FAQAT `SURGE_SNAPSHOT_HOURS` (avvalgi qiymat:
+     4) soatda bir yozardi, `surge_scan_job` esa shu bazadagi "oxirgi"
+     yozuvni har 30 daqiqada tekshirardi — ya'ni portlash BOSHLANGANDAN
+     keyin bazaga yozilishi uchun 4 soatgacha, keyin aniqlanishi uchun
+     yana 30 daqiqagacha, jami ~4.5 soatgacha kechikish bo'lishi mumkin
+     edi (MOVR aynan shunday kech ketgan).
+     - **Tuzatish**: `SURGE_SNAPSHOT_HOURS` standart qiymati 4 -> 1
+       (`config.py`). `exchange.volume_ticker_24hr()` — barcha juftliklar
+       uchun BITTA bulk so'rov (har juftlikka alohida emas), shuning
+       uchun soatiga bir chaqirish tezlik chegarasiga xavf solmaydi.
+       Bazaviy o'rtacha (`SURGE_BASELINE_EXCLUDE_HOURS=12`,
+       `min_snapshots=3`) mantig'iga tegilmadi — faqat ko'proq/tezroq
+       yozuv to'planadi, kechikish endi ~4.5 soat o'rniga ~1.5 soatgacha.
+     - `test_tracker.py` 9/9 — o'zgarmadi (`tracker.py`ga tegilmadi).

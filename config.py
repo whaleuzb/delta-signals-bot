@@ -108,8 +108,13 @@ SURGE_BASELINE_EXCLUDE_HOURS = float(os.getenv("SURGE_BASELINE_EXCLUDE_HOURS", "
 # 25 -> 15: xuddi shu sabab bilan yumshatildi.
 SURGE_DECLINE_DAYS = int(os.getenv("SURGE_DECLINE_DAYS", "30"))
 SURGE_DECLINE_PCT = float(os.getenv("SURGE_DECLINE_PCT", "15"))
-# Hajm suratga olish — har necha soatda (bazaga yozib borish).
-SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "4"))
+# Hajm suratga olish — har necha soatda (bazaga yozib borish). Bitta
+# YAGONA bulk so'rov (barcha juftliklar birdaniga) bo'lgani uchun
+# tez-tez chaqirish tezlik chegarasiga xavf solmaydi — 4 -> 1: foydalanuvchi
+# "portlash kech aniqlanyapti" deb topgach qisqartirildi (avvalgi 4 soatlik
+# oraliqda portlashning bazaga yozilishi O'ZI 4 soatgacha kechikishi mumkin
+# edi, ustiga surge_scan_job'ning 30 daqiqalik tsikli qo'shilardi).
+SURGE_SNAPSHOT_HOURS = int(os.getenv("SURGE_SNAPSHOT_HOURS", "1"))
 
 # --- Yangi tanga listing e'lonlari: Koreys birjalari (Upbit) — kalitsiz,
 #     bepul, manzili listings.py'da (DISCLOSURE_URL). Bithumb HALI
