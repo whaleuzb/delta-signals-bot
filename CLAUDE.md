@@ -2981,3 +2981,66 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yuboriladi — bu naqsh avtomatik-yopilish yo'lidagi (`on_button`
        ichidagi poll_job hodisa handleri, ~qator 2426) mavjud "personal"
        shoxchasi bilan BIR XIL uslubda yozildi.
+
+111. **Foydalanuvchi: "economik xabarlarni natijasi nega kelmayabti?"**
+     AskUserQuestion orqali aniqlashtirildi ("Boshqa narsa" javobi, misol
+     bilan): bu digest/eslatma (#17, ishlab turibdi) haqida EMAS —
+     foydalanuvchi natija (`actual`) chiqqach BATAFSIL xabar (teglar,
+     "AQSh - KATEGORIYA - KO'RSATKICH (oy):" sarlavhasi, har bir metrika
+     uchun oylik/yillik "kutilgan/oldingi" qatorlari) VA shu yangilikning
+     BTC narxiga ta'sirini (grafik bilan) xohlagan — o'zining haqiqiy
+     misolini (PCE narx indeksasi posti) aynan shu formatda yuborgan.
+     - **Yangi topilma**: `econcalendar.py` `actual` maydonini UMUMAN
+       o'qimasdi (faqat `forecast`/`previous`) — Forex Factory'ning
+       HAFTALIK fayli natija chiqqach shu maydonni O'ZI to'ldiradi,
+       alohida so'rov shart emas (faqat mavjud 30-daqiqalik keshni
+       kuting). Bu — yangi funksiyaning yagona texnik noaniqligi edi,
+       endi tasdiqlandi (mock javob bilan sinaldi — bu domen ham
+       sandbox'da bloklangan, production Railway logi orqali
+       tasdiqlanishi kerak).
+     - **Arxitektura qarori — YANGI infratuzilma emas, MAVJUDINI qayta
+       ishlatish**: #108'dagi surge/SEC quvuri (`news_events` jadvali +
+       `_news_render()`/`_news_candles()` + `news_live_job()`) allaqachon
+       aynan shu narsani qiladi — hodisa post qilinadi, keyin
+       `NEWS_LIVE_MINUTES` davomida narx grafigi avtomatik yangilanadi.
+       Shuning uchun HECH QANDAY yangi jadval/ustun QO'SHILMADI — faqat
+       `source="econ"`, `symbol="BTCUSDT"`, `market="crypto"` bilan bitta
+       yangi `news_events` qatori yoziladi, qolgani (jonli % kuzatuv,
+       grafik sarlavhasidagi `{symbol} ({live_pct:+.2f}%)`) BEPUL keladi.
+     - **newsai.py**: yangi `econ_result(events)` — `analyze()` andozasida,
+       LEKIN butun xabar matnini (teglar, sarlavha, har bir metrika
+       qatori) TO'LIQ Claude'ga yozdiradi (qattiq shablon + foydalanuvchi
+       bergan aynan o'zi misol PROMPT ichida) — bir xil `when` vaqtida
+       chiqqan bir nechta ko'rsatkich (masalan oylik+yillik PCE) BITTA
+       guruh sifatida uzatiladi, Claude ularni bitta xabarda birlashtiradi.
+       `is_market_moving=false` bo'lsa (arzimas ko'rsatkich) chaqiruvchi
+       postlamaydi.
+     - **bot.py — `econ_job()`ga 3-bo'lim qo'shildi** (yangi alohida job
+       EMAS, mavjud 60s tsiklga qo'shimcha): `actual` to'ldirilgan va
+       `ECON_RESULT_LOOKBACK_MINUTES` (standart 180) ichida chiqqan
+       hodisalar `when` bo'yicha guruhlanadi; `econ_calendar_state`
+       (`kind="result"`) orqali AVVAL belgilanadi (Claude chaqiruvi/post
+       muvaffaqiyatsiz bo'lsa ham qayta urinilmaydi — #17'dagi digest
+       naqshi bilan bir xil); `newsai.econ_result()` natijasi ->
+       `db.insert_news_event(source="econ", symbol="BTCUSDT", ...)` ->
+       `_news_render("BTCUSDT", "crypto", when, label="BTC")` -> post ->
+       `db.set_news_message(..., render_tf="1m", render_label="BTC")` —
+       shundan keyin `news_live_job()` uni BOSHQA HECH QANDAY o'zgarishsiz
+       avtomatik jonli yangilaydi (umumiy `active_live_events()` so'rovi
+       `source`ga qaramaydi).
+     - **config.py**: `ECON_RESULT_LOOKBACK_MINUTES=180` — funksiya
+       birinchi marta ishga tushganda (yoki uzoq to'xtab qolgandan keyin)
+       haftaning ESKI natijalarini birdaniga postlab tashlamasligi uchun.
+     - Tekshirildi (mock): (1) `econcalendar.fetch_week()` `actual`ni
+       to'g'ri o'qishi va past-ta'sirli hodisani hamon chiqarib
+       tashlashi; (2) `newsai.econ_result()` — client yo'q/JSON bo'lmagan
+       javob holatlarida xavfsiz `None`; (3) `econ_job()` uch xil
+       hodisadan (actual bor+yaqin / actual yo'q / actual bor lekin
+       ESKI) FAQAT to'g'risini postlashi, `insert_news_event`/`set_news_
+       message` parametrlari to'g'ri uzatilishi, ikkinchi chaqiriqda
+       TAKRORIY post YO'Qligi. `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy natija bilan tasdiqlanmagan** —
+       keyingi haqiqiy AQSH makro relizida (masalan navbatdagi PCE/CPI/NFP)
+       Railway logi orqali tekshirilishi kerak: `actual` maydoni
+       haqiqatan kelayaptimi, Claude formatlash to'g'rimi, BTC grafigi
+       to'g'ri postlanayaptimi.

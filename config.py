@@ -85,6 +85,11 @@ NEWS_LIVE_MINUTES = int(os.getenv("NEWS_LIVE_MINUTES", "20"))
 #     kabi NEWS_CHANNEL_ID kanaliga postlanadi (alohida kanal kerak emas) ---
 ECON_DIGEST_HOUR = int(os.getenv("ECON_DIGEST_HOUR", "12"))    # mahalliy vaqt (TZ)
 ECON_REMIND_MINUTES = int(os.getenv("ECON_REMIND_MINUTES", "15"))
+# Natija (actual) e'lon qilingach, BTC'ga ta'sirini tasvirlab post qilish —
+# faqat shu daqiqalar ICHIDA chiqqan natijalar ko'rib chiqiladi (funksiya
+# birinchi marta ishga tushganda haftaning ESKI natijalarini birdaniga
+# postlab tashlamasligi uchun).
+ECON_RESULT_LOOKBACK_MINUTES = int(os.getenv("ECON_RESULT_LOOKBACK_MINUTES", "180"))
 
 # --- Hajm portlashi (volume surge): uzoq pasaygan, keyin savdo hajmi
 #     keskin oshgan tangalarni topib, CryptoPanic'dan sababini qidiradi ---

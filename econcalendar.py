@@ -38,7 +38,9 @@ async def fetch_week() -> list[dict]:
 
     Xato bo'lsa (manba javob bermadi, format o'zgardi) — bo'sh ro'yxat,
     hech qachon istisno tashlamaydi. Natija: `{title, when (tz-aware
-    datetime), forecast, previous}`."""
+    datetime), forecast, previous, actual}`. `actual` — hodisa hali
+    e'lon qilinmagan bo'lsa bo'sh satr (manba shu haftalik faylni
+    natija chiqqach TO'LDIRIB qo'yadi, alohida so'rov shart emas)."""
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.get(CALENDAR_URL)
@@ -69,5 +71,6 @@ async def fetch_week() -> list[dict]:
             "when": when,
             "forecast": item.get("forecast") or "",
             "previous": item.get("previous") or "",
+            "actual": item.get("actual") or "",
         })
     return out

@@ -4592,6 +4592,72 @@ async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Iqtisodiy taqvim eslatmasi yuborilmadi")
 
+    # 3) Natijalar — hodisa allaqachon chiqqan (`actual` to'ldirilgan) bo'lsa,
+    # Claude orqali batafsil o'zbekcha xabar yasab, BTC grafigi bilan
+    # postlanadi (keyin `news_live_job` uni avtomatik jonli yangilaydi —
+    # xuddi SEC/surge hodisalari kabi, alohida infratuzilma shart emas).
+    # Bir xil vaqtda chiqqan ko'rsatkichlar (masalan oylik+yillik PCE)
+    # BITTA xabarda birlashadi.
+    result_due: dict[datetime, list[dict]] = {}
+    for e in events:
+        if not e.get("actual"):
+            continue
+        age = (now - e["when"]).total_seconds()
+        if 0 <= age <= config.ECON_RESULT_LOOKBACK_MINUTES * 60:
+            result_due.setdefault(e["when"], []).append(e)
+
+    for when, group in result_due.items():
+        key = when.isoformat()
+        if await db.econ_sent("result", key):
+            continue
+        # Bu guruh QAYTA baholanmasligi uchun AVVAL belgilaymiz — Claude
+        # chaqiruvi/post muvaffaqiyatsiz bo'lsa ham, keyingi tsiklda
+        # bekorga qayta urinilmaydi (natija o'zgarmaydi).
+        await db.econ_mark_sent("result", key)
+        try:
+            analysis = await newsai.econ_result(group)
+        except Exception:
+            log.exception("Iqtisodiy natija tahlili xato")
+            continue
+        if not analysis or not analysis.get("is_market_moving") or not analysis.get("message_uz"):
+            continue
+
+        external_key = f"econ:{key}"
+        eid = await db.insert_news_event(
+            source="econ", external_key=external_key, symbol="BTCUSDT",
+            market="crypto", headline_en="; ".join(e["title"] for e in group),
+            translation_uz=analysis["message_uz"], insight_uz=None,
+            event_at=when, posted=False)
+        if eid is None:
+            continue
+
+        caption = html.escape(analysis["message_uz"])
+        try:
+            rendered = await _news_render("BTCUSDT", "crypto", when, label="BTC")
+        except Exception:
+            log.warning("Iqtisodiy natija grafigi yasalmadi", exc_info=True)
+            rendered = None
+        photo = rendered[0] if rendered else None
+
+        buttons = await _signal_buttons("BTCUSDT", "crypto", ctx.bot.username)
+        try:
+            if photo:
+                sent = await ctx.bot.send_photo(
+                    config.NEWS_CHANNEL_ID, InputFile(photo, "econ.png"),
+                    caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+            else:
+                sent = await ctx.bot.send_message(
+                    config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                    reply_markup=buttons)
+        except Exception:
+            log.exception("Iqtisodiy natija kanalga postlanmadi (%s)", external_key)
+            continue
+        await db.set_news_message(
+            eid, sent.message_id, caption,
+            render_tf="1m" if photo else None,
+            render_label="BTC" if photo else None)
+        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
 
 # ─────────────────────────── Hajm portlashi (surge) ───────────────────────────
 # Uzoq muddat pasaygan, keyin savdo hajmi keskin oshgan tangalarni topib,
