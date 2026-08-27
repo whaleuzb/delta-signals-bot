@@ -3074,3 +3074,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - Tekshirildi: 1.123.640 -> "1,12M", 533.890 -> "533,89K" (o'zgarmadi),
        chegara holatlari (999.999 -> "1.000,00K", 1.000.000 -> "1,00M").
        `test_tracker.py` 9/9 — o'zgarmadi.
+
+114. **Foydalanuvchi (AASTUSDT/QAITUSDT portlash post skrinshotlari
+     bilan): "Delta chiqmadi avvalgidek keklayapti portlash."** Ya'ni
+     #108'da qo'shilgan Volume/Volume Delta ikki panelli grafik o'rniga
+     ESKI (profilsiz, faqat bitta ichki hajm ustuni) ko'rinish qaytib
+     kelayapti — bu `_process_surge_candidate()`ning `chart.news_chart()`
+     FALLBACK yo'liga tushayotganini bildiradi (`exchange.volume_delta_
+     profile()` `None` qaytarayotgani uchun).
+     - **Ildiz sabab topildi**: `exchange.py`da MEXC `/api/v3` — Binance
+       spot API'ni deyarli aynan oynaydi (fayl boshidagi izohga qarang),
+       Binance'ning HUJJATLASHTIRILGAN cheklovi bo'yicha `/aggTrades`da
+       `startTime` VA `endTime` ikkalasi ham berilsa, ular orasidagi FARQ
+       1 SOATDAN KICHIK bo'lishi SHART. `_agg_trades()` esa 48 soatlik
+       DELTA_WINDOW_MS oynasini BUTUNLIGICHA (`endTime=end_ms` o'zgarmas)
+       BITTA so'rovda yuborardi — bu MEXC tomonidan doim rad etilib
+       (400/bo'sh natija), `volume_delta_profile()` HAR DOIM `None`
+       qaytarardi. Bu #108'dagi mock testlarda ANIQLANMAGAN edi, chunki
+       ular `_client.get()`ni to'g'ridan-to'g'ri mocklab, MEXC'ning bu
+       real vaqt-oyna cheklovini simulyatsiya qilmagan edi.
+     - **Tuzatish**: `_agg_trades()` endi IKKI qavatli tsikl — TASHQI
+       tsikl 48 soatlik oynani `AGG_TRADES_WINDOW_MS=55 daqiqa`lik
+       kichik oynalarga bo'lib-bo'lib so'raydi (har biri < 1 soat, MEXC
+       chegarasidan xavfsiz), ICHKI tsikl esa har bir kichik oyna ICHIDA
+       (agar 1000 tadan ko'p savdo bo'lsa) avvalgidek `startTime`ni
+       surib sahifalaydi. 400-499 status endi BUTUN funksiyani emas,
+       FAQAT shu kichik oynani to'xtatadi (keyingi oynaga o'tiladi);
+       429 esa hamon BUTUN funksiyani to'xtatadi (tezlik chegarasi —
+       qayta urinish xavfli).
+     - Tekshirildi (mock): MEXC'ning haqiqiy >1 soat cheklovi simulyatsiya
+       qilindi (`endTime-startTime>1soat` bo'lsa 400) — ESKI (bitta
+       so'rov) yondashuv 400 bilan muvaffaqiyatsiz bo'lishi, YANGI
+       (oynali) yondashuv esa 48 soatlik oynadagi (oxirgi 30 daqiqadagi)
+       savdoni MUVAFFAQIYATLI topishi va HECH BIR so'rov 1 soatdan
+       oshmasligi tasdiqlandi (53 so'rov/nomzod — kam-tez-tez chaqiriladi,
+       muammo emas). Eski pagination/429/xarid-sotuv testlari (#108)
+       o'zgarishsiz 9/9 o'tdi. `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy portlash hodisasi bilan
+       tasdiqlanmagan** — keyingi surge postida Railway logi orqali
+       (yoki rasmning o'zida Volume+Delta ikki panel ko'rinishi bilan)
+       tekshirilishi kerak.

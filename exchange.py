@@ -207,45 +207,63 @@ async def volume_ticker_24hr() -> dict[str, float]:
 # odatda kichikroq hajmli tangalar bo'lgani uchun bu amalda ham
 # yetarlicha tez). `max_trades` — qo'shimcha xavfsizlik devori.
 AGG_TRADES_MAX = 60_000
+# Binance (MEXC shu API'ni oynaydi) `/api/v3/aggTrades`: `startTime` VA
+# `endTime` ikkalasi ham berilsa, ular orasidagi farq 1 SOATDAN KICHIK
+# bo'lishi SHART (aks holda so'rov bo'sh natija/xato bilan qaytadi).
+# Foydalanuvchi "portlash postlarida Delta chiqmayapti, avvalgidek
+# (profilsiz) keladi" deb topgach aniqlandi: 48 soatlik oyna BUTUNLIGICHA
+# (`endTime=end_ms` o'zgarmas, faqat `startTime` surilardi) bitta so'rovda
+# yuborilardi — MEXC buni HAR DOIM rad etib, `volume_delta_profile()`
+# doim `None` qaytarardi (fallback — eski, profilsiz `news_chart()`).
+AGG_TRADES_WINDOW_MS = 55 * 60_000   # 55 daqiqa — 1 soatlik chegaradan xavfsiz zaxira
 
 
 async def _agg_trades(symbol: str, start_ms: int, end_ms: int) -> list[dict]:
     """`start_ms`/`end_ms` oralig'idagi BARCHA agregatsiyalangan
-    savdolarni sahifalab (`startTime`ni oxirgi olingan savdodan keyingiga
-    surib) oladi. Tarmoq xatosi, tezlik chegarasi (429) yoki
+    savdolarni oladi — TASHQI tsikl `AGG_TRADES_WINDOW_MS` (< 1 soat)
+    dan katta bo'lmagan oynalarga bo'lib-bo'lib so'raydi (yuqoridagi
+    izohga qarang), ICHKI tsikl esa har bir oyna ICHIDA (agar 1000 tadan
+    ko'p savdo bo'lsa) `startTime`ni oxirgi olingan savdodan keyingiga
+    surib sahifalaydi. Tarmoq xatosi, tezlik chegarasi (429) yoki
     `AGG_TRADES_MAX`ga yetish — QISMAN natija bilan JIMGINA to'xtaydi
     (chaqiruvchi buni "yetarli" deb hisoblaydi, xato emas)."""
     out: list[dict] = []
-    cur_start = start_ms
-    while cur_start < end_ms and len(out) < AGG_TRADES_MAX:
-        try:
-            r = await _client.get("/api/v3/aggTrades", params={
-                "symbol": symbol, "startTime": cur_start, "endTime": end_ms,
-                "limit": 1000,
-            })
-        except Exception:
-            log.warning("MEXC aggTrades so'rovi xato (%s)", symbol, exc_info=True)
-            break
-        if r.status_code == 429:
-            log.warning("MEXC rate limit (aggTrades, %s) — %d savdo bilan to'xtatildi",
-                       symbol, len(out))
-            break
-        if 400 <= r.status_code < 500:
-            break
-        r.raise_for_status()
-        batch = r.json()
-        if not batch:
-            break
-        out.extend(batch)
-        try:
-            last_ts = int(batch[-1]["T"])
-        except (KeyError, TypeError, ValueError):
-            break
-        if last_ts < cur_start:
-            break   # kutilmagan/orqaga ketuvchi vaqt — cheksiz halqadan himoya
-        cur_start = last_ts + 1
-        if len(batch) < 1000:
-            break   # oxirgi sahifa
+    win_start = start_ms
+    while win_start < end_ms and len(out) < AGG_TRADES_MAX:
+        win_end = min(end_ms, win_start + AGG_TRADES_WINDOW_MS)
+        cur_start = win_start
+        while cur_start < win_end and len(out) < AGG_TRADES_MAX:
+            try:
+                r = await _client.get("/api/v3/aggTrades", params={
+                    "symbol": symbol, "startTime": cur_start, "endTime": win_end,
+                    "limit": 1000,
+                })
+            except Exception:
+                log.warning("MEXC aggTrades so'rovi xato (%s)", symbol, exc_info=True)
+                return out
+            if r.status_code == 429:
+                log.warning("MEXC rate limit (aggTrades, %s) — %d savdo bilan to'xtatildi",
+                           symbol, len(out))
+                return out
+            if 400 <= r.status_code < 500:
+                log.warning("MEXC aggTrades %d (%s, oyna %d-%d)",
+                           r.status_code, symbol, cur_start, win_end)
+                break   # shu oynada muammo — keyingi oynaga o'tamiz, butunlay to'xtamaymiz
+            r.raise_for_status()
+            batch = r.json()
+            if not batch:
+                break   # bu oynada savdo yo'q — keyingi oynaga o'tamiz
+            out.extend(batch)
+            try:
+                last_ts = int(batch[-1]["T"])
+            except (KeyError, TypeError, ValueError):
+                break
+            if last_ts < cur_start:
+                break   # kutilmagan/orqaga ketuvchi vaqt — cheksiz halqadan himoya
+            cur_start = last_ts + 1
+            if len(batch) < 1000:
+                break   # bu oynaning oxirgi sahifasi
+        win_start = win_end
     return out
 
 
