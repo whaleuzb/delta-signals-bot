@@ -3232,3 +3232,34 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (KERNELUSDT, YASHIL "Xarid" belgisi, +12.00%) News Trade AI
        uslubiga mos ekanligi tasdiqlandi. `test_tracker.py` 9/9 —
        o'zgarmadi.
+
+118. **Foydalanuvchi: "Portlash habaridagi grafik bilan bir xil bo'lsin.
+     Volume+delta."** (#117'da qo'shilgan grafik oddiy — profilsiz —
+     `news_chart()` edi.)
+     - **Yechim — MAVJUD profilni QAYTA ISHLATISH, yangi so'rov EMAS**:
+       kit hodisasi doim shu tanga PORTLASH sifatida ALLAQACHON
+       kuzatilayotgan payt yuz beradi (`whale_scan_job()` faqat surge
+       nomzodlarini tekshiradi, #116), demak o'sha portlash hodisasi
+       UCHUN ALLAQACHON hisoblangan Volume/Volume Delta profili
+       (`news_events.profile_data`, #108'da qo'shilgan, 48 soatlik
+       haqiqiy MEXC savdolaridan) bazada BOR. `whale_scan_job()` endi
+       `db.active_live_events()`dan qaytgan surge qatorining
+       `profile_data`sini o'qiydi (`surge_rows` endi symbol->QATOR
+       xaritasi, faqat symbol to'plami emas) va bo'lsa `chart.
+       surge_profile_chart()`ga TO'G'RIDAN-TO'G'RI uzatadi — MEXC'ga
+       QO'SHIMCHA so'rov YO'Q, va ikkala xabar (portlash + kit) AYNAN
+       BIR XIL profil ma'lumotini ko'rsatadi (foydalanuvchi so'ragan
+       aynan shu). Profil topilmasa (masalan portlash chizilganda
+       xato bo'lgan) — #117'dagi oddiy (marker rangli) grafikka
+       xavfsiz qaytadi.
+     - Kit hodisasining O'ZIGA ham `db.set_news_profile()` bilan bin'lar
+       nusxalanadi — shunda `news_live_job()` ham uni keyingi jonli
+       yangilanishlarda QAYTA SO'RAMASDAN xuddi shu profilli grafikni
+       chizadi (surge live-update yo'lining AYNAN o'zi).
+     - Tekshirildi (mock): (1) profil MAVJUD bo'lganda `surge_profile_
+       chart()` (Volume+Delta) chaqirilishi, oddiy `news_chart()`
+       chaqirilMASLIGI, profil kit hodisasiga ham nusxalanishi; (2) profil
+       YO'Q bo'lganda oddiy `news_chart()` (marker rangi bilan) fallback
+       ishlashi. Eski dedup/matn-format/24s-hajm-yo'q testlari (#116) ham
+       yangilangan mocklar bilan qayta o'tkazildi. `test_tracker.py` 9/9 —
+       o'zgarmadi.

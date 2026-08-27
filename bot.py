@@ -4846,15 +4846,15 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         log.exception("Kit faolligi uchun aktiv hodisalar olinmadi")
         return
-    surge_symbols = {r["symbol"] for r in rows if r["source"] == "surge" and r["symbol"]}
-    if not surge_symbols:
+    surge_rows = {r["symbol"]: r for r in rows if r["source"] == "surge" and r["symbol"]}
+    if not surge_rows:
         return
 
     now = datetime.now(timezone.utc)
     now_ms = int(now.timestamp() * 1000)
     window_ms = config.WHALE_WINDOW_MINUTES * 60_000
 
-    for symbol in surge_symbols:
+    for symbol, surge_row in surge_rows.items():
         try:
             vol24h = await db.latest_volume_snapshot(symbol)
         except Exception:
@@ -4916,22 +4916,47 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 f"📊24 soatlik hajm: {_fmt_usd_k(vol24h)} USDT"
             )
 
-            # Foydalanuvchi so'rovi: "Bunga ham 1D grafik bo'lishi kerak" —
-            # boshqa barcha post turlari (SEC/surge/likvidatsiya) kabi,
-            # `_news_render()` (1d, portlashdagi bilan bir xil oyna) orqali,
-            # keyin `news_live_job()` uni AVTOMATIK jonli yangilaydi (matn
-            # o'zgarmaydi, faqat grafik/% — boshqa turlar bilan bir xil).
+            # Grafik: foydalanuvchi so'rovi — "Portlash habaridagi grafik bilan
+            # bir xil bo'lsin, Volume+Delta". Shu tanga PORTLASH sifatida
+            # ALLAQACHON kuzatilayotgani uchun (`surge_row`), o'sha hodisa
+            # UCHUN ALLAQACHON hisoblangan Volume/Volume Delta profili
+            # (`db.set_news_profile`, 48 soatlik haqiqiy MEXC savdolaridan)
+            # bo'lsa — QAYTA SO'RALMAYDI, to'g'ridan-to'g'ri qayta ishlatiladi
+            # (MEXC'ga qo'shimcha yuk yo'q, ikkala xabar aynan BIR XIL
+            # ma'lumotni ko'rsatadi). Profil yo'q bo'lsa (masalan portlash
+            # chizilganda xato bo'lgan) — oddiy (profilsiz) grafikka xavfsiz
+            # qaytadi, xuddi `news_live_job()`ning surge yo'lidagi kabi.
+            profile = None
+            if surge_row["profile_data"]:
+                try:
+                    profile = json.loads(surge_row["profile_data"])
+                except (TypeError, ValueError):
+                    log.warning("Kit faolligi: profile_data o'qib bo'lmadi (%s)", symbol,
+                               exc_info=True)
+                    profile = None
+
             whale_before_ms = config.SURGE_DECLINE_DAYS * 86_400_000
             marker_color = chart.GREEN if side_label == "buy" else chart.RED
             chart_label = "Xarid" if side_label == "buy" else "Sotuv"
+            photo = None
+            profile_bins = None
             try:
-                rendered = await _news_render(symbol, "crypto", now, tf="1d",
-                                              before_ms=whale_before_ms,
-                                              label=chart_label, marker_color=marker_color)
+                result = await _news_candles(symbol, "crypto", now, tf="1d",
+                                             before_ms=whale_before_ms)
             except Exception:
                 log.warning("Kit faolligi grafigi yasalmadi (%s)", symbol, exc_info=True)
-                rendered = None
-            photo = rendered[0] if rendered else None
+                result = None
+            if result:
+                candles, news_idx, live_pct = result
+                if profile:
+                    profile_bins = (profile["vol_bins"], profile["delta_bins"],
+                                    profile["bin_lo"], profile["bin_size"])
+                    photo = chart.surge_profile_chart(
+                        candles, news_idx, symbol, live_pct, *profile_bins,
+                        label=chart_label, tf="1d")
+                else:
+                    photo = chart.news_chart(candles, news_idx, symbol, live_pct,
+                                             label=chart_label, marker_color=marker_color, tf="1d")
 
             buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
             try:
@@ -4951,7 +4976,9 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 render_tf="1d" if photo else None,
                 render_before_ms=whale_before_ms if photo else None,
                 render_label=chart_label if photo else None,
-                render_marker_color=marker_color if photo else None)
+                render_marker_color=(None if profile_bins else marker_color) if photo else None)
+            if profile_bins:
+                await db.set_news_profile(eid, *profile_bins)
             await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
