@@ -4524,13 +4524,23 @@ async def _start_markettwits_listener(bot_) -> None:
 # tsiklida bekorga tarmoqqa chiqmaydi.
 _econ_cache: list[dict] = []
 _econ_cache_at = 0.0
-ECON_CACHE_TTL = 1800   # 30 daqiqa
+_econ_cache_ok = True
+ECON_CACHE_TTL = 1800          # 30 daqiqa — MUVAFFAQIYATLI yangilanishdan keyin
+# Manba vaqti-vaqti bilan 429 (tezlik chegarasi) qaytarishi mumkin (Railway'ning
+# umumiy IP hududi sababli, boshqa bepul manbalarda ham ko'rilgan — CLAUDE.md
+# #107ga qarang). Bunday holatda TO'LIQ 30 daqiqa kutish xavfli: aynan
+# "actual" natija chiqqan payt shu muvaffaqiyatsiz tsiklga to'g'ri kelib
+# qolsa, keyingi tekshiruv yarim soatgacha kechikardi. Shu sabab
+# muvaffaqiyatsizlikdan keyin ANCHA qisqaroq (5 daqiqa) kutib qayta uriniladi.
+ECON_CACHE_RETRY_TTL = 300     # 5 daqiqa — MUVAFFAQIYATSIZLIKDAN keyin
 
 
 async def _econ_events_cached() -> list[dict]:
-    global _econ_cache, _econ_cache_at
-    if time.monotonic() - _econ_cache_at > ECON_CACHE_TTL:
+    global _econ_cache, _econ_cache_at, _econ_cache_ok
+    ttl = ECON_CACHE_TTL if _econ_cache_ok else ECON_CACHE_RETRY_TTL
+    if time.monotonic() - _econ_cache_at > ttl:
         fresh = await econcalendar.fetch_week()
+        _econ_cache_ok = bool(fresh)
         if fresh:
             _econ_cache = fresh
         # Bo'sh javob ESKI keshni O'CHIRMAYDI — manba vaqtincha ishlamay
@@ -4634,6 +4644,12 @@ async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Iqtisodiy natija tahlili xato")
             continue
         if not analysis or not analysis.get("is_market_moving") or not analysis.get("message_uz"):
+            # Nima uchun postlanmagani keyinchalik loglardan aniq bo'lishi
+            # uchun (masalan foydalanuvchi "natija kelmadi" deb so'rasa) —
+            # Claude ATAYLAB "kam ta'sirli" deb topgan bo'lishi mumkin,
+            # bu XATO emas.
+            log.info("Iqtisodiy natija postlanmadi (kam ta'sirli yoki tahlil "
+                    "muvaffaqiyatsiz): %s", ", ".join(e["title"] for e in group))
             continue
 
         external_key = f"econ:{key}"

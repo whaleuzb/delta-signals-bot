@@ -3263,3 +3263,42 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        ishlashi. Eski dedup/matn-format/24s-hajm-yo'q testlari (#116) ham
        yangilangan mocklar bilan qayta o'tkazildi. `test_tracker.py` 9/9 —
        o'zgarmadi.
+
+119. **Foydalanuvchi: "⏰ Diqqat, 15 daqiqa keyin: 🇺🇸 Unemployment Claims —
+     Shuni natijasi kelmadi."** (#111'da qo'shilgan econ natija funksiyasi
+     haqida.) Railway logi orqali aniqlandi: aynan shu hodisa vaqti atrofida
+     (`12:33:46 UTC` — AQSH haftalik ish o'rinlari hisoboti odatda 8:30 ET
+     = shu payt) `econcalendar.fetch_week()` **429 (Too Many Requests)**
+     qaytargan (`nfs.faireconomy.media`ning umumiy tezlik chegarasi —
+     Railway'ning umumiy IP hududi sababli, #107'dagi CoinAnk holatiga
+     o'xshash).
+     - **Haqiqiy xato topildi**: `_econ_events_cached()` muvaffaqiyatsiz
+       (bo'sh) javobda ham `_econ_cache_at`ni YANGILAB qo'yardi — bu esa
+       KEYINGI qayta urinishni TO'LIQ 30 daqiqaga (`ECON_CACHE_TTL`)
+       kechiktirar edi. Aynan "actual" natija chiqqan payt shu
+       muvaffaqiyatsiz tsiklga to'g'ri kelib qolsa, tabiiy 429 o'zi
+       tezda tuzalgan bo'lsa ham, bot 30 daqiqagacha ESKI (actual'siz)
+       ma'lumot bilan qolib ketardi.
+     - **Tuzatish**: yangi `_econ_cache_ok` bayrog'i — muvaffaqiyatsizlikdan
+       keyin YANGI, ANCHA QISQAROQ `ECON_CACHE_RETRY_TTL=300` (5 daqiqa)
+       qo'llanadi (muvaffaqiyatli holatda hamon 30 daqiqa — manbaning o'z
+       tezlik chegarasini hurmat qilish uchun).
+     - **Ikkinchi ehtimoliy sabab (bug EMAS, ATAYLAB)**: `newsai.econ_
+       result()` bu ko'rsatkichni "kam ta'sirli" (`is_market_moving=false`)
+       deb topgan bo'lishi ham mumkin — haftalik ish o'rinlari arizalari
+       ko'pincha rutin, keskin bozor harakati keltirmaydigan ko'rsatkich.
+       Bu holat oldin JIMGINA o'tkazib yuborilardi (loglarda iz qoldirmasdi)
+       — endi `log.info(...)` qo'shildi, kelajakda shunga o'xshash "nega
+       kelmadi" savollariga Railway logi orqali ANIQ javob berish mumkin
+       bo'lishi uchun.
+     - Tekshirildi (mock): (1) muvaffaqiyatsiz fetch'dan keyin qisqa
+       (5 daqiqa) TTL ichida qayta so'ralmasligi, TTL o'tgach ESKI 30
+       daqiqani emas, YANGI qisqa oralig'ni kutib qayta so'ralishi;
+       (2) muvaffaqiyatli holatda odatdagi to'liq 30 daqiqalik TTL
+       qo'llanishi (RETRY_TTL bilan aralashib ketmasligi). Eski econ
+       testlari (#111) ham o'zgarishsiz o'tdi. `test_tracker.py` 9/9 —
+       o'zgarmadi.
+     - **Hali production'da haqiqiy 429 holatida tasdiqlanmagan** —
+       keyingi shunga o'xshash hodisada (yangi manba muvaffaqiyatsizligi)
+       Railway logi orqali tekshirilishi kerak: endi 5 daqiqada qayta
+       urinilyaptimi.
