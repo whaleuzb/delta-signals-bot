@@ -5607,6 +5607,37 @@ async def _run_one_time_fixes() -> None:
         log.exception("Bir martalik tuzatish xato bilan tugadi")
     await db.set_setting(flag, "done")
 
+    # VAQTINCHA forenzika (#134 shikoyati: "limitga keldi lekin
+    # aktivlashmadi") — signal yaratilishidan (taxminan 18:00 UTC) beri
+    # LINEAUSDT'ning haqiqiy sham tarixini o'qib, entry=0.002492ga yaqin
+    # (1% ichida) har bir shamni loglaydi — bu entry haqiqatan HECH QACHON
+    # tegilmagani (thin-liquidity narx sakrashi) yoki kod xatosi tufayli
+    # o'tkazib yuborilganini ANIQLASH uchun. Keyingi tozalashda OLIB
+    # TASHLANADI — doimiy funksionallik emas.
+    flag2 = "onetime_forensics_signal_134"
+    if not await db.get_setting(flag2):
+        try:
+            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            start_ms = now_ms - 60 * 60_000
+            candles = await exchange.klines("LINEAUSDT", start_ms, limit=500, end_ms=now_ms)
+            entry = 0.002492
+            log.info("FORENZIKA #134: %d ta sham olindi (%s dan %s gacha)",
+                      len(candles),
+                      datetime.fromtimestamp(start_ms / 1000, timezone.utc),
+                      datetime.fromtimestamp(now_ms / 1000, timezone.utc))
+            for c in candles:
+                near = min(abs(c.low - entry), abs(c.high - entry)) / entry
+                touched = c.low <= entry <= c.high
+                if near < 0.01 or touched:
+                    t = datetime.fromtimestamp(c.open_ms / 1000, timezone.utc)
+                    log.info(
+                        "FORENZIKA #134: %s low=%.10g high=%.10g open=%.10g "
+                        "close=%.10g TEGDIMI=%s (farq=%.4f%%)",
+                        t, c.low, c.high, c.open, c.close, touched, near * 100)
+        except Exception:
+            log.exception("Forenzika (#134) xato bilan tugadi")
+        await db.set_setting(flag2, "done")
+
 
 async def post_init(app: Application) -> None:
     await db.init()
