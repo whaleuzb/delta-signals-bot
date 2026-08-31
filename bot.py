@@ -5616,12 +5616,29 @@ async def _forensics_signal_134() -> None:
     LINEAUSDT'ning haqiqiy sham tarixini o'qib, entry=0.002492ga yaqin
     (1% ichida) har bir shamni loglaydi — bu entry haqiqatan HECH QACHON
     tegilmagani (thin-liquidity narx sakrashi) yoki kod xatosi tufayli
-    o'tkazib yuborilganini ANIQLASH uchun. Keyingi tozalashda OLIB
-    TASHLANADI — doimiy funksionallik emas."""
-    flag2 = "onetime_forensics_signal_134"
+    o'tkazib yuborilganini ANIQLASH uchun. Birinchi urinish (klines
+    tarixi) entryga bir NECHTA marta (17:30, 17:31, 17:41-17:44, 17:54,
+    18:00, 18:01) tegilganini ko'rsatdi -- lekin AYNAN QAYSI paytdan
+    boshlab signal MAVJUD bo'lganini bilish uchun endi signalning O'ZI
+    (created_at/last_checked_ms/status) ham to'g'ridan-to'g'ri bazadan
+    o'qib loglanadi. Keyingi tozalashda OLIB TASHLANADI — doimiy
+    funksionallik emas."""
+    flag2 = "onetime_forensics_signal_134_v2"
     if await db.get_setting(flag2):
         return
     try:
+        sig = await db.get_signal(134)
+        if sig:
+            log.info(
+                "FORENZIKA #134 (baza yozuvi): status=%s entry=%s sl=%s "
+                "created_at=%s opened_at=%s last_checked_ms=%s (=%s)",
+                sig["status"], sig["entry"], sig["sl"], sig["created_at"],
+                sig["opened_at"], sig["last_checked_ms"],
+                datetime.fromtimestamp(sig["last_checked_ms"] / 1000, timezone.utc)
+                if sig["last_checked_ms"] else None)
+        else:
+            log.info("FORENZIKA #134 (baza yozuvi): signal #134 TOPILMADI")
+
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         start_ms = now_ms - 60 * 60_000
         candles = await exchange.klines("LINEAUSDT", start_ms, limit=500, end_ms=now_ms)
