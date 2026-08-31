@@ -4077,3 +4077,92 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        DIAGNOSTIKA, YAKUNIY tuzatish emas. Keyingi CLAUDE.md yozuvi
        shu loglardan topilgan HAQIQIY sabab (yoki "xato topilmadi,
        hammasi to'g'ri ishlagan" tasdig'i) bilan davom etishi kerak.
+
+134. **Foydalanuvchi (#133 LINEAUSDT, ANIQ signal raqami bilan): "133 da
+     ham hali buy limitga narx kelmagan lekin kirildi deb xabar keldi
+     keyin 5 sekunddan keyin TP1 bajarildi... aslida narx men qoygan
+     limitga yaqin ham kelmadi."** — #133'dagi diagnostika logi (shu
+     kunda #133'dan oldin qo'shilgan) endi ANIQ, YAKUNIY DALIL berdi —
+     **TUB SABAB TOPILDI VA TASDIQLANDI**, foydalanuvchi hammasi
+     BOSHIDAN BERI TO'G'RI edi.
+     - **Railway log dalili** (o'zgartirilmagan, aynan qatorlar):
+       ```
+       Signal #133 yaratilgan: 2026-08-31 17:38:41 UTC
+       "ENTRY TO'LDI" deb hisoblangan sham: 2026-08-31 12:43:00 UTC
+         — signal yaratilishidan 4 SOAT 55 DAQIQA OLDIN
+       "TP tegdi" deb hisoblangan sham: 2026-08-31 11:24:00 UTC
+         — signal yaratilishidan 6 SOAT 14 DAQIQA OLDIN
+       ```
+       Ya'ni bot HAQIQATAN ham soatlab OLDINGI (tarixiy) narxlarga
+       nisbatan "entry to'ldi" va "TP tegdi" deb qaror qilgan — foydalanuvchi
+       aytgan aynan shu ("tarixdagi narxni tekshiryapti") edi. #129
+       (bitta chegarasiz shamni o'tkazib yuborish) YETARLI EMAS edi,
+       chunki bu yerda BUTUN QAYTGAN massiv (bitta emas!) soatlab eski
+       edi — muammo boshqa, ancha KATTAROQ va TUB darajada edi.
+     - **Ildiz sabab — `tracker.py`da `exchange.klines()` `end_ms`SIZ
+       chaqirilardi**: `candles = await provider(...).klines(symbol,
+       start_ms + 1)` — `end_ms` parametri UMUMAN berilmagan edi. Bu
+       ANIQ MEXC xususiyati CLAUDE.md #47/#50'da ALLAQACHON
+       hujjatlashtirilgan edi ("MEXC faqat `startTime` berilganda
+       so'ralgan vaqtni DEYARLI E'TIBORGA OLMAYDI — o'rniga eng SO'NGGI
+       `limit` (standart 500) shamni, HOZIRDAN orqaga sanab, qaytaradi")
+       — LEKIN o'sha yozuvda tracker.py "bunga duch kelmaydi" deb
+       NOTO'G'RI xulosa qilingan edi ("u doim 'hozirgacha' o'qiydi,
+       shuning uchun end_ms'siz ham to'g'ri ishlaydi"). Bu xulosa FAQAT
+       `start_ms` "hozir"dan SEZILARLI OLDIN bo'lganda (masalan
+       navbatdagi oddiy poll, `last_checked_ms` bir necha soniya oldin)
+       to'g'ri edi. **YANGI signalning ENG BIRINCHI tekshiruvida
+       (`start_ms = created_at`, demak U HAM "hozir"ga teng) bu xulosa
+       BUTUNLAY BUZILADI**: kutilgan oyna DEYARLI BO'SH (signal endigina
+       yaratilgan), lekin MEXC baribir OXIRGI 500 DAQIQALIK (8+ soatlik!)
+       tarixni qaytaradi — kuzatuv bu BUTUN eski tarixni "signal
+       yaratilgandan keyin sodir bo'lgan" deb NOTO'G'RI "qayta o'ynatib",
+       entry/TP/SL'ni SOATLAB OLDINGI narxlarga nisbatan "tegdi" deb
+       hisoblardi. #129'ning "bitta chegarasiz shamni o'tkazib yuborish"
+       tuzatishi bu yerda YETARLI EMAS edi — chunki muammo FAQAT
+       BIRINCHI shamda emas, QAYTGAN BUTUN MASSIVDA edi (500 daqiqalik
+       terish MEXC tomonidan sodir bo'lardi, `start_ms`dan qat'i nazar).
+     - **Tuzatish**: `tracker.py`da `klines()` chaqiruviga endi HAR DOIM
+       aniq `end_ms=now_ms` (chaqiruv vaqti) beriladi. `end_ms` berilsa
+       MEXC (dokumentatsiya #47/#50'ga ko'ra) oynani ANIQ `[start_ms,
+       end_ms]`ga cheklaydi — "eng so'nggi 500 shamni qaytarish"
+       xatti-harakati BUTUNLAY yo'qoladi. `exchange.klines`/`forex.klines`/
+       `stocks.klines` uchtasi ham bir xil imzoga ega (`end_ms` allaqachon
+       mavjud, faqat FOYDALANILMAGAN edi) — shuning uchun qamrov barcha
+       bozor turlariga (kripto/forex/aksiya) avtomatik tarqaladi.
+     - **Boshqa chaqiruv nuqtalari TEKSHIRILDI**: `chart.py`/`bot.py`ning
+       grafik funksiyalari (`_fetch` orqali) `end_ms`ni ALLAQACHON
+       to'g'ri berardi (#50'da tuzatilgan edi) — faqat `tracker.py`ning
+       O'ZI qoldirilgan edi. `bot.py`ning `_process_surge_candidate()`
+       (kunlik shamlar, uzoq muddatli pasayishni tasdiqlash) `end_ms`siz
+       qoladi, lekin bu YERDA xato EMAS — u yerda `limit` kichik (taxminan
+       10-15) va so'ralgan oyna ALLAQACHON "hozirgacha" bo'lgani uchun
+       MEXC'ning "so'nggi N shamni qaytarish" xatti-harakati AYNAN
+       kutilgan natijaning O'ZI (tasodifiy emas, tekshirilgan).
+     - Tekshirildi: (1) `test_tracker.py`ga yangi doimiy regressiya testi
+       — `tracker.process()` chaqirilganda `exchange.klines()` ANIQ
+       `end_ms` bilan (chaqiruv vaqtiga mos) chaqirilishini tasdiqlaydi;
+       agar kimdir kelajakda bu parametrni yana olib tashlasa, test
+       DARHOL qizil bo'ladi. Mavjud 13 ta holat o'zgarishsiz (jami 14/14).
+       (2) Scratchpad'da xuddi shu tekshiruv alohida ham tasdiqlandi.
+       `python3 -m py_compile tracker.py test_tracker.py` — toza.
+     - **Ta'sir doirasi — JUDA KENG**: bu BARCHA yangi signallarga (limit
+       VA market, barcha bozorlarga) tegishli edi — har safar signal
+       yaratilib ENG BIRINCHI marta tekshirilganda, MEXC'dan (yoki
+       forex/aksiya provayderidan) qaytgan butun 500 daqiqalik tarix
+       noto'g'ri "signal yaratilgandan keyin" deb hisoblanardi. Bu #126,
+       #127, #133 (va ehtimol boshqa ko'plab, alohida shikoyat
+       qilinmagan) hodisalarning ANIQ tub sababi edi.
+     - **Muhim saboq**: #129 (chegara-sham) va #130 (limit-keyin-TP/SL)
+       tuzatishlari o'zlari HAM to'g'ri va foydali edi (haqiqiy, kichikroq
+       muammolarni yechgan), lekin ular USHBU (ancha kattaroq) muammoni
+       QISMAN "yashirgan" bo'lishi mumkin edi — shu sabab foydalanuvchi
+       "hech narsa o'zgarmadi" deb his qilardi. Faqat #133'ning ANIQ
+       signal raqami va Railway logidagi qattiq dalil orqaligina haqiqiy
+       tub sabab topildi — bu foydalanuvchining "aniq misol bering"
+       so'roviga (bu safar ANIQ signal raqami bilan) rioya qilishning
+       qanchalik muhim ekanini ko'rsatadi.
+     - **Ishlashi Railway logi orqali TEKSHIRILISHI SHART** — keyingi
+       yangi signalda diagnostika logi (`ENTRY TO'LDI`/`sl_touched`/
+       `tp_touched` qatorlari) endi signal yaratilgan vaqtga YAQIN
+       (soatlab emas) sham vaqtlarini ko'rsatishi kerak.

@@ -248,6 +248,32 @@ async def main():
     assert saved["sl"] is None, f"sl hamon NULL qolishi kerak edi: {saved['sl']}"
     assert len(ev) == 1 and ev[0]["type"] == "OPEN" and ev[0]["needs_tpsl"] is True, ev
 
+    # 12. #133'da HAQIQIY (Railway logi bilan isbotlangan) xato: klines()
+    # `end_ms`siz chaqirilardi -- MEXC bunday holda so'ralgan startTime'ni
+    # E'TIBORGA OLMAY, eng SO'NGGI 500 daqiqalik (8+ soatlik!) tarixni
+    # qaytarardi, kuzatuv esa shu butun eski tarixni "signal yaratilgandan
+    # keyin" deb noto'g'ri qayta o'ynatardi (entry/TP soatlab OLDINGI
+    # narxlarga "tegdi" deb hisoblanardi). Endi `klines()` doim aniq
+    # `end_ms` ("hozir") bilan chaqirilishi SHART.
+    klines_calls = []
+
+    async def _capture_klines(symbol, start_ms, limit=500, tf="1m", end_ms=None):
+        klines_calls.append(end_ms)
+        return [candle(0, 101, 101, 99, 100)]
+
+    exchange.klines = _capture_klines
+    db.save_progress = _save
+    before_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    await tracker.process(signal())
+    after_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    assert len(klines_calls) == 1 and klines_calls[0] is not None, (
+        "klines() end_ms'siz chaqirilyapti -- #133'dagi xato QAYTA CHIQQAN "
+        f"(MEXC eski tarixni qaytarishi mumkin): {klines_calls}")
+    assert before_ms <= klines_calls[0] <= after_ms + 1000, (
+        f"end_ms ({klines_calls[0]}) chaqiruv vaqtiga mos kelmayapti")
+    show("klines() end_ms bilan chaqirildi (#133 tuzatishi)",
+         {"status": "ACTIVE", "pnl_pct": None, "r_multiple": None}, [])
+
     print("\nBarcha holatlar tekshirildi.")
 
 

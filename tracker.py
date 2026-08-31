@@ -66,7 +66,26 @@ async def process(sig) -> list[dict]:
 
     is_first_poll = sig["last_checked_ms"] is None
     start_ms = sig["last_checked_ms"] or int(sig["created_at"].timestamp() * 1000)
-    candles = await provider(sig["market"]).klines(symbol, start_ms + 1)
+    # `end_ms` — MAJBURIY. MEXC (va forex/aksiya provayderlari, bir xil
+    # imzo) FAQAT `startTime` berilganda (`endTime`siz) uni DEYARLI E'TIBORGA
+    # OLMAYDI — o'rniga eng SO'NGGI `limit` (standart 500) shamni, HOZIRDAN
+    # orqaga sanab, qaytaradi (bu allaqachon #47/#50'da GRAFIK chizish uchun
+    # hujjatlashtirilgan, lekin o'sha yerda "Kuzatuv bunga duch kelmaydi,
+    # u doim 'hozirgacha' o'qiydi" deb NOTO'G'RI taxmin qilingan edi).
+    # YANGI signalning ENG BIRINCHI tekshiruvida `start_ms` (`created_at`)
+    # HAM "hozir"ga teng — demak kutilgan oyna DEYARLI BO'SH (bir necha
+    # soniya), lekin MEXC baribir OXIRGI 500 DAQIQALIK (8+ soatlik!) tarixni
+    # qaytaradi — kuzatuv bu butun eski tarixni "signal yaratilgandan
+    # keyin sodir bo'lgan" deb NOTO'G'RI "qayta o'ynatib", entry/TP/SL'ni
+    # SOATLAB OLDINGI narxlarga nisbatan "tegdi" deb hisoblardi (signal
+    # #133'da aniq kuzatildi va Railway logi bilan ISBOTLANDI: "TP tegdi"
+    # deb hisoblangan sham signal yaratilishidan 6 soat 14 daqiqa OLDIN
+    # edi). `end_ms` berilsa MEXC oynani ANIQ `[start_ms, end_ms]`ga
+    # cheklaydi — bu butun toifadagi xatoni ILDIZIDAN yo'q qiladi (#129'dagi
+    # "bitta chegarasiz shamni o'tkazib yuborish" — bu YETARLI EMAS edi,
+    # chunki butun QAYTGAN massiv, faqat birinchi shami emas, eski edi).
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    candles = await provider(sig["market"]).klines(symbol, start_ms + 1, end_ms=now_ms)
     if not candles:
         return []
 
