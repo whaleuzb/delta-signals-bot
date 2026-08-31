@@ -187,6 +187,53 @@ async def main():
     ev = await tracker.process(sig)
     show("Uzilgan sikl (2 bosqich)", SAVED, ev, 6.8)
 
+    # 10. Signal ENG BIRINCHI marta tekshirilyapti va birinchi qaytgan sham
+    # signal YARATILISHIDAN OLDIN boshlangan (1 daqiqalik chegaraga to'liq
+    # tushmagan, `created_at` odatda tasodifiy soniyada bo'lgani sabab bu
+    # DEYARLI HAR DOIM shunday) -- bu sham signal HALI mavjud bo'lmagan
+    # paytdagi narx harakatini o'z ichiga olishi mumkin, shuning uchun
+    # e'tiborga olinmasligi (o'tkazib yuborilishi) kerak.
+    created = NOW
+    first_partial = exchange.Candle(
+        int((created - timedelta(seconds=30)).timestamp() * 1000), 101, 101, 96, 100,
+        int((created + timedelta(seconds=30)).timestamp() * 1000))  # entry(100)ga tegadi, lekin OLDIN boshlangan
+    after_no_touch = candle(1, 102, 103, 101.5, 102)  # entryga tegmaydi
+    saved, ev = await run(signal(created_at=created), [first_partial, after_no_touch])
+    show("Yaratilishdan oldingi (chegarasiz) birinchi sham o'tkazib yuborildi", saved, ev)
+    assert saved["status"] == "PENDING", (
+        "birinchi (chegaraga tushmagan) sham o'tkazib yuborilib, entry hali "
+        f"TO'LMAGAN deb qolishi kerak edi: {saved['status']}")
+    assert not ev, f"hech qanday hodisa bo'lmasligi kerak edi: {ev}"
+
+    # Nazorat: signal yaratilgandan KEYIN boshlangan (haqiqiy, chegaraga
+    # tushgan) shamda entryga tegilsa, bu TO'G'RI aniqlanishi kerak --
+    # faqat chegarasiz BIRINCHI sham o'tkazib yuboriladi, undan keyingilari
+    # emas.
+    after_touch = candle(1, 102, 103, 99, 102)  # bu safar entry(100)ga tegadi
+    saved2, ev2 = await run(signal(created_at=created), [first_partial, after_touch])
+    show("... nazorat: keyingi (haqiqiy) shamda entry to'g'ri aniqlandi", saved2, ev2)
+    assert saved2["status"] == "ACTIVE", (
+        f"ikkinchi (haqiqiy) shamda entryga tegish aniqlanishi kerak edi: {saved2['status']}")
+    assert any(e["type"] == "OPEN" for e in ev2)
+
+    # Xuddi shu himoya Market order (`entry_mode="market"`, ACTIVE'dan
+    # to'g'ridan-to'g'ri boshlangan, "kirish shami" tushunchasi yo'q)
+    # signallari uchun ham ishlashi kerak: birinchi (chegarasiz) shamda
+    # SL'ga "tegilgan" bo'lib ko'ringan bo'lsa ham, bu signal HALI ACTIVE
+    # bo'lmagan paytdagi (yaratilishdan oldingi) narx bo'lishi mumkin --
+    # o'tkazib yuborilishi kerak.
+    market_sig = signal(status="ACTIVE", opened_at=created, created_at=created)
+    first_partial_sl = exchange.Candle(
+        int((created - timedelta(seconds=30)).timestamp() * 1000), 100, 101, 95, 100,
+        int((created + timedelta(seconds=30)).timestamp() * 1000))  # SL(96)ga tegadi, lekin OLDIN boshlangan
+    after_no_touch2 = candle(1, 100, 101, 98, 100)  # SL'ga tegmaydi
+    saved3, ev3 = await run(market_sig, [first_partial_sl, after_no_touch2])
+    show("Market: yaratilishdan oldingi shamdagi 'SL' o'tkazib yuborildi", saved3, ev3)
+    assert saved3["status"] == "ACTIVE", (
+        "Market signal yaratilishidan OLDINGI shamdagi SL tegishi e'tiborga "
+        f"olinmasligi kerak edi: {saved3['status']}")
+    assert not ev3, f"hech qanday hodisa bo'lmasligi kerak edi: {ev3}"
+
     print("\nBarcha holatlar tekshirildi.")
 
 

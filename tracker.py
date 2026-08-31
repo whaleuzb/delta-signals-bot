@@ -57,6 +57,7 @@ async def process(sig) -> list[dict]:
     status = sig["status"]
     ambiguous = sig["ambiguous"]
 
+    is_first_poll = sig["last_checked_ms"] is None
     start_ms = sig["last_checked_ms"] or int(sig["created_at"].timestamp() * 1000)
     candles = await provider(sig["market"]).klines(symbol, start_ms + 1)
     if not candles:
@@ -68,8 +69,28 @@ async def process(sig) -> list[dict]:
     exit_price = None
     last_ms = start_ms
 
-    for c in candles:
+    for idx, c in enumerate(candles):
         last_ms = c.close_ms
+
+        # Signalning ENG BIRINCHI (hali hech qachon tekshirilmagan) sikli —
+        # `start_ms` (`created_at`) 1 daqiqalik shamlar chegarasiga DEYARLI
+        # HECH QACHON to'liq tushmaydi (signal tasodifiy soniyada yaratiladi).
+        # MEXC bunday holda so'ralgan vaqtni O'Z ICHIGA olgan TO'LIQ (boshidan)
+        # shamni qaytaradi — ya'ni SIGNAL YARATILISHIDAN OLDINGI narx harakati
+        # ham shu shamning high/low'iga kirib qolishi mumkin. Shu shamga
+        # ishonib entry/SL/TP tekshirish signal HALI MAVJUD BO'LMAGAN paytdagi
+        # narxni "tegdi" deb noto'g'ri hisoblashi mumkin edi (foydalanuvchi:
+        # "hali limitga kelmagandi ham, qanday TP bilan yopildi?" — signal
+        # #126'da kuzatilgan naqsh). Shu sabab BITTA — ENG BIRINCHI va
+        # chegaraga to'liq tushmagan — sham xavfsizlik uchun UTKAZIB
+        # YUBORILADI (`last_ms` baribir yangilanadi — qayta so'ralmaydi);
+        # tekshiruv KEYINGI, signal yaratilgandan keyin TO'LIQ boshlangan
+        # shamdan davom etadi. Keyingi barcha chaqiriqlarda `start_ms`
+        # (`last_checked_ms`) doim aynan bir shamning `close_ms`'idan
+        # olinadi — shu sabab chegaraga TUSHGAN bo'ladi, bu muammo faqat
+        # signalning ENG BIRINCHI tekshiruvida yuz beradi.
+        if idx == 0 and is_first_poll and c.open_ms < start_ms:
+            continue
 
         # --- 1. Entryga tegdimi ---
         if status == "PENDING":

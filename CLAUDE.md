@@ -3757,3 +3757,82 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        "Tasdiqlash" tugmasini bosgan MILLISEKUNDDA narx harakatlansa
        (real tarmoq kechikishi), nazariy jihatdan ozgina eskirish qoladi
        — bu endi amaliy jihatdan e'tiborga olinmaydigan darajada.
+
+129. **Foydalanuvchi (davomida, yana taъkidlab): "Hali buy limitga
+     kelmagandiku qanday tp bilan yopildi? Bu juda jiddiy xatolik nima
+     bo'ldi?"** — **#128'dagi tashxis NOTO'G'RI yo'nalishda edi**: #126'ning
+     to'liq karta rasmi (`draft_text()`) "(🎯 darhol kirilgan)" belgisini
+     KO'RSATMAGAN — demak #126 aslida oddiy **LIMIT** signal edi, Darhol
+     (market) EMAS. #128'dagi tuzatish (tasdiqlashda narx qayta olish)
+     shu holatga umuman ALOQADOR EMAS edi. Chuqurroq qazilganda MANGA
+     ANCHA JIDDIYROQ, TUB (barcha signal turlariga tegishli) xato topildi.
+     - **Ildiz sabab — `tracker.py`ning HAR BIR yangi signal uchun ENG
+       BIRINCHI so'ragan shami**: `start_ms = sig["created_at"]` — bu
+       DEYARLI HECH QACHON 1 daqiqalik sham chegarasiga (soniya=0) to'liq
+       TUSHMAYDI, chunki signal tasodifiy soniyada yaratiladi. CLAUDE.md
+       #47'da allaqachon hujjatlashtirilgan MEXC xususiyati bo'yicha —
+       ILGARI faqat KATTA taym freymlarga (15m) tegishli deb hisoblangan
+       edi ("Kuzatuv bu tuzoqqa tushmaydi" — lekin bu faqat KEYINGI
+       so'rovlar uchun to'g'ri, ular doim chegaraga tushgan `last_checked_ms`
+       ishlatadi) — MEXC 1 daqiqalik so'rovda ham so'ralgan vaqtni ICHIGA
+       OLGAN TO'LIQ (boshidan, ya'ni daqiqaning :00 soniyasidan) shamni
+       qaytaradi. Ya'ni signal yaratilishidan bir necha soniya OLDINGI
+       narx harakati ham shu ENG BIRINCHI shamning high/low'iga kirib
+       qolardi — kuzatuv esa buni signal yaratilgandan KEYIN sodir
+       bo'lgan deb NOTO'G'RI hisoblardi. Bu LIMIT signalda entry
+       "to'lmagan holda to'lgan" ko'rinishiga (aslida signal hali mavjud
+       bo'lmagan paytdagi eski narxga "tegib" ketishi), Market signalda
+       esa SL/TP darrov "tegilgandek" ko'rinishiga olib kelishi mumkin
+       edi — ikkalasi ham "hali limitga/maqsadga kelmagandi" tuyg'usini
+       beradi, chunki foydalanuvchi HAQIQIY (signal yaratilgandan keyingi)
+       narx harakatini kuzatgan, bot esa signal yaratilishdan OLDINGI
+       daqiqa segmentiga ham ishongan.
+     - **Nega bu ilgari (9 ta asosiy test bilan) ushlanmagan**: mavjud
+       testlar `NOW`ni ANIQ shamlar chegarasi sifatida ISHLATGANDEK
+       qurilgan edi (`candle(0,...)`ning `open_ms`i signal `created_at`i
+       bilan aynan BIR XIL edi) — ya'ni test infratuzilmasining o'zi bu
+       chegara muammosini "yashirib" turgan, real productiondagi
+       tasodifiy soniyalarni aks ettirmagan.
+     - **Tuzatish**: `process()`da endi `is_first_poll = sig["last_checked_ms"]
+       is None` hisoblab olinadi. Sikldagi ENG BIRINCHI (`idx==0`) sham
+       agar `is_first_poll` bo'lsa VA uning `open_ms`i `start_ms`dan
+       (`created_at`dan) OLDIN boshlangan bo'lsa — BUTUNLAY o'tkazib
+       yuboriladi (`continue`, `last_ms` baribir yangilanadi — qayta
+       so'ralmaydi). Tekshiruv KEYINGI, signal yaratilgandan keyin TO'LIQ
+       boshlangan shamdan davom etadi. Keyingi barcha (ikkinchi va undan
+       keyingi) chaqiriqlarda `start_ms` doim oldingi shamning `close_ms`
+       +1'idan olinadi — bu HAR DOIM chegaraga tushgan bo'ladi, shuning
+       uchun bu tuzatish faqat signalning ENG BIRINCHI tekshiruvida
+       ishlaydi (qimmat emas — bir martalik).
+     - Tekshirildi (`test_tracker.py`ga 3 ta yangi holat): (1) LIMIT
+       signal — chegarasiz birinchi sham entryga "tegadi" (aslida OLDIN
+       boshlangan) — o'tkazib yuborilishi, signal PENDING qolishi kerak,
+       HECH QANDAY hodisa bo'lmasligi; (2) nazorat — signal yaratilgandan
+       KEYIN boshlangan (chegaraga tushgan) ikkinchi shamda entryga
+       tegilsa, bu TO'G'RI aniqlanishi (fix faqat BIRINCHI shamni
+       o'tkazadi, qolganlarini emas); (3) MARKET (`entry_mode="market"`,
+       ACTIVE'dan boshlangan) signal — chegarasiz birinchi shamdagi "SL"
+       tegishi ham xuddi shunday o'tkazib yuborilishi kerak. Mavjud 12 ta
+       holat (test infratuzilmasi `candle(0,...)`ni aynan chegarada
+       qurgani sabab) o'zgarishsiz o'tdi — bu YANGI himoya ularga
+       ta'sir qilmaydi (`open_ms < start_ms` sharti ular uchun `False`).
+       `python3 -m py_compile tracker.py test_tracker.py` — toza.
+     - **Ta'sir doirasi**: BARCHA yangi signallarning ENG BIRINCHI tekshiruv
+       siklida (limit VA market, barcha bozorlar) — signal yaratilgandan
+       biroz OLDINGI narx harakatiga endi ishonilmaydi. Xavfsiz/konservativ:
+       eng ko'pi bilan ~1 daqiqalik HAQIQIY (signal yaratilgandan keyingi)
+       tegishni biroz kechiktirishi mumkin (keyingi shamda baribir ushlanadi)
+       — bu noto'g'ri-ijobiy (soxta tegish)dan ANCHA yaxshi.
+     - **MUHIM — bu #128'ning O'RNINI BOSMAYDI, ULARNI BIRGA TO'LDIRADI**:
+       #128 entry narxining wizard bilan tasdiqlash orasidagi ESKIRISHINI
+       kamaytiradi (Market rejim uchun); #129 esa signalning ENG BIRINCHI
+       kuzatuv shami signal mavjud bo'lmagan paytdagi narxga ISHONMASLIGINI
+       kafolatlaydi (limit VA market, ikkalasi uchun ham). Ikkalasi ham
+       kerak edi.
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — bu ANIQ #126'dagi
+       naqshni takrorlaydigan keyingi signalda (yangi signal yaratilib,
+       birinchi tekshiruvda darrov "tegish" qayd etilganda) log orqali
+       kuzatilishi kerak. Agar foydalanuvchi #126'ga o'xshash holatni yana
+       ko'rsa — bu MUHIM signal: demak muammo yana boshqa (masalan
+       MEXC'ning haqiqiy real-time narx tarqalishi/lag'i) sababda bo'lishi
+       mumkin, chuqurroq tekshiruv kerak bo'ladi.
