@@ -2900,6 +2900,40 @@ async def on_fix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         pass  # matn o'zgarmasa Telegram xato beradi — muhim emas
 
 
+async def cmd_qaytar(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Xato sabab (masalan #121'dagi kabi, jonli narxni tekshirmasdan
+    qo'lda kiritilgan allaqachon "tegilgan" stop) bir zumda yopilib qolgan
+    signalni ACTIVE holatiga qaytaradi (faqat super-admin).
+    `tracker.reopen_signal()`ga qarang — raqamlar qo'lda kiritilmaydi,
+    hammasi saqlangan tp_hit/tps'dan qat'iy qayta hisoblanadi."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    if not ctx.args:
+        await update.message.reply_text("Foydalanish: /qaytar <signal ID>")
+        return
+    try:
+        sig_id = int(ctx.args[0])
+    except ValueError:
+        await update.message.reply_text("Signal ID raqam bo'lishi kerak.")
+        return
+    ev = await tracker.reopen_signal(sig_id)
+    if not ev:
+        await update.message.reply_text(
+            f"#{sig_id} topilmadi yoki allaqachon ochiq (faqat YOPILGAN "
+            "signalni qaytarish mumkin).")
+        return
+    # Depozit ham to'g'rilanadi — `cmd_tuzat`dagi bilan bir xil mantiq:
+    # yopilganda unga qo'shilgan/ayirilgan pul endi qaytarib olinadi.
+    if ev["alloc_amount"] is not None and ev["prev_pnl"] is not None:
+        money = ev["prev_pnl"] / 100 * ev["alloc_amount"]
+        await db.apply_deposit_delta(ev["workspace_id"], -money)
+    await update.message.reply_text(
+        f"↩️ <b>#{sig_id} {html.escape(ev['symbol'])}</b> — ACTIVE holatiga "
+        "qaytarildi.\nStop xavfsiz boshlang'ich qiymatga tushirildi, TP/SL "
+        "kuzatuvi hozirdan davom etadi.", parse_mode=ParseMode.HTML)
+
+
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
@@ -5407,6 +5441,7 @@ def main() -> None:
     # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
+    app.add_handler(CommandHandler("qaytar", cmd_qaytar))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))

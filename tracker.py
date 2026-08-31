@@ -282,6 +282,55 @@ async def partial_close(sig_id: int, portion: float) -> dict | None:
             "status": status, "pnl": pnl, "r": r}
 
 
+async def reopen_signal(sig_id: int) -> dict | None:
+    """Xato sabab (masalan jonli narxni tekshirmasdan qo'lda kiritilgan,
+    allaqachon "tegilgan" stop — #121'dagi holat) bir zumda yopilib qolgan
+    signalni ACTIVE holatiga qaytaradi.
+
+    `filled_pct`/`realized_pct` qo'lda kiritilmaydi — yopilishdan OLDIN
+    HAQIQATAN tegilgan TP'lar asosida (`tp_hit`/`tps`/`entry`/`side`dan)
+    qat'iy QAYTA hisoblanadi, xato yopilishning o'zi hissasi butunlay olib
+    tashlanadi (`cmd_tuzat`dagi bilan bir xil falsafa — statistika hech kim
+    tekshira olmaydigan qo'lyozmaga aylanmasligi kerak). `sl` xavfsiz
+    `sl_initial`ga qaytariladi (aynan shu yopilishga sabab bo'lgan xato
+    stopni saqlab qolish ma'nosiz). `last_checked_ms` HOZIRGA o'rnatiladi —
+    aks holda keyingi tekshiruvda ESKI (allaqachon "tegilgan" holatni
+    ko'rsatuvchi) shamlar qayta o'ynatilib, signal yana zumda yopilib
+    qolardi.
+
+    Faqat YOPIQ (TP/SL/BREAKEVEN) signal uchun ishlaydi — aks holda `None`
+    (allaqachon ochiq yoki topilmagan signalni "qaytarish" ma'nosiz)."""
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] not in ("TP", "SL", "BREAKEVEN"):
+        return None
+
+    entry = float(sig["entry"])
+    sl_init = float(sig["sl_initial"])
+    side = sig["side"]
+    tps = [float(x) for x in sig["tps"]]
+    tp_hit = sig["tp_hit"]
+    alloc = allocation(len(tps))
+
+    filled_before = sum(alloc[:tp_hit]) if tp_hit else 0.0
+    realized_before = sum(alloc[i] * pnl_at(side, entry, tps[i]) for i in range(tp_hit))
+
+    prev_pnl = sig["pnl_pct"]
+    prev_alloc_amount = sig["alloc_amount"]
+
+    await db.save_progress(sig_id, {
+        "sl": sl_init, "tp_hit": tp_hit, "filled_pct": round(filled_before, 6),
+        "realized_pct": round(realized_before, 4), "status": "ACTIVE",
+        "opened_at": sig["opened_at"], "closed_at": None, "exit_price": None,
+        "pnl_pct": None, "r_multiple": None,
+        "last_checked_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
+        "ambiguous": False,
+    })
+    return {"type": "REOPEN", "signal_id": sig_id, "workspace_id": sig["workspace_id"],
+            "symbol": sig["symbol"],
+            "prev_pnl": float(prev_pnl) if prev_pnl is not None else None,
+            "alloc_amount": float(prev_alloc_amount) if prev_alloc_amount is not None else None}
+
+
 async def run_once() -> list[dict]:
     out = []
     for sig in await db.live_signals():  # barcha workspace'lar

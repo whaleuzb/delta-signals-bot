@@ -3369,3 +3369,59 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        xavfsiz stop odatdagidek o'rnatilishi; (3) narx olinmasa xavfsiz
        davom etishi. `test_tracker.py` 9/9 — o'zgarmadi (`tracker.py`ga
        tegilmadi).
+
+122. **Foydalanuvchi (#121'da ham #117'dagi bilan bir xil muammo
+     kuzatilgach): "Oxirgi 0G 121 chi signalni hali yopmadim ochiqligicha
+     qaytar tez. Keyin public dagi Madrimov Vip statistikasini 0 ga
+     qaytarish kerak — shu kamchilik sabab signallari ishlamay qolgan."**
+     Ikkita alohida ehtiyoj: (1) noto'g'ri yopilgan #121'ni ACTIVE holatiga
+     qaytarish (YANGI FUNKSIYA — bunday imkoniyat oldin YO'Q edi), (2)
+     "Madrimov Vip" workspace'ining ommaviy statistikasini tuzatish.
+     - **(1) `/qaytar <ID>` — yangi super-admin buyrug'i**:
+       `tracker.reopen_signal()` — yopiq (TP/SL/BREAKEVEN) signalni ACTIVE
+       holatiga qaytaradi. Raqamlar QO'LDA KIRITILMAYDI — `cmd_tuzat`dagi
+       bilan bir xil falsafa ("statistikani hech kim tekshira olmaydigan
+       qo'lyozmaga aylantirmaslik"): `filled_pct`/`realized_pct` saqlangan
+       `tp_hit`/`tps`/`entry`/`side`dan QAT'IY qayta hisoblanadi (yopilishdan
+       OLDIN chinakam tegilgan TP'lar asosida — xato yopilishning o'zi
+       hissasi butunlay olib tashlanadi). `sl` xavfsiz `sl_initial`ga
+       qaytariladi (aynan shu yopilishga sabab bo'lgan xato stopni saqlab
+       qolish ma'nosiz — #121'da yangi joriy-narx tekshiruvi #121'ni HAM
+       himoya qiladi, endi qayta o'sha xato takrorlanmaydi). `last_checked_
+       ms` HOZIRGA o'rnatiladi — aks holda keyingi tekshiruvda ESKI
+       (allaqachon "tegilgan" holatni ko'rsatuvchi) shamlar qayta
+       o'ynatilib, signal yana zumda yopilib qolardi. Depozit ham
+       `cmd_tuzat`dagi bilan bir xil naqshda tuzatiladi (yopilishda
+       ayirilgan/qo'shilgan pul qaytarib olinadi).
+     - **(2) "Madrimov Vip" statistikasi — YANGI KOD KERAK EMAS, MAVJUD
+       vosita bor**: `db.py`/`bot.py`ni tekshirganda aniqlandi — ommaviy
+       sahifadagi statistika (`db.public_workspaces()`) HECH QANDAY alohida
+       saqlangan "hisoblagich" EMAS, `signals` jadvalidan JONLI hisoblanadi
+       (`excluded=FALSE` bo'lgan yopiq signallar bo'yicha). Xato signalni
+       statistikadan chiqarish uchun ALLAQACHON `/tuzat` buyrug'i bor
+       (super-admin, workspace ICHIDA ishlatiladi) — har bir signalni
+       "🚫 chiqarish"/"↩️ qaytarish" bilan statistikaga kiritish/chiqarish
+       mumkin, depozit ham mos ravishda tuzatiladi. **Bu Claude tomonidan
+       BAJARILMADI** — chunki (a) `/tuzat` allaqachon aynan shu vazifa
+       uchun mo'ljallangan va foydalanuvchining o'zi (super-admin) buni
+       "Madrimov Vip" guruh chatida ishlatishi kerak (Claude Telegram
+       foydalanuvchisi sifatida harakat qila olmaydi), (b) qaysi signallar
+       ANIQ "shu kamchilik sabab" ekanini faqat foydalanuvchi biladi.
+     - **Muhim cheklov, foydalanuvchiga aytilishi kerak**: Claude bu
+       seansda production Postgres bazasiga TO'G'RIDAN-TO'G'RI ulanib
+       yoza olmaydi (DATABASE_URL kabi maxfiy ma'lumotlarni ko'rish sandbox
+       xavfsizlik siyosati tomonidan bloklangan) — shuning uchun `/qaytar`
+       buyrug'ini HAM aynan foydalanuvchi (yoki boshqa super-admin)
+       Telegram'da o'zi yozishi kerak, Claude buni ORQAVAROT bajara
+       olmaydi.
+     - Tekshirildi (mock): (1) `tp_hit=0` (hech qanday haqiqiy TP tegmagan)
+       holatida to'liq ACTIVE'ga qaytishi, filled/realized 0'ga tushishi,
+       sl `sl_initial`ga qaytishi; (2) `tp_hit=1` (TP1 chindan tegilgan)
+       holatida FAQAT TP1 ulushi saqlanishi (qolgani emas); (3) ochiq yoki
+       topilmagan signalni qaytarishga urinish xavfsiz `None`; (4)
+       `cmd_qaytar()` to'liq oqimi — depozit to'g'ri tiklanishi (misolda
+       -5% * $1000 yopilishda ayirilgan $50 qaytarilishi). `test_tracker.py`
+       9/9 — o'zgarmadi.
+     - **Hali production'da haqiqiy #121 bilan tasdiqlanmagan** —
+       foydalanuvchi `/qaytar 121`ni ishlatgach Railway logi/signal holati
+       orqali tekshirilishi kerak.
