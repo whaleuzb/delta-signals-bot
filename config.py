@@ -100,6 +100,15 @@ CRYPTOPANIC_TOKEN = os.getenv("CRYPTOPANIC_TOKEN", "")
 # 3 -> 2.2: foydalanuvchi "kanalda ko'proq xabar kelishi" so'ragach
 # yumshatildi — ko'proq signal, ozroq "kuchlilik" kafolati (tabiiy savdo).
 SURGE_VOLUME_MULTIPLIER = float(os.getenv("SURGE_VOLUME_MULTIPLIER", "2.2"))
+# Oxirgi 24 soatlik hajm (USDT) shundan KICHIK tangalar butunlay chetlab
+# o'tiladi — foydalanuvchi: "kapitallashuvi juda past va yaroqsiz" tangalar
+# kelayotganini topib, mutlaq hajm chegarasi qo'yishni so'radi (bozor
+# kapitallashuvi ma'lumoti bepul/ishonchli manbada yo'q, lekin 24s savdo
+# hajmi — likvidlik va "yaroqlilik"ning to'g'ridan-to'g'ri o'lchovi —
+# ALLAQACHON bazada bor, `volume_snapshots`). Bu chegara PORTLASH VA kit
+# (whale) kuzatuvining IKKALASIGA ham ta'sir qiladi — kit kuzatuvi faqat
+# portlash nomzodlarida ishlaydi (#116).
+SURGE_MIN_VOLUME_USD = float(os.getenv("SURGE_MIN_VOLUME_USD", "10000000"))
 # Bazaviy o'rtacha shu soatdan OLDINGI yozuvlardan hisoblanadi (oxirgi
 # hajmning o'zi bazaga aralashib ketmasin).
 SURGE_BASELINE_EXCLUDE_HOURS = float(os.getenv("SURGE_BASELINE_EXCLUDE_HOURS", "12"))

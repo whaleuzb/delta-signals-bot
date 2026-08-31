@@ -3302,3 +3302,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        keyingi shunga o'xshash hodisada (yangi manba muvaffaqiyatsizligi)
        Railway logi orqali tekshirilishi kerak: endi 5 daqiqada qayta
        urinilyaptimi.
+
+120. **Foydalanuvchi: "Tokenlarni portlash va whales trakerga keladiganini
+     top 500 ta tokenga o'zgartiraylik. Yoki savdo hajmi 10 million
+     dollordan katta aktivlarni kuzatsin. Hozirgi beryotgan tokenlari
+     kapitallashuvi juda past va yaroqsiz."** Ikkita variant taklif
+     qilingan edi — ODDIYROQ va BARQARORROQ (top-N doim o'zgarib turadi,
+     mutlaq chegara esa doim bir xil ma'noni bildiradi) bo'lgani uchun
+     **mutlaq 24 soatlik hajm chegarasi** ($10M) tanlandi.
+     - **Sabab**: `db.volume_surge_candidates()` FAQAT nisbiy o'sishga
+       (`latest_volume > avg_volume * multiplier`) qarardi — mutlaq
+       hajm/kapitallashuv haqida umuman fikr yuritmasdi. Shu sabab juda
+       kichik/likvidsiz tanga ozgina dollarlik savdodan keyin ham "2.2x
+       o'sdi" deb portlash sifatida chiqib ketardi.
+     - **Bozor kapitallashuvi EMAS, 24 soatlik HAJM ishlatildi**:
+       kapitallashuv uchun bepul/ishonchli manba yo'q (yangi tashqi
+       integratsiya kerak bo'lardi), lekin 24s savdo hajmi — likvidlik va
+       "amalda savdo qilса bo'ladimi" degan savolning to'g'ridan-to'g'ri
+       o'lchovi — ALLAQACHON bazada bor (`volume_snapshots`,
+       `exchange.volume_ticker_24hr()`ning `quoteVolume`si).
+     - **Tuzatish**: `db.volume_surge_candidates()`ga yangi `min_volume_usd`
+       parametri — SQL `WHERE`ga `AND l.latest_volume >= $4` qo'shildi.
+       `config.SURGE_MIN_VOLUME_USD=10_000_000` (`surge_scan_job()`dan
+       uzatiladi). Bu chegara PORTLASH VA kit (whale) kuzatuvining
+       IKKALASIGA ham ta'sir qiladi — kit kuzatuvi FAQAT portlash
+       nomzodlarida ishlaydi (#116), shuning uchun bitta joyni tuzatish
+       ikkalasini ham hal qiladi.
+     - Tekshirildi: haqiqiy Postgres bilan (`initdb`/`pg_ctl`, shu seansda
+       ilgari ishlatilgan `/tmp/pgtest2` instansiyasi qayta ishga
+       tushirilib) ikkita soxta tanga — biri katta hajm+3x o'sish, biri
+       kichik hajm+5x o'sish (nisbiy o'sish YANA HAM katta, lekin mutlaq
+       hajm past) — bilan sinaldi: `min_volume_usd=0` (eski xatti-harakat)
+       ikkalasini ham qaytardi, `min_volume_usd=10_000_000` bilan FAQAT
+       katta hajmli tanga qaytdi. `test_tracker.py` 9/9 — o'zgarmadi.

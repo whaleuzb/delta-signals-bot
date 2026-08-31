@@ -4827,7 +4827,8 @@ async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     try:
         candidates = await db.volume_surge_candidates(
-            config.SURGE_VOLUME_MULTIPLIER, config.SURGE_BASELINE_EXCLUDE_HOURS)
+            config.SURGE_VOLUME_MULTIPLIER, config.SURGE_BASELINE_EXCLUDE_HOURS,
+            min_volume_usd=config.SURGE_MIN_VOLUME_USD)
     except Exception:
         log.exception("Hajm portlashi nomzodlarini olishda xato")
         return

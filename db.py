@@ -1121,12 +1121,18 @@ async def insert_volume_snapshots(rows: list[tuple[str, float]]) -> None:
 
 
 async def volume_surge_candidates(multiplier: float, exclude_hours: float,
-                                   min_snapshots: int = 3) -> list[asyncpg.Record]:
+                                   min_snapshots: int = 3,
+                                   min_volume_usd: float = 0) -> list[asyncpg.Record]:
     """Oxirgi hajm o'zining (`exclude_hours`dan OLDINGI) o'rtacha hajmidan
     kamida `multiplier` marta katta bo'lgan juftliklar. `min_snapshots` —
     ishonchli o'rtacha uchun tarixda kamida shuncha eski yozuv bo'lishi
     kerak (aks holda bot yangi ishga tushgan bo'lishi mumkin, hali baza
-    yig'ilmagan — bunday holatda hech narsa qaytmaydi, xato ham emas)."""
+    yig'ilmagan — bunday holatda hech narsa qaytmaydi, xato ham emas).
+    `min_volume_usd` — oxirgi 24 soatlik hajm (USDT) shundan KICHIK
+    juftliklar butunlay chetlab o'tiladi (foydalanuvchi: "kapitallashuvi
+    juda past" tangalarni chiqarib tashlash uchun — nisbiy % o'sish
+    qancha katta bo'lmasin, mutlaq hajm past bo'lsa baribir e'tiborga
+    olinmaydi)."""
     q = """
     WITH latest AS (
         SELECT DISTINCT ON (symbol) symbol, volume AS latest_volume
@@ -1142,10 +1148,12 @@ async def volume_surge_candidates(multiplier: float, exclude_hours: float,
     SELECT l.symbol, l.latest_volume, b.avg_volume
     FROM latest l JOIN baseline b ON b.symbol = l.symbol
     WHERE b.n >= $2 AND b.avg_volume > 0 AND l.latest_volume > b.avg_volume * $3
+          AND l.latest_volume >= $4
     ORDER BY (l.latest_volume / b.avg_volume) DESC
     """
     async with pool().acquire() as c:
-        return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier)
+        return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier,
+                             _d(min_volume_usd))
 
 
 async def latest_volume_snapshot(symbol: str) -> float | None:
