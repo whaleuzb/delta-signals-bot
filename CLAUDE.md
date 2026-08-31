@@ -3532,3 +3532,66 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        "hamma kamchilik" uchun audit qilish alohida, aniqroq so'rov
        (masalan qaysi qism: signal skanerlash, jonli yangilanish,
        xabarlar, UI oqimlari) bilan davom ettirilishi kerak.
+
+125. **Foydalanuvchi: "boshqa kamchiliklarni top va tuzat."** — keyin bitta
+     nazariy holat topilib ("Ha, shuni ham tuzat" bilan tasdiqlandi), keyin
+     esa **"Balki oco rejimidan ko'nikma ko'chirarmiz?"** — bittasi
+     noto'g'ri chiqib bekor qilindi, ikkinchisi esa CHINDAN eski (hech
+     qachon ishlamagan) xatoni ochib, to'g'ri tuzatdi.
+     - **1-urinish (BEKOR QILINDI)**: nazariy holat — TP1 tegib, stop
+       breakeven'ga ko'chgach, XUDDI SHU shamda narx qaytib breakeven'ga
+       tushsa, natija hozir "BREAKEVEN" bo'lib chiqadi, aslida "TP" (TP1
+       olingan, foydali) bo'lishi kerak edi degan taxmin bilan tuzatish
+       yozildi. **Taxmin NOTO'G'RI chiqdi**: shamning `low`'i albatta
+       `high`'dan KEYIN keladi degan asossiz farazga tayangan edi — aslida
+       bir tekis ko'tarilayotgan shamda `low == open` bo'lishi mumkin (TP1'ga
+       chiqishdan OLDIN, "TP1'dan keyin qaytish" emas). Bu tuzatish
+       `test_tracker.py`ning 9 tasidan 4 tasini BUZDI (TP1→TP2→TP3 ketma-
+       ketligi noto'g'ri erta "BREAKEVEN" bilan to'xtab qolardi) — to'liq
+       regressiya to'plami DARHOL ushladi. **To'liq bekor qilindi**;
+       faqat haqiqatan hech qachon ishlamaydigan (isbotlangan no-op,
+       o'chirilsa ham/qolsa ham natija bir xil) bitta o'lik qator xavfsiz
+       deb topilib alohida olib tashlandi (`ec063e7`).
+     - **2-urinish (MUVAFFAQIYATLI) — OCO'dan ko'nikma**: `process()`da SL
+       va TP bitta shamning ICHIDA ikkalasi ham tegilganda (`ambiguous`),
+       eski kod HAR DOIM "SL birinchi" deb TAXMIN qilardi
+       (`CONSERVATIVE_SAME_CANDLE` bayrog'i "tuzatib" berishi kerak edi).
+       Foydalanuvchi taklifi asosida — haqiqiy birjalardagi OCO (One-
+       Cancels-the-Other) order'lar qanday ANIQ savdo tartibiga qarab
+       hal qilinishini takrorlab — `exchange.resolve_touch_order()` (yangi)
+       qo'shildi: shu 1-daqiqalik shamning ICHIDAGI HAQIQIY MEXC
+       savdolarini (`_agg_trades()`, allaqachon mavjud, vaqt tartibida)
+       ko'rib, SL va TP darajalaridan QAYSI BIRI CHINDAN OLDIN tegilganini
+       topadi. Faqat `market == "crypto"` uchun (forex/aksiyada bunday
+       ochiq individual savdo ma'lumoti yo'q); savdo topilmasa, tarmoq
+       xatosi bo'lsa, yoki bitta savdoning o'zi ikkalasini ham "tegdi" deb
+       ko'rsatsa (chegara narxlar bir-biriga juda yaqin) — `None` qaytadi
+       va chaqiruvchi ESKI konservativ taxminga qaytadi (xavfsiz fallback).
+     - **Yon kashfiyot — `CONSERVATIVE_SAME_CANDLE` HECH QACHON ishlamagan**:
+       shu integratsiyani sinash chog'ida (birinchi urinish faqat
+       `tp_touched=False` qo'yardi) test natija BUTUNLAY o'zgarmaganini
+       ko'rsatdi — sabab: pastdagi yopish bloki (`if sl_touched:`)
+       `tp_touched`ning qiymatiga UMUMAN qaramaydi, faqat `sl_touched`ga
+       qaraydi. Ya'ni bu bayroq (va uni ishlatuvchi eski qator) qo'shilgan
+       kundan beri **funksional o'lik** bo'lgan — SL har doim "g'olib"
+       chiqargan, `CONSERVATIVE_SAME_CANDLE`ning qiymati (True/False)
+       hech qanday farq qilmagan. Tuzatish: `resolved == "TP"` bo'lganda
+       endi haqiqatan tekshiriladigan `sl_touched = False` qo'yiladi (
+       `tp_touched` emas) — shu orqali TP1 to'g'ri hisoblanadi va signal
+       ochiq qoladi (agar TP2/TP3 hali tegmagan bo'lsa).
+     - Tekshirildi (mock, `test_tracker.py`ga 2 ta yangi holat qo'shildi):
+       (4b) `resolve_touch_order` "TP" qaytarsa — signal "ACTIVE" bo'lib
+       qoladi, faqat TP1 ulushi (+2.0%) hisoblangan; (4c) "SL" qaytarsa —
+       eski konservativ natija bilan BIR XIL (-4.0%). Mavjud 9 ta holat
+       (shu jumladan "konserv." — savdo ma'lumoti yo'q/`None` holati)
+       o'zgarishsiz o'tdi. `python3 -m py_compile` — barcha o'zgargan
+       fayllar (`exchange.py`, `tracker.py`, `test_tracker.py`) toza.
+     - **Ta'sir doirasi**: FAQAT `market == "crypto"` signallariga (forex/
+       aksiya konservativ xatti-harakatni saqlab qoladi) va FAQAT ikkalasi
+       (SL va TP) bir xil shamda tegilgan (kamdan-kam, "noaniq") holatlarga
+       tegishli — oddiy holatlar (faqat SL YOKI faqat TP tegilgan)
+       butunlay tegilmagan.
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — bu haqiqiy
+       "ikkalasi ham bitta shamda tegilgan" holat kamdan-kam uchraydi;
+       birinchi shunday hodisa yuz berganda log'da `resolve_touch_order`
+       chaqiruvi va natijasi (yoki xatosi) kuzatilishi kerak.

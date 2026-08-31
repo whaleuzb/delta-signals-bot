@@ -98,9 +98,31 @@ async def process(sig) -> list[dict]:
         tp_touched = nxt is not None and ((c.high >= nxt) if side == "LONG" else (c.low <= nxt))
 
         if sl_touched and tp_touched:
-            # 1m sham ichida tartibni bilib bo'lmaydi -> konservativ: SL birinchi
             ambiguous = True
-            if config.CONSERVATIVE_SAME_CANDLE:
+            # OCO order'lardagi kabi — TAXMIN qilish o'rniga (faqat kripto
+            # uchun, forex/aksiyada bunday ochiq individual savdo ma'lumoti
+            # yo'q) HAQIQIY savdolarni (`exchange.resolve_touch_order()`)
+            # ko'rib, qaysi biri chindan OLDIN tegilganini aniqlashga
+            # harakat qilamiz. Aniq javob topilmasa (savdo yo'q, tarmoq
+            # xatosi, yoki bitta savdoning o'zi ikkalasini ham "tegdi" deb
+            # ko'rsatsa) — ESKI konservativ (SL birinchi) taxminga qaytadi.
+            resolved = None
+            if sig["market"] == "crypto":
+                try:
+                    resolved = await exchange.resolve_touch_order(
+                        symbol, c.open_ms, c.close_ms, side, sl, nxt)
+                except Exception:
+                    log.warning("Sham ichidagi tartibni aniqlashda xato (#%s %s)",
+                               sig["id"], symbol, exc_info=True)
+                    resolved = None
+            if resolved == "TP":
+                # HAQIQIY savdolar TP ANIQ oldin tegilganini ko'rsatdi — SL
+                # bekor qilinadi (pastdagi "--- 3. SL ---" bloki `sl_touched`
+                # ga qaraydi, `tp_touched`ga EMAS, shuning uchun aynan shu
+                # bayroqni o'chirish SHART — aks holda quyidagi tekshiruv
+                # baribir SL sifatida yopib qo'yardi).
+                sl_touched = False
+            elif config.CONSERVATIVE_SAME_CANDLE:
                 tp_touched = False
 
         # --- 3. SL ---

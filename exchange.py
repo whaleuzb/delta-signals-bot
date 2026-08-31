@@ -267,6 +267,48 @@ async def _agg_trades(symbol: str, start_ms: int, end_ms: int) -> list[dict]:
     return out
 
 
+async def resolve_touch_order(symbol: str, start_ms: int, end_ms: int, side: str,
+                              sl: float, tp: float) -> str | None:
+    """SL VA TP bir shamning ICHIDA tegilgan (`tracker.py`dagi noaniq holat)
+    — real birjalardagi OCO order (bitta ikkinchisini bekor qiladi, ANIQ
+    savdo tartibi bo'yicha) g'oyasidan foydalanib, TAXMIN qilish o'rniga
+    HAQIQIY individual savdolarni (`_agg_trades()`, vaqt tartibida) ko'rib,
+    qaysi biri chindan OLDIN tegilganini aniqlaydi.
+
+    Natija: `"SL"` yoki `"TP"` — ANIQ qaysi biri oldin tegilgan bo'lsa;
+    `None` — savdo topilmadi, YOKI bitta savdoning o'zi ikkalasini ham
+    "tegdi" deb ko'rsatdi (masalan narxlar bir-biriga juda yaqin —
+    baribir aniqlik yo'q). `None` holatida chaqiruvchi ESKI konservativ
+    taxminga (`CONSERVATIVE_SAME_CANDLE`) qaytishi kerak — bu funksiya
+    hech qachon "noaniq"likni o'zi hal qilib qo'ymaydi, faqat aniq
+    bo'lgandagina javob beradi."""
+    try:
+        trades = await _agg_trades(symbol, start_ms, end_ms)
+    except Exception:
+        log.warning("Savdo tartibini aniqlashda xato (%s)", symbol, exc_info=True)
+        return None
+    if not trades:
+        return None
+    try:
+        trades_sorted = sorted(trades, key=lambda t: int(t["T"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    for t in trades_sorted:
+        try:
+            price = float(t["p"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        sl_hit = (price <= sl) if side == "LONG" else (price >= sl)
+        tp_hit = (price >= tp) if side == "LONG" else (price <= tp)
+        if sl_hit and tp_hit:
+            return None   # bitta savdoning o'zida ikkalasi ham -- baribir aniq emas
+        if sl_hit:
+            return "SL"
+        if tp_hit:
+            return "TP"
+    return None   # savdolar orasida hech biri ANIQ tegilmadi
+
+
 async def volume_delta_profile(symbol: str, start_ms: int, end_ms: int,
                                lo: float, hi: float,
                                n_bins: int = 40) -> tuple[list[float], list[float]] | None:

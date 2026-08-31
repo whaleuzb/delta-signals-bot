@@ -35,8 +35,14 @@ def signal(**kw):
     return d
 
 
-async def run(sig, candles):
+async def run(sig, candles, resolve_touch_order=None):
     exchange.klines = lambda *a, **k: _ret(candles)
+    # Standart — hech qanday savdo ma'lumoti "topilmadi" (`None`), eski
+    # konservativ taxminga qaytadi. Bu fayl tarmoq/baza SHART EMAS deb
+    # va'da beradi (yuqoridagi docstring) — shu sabab haqiqiy tarmoqqa
+    # chiqmasdan, chaqiruvchi kerak bo'lsa `resolve_touch_order` orqali
+    # boshqa javob simulyatsiya qiladi.
+    exchange.resolve_touch_order = lambda *a, **k: _ret(resolve_touch_order)
     db.save_progress = _save
     events = await tracker.process(sig)
     return SAVED.copy(), events
@@ -91,13 +97,37 @@ async def main():
     # 0.5*4% + 0.5*0% = 2.0
     show("TP1 keyin breakeven", saved, ev, 2.0)
 
-    # 4. Bitta shamda TP ham SL ham
+    # 4. Bitta shamda TP ham SL ham — savdo ma'lumoti YO'Q (None) ->
+    # eski konservativ (SL birinchi) taxminga qaytadi.
     saved, ev = await run(signal(), [
         candle(0, 101, 101, 99, 100),
         candle(1, 100, 105, 95, 97),       # ikkalasi ham
     ])
     show("TP+SL bitta shamda (konserv.)", saved, ev, -4.0)
     assert saved["ambiguous"], "ambiguous bayrog'i qo'yilmadi"
+
+    # 4b. Xuddi shu holat, lekin HAQIQIY savdolar TP OLDIN tegilganini
+    # ko'rsatsa (OCO uslubidagi aniqlash) — endi TP1 hisoblanishi kerak
+    # (faqat TP1, TP2/TP3 hali tegmagan — signal ACHIQ qoladi), konservativ
+    # taxmin (SL birinchi) QO'LLANMASLIGI kerak.
+    saved, ev = await run(signal(), [
+        candle(0, 101, 101, 99, 100),
+        candle(1, 100, 105, 95, 97),
+    ], resolve_touch_order="TP")
+    show("TP+SL bitta shamda (savdo: TP oldin)", saved, ev)
+    assert saved["ambiguous"], "ambiguous bayrog'i baribir qo'yilishi kerak"
+    assert saved["status"] == "ACTIVE", (
+        "faqat TP1 tegdi (TP2/TP3 hali yo'q) -- signal ochiq qolishi kerak edi")
+    assert abs(saved["realized_pct"] - 2.0) < 1e-6, (
+        f"TP1 ulushi (0.5*4%=2.0%) to'plangan bo'lishi kerak edi, {saved['realized_pct']} chiqdi")
+
+    # 4c. Xuddi shunday, lekin savdolar SL OLDIN tegilganini ko'rsatsa —
+    # natija konservativ holat bilan BIR XIL bo'lishi kerak.
+    saved, ev = await run(signal(), [
+        candle(0, 101, 101, 99, 100),
+        candle(1, 100, 105, 95, 97),
+    ], resolve_touch_order="SL")
+    show("TP+SL bitta shamda (savdo: SL oldin)", saved, ev, -4.0)
 
     # 5. Entryga tegmadi
     saved, ev = await run(signal(), [
