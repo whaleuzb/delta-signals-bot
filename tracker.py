@@ -86,6 +86,21 @@ async def process(sig) -> list[dict]:
     # chunki butun QAYTGAN massiv, faqat birinchi shami emas, eski edi).
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     candles = await provider(sig["market"]).klines(symbol, start_ms + 1, end_ms=now_ms)
+    # Oxirgi qaytgan sham hali TO'LIQ YOPILMAGAN bo'lishi mumkin — MEXC
+    # (va forex/aksiya provayderlari) joriy shakllanayotgan (hali davom
+    # etayotgan) shamni ham qaytaradi, `close_ms`si hozirdan KEYIN bo'lsa
+    # ham. Bunday shamning low/high'i HALI YAKUNIY EMAS — signal #134'da
+    # ANIQ kuzatildi: entry narxga sham shakllanishining KEYINGI (hali
+    # so'ralmagan) qismida tegib, lekin poll o'sha ONDA shamni "tekshirdim"
+    # deb `last_checked_ms`ni uning to'liq close_ms'iga o'rnatib qo'ygan —
+    # keyingi pollarda bu sham QAYTA SO'RALMAGANI uchun HAQIQIY teginish
+    # ABADIY yo'qolib qolgan (signal butun umri davomida PENDING qolib
+    # ketgan, garchi narx bir necha marta entryga tegib o'tgan bo'lsa ham).
+    # Shu sabab HALI yopilmagan oxirgi sham(lar) BUTUNLAY tashlab
+    # yuboriladi — keyingi pollda (u haqiqatan yopilgach, YAKUNIY low/high
+    # bilan) qaytadan so'raladi.
+    while candles and candles[-1].close_ms > now_ms:
+        candles = candles[:-1]
     if not candles:
         return []
 

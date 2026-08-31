@@ -4192,3 +4192,65 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        ko'rsatadi, tub sababni ANIQLASHGA yordam beradi (masalan: entry
        noto'g'ri saqlangan, symbol/market noto'g'ri, yoki boshqa sabab).
        Hali TUZATISH QILINMADI — avval dalil kerak (#133'dagi kabi).
+
+136. **#134 — TUB SABAB TOPILDI VA TUZATILDI: hali TO'LIQ yopilmagan
+     (shakllanayotgan) sham "tekshirilgan" deb belgilanardi.** Yuqoridagi
+     (135-band) diagnostika va bevosita bazadan o'qilgan forenzika ANIQ
+     dalil berdi:
+     - **Baza yozuvi** (`db.get_signal(134)` to'g'ridan-to'g'ri o'qildi):
+       `created_at=2026-08-31 18:00:33.222 UTC`, `status=PENDING`.
+     - **Haqiqiy sham tarixi** (birjadan to'g'ridan-to'g'ri): entry
+       (0.002492) signal yaratilgandan KEYIN, 18:01:00 shamida ANIQ
+       tegilgan (`low=0.00249 high=0.002493`) — bu #129'ning "yaratilishdan
+       oldingi birinchi shamni o'tkazib yuborish" himoyasiga TEGMAYDI
+       (chunki bu sham signal yaratilgandan KEYIN boshlangan). Shunga
+       qaramay signal soatlab (30+ daqiqa) PENDING qolib ketaverdi.
+     - **Ildiz sabab**: `tracker.py`da `for idx, c in enumerate(candles):
+       last_ms = c.close_ms` — bu qator HAR BIR shamda SHARTSIZ ishlaydi,
+       hatto sham hali TO'LIQ yopilmagan (MEXC joriy shakllanayotgan
+       shamni ham qaytaradi, `close_ms`si hozirdan KEYIN bo'lsa ham)
+       bo'lsa ham. Agar entry narxga aynan shu shamning HALI so'ralmagan
+       (kelajakdagi) qismida tegsa — masalan poll 18:01:15da bo'lib,
+       sham hali 18:01:59gacha davom etayotgan bo'lsa, o'sha ONDA
+       shamning low/high'i hali YAKUNIY EMAS — keyingi pollda
+       `last_checked_ms` bu shamning to'liq `close_ms`siga ALLAQACHON
+       o'rnatilgan bo'lgani uchun bu sham QAYTA SO'RALMAYDI. Sham
+       TO'LIQ yopilgach paydo bo'ladigan HAQIQIY (yakuniy) low/high
+       ABADIY yo'qolib qoladi — signal narx entryga necha marta tegib
+       o'tsa ham PENDING'da qolib ketaveradi.
+     - **Tuzatish**: `klines()` chaqiruvidan keyin, sikldan OLDIN — oxirgi
+       qaytgan sham(lar) hali TO'LIQ yopilmagan bo'lsa (`close_ms >
+       now_ms`) BUTUNLAY tashlab yuboriladi: `while candles and
+       candles[-1].close_ms > now_ms: candles = candles[:-1]`. Bunday
+       sham keyingi pollda (u haqiqatan yopilib, YAKUNIY low/high bilan)
+       qaytadan so'raladi — hech qanday teginish yo'qolmaydi.
+     - **#133'dan FARQI**: #133 ESKI (signal yaratilishidan SOATLAB
+       oldingi) narxni noto'g'ri "yangi" deb hisoblagan edi. #134 esa
+       aksincha — YANGI (hali sodir bo'lmagan, kelajakdagi) narxni
+       "allaqachon tekshirilgan" deb noto'g'ri belgilagan. Ikkalasi ham
+       bir xil oilaga tegishli (sham chegaralari bilan bog'liq nozik
+       xatolar), lekin mustaqil, alohida topilgan va tuzatilgan xatolar.
+     - **Testlar**: `test_tracker.py`ga yangi (15-) holat qo'shildi — hali
+       yopilmagan sham TASHLAB YUBORILISHINI (va `save_progress`
+       chaqirilMAsligini) hamda xuddi shu narx TO'LIQ yopilgandan keyin
+       TO'G'RI aniqlanishini tekshiradi. Sintetik shamlar HAQIQIY joriy
+       vaqtga nisbatan hisoblangani sabab `NOW` konstantasi 1 soat ORQAGA
+       suriltdi (aks holda barcha eski testlar ham "hali yopilmagan" deb
+       noto'g'ri buzilardi). Mavjud 14 ta holat o'zgarishsiz (jami 15/15).
+     - **Vaqtinchа forenzika kodi OLIB TASHLANDI** (`bot.py`dagi
+       `_forensics_signal_134()`) — vazifasini bajardi, tub sabab
+       topildi. Doimiy diagnostika (`tracker.py`dagi "PENDING, entryga
+       TEGMADI" logi, 135-bandda qo'shilgan) esa SAQLAB QOLINDI —
+       kelajakda shunga o'xshash holatlarni tezroq aniqlashga yordam
+       beradi.
+     - **Ta'sir doirasi**: bu HAR QANDAY Limit (PENDING) signalga
+       tegishli edi — entry narxi aynan poll paytida shakllanayotgan
+       shamning "hali sodir bo'lmagan" qismida tegilsa, signal ABADIY
+       PENDING qolib ketardi (narx keyinroq entrydan uzoqlashib ketsa,
+       foydalanuvchi buni "limit hech qachon aktivlashmadi" deb ko'rardi
+       — aynan #134'dagi shikoyat).
+     - **Ishlashi Railway logi orqali TEKSHIRILISHI SHART** — keyingi
+       Limit signallarda entry narxga tegishi bilanoq (garchi bu poll
+       paytida shakllanayotgan shamda bo'lsa ham) 1-2 poll ichida
+       "ENTRY TO'LDI" logi chiqishi kerak, "PENDING, entryga TEGMADI"da
+       abadiy qolib ketmasligi kerak.

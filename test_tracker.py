@@ -14,7 +14,13 @@ import db
 import exchange
 import tracker
 
-NOW = datetime.now(timezone.utc)
+
+# 1 soat ORQAGA -- process() endi hali TO'LIQ yopilmagan (close_ms haqiqiy
+# "hozir"dan KEYIN bo'lgan) shamlarni tashlab yuboradi (#134 tuzatishi),
+# shuning uchun sintetik shamlar HAQIQIY joriy vaqtdan xavfsiz OLDINDA
+# bo'lishi kerak -- aks holda ular ham "hali yopilmagan" deb tashlanib,
+# testlar noto'g'ri (yolg'on) muvaffaqiyatsiz bo'lardi.
+NOW = datetime.now(timezone.utc) - timedelta(hours=1)
 SAVED: dict = {}
 
 
@@ -273,6 +279,43 @@ async def main():
         f"end_ms ({klines_calls[0]}) chaqiruv vaqtiga mos kelmayapti")
     show("klines() end_ms bilan chaqirildi (#133 tuzatishi)",
          {"status": "ACTIVE", "pnl_pct": None, "r_multiple": None}, [])
+
+    # 13. #134'da HAQIQIY (Railway logi + to'g'ridan-to'g'ri baza yozuvi bilan
+    # isbotlangan) xato: MEXC joriy SHAKLLANAYOTGAN (hali to'liq yopilmagan)
+    # shamni ham qaytaradi -- uning `close_ms`si hozirdan KEYIN. Eski kod
+    # bunday shamni ham "tekshirdim" deb `last_checked_ms`ni uning to'liq
+    # close_ms'iga o'rnatib qo'yardi -- agar entry aynan shu shamning HALI
+    # so'ralmagan (keyingi) qismida tegsa, keyingi pollarda bu sham QAYTA
+    # so'ralmagani uchun teginish ABADIY yo'qolib qolardi (signal soatlab
+    # PENDING qolib ketardi, garchi narx entryga bir necha marta tegib
+    # o'tgan bo'lsa ham). Endi hali yopilmagan sham BUTUNLAY tashlab
+    # yuboriladi -- keyingi pollda (haqiqatan yopilgach) qaytadan so'raladi.
+    SAVED.clear()
+    now_real = datetime.now(timezone.utc)
+    now_ms = int(now_real.timestamp() * 1000)
+    forming = exchange.Candle(
+        now_ms - 30_000, 101, 101, 99, 100, now_ms + 30_000)  # entry(100)ga tegadi, LEKIN hali yopilmagan
+    sig13 = signal(created_at=now_real - timedelta(minutes=5))
+    exchange.klines = lambda *a, **k: _ret([forming])
+    db.save_progress = _save
+    ev13a = await tracker.process(sig13)
+    assert not SAVED, (
+        "hali yopilmagan sham tashlab yuborilishi kerak edi, lekin "
+        f"save_progress baribir chaqirildi: {SAVED}")
+    assert not ev13a, f"hali yopilmagan shamda hech qanday hodisa bo'lmasligi kerak edi: {ev13a}"
+    assert sig13["status"] == "PENDING", "signal hamon PENDING qolishi kerak edi"
+
+    # Endi XUDDI SHU teginish, lekin sham AYNAN xuddi shu qiymatlar bilan
+    # (real kelajakda MEXC'dan qaytadigan) TO'LIQ yopilgan holda -- vaqt
+    # o'zgarishi test ijrosi orasidagi kichik kechikishga sezgir bo'lmasin
+    # uchun close_ms real "hozir"dan aniq (30s) OLDIN tanlandi.
+    closed = exchange.Candle(now_ms - 90_000, 101, 101, 99, 100, now_ms - 30_000)
+    exchange.klines = lambda *a, **k: _ret([closed])
+    ev13b = await tracker.process(sig13)
+    show("Hali yopilmagan sham tashlab yuborildi (#134 tuzatishi)", SAVED, ev13b)
+    assert SAVED.get("status") == "ACTIVE", (
+        f"sham TO'LIQ yopilgach entry to'g'ri aniqlanishi kerak edi: {SAVED.get('status')}")
+    assert any(e["type"] == "OPEN" for e in ev13b)
 
     print("\nBarcha holatlar tekshirildi.")
 
