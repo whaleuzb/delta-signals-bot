@@ -3595,3 +3595,47 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        "ikkalasi ham bitta shamda tegilgan" holat kamdan-kam uchraydi;
        birinchi shunday hodisa yuz berganda log'da `resolve_touch_order`
        chaqiruvi va natijasi (yoki xatosi) kuzatilishi kerak.
+
+126. **Foydalanuvchi: "Darhol tugmasidagi kamchilik ham bor. Agar entry
+     narxidan baland bo'lsa foiz xisoblaydi. Bu guruhlar o'rtasida
+     noxaqlikni keltiradi. Darhol tugmasini bosganda bot o'zi bozor
+     narxini olib entryni avtomatik xisoblasin. Entry yozish shart
+     bo'lmasin."** Real bug — sehrgar (`/new`) oqimidagi
+     `🎯 Oddiy (darhol)` tugmasiga tegishli.
+     - **Ildiz sabab**: `entry_mode="market"` ("darhol ochiladi") tanlansa
+       ham, sehrgar 4/6-bosqichda ("Entry narxini kiriting") entryni
+       HAMON qo'lda yozdirardi (`wizard_entry()`). Foydalanuvchi
+       yozayotgan "joriy narx" taxmini haqiqiy bozor narxidan bir necha
+       soniya/foiz farq qilishi mumkin edi — natijada BIR XIL vaqtda
+       ochilgan signal turli guruhlarda (turli admin turlicha entry
+       yozgani sabab) turlicha % bilan hisoblanardi. `show_preview()`
+       joriy narxni ko'rsatib ogohlantirar ("entrydan +X%"), lekin uni
+       AVTOMATIK TUZATMASDI — faqat ma'lumot sifatida.
+     - **Tuzatish**: `wizard_side()` (yo'nalish LONG/SHORT tanlangandan
+       KEYIN, entry so'ralishidan OLDINGI nuqta) — `entry_mode=="market"`
+       bo'lsa, endi `safe_last_price(market, symbol, fresh=True)` bilan
+       (keshsiz, eng yangi) jonli narxni DARHOL o'zi oladi va
+       `wiz["entry"]` sifatida o'rnatadi, so'ng WIZ_ENTRY bosqichini
+       BUTUNLAY o'tkazib yuborib to'g'ridan-to'g'ri TP so'rashga (WIZ_TP)
+       o'tadi — foydalanuvchiga entry umuman ko'rsatilmaydi/so'ralmaydi,
+       faqat qaysi narx ishlatilgani xabar qilinadi. Narx olinmasa
+       (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan qo'lda so'raladi
+       (sehrgar to'xtab qolmaydi). `⏳ Limit` rejimi BUTUNLAY tegilmadi —
+       u yerda entry hamon qo'lda kiritiladi (narx hali noma'lum, kutish
+       kerak, bu yerda "avtomatik" tushunchasi ma'nosiz).
+     - **Qamrov — ATAYLAB faqat sehrgar tugmasiga**: foydalanuvchi aniq
+       "Darhol tugmasi" dedi. Tezkor matn usulida ham (`BTCUSDT LONG
+       market ...`) xuddi shu nazariy muammo bor (`parsing.py`da entry
+       hamon majburiy), lekin bu ALOHIDA so'rov — bu yerda tegilmadi.
+     - Tekshirildi (mock, `unittest.mock` bilan `wizard_side()`ni
+       to'g'ridan-to'g'ri chaqirib): (1) market rejim + narx muvaffaqiyatli
+       olinsa — `wiz["entry"]` avtomatik o'rnatildi, natija WIZ_TP (WIZ_ENTRY
+       butunlay o'tkazib yuborildi); (2) market rejim + narx olinmadi
+       (`None`) — xavfsiz WIZ_ENTRYga qaytdi, `wiz["entry"]` o'rnatilmadi;
+       (3) limit rejim — `safe_last_price` UMUMAN chaqirilmadi (assert bilan
+       tekshirildi), xatti-harakat eskicha. `python3 -m py_compile bot.py
+       parsing.py` — toza. `test_tracker.py` 9/9 (bu o'zgarish tracker.py'ga
+       tegmaydi, regressiya yo'q).
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — birinchi haqiqiy
+       "Oddiy (darhol)" signal kiritilganda entry avtomatik va to'g'ri
+       o'rnatilganini (`safe_last_price` xatosiz qaytganini) kuzatish kerak.

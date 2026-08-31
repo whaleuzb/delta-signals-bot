@@ -1605,6 +1605,30 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["side"] = side
     await q.edit_message_text(f"3/6 — Yo'nalish: {side}")
+
+    if wiz.get("entry_mode") == "market":
+        # Oddiy (darhol) rejimida entry QO'LDA SO'RALMAYDI — turli admin
+        # "joriy narx"ni turlicha taxmin qilib yozishi (kechikish, xatolik)
+        # bir xil vaqtda ochilgan signalga guruhlar o'rtasida turlicha %
+        # hisoblanishiga olib kelardi. Bot o'zi jonli narxni (keshsiz,
+        # `fresh=True`) shu zahoti olib, to'g'ridan-to'g'ri entry sifatida
+        # ishlatadi.
+        price = await safe_last_price(wiz["market"], wiz["symbol"], fresh=True)
+        if price:
+            wiz["entry"] = price
+            await q.message.reply_text(
+                f"4/6 — Entry avtomatik: <b>{fmt_price(price)}</b> (joriy bozor narxi)\n\n"
+                "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan "
+                "ajrating, masalan: 67000 68500):",
+                parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+            return WIZ_TP
+        # Narx olinmadi (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan
+        # qo'lda so'raladi, sehrgar to'xtab qolmaydi.
+        await q.message.reply_text(
+            "⚠️ Joriy bozor narxini olib bo'lmadi — entryni qo'lda kiriting:",
+            reply_markup=WIZ_CANCEL_KB)
+        return WIZ_ENTRY
+
     await q.message.reply_text("4/6 — Entry (kirish) narxini kiriting:",
                                reply_markup=WIZ_CANCEL_KB)
     return WIZ_ENTRY
