@@ -4166,3 +4166,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yangi signalda diagnostika logi (`ENTRY TO'LDI`/`sl_touched`/
        `tp_touched` qatorlari) endi signal yaratilgan vaqtga YAQIN
        (soatlab emas) sham vaqtlarini ko'rsatishi kerak.
+
+135. **Foydalanuvchi: "134 signal limitga keldi lekin limit aktivlashmadi.
+     Xatto pastga ham tushib ketti."** — #134 LINEAUSDT LONG, entry=0.002492.
+     Railway logida (17:34dan 18:12gacha, 3 soat, `end_ms` tuzatilgandan
+     KEYINGI davr ham kiradi) signal #134 haqida BITTA HAM qator topilmadi —
+     na "ENTRY TO'LDI", na "kuzatuvida xato". Skrinshot bilan tasdiqlandi:
+     joriy narx haqiqatan entry (0.002492) dan PASTDA (~0.002480 atrofida).
+     Sandbox'dan MEXC API'ga to'g'ridan-to'g'ri chiqish YO'Q (agent-proxy
+     403 — tashkilot siyosati), shuning uchun haqiqiy sham tarixini mahalliy
+     tekshirib bo'lmadi — production DB'ga ham to'g'ridan-to'g'ri kirish
+     yo'q (avvalgi cheklov). Tub sabab HALI ANIQLANMAGAN.
+     - **Vaqtinchа qo'shilgan diagnostika** (`tracker.py`, `process()`,
+       PENDING blokining "tegmadi" shoxobchasi): endi entryga 0.5% ichida
+       kelib TEGMAGAN har bir sham ham loglanadi (`"PENDING, entryga
+       TEGMADI"`) — oldin FAQAT tegib ACTIVE bo'lgan holat loglanardi,
+       "tekshirdim-lekin-tegmadi" holati uchun log UMUMAN yo'q edi (shu
+       bo'shliq #134'ni loglardan aniqlashni imkonsiz qilgan edi). Xatti-
+       harakat o'zgarmadi — faqat yangi log.info() qatori.
+     - Tekshirildi: `python3 -m py_compile tracker.py`, `test_tracker.py`
+       14/14 o'zgarishsiz.
+     - **Keyingi qadam**: deploy qilingandan keyin Railway logida #134
+       uchun yangi "PENDING, entryga TEGMADI" qatorlari kutilmoqda — ular
+       narxning entryga qanchalik yaqinlashganini (aniq sham low/high bilan)
+       ko'rsatadi, tub sababni ANIQLASHGA yordam beradi (masalan: entry
+       noto'g'ri saqlangan, symbol/market noto'g'ri, yoki boshqa sabab).
+       Hali TUZATISH QILINMADI — avval dalil kerak (#133'dagi kabi).
