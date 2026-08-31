@@ -825,6 +825,23 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if abs(float(sig["sl"]) - entry) < 1e-12:
         await q.answer("Stop allaqachon breakeven'da.", show_alert=True)
         return
+    # "✏️ Stop" oqimidagi bilan bir xil ogohlantirish — narx allaqachon
+    # kirish narxidan "narigi tomonda" bo'lsa, breakeven'ga ko'chirish
+    # signalni DARHOL yopib yuboradi.
+    try:
+        live_price = await tracker.provider(sig["market"]).last_price(
+            sig["symbol"], fresh=True)
+    except Exception:
+        live_price = None
+    if live_price:
+        breached = (live_price <= entry) if sig["side"] == "LONG" else (live_price >= entry)
+        if breached:
+            await q.answer(
+                f"Joriy narx ({fmt_price(live_price)}) kirish narxidan "
+                f"{'past' if sig['side'] == 'LONG' else 'baland'} — breakeven'ga "
+                "ko'chirish signalni DARHOL yopadi. Shuni xohlasangiz \"To'liq "
+                "yopish\"ni bosing.", show_alert=True)
+            return
     await db.set_stop(sig["id"], entry)
     await notify_group(ctx, ws, sig,
                         f"🛡 <b>#{sig['id']} {sig['symbol']}</b> — stop breakeven'ga "
@@ -923,6 +940,33 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             await msg.reply_text("Bu narx kirish narxidan juda uzoq. "
                                   "Tekshiring yoki /bekor.")
             return True
+        # Foydalanuvchi: "stopni ko'tarsam, narx hali yetmagan bo'lsa ham
+        # erta yopib yuboryapti". Sabab — agar yangi stop JORIY narxning
+        # NARIGI tomonida bo'lsa (LONG: narx allaqachon stopdan PAST;
+        # SHORT: allaqachon BALAND), signal KEYINGI tekshiruvda (odatda
+        # sekundlar ichida) DARHOL yopiladi — bu texnik jihatdan to'g'ri
+        # (stop haqiqatan ham allaqachon "tegilgan"), lekin foydalanuvchiga
+        # "narx hali yetmagan" bo'lib tuyuladi, chunki ular buni CHART
+        # dagi narx bilan emas, o'z fikridagi narx bilan solishtirishgan.
+        # Shu sabab oldindan ANIQ ogohlantiramiz, jimgina qabul qilmaymiz.
+        try:
+            live_price = await tracker.provider(sig["market"]).last_price(
+                sig["symbol"], fresh=True)
+        except Exception:
+            live_price = None
+        if live_price:
+            side = sig["side"]
+            breached = (live_price <= price) if side == "LONG" else (live_price >= price)
+            if breached:
+                AWAITING_SL[uid] = sig_id
+                await msg.reply_text(
+                    f"⚠️ Joriy narx (<code>{fmt_price(live_price)}</code>) bu stopdan "
+                    f"{'PAST' if side == 'LONG' else 'BALAND'} — signal KEYINGI "
+                    "tekshiruvda DARHOL yopiladi (stop allaqachon tegilgan hisoblanadi). "
+                    "Shuni xohlasangiz \"🔒 To'liq yopish\" tugmasidan foydalaning, "
+                    "aks holda boshqa narx kiriting yoki /bekor.",
+                    parse_mode=ParseMode.HTML)
+                return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not can_manage(uid, ws):
             return True

@@ -3335,3 +3335,37 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        hajm past) — bilan sinaldi: `min_volume_usd=0` (eski xatti-harakat)
        ikkalasini ham qaytardi, `min_volume_usd=10_000_000` bilan FAQAT
        katta hajmli tanga qaytdi. `test_tracker.py` 9/9 — o'zgarmadi.
+
+121. **Foydalanuvchi: "Nega stopni yuqoriga ko'tarsam hali tushmagan
+     bo'lsayam erta yopib yuboryapti?"** Kod tekshirildi (`tracker.py`
+     `process()`, `bot.py`ning "✏️ Stop"/"Stop → breakeven" oqimlari) —
+     `last_checked_ms` orqali eskirgan shamlarni QAYTA SKAN QILISH bugi
+     TOPILMADI (bu mexanizm to'g'ri ishlayapti, #37/#106'da tasdiqlangan
+     1 daqiqalik aniqlik prinsipi ham buzilmagan).
+     - **Haqiqiy topilma**: qo'lda yangi stop kiritishda ("✏️ Stop" matn
+       oqimi, `handle_manage_input()`) YOKI "Stop → breakeven" tugmasida
+       (`on_manage_be()`) JORIY bozor narxi bilan HECH QANDAY solishtirish
+       yo'q edi. Agar foydalanuvchi yangi stopni JORIY narxning "narigi
+       tomonida" qo'ysa (LONG: narx allaqachon yangi stopdan PAST; SHORT:
+       BALAND) — bu texnik jihatdan TO'G'RI, chunki stop haqiqatan ham
+       "allaqachon tegilgan" hisoblanadi, lekin `tracker.py`ning KEYINGI
+       tsiklida (odatda sekundlar ichida) signal DARHOL yopiladi.
+       Foydalanuvchi buni "narx hali yetmagan bo'lsa ham erta yopdi" deb
+       xato tushunishi mumkin — ular buni CHARTdagi haqiqiy narx bilan
+       emas, xayolidagi narx bilan solishtirgan.
+     - **Tuzatish**: ikkalasi ham endi qo'llashdan OLDIN jonli narxni
+       (`tracker.provider(market).last_price(symbol, fresh=True)`)
+       tekshiradi — agar yangi stop allaqachon "tegilgan" bo'lsa,
+       ANIQ ogohlantirish bilan RAD ETADI (o'rnatilmaydi): "✏️ Stop"da
+       qayta kiritishni so'raydi (`AWAITING_SL` saqlanadi), "Stop →
+       breakeven"da `show_alert=True` xabar ko'rsatib hech narsa
+       o'zgartirmaydi. Ikkalasida ham "buni xohlasangiz '🔒 To'liq
+       yopish'dan foydalaning" — chunki DARHOL yopish uchun mo'ljallangan
+       to'g'ri vosita ALLAQACHON bor.
+     - Narx olinmasa (tarmoq xatosi) — ESKI xatti-harakat (ogohlantirmasdan
+       davom etadi) xavfsiz saqlanadi, funksiya butunlay to'xtab qolmaydi.
+     - Tekshirildi (mock): (1) yangi stop allaqachon "tegilgan" bo'lsa
+       ogohlantirish chiqishi va `db.set_stop()` CHAQIRILMASLIGI; (2)
+       xavfsiz stop odatdagidek o'rnatilishi; (3) narx olinmasa xavfsiz
+       davom etishi. `test_tracker.py` 9/9 — o'zgarmadi (`tracker.py`ga
+       tegilmadi).
