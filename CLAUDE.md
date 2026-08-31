@@ -3639,3 +3639,49 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — birinchi haqiqiy
        "Oddiy (darhol)" signal kiritilganda entry avtomatik va to'g'ri
        o'rnatilganini (`safe_last_price` xatosiz qaytganini) kuzatish kerak.
+
+127. **Foydalanuvchi (skrinshot bilan, #126 TACUSDT signalini ko'rsatib):
+     "Muammo haliyam hal bo'lmagan bu safar take bilan yopib yubordi."**
+     Skrinshotda: signalda YAGONA TP bor edi (TP1 +6.84%), pozitsiya
+     ochilib TP1 100% bajarilgani ("100% sotildi", yopilgan) darhol
+     ko'rsatildi, lekin SHUNDAN KEYIN yana bitta mantiqsiz xabar kelgan —
+     "🛡 stop breakeven'ga ko'chirildi" (garchi pozitsiya allaqachon
+     to'liq yopilgan bo'lsa ham). Kod bilan RIVAM TASDIQLANDI.
+     - **Ildiz sabab**: `tracker.py` `process()`ning TP siklida
+       (`tp_hit == 1 and config.MOVE_SL_TO_BE_AFTER_TP1 and sl != entry`)
+       sharti YAGONA (yoki oxirgi) TP TP1'ning o'zida bajarilib, pozitsiya
+       SHU YERDA 100% yopilayotganini UMUMAN TEKSHIRMAS edi — natijada
+       "BE" hodisasi (va unga mos "stop breakeven'ga ko'chirildi" xabari)
+       pozitsiya ALLAQACHON to'liq yopilgandan keyin ham qo'shilib
+       ketardi. Bu **faqat 1-TP li (yoki TP1 aynan OXIRGI TP bo'lgan)
+       signallarga xos** — 2+ TP li signallarda (mavjud testlar 3 TP
+       bilan sinaydi) BE to'g'ri, TP1'dan KEYIN ham signal ochiq
+       qolganda ishlaydi, muammo yo'q edi — shu sabab bu xato oldingi
+       to'liq regressiya to'plamida (9/9) hech qachon ushlanmagan edi.
+     - **Eslatma**: bu skrinshotdagi TP1'ning "zudlik bilan" tegishi
+       o'zi BUG EMAS — signal `entry_mode="market"` (Darhol) bilan
+       ochilgan, bunday signal to'g'ridan-to'g'ri ACTIVE holatda
+       boshlanadi (#124'da tasdiqlangan siyosat — "kirish shami"
+       tushunchasi yo'q, SHU shamning o'zida SL/TP tekshirilishi mumkin,
+       bu QASDDAN shunday). TACUSDT — o'ta uchuvchan kichik tanga,
+       bir necha daqiqada +6.84% harakat haqiqiy bo'lishi mumkin.
+       Muammo FAQAT keyin kelgan mantiqsiz "BE" xabari edi.
+     - **Tuzatish**: shu shartga `and tp_hit < len(tps)` qo'shildi — BE
+       endi FAQAT signal hali TO'LIQ yopilmagan (yana TP qolgan) bo'lsa
+       ishlaydi. Yagona/oxirgi TP TP1'ning o'zida bajarilsa, "BE" hodisasi
+       BUTUNLAY chiqarilmaydi (mantiqiy: yopilgan pozitsiyaning stopi
+       endi ahamiyatsiz).
+     - Tekshirildi (`test_tracker.py`ga yangi holat qo'shildi — "Yagona
+       TP"): 1 TP li signal, TP tegilganda natija `[OPEN → TP1]` (BE YO'Q),
+       `status="TP"`, `pnl=+4.00%`. Mavjud 3-TP holatlar (`[OPEN → TP1 →
+       BE → TP2 → TP3]` va h.k.) O'ZGARISHSIZ qoldi — bu tuzatish FAQAT
+       "yagona/oxirgi TP TP1'ning o'zida" holatiga tegishli. Barcha oldingi
+       testlar (11 ta, OCO sub-holatlari bilan) ham o'zgarishsiz o'tdi.
+       `python3 -m py_compile tracker.py test_tracker.py` — toza.
+     - **Ta'sir doirasi**: xabar/hodisa darajasida (foydalanuvchiga
+       ko'rinadigan chalkash xabar chiqmaydi) — statistika/pnl hisobiga
+       ta'sir qilmaydi (`sl` o'zgaruvchisi baribir `status="TP"` bo'lgach
+       ishlatilmaydi, faqat xabar generatsiyasiga ta'sir qilardi).
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi yagona
+       TP li signal to'liq TP bilan yopilganda "BE" xabari ENDI
+       chiqmasligini kuzatish kerak.

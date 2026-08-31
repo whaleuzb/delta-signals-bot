@@ -150,7 +150,13 @@ async def process(sig) -> list[dict]:
             events.append({"type": "TP", "n": tp_hit, "price": price,
                            "share": share, "running": realized})
 
-            if tp_hit == 1 and config.MOVE_SL_TO_BE_AFTER_TP1 and sl != entry:
+            # `tp_hit < len(tps)` SHART: aks holda YAGONA (yoki oxirgi) TP
+            # TP1'ning o'zida bajarilganda ham (pozitsiya SHU YERDA 100%
+            # yopilayotgan bo'lsa ham) keraksiz "stop breakeven'ga
+            # ko'chirildi" xabari yuborilardi — mantiqsiz, chunki yopilgan
+            # pozitsiyaning stopi endi umuman ahamiyatsiz.
+            if (tp_hit == 1 and config.MOVE_SL_TO_BE_AFTER_TP1 and sl != entry
+                    and tp_hit < len(tps)):
                 sl = entry
                 events.append({"type": "BE", "price": entry})
 

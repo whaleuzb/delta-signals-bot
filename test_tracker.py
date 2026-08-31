@@ -129,6 +129,19 @@ async def main():
     ], resolve_touch_order="SL")
     show("TP+SL bitta shamda (savdo: SL oldin)", saved, ev, -4.0)
 
+    # 4d. YAGONA TP (bitta TP) signal -- TP tegishi bilan SHU YERDA 100%
+    # yopiladi. Keraksiz "BE" hodisasi (demak "stop breakeven'ga
+    # ko'chirildi" xabari) EMITLANMASLIGI kerak -- pozitsiya allaqachon
+    # to'liq yopilgan, stopning endi ahamiyati yo'q.
+    saved, ev = await run(signal(tps=[104.0]), [
+        candle(0, 101, 101, 99, 100),
+        candle(1, 100, 104.5, 100, 104),   # yagona TP
+    ])
+    show("Yagona TP -- BE hodisasi bo'lmasligi kerak", saved, ev, 4.0)
+    assert not any(e["type"] == "BE" for e in ev), (
+        f"yagona TP to'liq yopilganda BE hodisasi bo'lmasligi kerak edi: {ev}")
+    assert saved["status"] == "TP"
+
     # 5. Entryga tegmadi
     saved, ev = await run(signal(), [
         candle(0, 102, 103, 101, 102),
