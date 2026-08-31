@@ -3929,3 +3929,39 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        shaklda takrorlansa — bu ENDI signal HAQIQIY YOPILISHI mumkin
        emasligi sabab (TP/SL entry to'lgunicha umuman mavjud bo'lmaydi)
        BUTUNLAY BOSHQA muammo bo'ladi, alohida chuqur tekshiruv kerak.
+
+131. **Foydalanuvchi: "naga limitda rasmni aniqlash yo'q?"** — #130'da
+     Limit-keyin-TP/SL oqimi qo'shilganda, "📈 Bot grafikni aniqlasin"
+     tugmasi ATAYLAB olib tashlangan edi (`chart._render()` o'sha payt
+     `sl`/`tps`ni MAJBURIY parametr deb kutardi — TP/SL hali mavjud
+     bo'lmagan qoralamada chaqirilsa xato berardi). Foydalanuvchi buni
+     kamchilik sifatida to'g'ri payqadi — tugmani butunlay OLIB
+     TASHLASH o'rniga, GRAFIKNING O'ZINI TP/SL'siz ishlaydigan qilish
+     to'g'riroq yechim edi.
+     - **Tuzatish**: `chart.py`da `_render()`ning `sl` parametri endi
+       `float | None` — `None` bo'lsa: (a) y-o'qi diapazoni hisobida
+       e'tiborga olinmaydi (`levels` ro'yxatidan chiqarib tashlanadi),
+       (b) qizil stop chizig'i (`hline`) chizilmaydi. `tps=[]` allaqachon
+       xavfsiz edi (bo'sh sikl). `setup_chart()` endi `draft.get("sl")`/
+       `draft.get("tps")`ni `None`/`[]` bilan mos tekshiradi. Natijada:
+       Limit-keyin-TP/SL qoralamasida grafik CHIZILADI — faqat ENTRY
+       chizig'i bilan (● belgi), stop/maqsad chiziqlarisiz — TP/SL
+       kiritilgach keyingi (yopilish) grafiklarida ular normal chiqadi.
+     - `bot.py`: `preview_kb()`dagi `has_tpsl` shartli yashirish BUTUNLAY
+       OLIB TASHLANDI — "📈 Bot grafikni aniqlasin" endi HAR DOIM
+       ko'rsatiladi (barcha uchta chaqiruv nuqtasida: `show_preview()`,
+       "bk" orqaga qaytish tugmasi).
+     - Tekshirildi: `chart.setup_chart()` haqiqiy (soxta) shamlar bilan
+       `draft={"sl": None, "tps": []}` bilan chaqirildi — YIQILMADI,
+       haqiqiy PNG (32KB+, to'g'ri PNG sarlavhasi bilan) qaytardi; nazorat
+       — `sl`/`tps` mavjud bo'lganda ham eskicha ishlashi tasdiqlandi.
+       `preview_kb()` endi tugmani doim qaytarishi tekshirildi. Barcha
+       oldingi mock testlar (13/13 tracker + bot.py mock testlari)
+       o'zgarishsiz o'tdi. `python3 -m py_compile chart.py bot.py` — toza.
+     - **Ta'sir doirasi**: faqat Limit-keyin-TP/SL oqimidagi "ochilish"
+       grafigiga tegishli — yopilish grafigi (`signal_chart()`, TP/SL
+       kiritilgandan KEYIN chiziladi, allaqachon to'liq ma'lumot bilan)
+       va boshqa barcha grafik funksiyalari tegilmagan.
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi Limit
+       signalda "📈 Bot grafikni aniqlasin" tanlansa, grafik xatosiz
+       chizilishini kuzatish kerak.

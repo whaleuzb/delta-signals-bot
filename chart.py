@@ -200,7 +200,7 @@ def _draw_side_profiles(ax_vol, ax_delta, vol_bins: list[float], delta_bins: lis
     ax_delta.set_title("Volume Delta", color=TXT, fontsize=10, pad=6)
 
 
-def _render(candles, *, header: str, side: str, entry: float, sl: float,
+def _render(candles, *, header: str, side: str, entry: float, sl: float | None,
             tps: list[float], tp_hit: int, exit_idx: int | None,
             exit_price: float | None, pnl, r, ws_name: str,
             bot_username: str | None, tf: str, note: str | None,
@@ -233,7 +233,10 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
 
     lo = min(c.low for c in candles)
     hi = max(c.high for c in candles)
-    levels = [entry, sl, *tps]
+    # `sl` NULL bo'lishi mumkin — limit-keyin-TP/SL oqimida entry hali
+    # TP/SL'siz e'lon qilinadi (`setup_chart()`), stop chizig'i hali
+    # chizib bo'lmaydi.
+    levels = [entry, *([sl] if sl is not None else []), *tps]
     if exit_price is not None:
         levels.append(exit_price)
     lo = min(lo, *levels)
@@ -285,7 +288,8 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float,
                    zorder=5, edgecolor=BG, linewidth=1.3)
     else:
         hline(entry, ACC, f"● {_fmt(entry)}")
-    hline(sl, RED, f"✕ {_fmt(sl)}", alpha=0.85)
+    if sl is not None:
+        hline(sl, RED, f"✕ {_fmt(sl)}", alpha=0.85)
     for n, tp in enumerate(tps, start=1):
         hit = n <= tp_hit
         hline(tp, GREEN, f"▲{n} {_fmt(tp)}", alpha=1.0 if hit else 0.4,
@@ -396,8 +400,9 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
     return _render(
         candles, header=symbol, side=draft["side"],
-        entry=float(draft["entry"]), sl=float(draft["sl"]),
-        tps=[float(x) for x in draft["tps"]], tp_hit=0,
+        entry=float(draft["entry"]),
+        sl=float(draft["sl"]) if draft.get("sl") is not None else None,
+        tps=[float(x) for x in draft["tps"]] if draft.get("tps") else [], tp_hit=0,
         exit_idx=None, exit_price=None, pnl=None, r=None,
         ws_name=ws_name, bot_username=bot_username, tf=tf,
         note="ochildi" if mode == "market" else "kutilmoqda",

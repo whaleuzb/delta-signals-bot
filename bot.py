@@ -2107,22 +2107,20 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     body += "\n\n<b>Rasm qanday bo'lsin?</b>"
 
     await msg.reply_text(body, parse_mode=ParseMode.HTML,
-                          reply_markup=preview_kb(token, file_id, has_tpsl=draft.get("sl") is not None))
+                          reply_markup=preview_kb(token, file_id))
 
 
-def preview_kb(token: str, file_id, has_tpsl: bool = True) -> InlineKeyboardMarkup:
+def preview_kb(token: str, file_id) -> InlineKeyboardMarkup:
     """Uchta tanlov. Rasm HECH QACHON majburiy emas — uchinchi tugma har doim bor.
 
-    `has_tpsl=False` — TP/SL hali kiritilmagan (limit-keyin-so'ralsin oqimi):
-    "📈 Bot grafikni aniqlasin" tugmasi OLIB TASHLANADI — u entry/SL/TP
-    chiziqlari bilan grafik chizadi (`chart.setup_chart`), SL/TP hali
-    mavjud bo'lmagan qoralamada bu ma'nosiz (va `_render()` ularni
-    MAJBURIY parametr deb kutadi — chaqirilsa xato beradi)."""
+    "📈 Bot grafikni aniqlasin" TP/SL hali kiritilmagan (limit-keyin-
+    so'ralsin oqimi) qoralamalarda ham ishlaydi — `chart._render()` endi
+    `sl=None`/`tps=[]` bilan xavfsiz (faqat entry chizig'i bilan, stop/
+    maqsad chiziqlarisiz chiziladi)."""
     first = ("🖼 Yuborgan rasmim bilan" if file_id else "🖼 Rasm yuklash")
-    rows = [[InlineKeyboardButton(first, callback_data=f"pic:{token}")]]
-    if has_tpsl:
-        rows.append([InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")])
-    rows += [
+    rows = [
+        [InlineKeyboardButton(first, callback_data=f"pic:{token}")],
+        [InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")],
         [InlineKeyboardButton("📝 Rasmsiz davom etish", callback_data=f"nopic:{token}")],
         [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
          InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
@@ -2318,8 +2316,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "bk":
         await q.edit_message_reply_markup(
-            reply_markup=preview_kb(token, item["file_id"],
-                                     has_tpsl=item["draft"].get("sl") is not None))
+            reply_markup=preview_kb(token, item["file_id"]))
         return
 
     if action == "pic":
