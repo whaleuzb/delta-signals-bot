@@ -97,6 +97,10 @@ async def process(sig) -> list[dict]:
         # olinadi — shu sabab chegaraga TUSHGAN bo'ladi, bu muammo faqat
         # signalning ENG BIRINCHI tekshiruvida yuz beradi.
         if idx == 0 and is_first_poll and c.open_ms < start_ms:
+            log.info(
+                "Signal #%s %s: ENG BIRINCHI sham (open=%s) yaratilishdan (created=%s) "
+                "OLDIN boshlangani uchun O'TKAZIB YUBORILDI (low=%.10g high=%.10g)",
+                sig["id"], symbol, c.open_ms, start_ms, c.low, c.high)
             continue
 
         # --- 1. Entryga tegdimi ---
@@ -105,6 +109,11 @@ async def process(sig) -> list[dict]:
                 status = "ACTIVE"
                 opened_at = datetime.fromtimestamp(c.open_ms / 1000, timezone.utc)
                 events.append({"type": "OPEN", "price": entry, "needs_tpsl": awaiting_tpsl})
+                log.info(
+                    "Signal #%s %s: ENTRY TO'LDI @ %.10g — sham open=%s close=%s "
+                    "(low=%.10g high=%.10g), signal yaratilgan=%s, entry=%.10g",
+                    sig["id"], symbol, entry, c.open_ms, c.close_ms, c.low, c.high,
+                    start_ms, entry)
             # Entry TO'LGAN shamning O'ZIDA SL/TP TEKSHIRILMAYDI — Market
             # order (ACTIVE holatda BOSHLANADI, "kirish shami" degan tushuncha
             # umuman yo'q) bilan IZCHIL xatti-harakat uchun. Sabab: "low<=
@@ -133,6 +142,13 @@ async def process(sig) -> list[dict]:
         sl_touched = (c.low <= sl) if side == "LONG" else (c.high >= sl)
         nxt = tps[tp_hit] if tp_hit < len(tps) else None
         tp_touched = nxt is not None and ((c.high >= nxt) if side == "LONG" else (c.low <= nxt))
+
+        if sl_touched or tp_touched:
+            log.info(
+                "Signal #%s %s: sham open=%s close=%s (low=%.10g high=%.10g) — "
+                "sl_touched=%s(%.10g) tp_touched=%s(%s), entry to'lgan vaqt=%s",
+                sig["id"], symbol, c.open_ms, c.close_ms, c.low, c.high,
+                sl_touched, sl, tp_touched, nxt, opened_at)
 
         if sl_touched and tp_touched:
             ambiguous = True

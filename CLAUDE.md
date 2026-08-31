@@ -4029,3 +4029,51 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi yopilgan
        signal grafigida entry belgisi endi to'g'ri (exit'dan OLDIN yoki
        bir xil joyda) chiqishini kuzatish kerak.
+
+133. **Foydalanuvchi (#132'dagi tushuntirishga ishonmay): "hech narsa
+     o'zgarmadi meni aytganimni qil faqat kelajakdagi narx xisobga
+     olinsin bu faqat limit funksiyasida ishlasin."** — foydalanuvchi
+     yangi konkret misol (skrinshot) KO'RSATMASDAN, #131'dagi eski
+     shikoyatni (grafik xatosi sifatida ISBOTLANGAN va TUZATILGAN edi)
+     yana takrorladi.
+     - **Holat**: kod QAYTA TEKSHIRILDI (uchinchi marta) — `tracker.py`
+       `process()`'da LIMIT signallar uchun "faqat kelajakdagi narx"
+       tamoyili ALLAQACHON ikki qatlamda amalga oshirilgan:
+       (1) #129 — signalning ENG BIRINCHI shami, agar yaratilishdan
+       OLDIN boshlangan bo'lsa, butunlay o'tkazib yuboriladi; (2) #130 —
+       LIMIT signalda TP/SL umuman signal ACTIVE (entry to'lgan)
+       bo'lgunicha MAVJUD BO'LMAYDI, shuning uchun ularni "kelajakda
+       emas" deb hisoblashning ILOJI YO'Q. Uchinchi, YANGI, KONKRET
+       xato TOPILMADI (kod diqqat bilan qayta o'qildi) — bu #131'ning
+       o'zi ALOHIDA (chart.py, #132'da tuzatilgan) muammo ekani
+       ALLAQACHON matematik isbotlangan edi.
+     - **Qaror — taxmin qilishni TO'XTATIB, DALIL yig'ishga o'tildi**:
+       foydalanuvchi yangi misol keltirmasdan eski shikoyatni
+       takrorlagani sabab, keyingi (to'rtinchi) o'zgarish nazariy
+       taxminga asoslanardi — bu xavfli (kod bazasiga keraksiz
+       murakkablik qo'shishi, yoki hatto haqiqiy ishlayotgan mantiqni
+       buzishi mumkin edi). Shuning o'rniga `tracker.py`'ga DIAGNOSTIKA
+       (`log.info`) qo'shildi — Railway logi orqali KEYINGI holatni
+       ANIQ dalil bilan tekshirish uchun:
+       - Signalning ENG BIRINCHI shami o'tkazib yuborilganda — aniq
+         qatorlar bilan (sham vaqti, signal yaratilgan vaqt, low/high).
+       - Entry TO'LGANDA — aniq qaysi shamda, qaysi narxda.
+       - SL yoki TP TEGILGANDA (har safar, hodisa yopilishidan qat'i
+         nazar) — aniq sham vaqti/low/high va entry to'lgan vaqt bilan
+         SOLISHTIRIB.
+     - **Bu KOD XATTI-HARAKATINI O'ZGARTIRMAYDI** — faqat kuzatuv
+       (`log.info`, mavjud xatti-harakatga hech qanday ta'sir qilmaydi).
+       Tekshirildi: `test_tracker.py` 13/13 o'zgarishsiz (loglash
+       yon ta'sirsiz).
+     - **Keyingi qadam — foydalanuvchidan SO'RALDI**: keyingi safar shu
+       naqsh (limit signal "darrov" yopilgandek tuyulsa) yuz bersa,
+       ANIQ signal raqamini aytish kerak — endi Railway logidan O'SHA
+       signal uchun QAYSI sham, QAYSI narxda, ENTRY to'lgan vaqtdan
+       necha soniya/daqiqa keyin TP/SL tegilgani ANIQ ko'rinadi. Shu
+       DALIL asosida — agar HAQIQIY yangi xato topilsa — to'g'ri
+       tuzatiladi; agar (yana) chart yoki tushunish farqi bo'lsa, buni
+       ham ANIQ ko'rsatib berish mumkin bo'ladi.
+     - **Ishlashi hali TEKSHIRILMAGAN** — bu birinchi navbatda
+       DIAGNOSTIKA, YAKUNIY tuzatish emas. Keyingi CLAUDE.md yozuvi
+       shu loglardan topilgan HAQIQIY sabab (yoki "xato topilmadi,
+       hammasi to'g'ri ishlagan" tasdig'i) bilan davom etishi kerak.
