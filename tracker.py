@@ -110,8 +110,6 @@ async def process(sig) -> list[dict]:
             filled = 1.0
             exit_price = sl
             status = "BREAKEVEN" if abs(sl - entry) < 1e-12 else ("TP" if tp_hit else "SL")
-            if tp_hit and status == "TP":
-                status = "TP"  # TP1 olingandan keyin BE/stopda yopilgan — foydali yakun
             closed_at = datetime.fromtimestamp(c.close_ms / 1000, timezone.utc)
             events.append({"type": "STOP", "price": sl, "was_be": abs(sl - entry) < 1e-12})
             break
