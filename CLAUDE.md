@@ -3425,3 +3425,55 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Hali production'da haqiqiy #121 bilan tasdiqlanmagan** —
        foydalanuvchi `/qaytar 121`ni ishlatgach Railway logi/signal holati
        orqali tekshirilishi kerak.
+
+123. **Foydalanuvchi: "Madrimov guruhini statistikasini 1 marta 0 ga
+     qaytarib ber. Keyingi safar o'zim qilaman."** (#122'ning davomi —
+     "Madrimov Vip" statistikasi uchun `/tuzat` bor deb aytilgan edi, lekin
+     bu safar foydalanuvchi ANIQ shu BIR martalik ishni Claude'dan
+     bajarishni so'radi.)
+     - **Muhim texnik cheklov (yana bir bor)**: Claude production Postgres
+       bazasiga TO'G'RIDAN-TO'G'RI ulanolmaydi (DATABASE_URL kabi maxfiy
+       ma'lumotlar sandbox xavfsizlik siyosati tomonidan bloklangan,
+       `mcp__Railway__list-variables` sinab ko'rilganda tasdiqlandi). Shu
+       sabab bu ONE-TIME tuzatish ALOHIDA admin buyruq sifatida EMAS
+       (buni foydalanuvchi o'zi Telegram'da bosishi kerak bo'lardi),
+       balki **bot ISHGA TUSHGANDA bir marta o'zi bajaradigan** kod
+       sifatida yozildi — bu kod bot ICHIDA, uning O'Z qonuniy DB
+       ulanishi bilan ishlaydi, Claude hech qanday maxfiy ma'lumotni
+       ko'rmaydi.
+     - **Xavfsizlik naqshi — `bot_settings` bayrog'i**: `_run_one_time_
+       fixes()` (`post_init()`dan chaqiriladi) `onetime_reset_madrimov_
+       stats` kalitini tekshiradi — allaqachon bajarilgan bo'lsa (konteyner
+       qayta tushsa ham) IKKINCHI marta ISHLAMAYDI.
+     - **Workspace'ni ANIQ topish — noto'g'ri guruhga tegib ketmaslik
+       uchun**: `db.find_workspaces_by_name("madrimov")` (`ILIKE`, katta-
+       kichik harfga bog'liq emas) — agar ANIQ 1 TA mos kelmasa (0 yoki
+       bir nechta) — HECH NARSA QILINMAYDI, faqat aniq `log.warning()`
+       bilan nima topilgani yoziladi (keyin Railway logi orqali tekshirib,
+       kerak bo'lsa qo'lda hal qilinadi).
+     - **`db.reset_workspace_stats(workspace_id)`** — `cmd_tuzat`dagi
+       BITTA-BITTA "🚫 chiqarish" bilan BIR XIL natija, faqat bir martada
+       BARCHASI uchun: workspace'ning barcha YOPIQ (`excluded=FALSE`)
+       signallarini `excluded=TRUE` qiladi (statistika — jami/g'alaba/foiz
+       yig'indisi — 0'ga tushadi), depozitni esa har bir signalning
+       haqiqiy (`pnl_pct * alloc_amount`) hissasi bo'yicha TESKARI
+       tuzatadi (bitta tranzaksiyada) — natijada depozit hech qanday
+       signal yopilmagandagi boshlang'ich holatiga qaytadi (o'zboshimcha
+       "0" emas, matematik izchil qiymat). **HECH NARSA O'CHIRILMAYDI** —
+       `excluded` faqat bayroq, `/tuzat` bilan istalgan payt QAYTARISH
+       mumkin (foydalanuvchining o'zi "keyingi safar o'zim qilaman" deb
+       aytgan aynan shu vosita orqali).
+     - Tekshirildi: haqiqiy Postgres bilan (shu seansda ilgari ishlatilgan
+       `/tmp/pgtest2` instansiyasi) — 2 ta yopiq (biri foydali +20%, biri
+       zararli -5%, ikkalasi ham $1000 hissali) va 1 ta ochiq (ACTIVE) va
+       1 ta ALLAQACHON excluded signal + BOSHQA workspace'dagi signal bilan
+       sinaldi: FAQAT 2 ta yopiq signal `excluded=TRUE` bo'ldi, ACTIVE va
+       allaqachon-excluded signallarga tegilmadi, depozit to'g'ri
+       ($1500 -> $1350, ya'ni -$150 = 20%*1000 - 5%*1000) tuzatildi,
+       BOSHQA workspace butunlay tegilmay qoldi. `find_workspaces_by_name`
+       aniq bitta va bir nechta mos kelish holatlarida ham sinaldi.
+       `test_tracker.py` 9/9 — o'zgarmadi.
+     - **Ishlashi Railway logi orqali (deploy'dan darhol keyin) TEKSHIRILISHI
+       SHART** — "madrimov" bo'yicha aniq 1 ta workspace topilib, muvaffaqiyatli
+       tuzatilganini tasdiqlash kerak; agar 0/bir nechta topilsa — foydalanuvchiga
+       aniq nom/ID so'rab, prompt yangilanishi kerak.

@@ -5366,9 +5366,40 @@ async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────
 
+# Bir martalik tuzatishlar — `bot_settings`da o'z belgisini qo'yadi, qayta
+# ishlamaydi (konteyner qayta tushsa ham). Foydalanuvchi so'rovi: "#121'dagi
+# kabi (allaqachon 'tegilgan' stop) xato bilan yopilgan signallar Madrimov
+# guruhining ommaviy statistikasini buzgan — buni 1 marta 0'ga qaytarib
+# ber, keyingi safar o'zim /tuzat orqali qilaman". Bitta workspace aniq
+# TOPILMASA (0 yoki bir nechta mos keladigan nom) — HECH NARSA qilinmaydi,
+# faqat aniq loglanadi (noto'g'ri workspace'ga tegib ketmaslik uchun).
+async def _run_one_time_fixes() -> None:
+    flag = "onetime_reset_madrimov_stats"
+    if await db.get_setting(flag):
+        return
+    try:
+        matches = await db.find_workspaces_by_name("madrimov")
+        if len(matches) != 1:
+            log.warning(
+                "Bir martalik tuzatish: 'madrimov' bo'yicha %d ta workspace topildi "
+                "(aniq 1 ta kutilgan edi) — HECH NARSA qilinmadi: %s",
+                len(matches), [(m["id"], m["name"]) for m in matches])
+        else:
+            ws = matches[0]
+            result = await db.reset_workspace_stats(ws["id"])
+            log.info(
+                "Bir martalik tuzatish: '%s' (id=%s) statistikasi 0'ga qaytarildi — "
+                "%d ta signal hisobdan chiqarildi, depozit %+.2f o'zgardi",
+                ws["name"], ws["id"], result["excluded_count"], result["deposit_delta"])
+    except Exception:
+        log.exception("Bir martalik tuzatish xato bilan tugadi")
+    await db.set_setting(flag, "done")
+
+
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    await _run_one_time_fixes()
     await app.bot.set_my_commands([
         ("start", "Bosh menyu"),
         ("new", "Yangi signal (sehrgar)"),

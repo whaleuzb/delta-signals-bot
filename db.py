@@ -842,6 +842,43 @@ async def set_signal_excluded(sig_id: int, excluded: bool) -> None:
         await c.execute("UPDATE signals SET excluded=$2 WHERE id=$1", sig_id, excluded)
 
 
+async def find_workspaces_by_name(fragment: str) -> list[asyncpg.Record]:
+    """Nomi bo'yicha (katta-kichik harfga qaramasdan) qidirish — bir
+    martalik admin tuzatishlarida workspace'ni ANIQ topish uchun (masalan
+    guruh nomi qo'lda kiritilganda)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, name FROM workspaces WHERE name ILIKE $1", f"%{fragment}%")
+
+
+async def reset_workspace_stats(workspace_id: int) -> dict:
+    """Workspace'ning BARCHA yopiq (hozircha hisobga olinayotgan) signallarini
+    hisobdan chiqaradi (`excluded=TRUE`) — ommaviy statistika (jami, g'alaba,
+    foiz yig'indisi) 0'ga tushadi, xuddi `cmd_tuzat`dagi bitta-bitta
+    chiqarish bilan BIR XIL natija, faqat bir martada BARCHASI uchun.
+    Depozit ham har bir signalning haqiqiy hissasi bo'yicha TESKARI
+    tuzatiladi — natijada depozit hech qanday signal yopilmagandagi
+    boshlang'ich holatiga qaytadi. HECH NARSA O'CHIRILMAYDI — `excluded`
+    faqat bayroq, keyin istalgan payt `/tuzat` bilan qaytarish mumkin."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            rows = await c.fetch(
+                f"SELECT id, pnl_pct, alloc_amount FROM signals "
+                f"WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded",
+                workspace_id)
+            await c.execute(
+                f"UPDATE signals SET excluded=TRUE WHERE workspace_id=$1 "
+                f"AND status IN {CLOSED} AND NOT excluded", workspace_id)
+            total_money = sum(
+                (float(r["pnl_pct"]) / 100 * float(r["alloc_amount"]))
+                for r in rows if r["pnl_pct"] is not None and r["alloc_amount"] is not None)
+            if total_money:
+                await c.execute(
+                    "UPDATE workspaces SET deposit = deposit - $2 "
+                    "WHERE id=$1 AND deposit IS NOT NULL", workspace_id, _d(total_money))
+    return {"excluded_count": len(rows), "deposit_delta": -total_money}
+
+
 async def save_progress(sig_id: int, f: dict) -> None:
     q = """
     UPDATE signals SET
