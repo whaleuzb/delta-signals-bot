@@ -452,10 +452,7 @@ def fmt_price(x: float) -> str:
 
 
 def draft_text(d: dict, sig_id: int | None = None) -> str:
-    e, sl, tps = d["entry"], d["sl"], d["tps"]
-    risk = abs(e - sl) / e * 100
-    reward = abs(tps[-1] - e) / e * 100
-    rr = reward / risk if risk else 0
+    e, sl, tps = d["entry"], d.get("sl"), d.get("tps") or []
     arrow = "🟢 LONG" if d["side"] == "LONG" else "🔴 SHORT"
     tag = {"forex": "💱 ", "stock": "📈 "}.get(d.get("market"), "")
     head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
@@ -463,6 +460,15 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
         head += f"  <code>#{sig_id}</code>"
     entry_note = " <i>(🎯 darhol kirilgan)</i>" if d.get("entry_mode") == "market" else ""
     lines = [head, "", f"Kirish: <b>{fmt_price(e)}</b>{entry_note}"]
+    if sl is None:
+        # TP/SL hali kiritilmagan — limit to'lgach so'raladi (foydalanuvchi:
+        # "boshida faqat limitni kiritamiz, TP/SL limit aktivlashgandan
+        # keyin so'ralsin"). R:R hali hisoblab bo'lmaydi.
+        lines.append("<i>TP/SL — limit to'lgandan keyin so'raladi.</i>")
+        return "\n".join(lines)
+    risk = abs(e - sl) / e * 100
+    reward = abs(tps[-1] - e) / e * 100
+    rr = reward / risk if risk else 0
     for i, t in enumerate(tps, 1):
         pct = abs(t - e) / e * 100
         lines.append(f"🎯 TP{i}: <b>{fmt_price(t)}</b>  <i>(+{pct:.2f}%)</i>")
@@ -724,10 +730,25 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
 # admin id -> signal_id (yangi stop / yangi maqsadlar kutilmoqda)
 AWAITING_SL: dict[int, int] = {}
 AWAITING_TPS: dict[int, int] = {}
+# admin id -> signal_id — Limit rejimida entry to'ldi, lekin TP/SL HALI
+# UMUMAN kiritilmagan (`AWAITING_TPS`dan farqli — u ALLAQACHON mavjud
+# TP'larni o'zgartirish uchun, bu esa BIRINCHI marta joylashtirish uchun).
+AWAITING_TPSL: dict[int, int] = {}
 
 
 async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
     entry = float(sig["entry"])
+    if sig["sl"] is None:
+        # Limit to'ldi, lekin TP/SL HALI kiritilmagan (limit-keyin-TP/SL
+        # oqimi) — pastdagi boshqaruv (stop/maqsad o'zgartirish, qisman
+        # yopish) TP/SL borligini kutadi, shuning uchun bu yerda mavjud
+        # emas. Foydalanuvchini to'g'ridan-to'g'ri TP/SL kiritishga
+        # yo'naltiramiz.
+        rows = [[InlineKeyboardButton("📐 TP/SL kiriting", callback_data=f"tpsl:{sig['id']}")],
+                [InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]]
+        return (f"⚙️ <b>#{sig['id']} {sig['symbol']} {sig['side']}</b>\n"
+                f"Kirish: <b>{fmt_price(entry)}</b>\n\n"
+                "<i>TP/SL hali kiritilmagan.</i>"), InlineKeyboardMarkup(rows)
     filled = float(sig["filled_pct"])
     realized = float(sig["realized_pct"])
     price = await safe_last_price(sig["market"], sig["symbol"])
@@ -1011,6 +1032,82 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         return True
 
     return False
+
+
+def _tpsl_prompt(sig_id: int, symbol: str) -> str:
+    return (f"📐 <b>#{sig_id} {symbol}</b> — TP va SL kiriting:\n"
+            "<code>tp 67000 68500 sl 64000</code>\n"
+            "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop).")
+
+
+async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Limit to'lib, TP/SL HALI kiritilmagan signal uchun birinchi marta
+    TP/SL javobi. Ishlov berilgan bo'lsa True (`AWAITING_TPS`dan farqli —
+    u ALLAQACHON mavjud TP'larni o'zgartiradi, bu esa birinchi joylashtirish)."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    text = (msg.text or "").strip()
+
+    sig_id = AWAITING_TPSL.pop(uid, None)
+    if not sig_id:
+        return False
+
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] != "ACTIVE" or sig["sl"] is not None:
+        # Signal allaqachon yopilgan, yoki (masalan boshqa yo'l bilan)
+        # TP/SL allaqachon o'rnatilgan bo'lsa — bu javob endi ma'nosiz.
+        await msg.reply_text("Bu so'rov endi kerak emas.", reply_markup=MENU_BACK_KB)
+        return True
+
+    parsed = parsing.parse_tp_sl(text)
+    if parsed is None:
+        AWAITING_TPSL[uid] = sig_id
+        await msg.reply_text(
+            "O'qiy olmadim. Namuna: <code>tp 67000 68500 sl 64000</code>\n"
+            "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop). "
+            "Yoki /bekor yozing.", parse_mode=ParseMode.HTML)
+        return True
+
+    entry = float(sig["entry"])
+    side = sig["side"]
+    tps = sorted(set(parsed["tps"]), reverse=(side == "SHORT"))
+    err = parsing.validate({"entry": entry, "sl": parsed["sl"], "tps": tps, "side": side})
+    if err:
+        AWAITING_TPSL[uid] = sig_id
+        await msg.reply_text(f"❌ {err}\nQayta kiriting yoki /bekor.")
+        return True
+
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(uid, ws):
+        return True
+
+    await db.set_tp_sl(sig_id, parsed["sl"], tps)
+    body = draft_text({"symbol": sig["symbol"], "side": side, "entry": entry,
+                        "sl": parsed["sl"], "tps": tps, "market": sig["market"]},
+                       sig_id)
+    await msg.reply_text(f"✅ TP/SL joylashtirildi.\n\n{body}", parse_mode=ParseMode.HTML,
+                          reply_markup=MENU_BACK_KB)
+    await notify_group(ctx, ws, sig,
+                        f"📐 <b>#{sig_id} {sig['symbol']}</b> — TP/SL joylashtirildi:\n{body}")
+    return True
+
+
+async def on_tpsl_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"📐 TP/SL kiriting" tugmasi — dastlabki DM so'rovi o'tkazib
+    yuborilgan/kechiktirilgan bo'lsa, AWAITING_TPSL'ni qayta yoqadi."""
+    q = update.callback_query
+    await q.answer()
+    sig_id = int(q.data.split(":", 1)[1])
+    sig = await db.get_signal(sig_id)
+    if not sig or sig["status"] != "ACTIVE" or sig["sl"] is not None:
+        await q.answer("Bu so'rov endi kerak emas.", show_alert=True)
+        return
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not can_manage(q.from_user.id, ws):
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    AWAITING_TPSL[q.from_user.id] = sig_id
+    await q.message.reply_text(_tpsl_prompt(sig_id, sig["symbol"]), parse_mode=ParseMode.HTML)
 
 
 async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1629,8 +1726,9 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=WIZ_CANCEL_KB)
         return WIZ_ENTRY
 
-    await q.message.reply_text("4/6 — Entry (kirish) narxini kiriting:",
-                               reply_markup=WIZ_CANCEL_KB)
+    await q.message.reply_text(
+        "4/6 — Entry (limit) narxini kiriting.\nTP/SL narx to'lgach so'raladi:",
+        reply_markup=WIZ_CANCEL_KB)
     return WIZ_ENTRY
 
 
@@ -1644,6 +1742,24 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if wiz is None:
         return ConversationHandler.END
     wiz["entry"] = entry
+
+    if wiz.get("entry_mode") == "limit":
+        # Foydalanuvchi so'roviga ko'ra ("boshida faqat limitni kiritamiz,
+        # TP/SL limit aktivlashgandan keyin so'ralsin"): Limit rejimida TP/SL
+        # HOZIR SO'RALMAYDI — signal `sl=None, tps=[]` bilan yaratiladi
+        # (`db.create_signal`/`tracker.process` buni qo'llab-quvvatlaydi —
+        # kuzatuv entry to'lgunicha, KEYIN esa TP/SL kiritilgunicha kutadi).
+        # Bu #126/#127'dagi "hali limitga kelmagandi ham TP bilan yopildi"
+        # muammosining tub yechimi: TP/SL entry to'lganidan KEYIN, HAQIQIY
+        # tasdiqlangan narx asosida kiritiladi — hech qachon oldindan
+        # taxmin qilinmaydi.
+        wiz2 = ctx.user_data.pop("wiz")
+        draft = {"symbol": wiz2["symbol"], "side": wiz2["side"], "entry": wiz2["entry"],
+                 "sl": None, "tps": [], "market": wiz2.get("market", "crypto"),
+                 "entry_mode": "limit"}
+        await show_preview(msg, ctx, draft, wiz2.get("file_id"), "wizard", wiz2["workspace_id"])
+        return ConversationHandler.END
+
     await msg.reply_text(
         "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
         "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
@@ -1819,6 +1935,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await show_preview(msg, ctx, draft, None, "jurnal", ws["id"])
         return
 
+    # Limit to'lib, TP/SL HALI kiritilmagan signal uchun birinchi javob.
+    if await handle_tpsl_input(update, ctx):
+        return
+
     # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
     if await handle_manage_input(update, ctx):
         return
@@ -1941,10 +2061,15 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     draft["market"] = market
     draft.setdefault("entry_mode", "limit")
 
-    err = parsing.validate(draft)
-    if err:
-        await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
-        return
+    # TP/SL hali kiritilmagan (limit-keyin-so'ralsin oqimi) — `validate()`
+    # ularni MAJBURIY deb kutadi (solishtiruv None bilan xato beradi),
+    # bu yerda hali tekshirishning o'zi ma'nosiz: TP/SL foydalanuvchi
+    # limit to'lgach kiritganida (`handle_tpsl_input()`) tekshiriladi.
+    if draft.get("sl") is not None:
+        err = parsing.validate(draft)
+        if err:
+            await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            return
 
     warn = []
     # SPOT cheklovi faqat KRIPTOGA tegishli: forex va aksiyalarda short
@@ -1953,6 +2078,8 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         warn.append("⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.")
     if draft.get("entry_mode") == "market":
         warn.append("🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.")
+    if draft.get("entry_mode") == "limit" and draft.get("sl") is None:
+        warn.append("📐 Limit to'lganda TP/SL kiritishingiz so'raladi.")
     if source == "vision":
         conf = draft.get("confidence", 0)
         warn.append(f"🤖 Rasmdan o'qildi (ishonch {conf:.0%}) — darajalarni tekshiring.")
@@ -1980,19 +2107,27 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     body += "\n\n<b>Rasm qanday bo'lsin?</b>"
 
     await msg.reply_text(body, parse_mode=ParseMode.HTML,
-                          reply_markup=preview_kb(token, file_id))
+                          reply_markup=preview_kb(token, file_id, has_tpsl=draft.get("sl") is not None))
 
 
-def preview_kb(token: str, file_id) -> InlineKeyboardMarkup:
-    """Uchta tanlov. Rasm HECH QACHON majburiy emas — uchinchi tugma har doim bor."""
+def preview_kb(token: str, file_id, has_tpsl: bool = True) -> InlineKeyboardMarkup:
+    """Uchta tanlov. Rasm HECH QACHON majburiy emas — uchinchi tugma har doim bor.
+
+    `has_tpsl=False` — TP/SL hali kiritilmagan (limit-keyin-so'ralsin oqimi):
+    "📈 Bot grafikni aniqlasin" tugmasi OLIB TASHLANADI — u entry/SL/TP
+    chiziqlari bilan grafik chizadi (`chart.setup_chart`), SL/TP hali
+    mavjud bo'lmagan qoralamada bu ma'nosiz (va `_render()` ularni
+    MAJBURIY parametr deb kutadi — chaqirilsa xato beradi)."""
     first = ("🖼 Yuborgan rasmim bilan" if file_id else "🖼 Rasm yuklash")
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(first, callback_data=f"pic:{token}")],
-        [InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")],
+    rows = [[InlineKeyboardButton(first, callback_data=f"pic:{token}")]]
+    if has_tpsl:
+        rows.append([InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")])
+    rows += [
         [InlineKeyboardButton("📝 Rasmsiz davom etish", callback_data=f"nopic:{token}")],
         [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
          InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
-    ])
+    ]
+    return InlineKeyboardMarkup(rows)
 
 
 async def send_final_preview(target, ctx, token: str) -> None:
@@ -2183,7 +2318,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "bk":
         await q.edit_message_reply_markup(
-            reply_markup=preview_kb(token, item["file_id"]))
+            reply_markup=preview_kb(token, item["file_id"],
+                                     has_tpsl=item["draft"].get("sl") is not None))
         return
 
     if action == "pic":
@@ -2393,14 +2529,20 @@ def risk_amount(deposit: float, entry: float, sl: float, risk_pct: float) -> flo
 def alloc_prompt(sig_id: int, d: dict, deposit: float) -> tuple[str, InlineKeyboardMarkup]:
     """Pozitsiya hajmini so'rash — risk bo'yicha tayyor variantlar bilan.
     Avval faqat "necha pul ishlatasiz?" deb so'rardi va hisobni odam o'zi
-    qilishi kerak edi."""
-    entry, sl = float(d["entry"]), float(d["sl"])
-    dist = abs(entry - sl) / entry * 100 if entry > 0 else 0
+    qilishi kerak edi.
+
+    `d["sl"]` NULL bo'lishi mumkin (limit-keyin-TP/SL oqimi — stop hali
+    kiritilmagan) — bunday holda risk% ga asoslangan tugmalar hisoblab
+    bo'lmaydi (stopgacha masofa hali noma'lum), shuning uchun faqat
+    "summani o'zingiz yozing" varianti ko'rsatiladi."""
+    entry = float(d["entry"])
+    sl = float(d["sl"]) if d.get("sl") is not None else None
+    dist = abs(entry - sl) / entry * 100 if (sl is not None and entry > 0) else 0
 
     t = [f"💰 <b>#{sig_id} {html.escape(str(d['symbol']))}</b> — pozitsiya hajmi",
-         f"Depozit: <b>{deposit:,.2f}</b> · Stopgacha: <b>{dist:.2f}%</b>"]
+         f"Depozit: <b>{deposit:,.2f}</b>" + (f" · Stopgacha: <b>{dist:.2f}%</b>" if sl is not None else "")]
     rows, capped = [], False
-    if dist > 0:
+    if sl is not None and dist > 0:
         btns = []
         for rp in RISK_CHOICES:
             amt = risk_amount(deposit, entry, sl, rp)
@@ -2569,6 +2711,23 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 )
             except Exception:
                 pass
+
+        # Limit to'ldi, lekin TP/SL HALI kiritilmagan (foydalanuvchi "avval
+        # faqat limit, TP/SL keyin" so'ragan oqim) — signal yaratgan odamga
+        # DM orqali so'rov yuboriladi (signal boshqaruvi shu botda doim
+        # shaxsiy chatda, guruhda emas). AWAITING_TPSL shu odamga o'rnatiladi
+        # — u DIREKT javob yozishi mumkin, yoki keyinroq tugmani bossa ham
+        # bo'ladi (agar bu xabarni o'tkazib yuborgan/kechiktirgan bo'lsa).
+        if e["type"] == "OPEN" and e.get("needs_tpsl") and sig and sig["author_id"]:
+            author_id = sig["author_id"]
+            AWAITING_TPSL[author_id] = sid
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                "📐 TP/SL kiriting", callback_data=f"tpsl:{sid}")]])
+            try:
+                await ctx.bot.send_message(author_id, _tpsl_prompt(sid, sym),
+                                            parse_mode=ParseMode.HTML, reply_markup=kb)
+            except Exception:
+                log.exception("TP/SL so'rovi yuborilmadi (#%s)", sid)
 
 
 # ─────────────── Avtomatik kunlik hisobot ───────────────
@@ -2854,6 +3013,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_SIGNAL_PHOTO.pop(update.effective_user.id, None)
     AWAITING_SL.pop(update.effective_user.id, None)
     AWAITING_TPS.pop(update.effective_user.id, None)
+    AWAITING_TPSL.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
     AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
@@ -5554,6 +5714,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))
+    app.add_handler(CallbackQueryHandler(on_tpsl_button, pattern=r"^tpsl:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))

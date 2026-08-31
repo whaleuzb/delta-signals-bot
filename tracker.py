@@ -46,10 +46,17 @@ async def process(sig) -> list[dict]:
     symbol = sig["symbol"]
     side = sig["side"]
     entry = float(sig["entry"])
-    sl = float(sig["sl"])
-    sl_init = float(sig["sl_initial"])
-    tps = [float(x) for x in sig["tps"]]
-    alloc = allocation(len(tps))
+    # `sl` (demak `sl_initial`/`tps` ham) NULL bo'lishi mumkin — foydalanuvchi
+    # "avval faqat limit, TP/SL limit aktivlashgandan keyin" so'ragan (limit
+    # sehrgar oqimi endi shunday ishlaydi). Bunday holda TP/SL HALI UMUMAN
+    # MAVJUD EMAS, shuning uchun ularni "tegdi" deb hisoblashning iloji yo'q —
+    # bu signal #126/#127'dagi "hali limitga kelmagandi ham TP bilan yopildi"
+    # muammosining eng ISHONCHLI, tub yechimi.
+    awaiting_tpsl = sig["sl"] is None
+    sl = float(sig["sl"]) if sig["sl"] is not None else None
+    sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
+    tps = [float(x) for x in sig["tps"]] if sig["tps"] else []
+    alloc = allocation(len(tps)) if tps else []
 
     tp_hit = sig["tp_hit"]
     filled = float(sig["filled_pct"])
@@ -97,7 +104,7 @@ async def process(sig) -> list[dict]:
             if c.low <= entry <= c.high:
                 status = "ACTIVE"
                 opened_at = datetime.fromtimestamp(c.open_ms / 1000, timezone.utc)
-                events.append({"type": "OPEN", "price": entry})
+                events.append({"type": "OPEN", "price": entry, "needs_tpsl": awaiting_tpsl})
             # Entry TO'LGAN shamning O'ZIDA SL/TP TEKSHIRILMAYDI — Market
             # order (ACTIVE holatda BOSHLANADI, "kirish shami" degan tushuncha
             # umuman yo'q) bilan IZCHIL xatti-harakat uchun. Sabab: "low<=
@@ -112,6 +119,15 @@ async def process(sig) -> list[dict]:
 
         if status != "ACTIVE":
             break
+
+        if awaiting_tpsl:
+            # Kirish to'ldi, lekin TP/SL hali kiritilmagan (foydalanuvchi
+            # javob berishi kutilmoqda — bot.py AWAITING_TPSL orqali) —
+            # SL/TP HALI MAVJUD EMAS, shuning uchun tekshirishning ma'nosi
+            # yo'q. Foydalanuvchi javob bergach (`db.set_tp_sl`), keyingi
+            # pollda `sig["sl"]` endi NULL bo'lmaydi va odatdagidek davom
+            # etadi.
+            continue
 
         # --- 2. Shu shamda SL va TP holati ---
         sl_touched = (c.low <= sl) if side == "LONG" else (c.high >= sl)

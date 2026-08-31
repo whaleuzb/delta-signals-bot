@@ -234,6 +234,20 @@ async def main():
         f"olinmasligi kerak edi: {saved3['status']}")
     assert not ev3, f"hech qanday hodisa bo'lmasligi kerak edi: {ev3}"
 
+    # 11. TP/SL hali kiritilmagan (limit-keyin-so'ralsin oqimi, `sl=None`):
+    # entry to'lgach ham, HAR QANDAY keyingi narx harakati (garchi juda
+    # keskin bo'lsa ham) TP/SL sifatida HISOBLANMASLIGI kerak -- ular hali
+    # UMUMAN mavjud emas, foydalanuvchi ularni hali kiritmagan.
+    saved, ev = await run(signal(sl=None, sl_initial=None, tps=[]), [
+        candle(0, 101, 101, 99, 100),      # entry to'ldi
+        candle(1, 100, 500, 1, 100),       # HAR QANDAY narx -- baribir tekshirilmaydi
+    ])
+    show("TP/SL hali kiritilmagan -- narx harakati e'tiborga olinmadi", saved, ev)
+    assert saved["status"] == "ACTIVE", (
+        f"TP/SL kiritilmaguncha signal ACTIVE (kutish) holatida qolishi kerak edi: {saved['status']}")
+    assert saved["sl"] is None, f"sl hamon NULL qolishi kerak edi: {saved['sl']}"
+    assert len(ev) == 1 and ev[0]["type"] == "OPEN" and ev[0]["needs_tpsl"] is True, ev
+
     print("\nBarcha holatlar tekshirildi.")
 
 

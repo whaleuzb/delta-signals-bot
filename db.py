@@ -293,6 +293,17 @@ CREATE TABLE IF NOT EXISTS market_hashtags (
     hashtag  TEXT PRIMARY KEY,
     added_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Limit signalda TP/SL ni ENTRYDAN KEYIN (limit to'lgach) so'rash imkoniyati
+-- uchun: sehrgarda foydalanuvchi avval FAQAT entryni kiritadi, `sl`/
+-- `sl_initial` signal ACTIVE bo'lgunicha NULL qoladi (`tps` esa bo'sh
+-- massiv — NOT NULL bilan mos, o'zgartirish shart emas). tracker.py
+-- `sl IS NULL` bo'lsa SL/TP tekshiruvini UMUMAN o'tkazmaydi (bot.py
+-- foydalanuvchidan javob kutadi) — shu sabab "hali limitga kelmagan"
+-- paytda TP allaqachon "tegilgan" ko'rinishi MUMKIN EMAS: TP/SL hali
+-- mavjud ham emas.
+ALTER TABLE signals ALTER COLUMN sl DROP NOT NULL;
+ALTER TABLE signals ALTER COLUMN sl_initial DROP NOT NULL;
 """
 
 
@@ -639,6 +650,17 @@ async def create_signal(workspace_id: int, d: dict) -> int:
             d.get("chart_file_id"), d.get("author_id"), d.get("note"),
             d.get("market", "crypto"), entry_mode, status, opened_at,
             d.get("chart_tf"),
+        )
+
+
+async def set_tp_sl(sig_id: int, sl: float, tps: list[float]) -> None:
+    """Kirish (limit) allaqachon to'lgan, lekin TP/SL hali kiritilmagan
+    signalga TP/SL'ni BIRINCHI marta joylashtiradi (`sl` shu vaqtgacha
+    NULL edi — `tracker.py` shu sabab kuzatuvni to'xtatib turgan)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET sl=$2, sl_initial=$2, tps=$3 WHERE id=$1",
+            sig_id, _d(sl), [_d(t) for t in tps],
         )
 
 

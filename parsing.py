@@ -139,6 +139,44 @@ def parse(text: str) -> dict | None:
             "sl": sl, "tps": tps, "entry_mode": entry_mode}
 
 
+def parse_tp_sl(text: str) -> dict | None:
+    """Faqat TP/SL matnini o'qiydi — symbol/side/entry ALLAQACHON ma'lum
+    bo'lgan holatda ishlatiladi (limit signal to'lib, TP/SL SO'RALGANDA,
+    `bot.py`ning AWAITING_TPSL oqimida). `parse()`dagi bilan bir xil
+    regex andozalari (SL/TP qismi) qayta ishlatiladi — faqat symbol/entry
+    qidirilmaydi."""
+    if not text:
+        return None
+    low = text.replace(" ", " ").lower()
+
+    sl = None
+    m = re.search(r"(?:sl|stop\s*loss|stop|stoploss|zarar)\D{0,6}(" + NUM + ")", low)
+    if m:
+        sl = _f(m.group(1))
+
+    tps: list[float] = [
+        _f(m.group(1))
+        for m in re.finditer(r"(?:tp\d|take\s*profit\s*\d)\D{0,6}(" + NUM + ")", low)
+    ]
+    if not tps:
+        m = re.search(
+            r"(?:tp|take\s*profit|target|maqsad)\s*[:\-=]?\s*((?:" + NUMS + r"[\s,]*)+)", low
+        )
+        if m:
+            tps = _nums(m.group(1))
+
+    # Kalit so'zsiz qisqa format: "67000 68500 64000" — oxirgisi SL,
+    # qolganlari TP (`parse()`dagi qisqa format bilan bir xil andoza).
+    if sl is None or not tps:
+        nums = _nums(re.sub(r"[A-Za-z]+", " ", text))
+        if sl is None and not tps and len(nums) >= 2:
+            *tps, sl = nums
+
+    if sl is None or not tps:
+        return None
+    return {"sl": sl, "tps": tps}
+
+
 def validate(d: dict) -> str | None:
     """Mantiqiy xatolarni tutadi. Xato bo'lsa matn qaytaradi."""
     e, sl, tps = d["entry"], d["sl"], d["tps"]

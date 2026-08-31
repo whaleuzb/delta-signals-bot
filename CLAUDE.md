@@ -3758,7 +3758,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (real tarmoq kechikishi), nazariy jihatdan ozgina eskirish qoladi
        — bu endi amaliy jihatdan e'tiborga olinmaydigan darajada.
 
-129. **Foydalanuvchi (davomida, yana taъkidlab): "Hali buy limitga
+129. **Foydalanuvchi (davomida, yana ta'kidlab): "Hali buy limitga
      kelmagandiku qanday tp bilan yopildi? Bu juda jiddiy xatolik nima
      bo'ldi?"** — **#128'dagi tashxis NOTO'G'RI yo'nalishda edi**: #126'ning
      to'liq karta rasmi (`draft_text()`) "(🎯 darhol kirilgan)" belgisini
@@ -3836,3 +3836,96 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        ko'rsa — bu MUHIM signal: demak muammo yana boshqa (masalan
        MEXC'ning haqiqiy real-time narx tarqalishi/lag'i) sababda bo'lishi
        mumkin, chuqurroq tekshiruv kerak bo'ladi.
+
+130. **Foydalanuvchi (#127 TACUSDT skrinshoti bilan, #129'dan keyin HAM
+     xuddi shu naqsh takrorlanganda): "Hali buy limitga kelmagandiku
+     qanday tp bilan yopildi? Bu juda jiddiy xatolik. ishlamadi yana
+     menimcha sen asl muammo qayerdaligini bilmayabsan. Balki boshida
+     faqat limitni o'zini kiritishi qo'shamiz. Tp va sl ni limit
+     aktivlashganidan keyin so'rov kelsa joylashtirsin."** — #129 deploy
+     qilingandan KEYIN yaratilgan #127 signalida XUDDI SHU naqsh yana
+     kuzatildi — demak #129 (chegara-sham tuzatishi) YOLG'IZ YETARLI
+     emas edi (haqiqiy sabab hali ham noaniq — MEXC narx tarqalishi/lag'i,
+     yoki boshqa nozik holat bo'lishi mumkin). Foydalanuvchi TAXMIN
+     qilishni to'xtatib, MUAMMONING O'ZINI ARXITEKTURA DARAJASIDA
+     yo'q qiluvchi yechim taklif qildi — **QABUL QILINDI va amalga
+     oshirildi** (keyingi tekshiruv/taxmin kerak emas, chunki bu yechim
+     TP/SL hali MAVJUD BO'LMAGANDA ularni "tegdi" deb hisoblashning
+     TEXNIK JIHATDAN MUMKIN emasligini kafolatlaydi — qaysi tub sabab
+     ekanidan qat'i nazar).
+     - **Yangi arxitektura — Limit sehrgarida TP/SL ENDI ENTRYDAN KEYIN
+       so'raladi**: foydalanuvchi endi FAQAT symbol/yo'nalish/entry
+       (limit narxi) kiritadi — signal `sl=NULL, tps=[]` bilan PENDING
+       holatda yaratiladi. Entry to'lib signal ACTIVE bo'lgandan KEYIN
+       — HAQIQIY tasdiqlangan fakt asosida — bot foydalanuvchiga DM
+       orqali TP/SL so'raydi ("📐 TP/SL kiriting" tugmasi bilan ham
+       qayta so'raladigan). Faqat sehrgar (`/new`) — Darhol (market)
+       rejimi VA tezkor matn usuli butunlay TEGILMADI (ular allaqachon
+       darhol yoki bir yo'la kiritadi, "kutish" tushunchasi yo'q).
+     - **`tracker.py`**: `process()` endi `sl IS NULL` bo'lsa
+       (`awaiting_tpsl`) SL/TP tekshiruvini SHART SIZ o'tkazib yuboradi
+       (`continue`) — TP/SL HALI MAVJUD BO'LMAGANI uchun ularni "tegdi"
+       deb hisoblashning ILOJI YO'Q, taxmin/nazariya kerak emas. Entry
+       to'lganda `OPEN` hodisasiga `needs_tpsl` bayrog'i qo'shiladi.
+     - **`db.py`**: `signals.sl`/`sl_initial` endi NULL bo'lishi mumkin
+       (`ALTER TABLE ... DROP NOT NULL`, `tps` allaqachon bo'sh massivni
+       qabul qiladi). Yangi `set_tp_sl(sig_id, sl, tps)` — TP/SL'ni
+       BIRINCHI marta joylashtiradi.
+     - **`parsing.py`**: yangi `parse_tp_sl(text)` — faqat TP/SL matnini
+       o'qiydi (symbol/side/entry allaqachon ma'lum), `parse()`dagi bilan
+       bir xil regex andozalarini qayta ishlatadi.
+     - **`bot.py`**: `wizard_entry()` — Limit rejimida entry kiritilgach
+       WIZ_TP/WIZ_SL bosqichlari BUTUNLAY o'tkazib yuboriladi, draft
+       to'g'ridan-to'g'ri `show_preview()`ga (`sl=None, tps=[]` bilan)
+       uzatiladi. `draft_text()`/`preview_kb()` — `sl=None` bo'lsa
+       yiqilmasdan ("TP/SL — limit to'lgandan keyin so'raladi" matni,
+       bot-grafik tugmasi yashirilgan — u SL/TP'ni MAJBURIY parametr deb
+       kutadi). `poll_job()` — `OPEN`+`needs_tpsl` hodisasida signal
+       muallifiga DM orqali so'rov + tugma yuboriladi, `AWAITING_TPSL`
+       o'rnatiladi. Yangi `handle_tpsl_input()` — javobni o'qiydi,
+       tekshiradi (`parsing.validate()`), `db.set_tp_sl()` chaqiradi,
+       guruhga/foydalanuvchiga tasdiq yuboradi. Yangi `on_tpsl_button()`
+       — so'rov o'tkazib yuborilgan/kechiktirilgan bo'lsa qayta yoqadi.
+     - **Yon ta'sirda topilgan 2 ta CHINDAN MUHIM crash xatosi** (kod
+       yozilayotganda, deploy qilishdan OLDIN, o'z-o'zini tekshirishda
+       topildi): `alloc_prompt()` (signal tasdiqlangach — depozit
+       belgilangan BO'LSA HAR DOIM chaqiriladi!) va `manage_view()`
+       ("⚙️ boshqarish" tugmasi) ikkalasi ham `float(d["sl"])`ni SHARTSIZ
+       chaqirardi — `sl=None` bilan YANGI Limit signal tasdiqlansa yoki
+       "boshqarish" bosilsa, ikkalasi ham DARHOL yiqilardi. Ikkalasi ham
+       tuzatildi: `alloc_prompt()` — `sl=None` bo'lsa risk% tugmalari
+       ko'rsatilmaydi (faqat "summani o'zingiz yozing"); `manage_view()`
+       — `sl=None` bo'lsa alohida ("TP/SL kiriting" tugmali) ko'rinish
+       qaytaradi. Boshqa ehtimoliy joylar (`open_signals_view`,
+       `milestone_job`, `on_close_request`, `chart.signal_chart`) ATAYLAB
+       tekshirildi — ularning hech biri `sl`ga bog'liq emas (yoki faqat
+       YOPILGAN signallar uchun chaqiriladi, awaiting-tpsl signal hech
+       qachon yopilmaydi) — xavfsiz.
+     - Tekshirildi: (1) `test_tracker.py`ga yangi holat — yagona TP/SL
+       hali `None` bo'lganda, HAR QANDAY keskin narx harakati (500
+       gachа) e'tiborga OLINMASLIGI, faqat `OPEN(needs_tpsl=True)`
+       hodisasi chiqishi; mavjud 12 ta holat o'zgarishsiz (jami 13/13).
+       (2) Haqiqiy Postgres bilan TO'LIQ hayot davri: `create_signal
+       (sl=None)` → entry to'ladi (keskin 500 gacha harakat e'tiborga
+       olinmadi, `ACTIVE`+kutish) → `set_tp_sl()` → KEYINGI pollda
+       TP odatdagidek to'g'ri aniqlandi. (3) Mock bilan (`unittest.mock`):
+       `wizard_entry()` limit rejimda TP/SL bosqichlarini o'tkazib
+       yuborishi; `handle_tpsl_input()` — muvaffaqiyatli, noto'g'ri
+       matn, mantiqsiz TP/SL (SL entrydan noto'g'ri tomonda) — 3 holat;
+       `on_button()` "go" tasdiqlash — `create_signal(sl=None, tps=[])`
+       to'g'ri chaqirilishi, `draft_text` yiqilmasligi; `poll_job()` —
+       `OPEN+needs_tpsl` hodisasida muallifga DM+tugma yuborilishi,
+       `AWAITING_TPSL` o'rnatilishi; `alloc_prompt`/`manage_view`
+       `sl=None` bilan yiqilmasligi (yuqoridagi crash tuzatishlari).
+       `python3 -m py_compile` — barcha o'zgargan fayllar toza.
+     - **Ta'sir doirasi**: FAQAT sehrgar orqali yaratilgan Limit
+       signallariga — Market (Darhol) va tezkor matn usuli BUTUNLAY
+       o'zgarishsiz (ular hamon entry+TP+SL'ni bir yo'la so'raydi/oladi).
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — birinchi haqiqiy
+       Limit signalda: (a) TP/SL so'rovi muallifga to'g'ri yetib
+       borishini, (b) javob to'g'ri saqlanishini, (c) shundan keyingi
+       kuzatuv odatdagidek ishlashini kuzatish kerak. Agar #126/#127
+       naqshi HALI HAM (bu arxitektura o'zgarishidan keyin ham) qandaydir
+       shaklda takrorlansa — bu ENDI signal HAQIQIY YOPILISHI mumkin
+       emasligi sabab (TP/SL entry to'lgunicha umuman mavjud bo'lmaydi)
+       BUTUNLAY BOSHQA muammo bo'ladi, alohida chuqur tekshiruv kerak.
