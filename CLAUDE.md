@@ -3477,3 +3477,58 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        SHART** — "madrimov" bo'yicha aniq 1 ta workspace topilib, muvaffaqiyatli
        tuzatilganini tasdiqlash kerak; agar 0/bir nechta topilsa — foydalanuvchiga
        aniq nom/ID so'rab, prompt yangilanishi kerak.
+
+124. **Foydalanuvchi: "Keyin botdagi hamma kamchiliklarni top. Menimcha
+     Limit order qo'yishda kamchiliklar bor. Kichik foizlarda stop qo'yilsa
+     darrov yopilib qolyabti. Katta foizdagi stop lossda hammasi yaxshi
+     ishlayabti."** Real bug — kod bilan RIVAM TASDIQLANDI (`tracker.py`
+     `process()`).
+     - **Ildiz sabab**: Limit order (`PENDING`) to'lganda (`c.low<=entry
+       <=c.high`) kod SHU SHAMNING O'ZIDA SL/TP tegishini ham darhol
+       tekshirardi — orasiga `continue` YO'Q edi. Agar stop kirish narxiga
+       YAQIN bo'lsa (kichik %), ODDIY sham shovqinining o'zi (halokatli
+       harakat SHART EMAS) allaqachon SL darajasiga yetib qolardi — signal
+       kirish bilan BIR VAQTDA zumda yopilardi. Katta % stopda esa xuddi
+       shu sham hech qachon muammo tug'dirmasdi (shovqin unchalik uzoq
+       yetmaydi) — foydalanuvchi tasvirlagan aynan shu naqsh.
+       **FAQAT Limit orderlarga xos** — Market order (`entry_mode=
+       'market'`) to'g'ridan-to'g'ri ACTIVE holatda boshlanadi ("kirish
+       shami" tushunchasi umuman yo'q), shu sabab bu xato u yerda
+       bo'lishi MUMKIN EMAS edi — foydalanuvchining o'z tashxisi
+       ("Limit order qo'yishda") ANIQ to'g'ri chiqdi.
+     - Mock bilan ANIQ reproduksiya qilindi: entry=100/sl=98 (2%) va bir
+       xil sham (low=97.5) bilan entry=100/sl=80 (20%) solishtirildi —
+       kichigi zumda "SL" (-2.00%), kattasi esa xuddi shu shamda "ACTIVE"
+       (ochiq) qoldi — aynan foydalanuvchi ta'riflagan naqsh.
+     - **AskUserQuestion orqali ikkita yechim taklif qilindi** (bu trade-
+       simulyatsiya falsafasiga ta'sir qiladigan qaror, o'zim hal
+       qilmadim): (A) hozirgi holat — konservativ, statistikani past
+       ko'rsatishga moyil, lekin kichik % stoplar amalda ishlatib
+       bo'lmas; (B) entry to'lgan shamda SL/TP TEKSHIRILMAYDI, keyingi
+       shamdan boshlanadi — Market order bilan IZCHIL bo'ladi. **Foydalanuvchi
+       (B)ni tanladi.**
+     - **Tuzatish**: `process()`da entry to'lgan (yoki to'lmagan) holatning
+       IKKALASI ham endi `continue` bilan tugaydi — SL/TP tekshiruvi HECH
+       QACHON entry bilan bir xil shamda BAJARILMAYDI, faqat KEYINGI
+       shamdan. Market order yo'li (status allaqachon ACTIVE bo'lib
+       kirgan holatlar) BUTUNLAY TEGILMADI — o'sha yerda SL/TP hamon SHU
+       shamning o'zida tekshiriladi (bu yerda hech qachon muammo yo'q edi).
+     - Tekshirildi (mock): (1) reproduksiya stsenariysi endi ikkalasi ham
+       "ACTIVE" (muammo yo'qoldi); (2) entry+SL bir shamda o'tkazib
+       yuborilib, KEYINGI shamdagi HAQIQIY SL to'g'ri ishlashi; (3) entry+TP
+       bir shamda o'tkazib yuborilib, KEYINGI shamdagi HAQIQIY TP1 to'g'ri
+       ishlashi; (4) Market order (ACTIVE'dan boshlangan) — SHU shamning
+       o'zida SL hamon ishlayveradi, xatti-harakat O'ZGARMAGAN. Mavjud
+       `test_tracker.py` 9/9 — BARCHASI o'zgarishsiz o'tdi (hech qaysi
+       mavjud test entry bilan bir shamda SL/TP tegishini sinamagan edi,
+       shuning uchun ular buzilmadi).
+     - **Ta'sir doirasi**: FAQAT KELAJAKDAGI (hali PENDING) Limit
+       signallariga qo'llanadi — allaqachon yopilgan eski signallar
+       QAYTA HISOBLANMAYDI (tarixni qayta yozish yo'q, izchil siyosat).
+     - **"Botdagi hamma kamchiliklarni top" — keng so'rov, TO'LIQ audit
+       BAJARILMADI**: bu seansda faqat foydalanuvchi ko'rsatgan ANIQ va
+       tasdiqlangan yo'nalish (`tracker.py`ning trade-simulyatsiya
+       yadrosi) chuqur tekshirildi va tuzatildi. Butun kod bazasini
+       "hamma kamchilik" uchun audit qilish alohida, aniqroq so'rov
+       (masalan qaysi qism: signal skanerlash, jonli yangilanish,
+       xabarlar, UI oqimlari) bilan davom ettirilishi kerak.

@@ -77,8 +77,17 @@ async def process(sig) -> list[dict]:
                 status = "ACTIVE"
                 opened_at = datetime.fromtimestamp(c.open_ms / 1000, timezone.utc)
                 events.append({"type": "OPEN", "price": entry})
-            else:
-                continue  # entry ochilmagan — TP/SL hisoblanmaydi
+            # Entry TO'LGAN shamning O'ZIDA SL/TP TEKSHIRILMAYDI — Market
+            # order (ACTIVE holatda BOSHLANADI, "kirish shami" degan tushuncha
+            # umuman yo'q) bilan IZCHIL xatti-harakat uchun. Sabab: "low<=
+            # entry<=high" sharti bajarilgan BITTA shamning ICHIDA SL (yoki
+            # TP) ham tegib qolishi mumkin (masalan kirish narxiga yaqin —
+            # kichik % — stopda oddiy narx shovqinining o'zi yetadi), lekin
+            # OHLC'dan ICHKI tartibni (avval kirdimi, keyin tegdimi, yoki
+            # aksincha) BILIB BO'LMAYDI. Foydalanuvchi: "kichik foizlarda
+            # stop qo'yilsa, kirish bilan bir vaqtda zumda yopilib
+            # qolyapti" — keyingi shamdan tekshirish shu muammoni yo'qotadi.
+            continue
 
         if status != "ACTIVE":
             break
