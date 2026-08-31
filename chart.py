@@ -79,6 +79,27 @@ def align(start_ms: int, tf: str) -> int:
     return start_ms - (start_ms % step)
 
 
+def _idx_for_ms(candles, target_ms: int) -> int:
+    """Berilgan vaqt TUSHADIGAN shamning indeksini topadi — shamning
+    `[open_ms, close_ms]` oralig'ini O'Z ICHIGA olganini qidiradi, "eng
+    yaqin `close_ms`" (mutlaq farq) o'rniga.
+
+    Sabab: displaydagi timeframe (masalan 15m) kuzatuvning ichki 1
+    daqiqalik aniqligidan KATTA bo'lganda, "eng yaqin close_ms" usuli
+    XRONOLOGIK TARTIBSIZ sham tanlashi mumkin edi — masalan `entry_idx`
+    va `exit_idx` mustaqil hisoblanib, natijada ENTRY belgisi grafikda
+    EXIT belgisidan KEYIN chiqib qolardi (foydalanuvchi #131 LINEAUSDT
+    skrinshotida ko'rsatdi — "TP orqada, kirish oldinda bo'lib qolgan"),
+    garchi haqiqiy hisob-kitob (pnl/R, tracker.py'dan, mustaqil va
+    to'g'ri xronologik tartibda) TO'G'RI bo'lsa ham."""
+    for i, c in enumerate(candles):
+        if c.open_ms <= target_ms <= c.close_ms:
+            return i
+    # Oraliqqa umuman tushmasa (masalan so'ralgan oyna chetida) — eng
+    # yaqin chegaraga qaytadi (avvalgi xatti-harakat, faqat fallback sifatida).
+    return min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - target_ms))
+
+
 async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str,
                  end_ms: int | None = None):
     """Shamlarni olish. Xato bo'lsa None — grafik shunchaki chizilmaydi va
@@ -468,8 +489,7 @@ async def mini_chart(sig) -> io.BytesIO | None:
         exit_idx = None
         if exit_price is not None:
             closed_ms = int(closed_at.timestamp() * 1000)
-            exit_idx = min(range(len(candles)),
-                           key=lambda i: abs(candles[i].close_ms - closed_ms))
+            exit_idx = _idx_for_ms(candles, closed_ms)
     else:
         # Birjada bu tiker yo'q (eski sinov signali) yoki narx vaqtincha
         # olinmadi — ro'yxatda bo'sh joy qoldirish o'rniga kirish->chiqish
@@ -549,13 +569,13 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     exit_idx = None
     if exit_price is not None:
         closed_ms = int(closed_at.timestamp() * 1000)
-        exit_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - closed_ms))
+        exit_idx = _idx_for_ms(candles, closed_ms)
 
     # Kirish shami — "pozitsiya izi" uslubi uchun: kirish TO'LIQ KENGLIKDAGI
     # chiziq o'rniga aynan shu shamning ustiga qo'yilgan belgi bilan
     # ko'rsatiladi (`_render()`ga qarang).
     opened_ms = int(opened_at.timestamp() * 1000)
-    entry_idx = min(range(len(candles)), key=lambda i: abs(candles[i].close_ms - opened_ms))
+    entry_idx = _idx_for_ms(candles, opened_ms)
 
     lo = min(c.low for c in candles)
     hi = max(c.high for c in candles)

@@ -3965,3 +3965,67 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi Limit
        signalda "📈 Bot grafikni aniqlasin" tanlansa, grafik xatosiz
        chizilishini kuzatish kerak.
+
+132. **Foydalanuvchi (#131 LINEAUSDT yopilish grafigi skrinshoti bilan):
+     "yana o'sha muammo hal qilinmagan. Tarixdagi narxni aniqlab yopib
+     yuboryabti. Tp orqada kirish oldinda bo'lib qolgan. Bu muammoga
+     yechim bot tarixdagi narxni tekshiryotganida bo'lyabti. Buni
+     kelajakdagi narxni tekshiradigan qilishimiz kerak."** — skrinshotda
+     ENTRY belgisi (△) grafikda EXIT belgisi (▽)dan KEYIN (o'ngda)
+     chiqib qolgan — xronologik jihatdan mumkin emas ko'rinish. Kod
+     bilan tekshirilganda: bu #129/#130'dagi TRACKER (haqiqiy savdo
+     hisob-kitobi) muammosi EMAS — **`chart.py`ning `signal_chart()`
+     GRAFIK CHIZISH funksiyasidagi alohida, mustaqil xato** ekani
+     aniqlandi. `sig["pnl_pct"]`/`sig["r_multiple"]` (chartda ko'rsatilgan
+     +1.98%/+4.46R) to'g'ridan-to'g'ri `tracker.py`dan (haqiqiy, to'g'ri
+     xronologik tartibda hisoblangan) olinadi — GRAFIKDAGI belgilarning
+     JOYI esa ALOHIDA, o'zining xato mantig'i bilan hisoblanadi.
+     - **Ildiz sabab**: `entry_idx`/`exit_idx` "eng yaqin `close_ms`"
+       (mutlaq farq) usulida qidirilardi — CONTAINS (oraliqqa tushish)
+       emas. Matematik isbot: 1 daqiqalik shamning `close_ms`'i doim
+       O'SHA daqiqaning OXIRIDA (`open_ms + dur - 1`), lekin displaydagi
+       KATTAROQ timeframe (masalan 15m, sarlavhada "· 15m" ko'ringan)da
+       — agar maqsad vaqt (`opened_at`, HAR DOIM 1m to'ldirish shamining
+       OCHILISH vaqti, `tracker.py`da `datetime.fromtimestamp(c.open_ms/
+       1000,...)`) o'z 15 daqiqalik shamining BOSHIDA (birinchi yarmida)
+       joylashsa — O'SHA shamning `close_ms`'i emas, balki OLDINGI 15m
+       shamning `close_ms`'i RAQAMIY jihatdan YAQINROQ chiqadi (chunki
+       ikkala masofa yig'indisi `dur`ga teng — kim kichik bo'lsa, o'sha
+       g'olib). `opened_at` DEYARLI HAR DOIM o'z shamining BOSHIDA
+       (chunki u 1 daqiqalik aniqlik bilan yozilgan, 15m shamning
+       BOSHLANISHIGA yaqin bo'lishi ehtimoli katta) — shuning uchun bu
+       KAMDAN-KAM emas, **odatiy** holat edi: `entry_idx` tizimli
+       ravishda HAQIQIYSIDAN OLDINGI shamga siljib qolardi. `closed_at`
+       esa (`c.close_ms`dan yozilgani sabab) o'z shamining OXIRIDA
+       joylashadi — shu sabab `exit_idx` odatda TO'G'RI chiqardi. Bu
+       ANIQ foydalanuvchi ko'rgan naqshni tushuntiradi: exit to'g'ri
+       joyda, entry esa undan OLDINGA (chapga) siljib qolgan.
+     - **Foydalanuvchining "tarixdagi narxni tekshiryapti" tashxisi
+       NOTO'G'RI YO'NALISHDA edi** (haqiqiy sabab tracker emas, chart
+       edi) — lekin muammoning O'ZI (vizual chalkashlik) 100% TASDIQLANDI
+       va tuzatildi.
+     - **Tuzatish**: yangi umumiy `chart._idx_for_ms(candles, target_ms)`
+       — endi maqsad vaqt shamning `[open_ms, close_ms]` oralig'iga
+       TO'G'RIDAN-TO'G'RI TUSHADIGAN shamni qidiradi (topilmasa — oyna
+       chetida bo'lgani uchun — eski "eng yaqin" usulga XAVFSIZ
+       fallback). `signal_chart()`dagi `entry_idx`/`exit_idx` va
+       `mini_chart()`dagi `exit_idx` (bir xil eski xato naqshi bilan)
+       shu yangi funksiyaga o'tkazildi.
+     - Tekshirildi: (1) shamning BOSHIDAGI vaqt — yangi usul TO'G'RI
+       shamga tushishi, ESKI usul bilan SOLISHTIRILGANDA aynan bir
+       oldingi shamni (isbotlangan xato) tanlashi; (2) shamning
+       OXIRIDAGI vaqt — ikkala usul ham to'g'ri (nazorat/regressiya
+       yo'q); (3) oraliqdan tashqaridagi vaqt — xavfsiz fallback,
+       IndexError yo'q; (4) real stsenariy (entry shamning boshida,
+       exit KEYINGI shamning oxirida) — `entry_idx <= exit_idx`
+       KAFOLATLANDI. Barcha oldingi testlar (13/13 tracker + bot.py/
+       chart.py mock testlari) o'zgarishsiz o'tdi. `python3 -m py_compile
+       chart.py` — toza.
+     - **Ta'sir doirasi**: `signal_chart()` (yopilgan signal natija
+       grafigi — HAR YOPILISH postida ishlatiladi) va `mini_chart()`
+       (veb sahifadagi kichik grafik). **Faqat KO'RINISH** — tracker.py,
+       pnl/R hisob-kitobi, yoki bazadagi qiymatlar HECH QANDAY o'zgarmadi
+       va hech qachon noto'g'ri bo'lmagan edi.
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi yopilgan
+       signal grafigida entry belgisi endi to'g'ri (exit'dan OLDIN yoki
+       bir xil joyda) chiqishini kuzatish kerak.
