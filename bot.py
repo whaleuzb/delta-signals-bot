@@ -2270,6 +2270,37 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     d = item["draft"]
     entry_mode = d.get("entry_mode", "limit")
+
+    if entry_mode == "market":
+        # Entry sehrgarda ANCHA OLDIN (yo'nalish tanlangandan keyin) yoki
+        # matn kiritilganda ushlangan bo'lishi mumkin — keyin TP/SL
+        # kiritish, ko'rib chiqish, tasdiqlash bosqichlari VAQT OLADI. Shu
+        # oraliqda (ayniqsa uchuvchan kichik tangalarda) haqiqiy narx
+        # sezilarli o'zgarib ketishi mumkin — natijada TP "hali limitga
+        # kelmasdan" darrov "tegib qolgandek" ko'rinardi, aslida saqlangan
+        # entry ESKIRGAN edi. Shu sabab TASDIQLASH lahzasida (signal DB'ga
+        # yozilishidan OLDIN) narx QAYTA, eng so'nggi (keshsiz) holda
+        # olinadi — kechikish endi faqat tarmoq javobi bilan chegaralanadi.
+        fresh_price = await safe_last_price(d.get("market", "crypto"), d["symbol"], fresh=True)
+        if fresh_price:
+            refreshed = dict(d, entry=fresh_price)
+            err = parsing.validate(refreshed)
+            if err:
+                # Narx shu qadar siljiganki, avval tanlangan TP/SL endi
+                # mantiqsiz (masalan TP allaqachon o'tib ketgan) — signalni
+                # SHUNDAY yaratish o'rniga (darrov "yopilgan" holatda
+                # tug'iladi) to'xtatib, foydalanuvchiga aniq xabar beramiz.
+                await _edit(
+                    q, f"❌ Narx yangilandi (<b>{fmt_price(fresh_price)}</b>), lekin endi "
+                    f"darajalar mantiqan to'g'ri kelmaydi: {err}\n"
+                    "✏️ Tahrirlash orqali qayta kiriting.",
+                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                return
+            d = refreshed
+            item["draft"] = d
+        # Narx olinmasa (tarmoq xatosi) — xavfsiz DAVOM ETAMIZ, eski (ko'rib
+        # chiqilgan) narx bilan — signal umuman yaratilmay qolishidan yaxshi.
+
     # Guruhga yuboriladigan rasm — foydalanuvchi KO'RGANINING AYNI o'zi.
     # send_final_preview() uni Telegram'ga yuklab, file_id'ni saqlab qo'ygan.
     post_file_id = item.get("ready_file_id") or item.get("file_id")

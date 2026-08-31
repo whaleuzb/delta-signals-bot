@@ -3685,3 +3685,75 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi yagona
        TP li signal to'liq TP bilan yopilganda "BE" xabari ENDI
        chiqmasligini kuzatish kerak.
+
+128. **Foydalanuvchi (davomida, #126 haqida): "Hali limitga kelmagandi
+     ham."** — #127'dagi izoh ("TP1'ning tez tegishi o'zi bug emas")
+     NOTO'G'RI chiqdi: foydalanuvchi aslida TP1 (limit/maqsad narx)
+     signal TASDIQLANGAN paytda HALI haqiqatan tegilmagan bo'lishi
+     mumkinligini ta'kidladi — bu #126'ning O'ZIGA emas, balki #126'ni
+     yaratgan #126-oldi o'zgarishga (bugungi "Darhol" tugmasi entry
+     avtomatik tuzatishi, yozuv 126) ISHORA.
+     - **Ildiz sabab — #126 (Darhol/entry avtomatik) tuzatishning o'zi
+       yangi eskirish oynasi ochib qo'ygan edi**: `wizard_side()` entryni
+       yo'nalish TANLANGANDA (2/6-3/6 oralig'ida) DARHOL ushlaydi — lekin
+       shundan keyin foydalanuvchi TP kiritadi, SL kiritadi, ko'rikni
+       ko'radi, rasm tanlaydi, va NIHOYAT "✅ Tasdiqlash" tugmasini
+       bosadi — bu bosqichlar HAQIQIY VAQT oladi (o'nlab soniyadan
+       bir necha daqiqagacha, foydalanuvchining tezligiga qarab). Shu
+       oraliqda (ayniqsa TACUSDT kabi o'ta uchuvchan kichik tangada)
+       haqiqiy narx SEZILARLI siljib ketishi mumkin edi — natijada
+       signal DB'ga yozilganda (kuzatuv shu lahzadan boshlanadi) TP1
+       darajasi HAQIQATDA ALLAQACHON o'tib ketgan bo'lardi (chunki
+       "entry" eskirgan, past qolgan qiymat edi) — kuzatuv birinchi
+       shamda buni "TP1 tegdi" deb to'g'ri qayd etardi, lekin
+       foydalanuvchi TASDIQLASH paytida ko'rgan narx bilan solishtirsa
+       "hali yetmagandi" bo'lib chiqardi. **Matnli tezkor usulda ("...
+       market ...") ham xuddi shu muammo — foydalanuvchi entryni QO'LDA
+       yozgan payt bilan tasdiqlash payti orasida ham vaqt o'tadi.**
+     - **Tuzatish**: `on_button()`ning tasdiqlash blokida (signal
+       `db.create_signal()`ga yozilishidan BIR QADAM OLDIN) —
+       `entry_mode=="market"` bo'lsa, narx YANA, ENG SO'NGGI (keshsiz,
+       `fresh=True`) holda olinadi va `entry` shu YANGI narxga
+       yangilanadi — kechikish endi FAQAT tarmoq javob vaqti bilan
+       chegaralanadi (bir necha soniya emas, millisekund darajasida).
+       Bu wizard'dagi avvalgi (#126) avtomatik-narx bilan ZIDDIYAT
+       EMAS — ikkalasi BIRGA ishlaydi: wizard'dagi erta narx TP/SL
+       kiritishda foydalanuvchiga MO'LJAL (taxminiy son) beradi,
+       tasdiqlash paytidagi narx esa signal uchun HAQIQIY, YAKUNIY
+       qiymat sifatida ishlatiladi.
+       - Agar yangi narx bilan TP/SL endi MANTIQSIZ bo'lib qolsa
+         (masalan narx allaqachon eng yuqori TP'dan ham o'tib ketgan) —
+         signal SHUNDAY (darrov "yopilgan" holatda) YARATILMAYDI,
+         o'rniga foydalanuvchiga aniq xato ko'rsatiladi ("✏️ Tahrirlash
+         orqali qayta kiriting") va qoralama `PENDING`da saqlanib
+         qoladi (qayta urinish yoki tahrirlash uchun) — bu ilgari
+         qo'lda stop o'zgartirishda qo'llangan xuddi shu falsafa
+         ("REJECT bilan aniq xabar, jimgina noto'g'ri qiymat bilan
+         davom etmaslik").
+       - Narx OLINMASA (tarmoq xatosi) — xavfsiz DAVOM ETADI, eski (ko'rib
+         chiqilgan) narx bilan — signal umuman yaratilmay qolishidan
+         yaxshiroq.
+       - **Qamrov ATAYLAB manba-neytral**: tuzatish `on_button()`ning
+         BARCHA manbalar (sehrgar, tezkor matn, rasm/vision) uchun
+         UMUMIY tasdiqlash nuqtasida — shu sabab matnli "market" signal
+         ham xuddi shu himoyani avtomatik oladi, alohida kod kerak
+         bo'lmadi.
+     - Tekshirildi (mock, `unittest.mock` bilan `on_button()`ni
+       to'g'ridan-to'g'ri chaqirib, 4 ta holat): (1) market rejim + yangi
+       narx MANTIQAN to'g'ri — `entry` yangilandi, signal yaratildi;
+       (2) market rejim + yangi narx TP'dan o'tib ketgan — signal
+       YARATILMADI, aniq xato ko'rsatildi, `PENDING`da qoldi; (3) market
+       rejim + narx olinmadi (`None`) — xavfsiz ESKI narx bilan davom
+       etdi; (4) limit rejim — `safe_last_price` UMUMAN chaqirilmadi
+       (assert bilan tekshirildi), o'zgarishsiz. `python3 -m py_compile
+       bot.py parsing.py tracker.py` — toza. `test_tracker.py` 12/12
+       (bu o'zgarish tracker.py'ga tegmaydi, regressiya yo'q).
+     - **Ta'sir doirasi**: FAQAT `entry_mode=="market"` (Darhol) signallar
+       — limit rejim butunlay tegilmadi.
+     - **Ishlashi Railway logi orqali TEKSHIRILMAGAN** — keyingi "Darhol"
+       signalda tasdiqlash lahzasidagi narx to'g'ri olinganini va (agar
+       kerak bo'lsa) mantiqsiz holatda signal to'xtatilganini kuzatish
+       kerak. **#128 hali ham to'liq oldini olmaydi**: agar foydalanuvchi
+       "Tasdiqlash" tugmasini bosgan MILLISEKUNDDA narx harakatlansa
+       (real tarmoq kechikishi), nazariy jihatdan ozgina eskirish qoladi
+       — bu endi amaliy jihatdan e'tiborga olinmaydigan darajada.
