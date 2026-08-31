@@ -4254,3 +4254,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        paytida shakllanayotgan shamda bo'lsa ham) 1-2 poll ichida
        "ENTRY TO'LDI" logi chiqishi kerak, "PENDING, entryga TEGMADI"da
        abadiy qolib ketmasligi kerak.
+
+137. **Foydalanuvchi: "bekor qilish tugmasi va entryni o'zgartirish
+     tugmasini qo'sh."** — PENDING (hali entryga tegmagan) signalning
+     boshqaruv oynasida (`manage_view()`) ilgari faqat stop/maqsad
+     o'zgartirish va umumiy "🔒 To'liq yopish" tugmasi bor edi — PENDING
+     uchun ma'nosi noaniq ("to'liq yopish" pozitsiya hali OCHILMAGANDA
+     chalkash) va entry narxini tuzatishning umuman iloji yo'q edi
+     (masalan xato yozilgan bo'lsa, faqat butun signalni bekor qilib
+     qaytadan yaratish kerak edi).
+     - `manage_view()`: `pending = sig["status"] == "PENDING"` — PENDING
+       bo'lsa (sl mavjud yoki `sl=None` — ikkala holatda ham) endi
+       "✏️ Entry" tugmasi qo'shildi. "🔒 To'liq yopish" tugmasi PENDINGda
+       "❌ Bekor qilish" deb ko'rsatiladi (xuddi shu `close:` callback —
+       `close_now()` PENDING uchun ALLAQACHON `db.cancel_signal()`
+       chaqirardi, faqat matni chalkash edi; backend o'zgarmadi, faqat
+       aniqroq nom).
+     - Yangi `on_manage_entry()` (`mentry:{sid}`) — `AWAITING_ENTRY[uid]`
+       o'rnatadi, `✏️ Stop` bilan bir xil andozada yangi narx so'raydi.
+       Faqat PENDING'da ishlaydi (ACTIVE bo'lsa — entry ALLAQACHON
+       bajarilgan, o'zgartirish ma'nosiz — aniq xabar bilan rad etiladi).
+     - `handle_manage_input()`ga yangi shoxobcha: narxni tekshiradi
+       (musbat, eski entrydan 0.5x–1.5x oralig'ida — xato yozuvni
+       tutish uchun, `✏️ Stop` bilan bir xil himoya), agar `sl` allaqachon
+       mavjud bo'lsa (tezkor matn usulida yaratilgan Limit) yangi entry
+       mavjud SL/TP bilan `parsing.validate()` orqali mantiqan mos
+       kelishini ham tekshiradi (masalan LONG uchun SL entrydan baland
+       bo'lib qolmasin). `db.set_entry()` — yangi, faqat `status='PENDING'`
+       bo'lganda ishlaydi.
+     - Tekshirildi (scratchpad mock testlar, haqiqiy DB/Telegram'siz):
+       (1) 4 holatning barchasida (`PENDING`/`sl bor`, `ACTIVE`/`sl bor`,
+       `PENDING`/`sl=None`, `ACTIVE`/`sl=None`) tugmalar TO'G'RI
+       ko'rsatiladi/yashiriladi; (2) `handle_manage_input()`ning Entry
+       shoxobchasi — noto'g'ri raqam, juda uzoq narx, mavjud SL/TP bilan
+       mantiqsiz narx barchasi rad etiladi (aniq xabar bilan, qayta
+       so'raladi), to'g'ri narx saqlanadi va guruhga xabar boradi, ACTIVE
+       signalda butunlay rad etiladi.
+     - Sxema o'zgarishi YO'Q — `entry` ustuni allaqachon mavjud, faqat
+       yangi `UPDATE` funksiyasi qo'shildi. `test_tracker.py` 15/15
+       o'zgarishsiz (bu o'zgarish faqat `bot.py`/`db.py`da,
+       `tracker.py`ga tegmaydi).

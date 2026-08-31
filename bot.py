@@ -730,6 +730,7 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
 # admin id -> signal_id (yangi stop / yangi maqsadlar kutilmoqda)
 AWAITING_SL: dict[int, int] = {}
 AWAITING_TPS: dict[int, int] = {}
+AWAITING_ENTRY: dict[int, int] = {}
 # admin id -> signal_id — Limit rejimida entry to'ldi, lekin TP/SL HALI
 # UMUMAN kiritilmagan (`AWAITING_TPS`dan farqli — u ALLAQACHON mavjud
 # TP'larni o'zgartirish uchun, bu esa BIRINCHI marta joylashtirish uchun).
@@ -738,15 +739,27 @@ AWAITING_TPSL: dict[int, int] = {}
 
 async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
     entry = float(sig["entry"])
+    sid = sig["id"]
+    # PENDING — signal hali entryga TEGMAGAN (limit hali bajarilmagan).
+    # Shu holatda "bekor qilish" (endi urinib ko'rmaymiz) va "entry
+    # o'zgartirish" (narx noto'g'ri kiritilgan yoki bozor siljigan bo'lsa)
+    # mantiqiy — ACTIVE bo'lgandan keyin esa entry ALLAQACHON bajarilgan
+    # hisoblanadi, uni "o'zgartirish" ma'nosiz.
+    pending = sig["status"] == "PENDING"
     if sig["sl"] is None:
-        # Limit to'ldi, lekin TP/SL HALI kiritilmagan (limit-keyin-TP/SL
-        # oqimi) — pastdagi boshqaruv (stop/maqsad o'zgartirish, qisman
-        # yopish) TP/SL borligini kutadi, shuning uchun bu yerda mavjud
-        # emas. Foydalanuvchini to'g'ridan-to'g'ri TP/SL kiritishga
-        # yo'naltiramiz.
-        rows = [[InlineKeyboardButton("📐 TP/SL kiriting", callback_data=f"tpsl:{sig['id']}")],
-                [InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]]
-        return (f"⚙️ <b>#{sig['id']} {sig['symbol']} {sig['side']}</b>\n"
+        # Limit to'ldi (yoki hali kutilmoqda), lekin TP/SL HALI
+        # kiritilmagan (limit-keyin-TP/SL oqimi) — pastdagi boshqaruv
+        # (stop/maqsad o'zgartirish, qisman yopish) TP/SL borligini
+        # kutadi, shuning uchun bu yerda mavjud emas. Foydalanuvchini
+        # to'g'ridan-to'g'ri TP/SL kiritishga yo'naltiramiz.
+        rows = [[InlineKeyboardButton("📐 TP/SL kiriting", callback_data=f"tpsl:{sid}")]]
+        if pending:
+            rows.append([
+                InlineKeyboardButton("✏️ Entry", callback_data=f"mentry:{sid}"),
+                InlineKeyboardButton("❌ Bekor qilish", callback_data=f"close:{sid}"),
+            ])
+        rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+        return (f"⚙️ <b>#{sid} {sig['symbol']} {sig['side']}</b>\n"
                 f"Kirish: <b>{fmt_price(entry)}</b>\n\n"
                 "<i>TP/SL hali kiritilmagan.</i>"), InlineKeyboardMarkup(rows)
     filled = float(sig["filled_pct"])
@@ -770,20 +783,25 @@ async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
     else:
         lines.append("<i>Joriy narx olinmadi</i>")
 
-    sid = sig["id"]
     be = " ✓" if abs(float(sig["sl"]) - entry) < 1e-12 else ""
     rows = [
         [InlineKeyboardButton(f"🛡 Stop → breakeven{be}", callback_data=f"mbe:{sid}"),
          InlineKeyboardButton("✏️ Stop", callback_data=f"msl:{sid}")],
         [InlineKeyboardButton("🎯 Maqsadlarni o'zgartirish", callback_data=f"mtp:{sid}")],
     ]
+    if pending:
+        rows.append([InlineKeyboardButton("✏️ Entry", callback_data=f"mentry:{sid}")])
     if sig["status"] == "ACTIVE" and filled < 0.999:
         rows.append([
             InlineKeyboardButton("✂️ 25%", callback_data=f"mpc:{sid}:25"),
             InlineKeyboardButton("✂️ 50%", callback_data=f"mpc:{sid}:50"),
             InlineKeyboardButton("✂️ 75%", callback_data=f"mpc:{sid}:75"),
         ])
-    rows.append([InlineKeyboardButton("🔒 To'liq yopish", callback_data=f"close:{sid}")])
+    # PENDING'da "yopish" tushunchasi yo'q (pozitsiya hali OCHILMAGAN) —
+    # xuddi shu tugma (close:) close_now()da PENDING uchun ALLAQACHON
+    # bekor qilish sifatida ishlaydi, faqat matni aniqroq qilib ko'rsatiladi.
+    rows.append([InlineKeyboardButton(
+        "❌ Bekor qilish" if pending else "🔒 To'liq yopish", callback_data=f"close:{sid}")])
     rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
@@ -880,6 +898,23 @@ async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(
         f"✏️ #{sig['id']} {sig['symbol']} uchun <b>yangi stop</b> narxini yozing.\n"
         f"Hozirgi: <code>{fmt_price(float(sig['sl']))}</code>\n\n"
+        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+
+
+async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _manage_guard(q)
+    if not sig:
+        return
+    if sig["status"] != "PENDING":
+        await q.answer("Entry faqat hali tegmagan (PENDING) signalda o'zgartiriladi.",
+                       show_alert=True)
+        return
+    AWAITING_ENTRY[q.from_user.id] = sig["id"]
+    await q.edit_message_text(
+        f"✏️ #{sig['id']} {sig['symbol']} uchun <b>yangi entry (limit)</b> narxini yozing.\n"
+        f"Hozirgi: <code>{fmt_price(float(sig['entry']))}</code>\n\n"
         "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
 
 
@@ -1028,6 +1063,49 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
                             f"🎯 <b>#{sig_id} {sig['symbol']}</b> — maqsadlar "
                             f"yangilandi: <b>{shown}</b>")
         await msg.reply_text(f"✅ Maqsadlar: <b>{shown}</b>",
+                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        return True
+
+    sig_id = AWAITING_ENTRY.pop(uid, None)
+    if sig_id:
+        sig = await db.get_signal(sig_id)
+        if not sig or sig["status"] != "PENDING":
+            await msg.reply_text(
+                "Signal allaqachon bajarilgan yoki yopilgan — entry endi o'zgarmaydi.",
+                reply_markup=MENU_BACK_KB)
+            return True
+        price = _parse_price(text)
+        if price is None or price <= 0:
+            AWAITING_ENTRY[uid] = sig_id
+            await msg.reply_text("Noto'g'ri raqam. Qayta kiriting yoki /bekor.")
+            return True
+        old_entry = float(sig["entry"])
+        # Eski entrydan juda uzoq qiymat deyarli doim xato yozuv — bejiz
+        # noto'g'ri narxda signal "aktivlashtirib" yuborilmasligi uchun.
+        if not (old_entry * 0.5 <= price <= old_entry * 1.5):
+            AWAITING_ENTRY[uid] = sig_id
+            await msg.reply_text("Bu narx eski entrydan juda uzoq. "
+                                  "Tekshiring yoki /bekor.")
+            return True
+        if sig["sl"] is not None:
+            err = parsing.validate({
+                "entry": price, "sl": float(sig["sl"]),
+                "tps": [float(t) for t in sig["tps"]], "side": sig["side"],
+            })
+            if err:
+                AWAITING_ENTRY[uid] = sig_id
+                await msg.reply_text(
+                    f"❌ {err}\nMavjud stop/maqsadlar bilan mos kelmayapti. "
+                    "Boshqa narx kiriting yoki /bekor.")
+                return True
+        ws = await db.get_workspace(sig["workspace_id"])
+        if not ws or not can_manage(uid, ws):
+            return True
+        await db.set_entry(sig_id, price)
+        await notify_group(ctx, ws, sig,
+                            f"✏️ <b>#{sig_id} {sig['symbol']}</b> — entry "
+                            f"<b>{fmt_price(price)}</b> ga o'zgartirildi")
+        await msg.reply_text(f"✅ Entry <b>{fmt_price(price)}</b> ga o'rnatildi.",
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
 
@@ -3009,6 +3087,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_ALLOC.pop(update.effective_user.id, None)
     AWAITING_SIGNAL_PHOTO.pop(update.effective_user.id, None)
     AWAITING_SL.pop(update.effective_user.id, None)
+    AWAITING_ENTRY.pop(update.effective_user.id, None)
     AWAITING_TPS.pop(update.effective_user.id, None)
     AWAITING_TPSL.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
@@ -5724,6 +5803,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_manage, pattern=r"^mng:"))
     app.add_handler(CallbackQueryHandler(on_manage_be, pattern=r"^mbe:"))
     app.add_handler(CallbackQueryHandler(on_manage_sl, pattern=r"^msl:"))
+    app.add_handler(CallbackQueryHandler(on_manage_entry, pattern=r"^mentry:"))
     app.add_handler(CallbackQueryHandler(on_manage_tp, pattern=r"^mtp:"))
     app.add_handler(CallbackQueryHandler(on_manage_partial, pattern=r"^mpc:"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))

@@ -859,6 +859,16 @@ async def set_tps(sig_id: int, tps: list[float]) -> None:
             sig_id, [_d(t) for t in tps])
 
 
+async def set_entry(sig_id: int, entry: float) -> None:
+    """Hali TEGMAGAN (PENDING) signalning limit narxini o'zgartiradi.
+    Faqat PENDING'da ma'noli — ACTIVE bo'lgach entry ALLAQACHON bajarilgan
+    hisoblanadi (`process()` uni endi tekshirmaydi)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE signals SET entry=$2 WHERE id=$1 AND status='PENDING'",
+            sig_id, _d(entry))
+
+
 async def set_signal_excluded(sig_id: int, excluded: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET excluded=$2 WHERE id=$1", sig_id, excluded)
