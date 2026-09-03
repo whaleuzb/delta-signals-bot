@@ -807,10 +807,19 @@ def macd_chart(candles, symbol: str, tf: str, direction: str,
 
     ax.set_ylim(lo, hi)
     for a in (ax, axm):
-        a.set_xlim(-1.5, len(candles) + max(2.0, len(candles) * 0.04))
+        # O'ngdan bo'sh joy: oxirgi sham ramkaning chekkasiga TIQILIB
+        # qolmasligi kerak (foydalanuvchi: "chart burchakka tiqilib
+        # qolgan, ozroq o'rtaroqqa surish kerak") — 12% zaxira kesishma
+        # shamini va uning belgisini bemalol ko'rsatadi.
+        a.set_xlim(-1.5, len(candles) - 1 + max(4.0, len(candles) * 0.12))
         a.grid(True, color=GRID, lw=0.6, alpha=0.6)
         a.set_xticks([])
         a.tick_params(colors=TXT, labelsize=9)
+        # Narx yorliqlari O'NG tomonda — foydalanuvchi namunasidagi
+        # (Bulltard/TradingView) kabi: trader oxirgi narxni grafikning
+        # o'ng chetida, joriy sham yonida ko'rishga o'rgangan.
+        a.yaxis.tick_right()
+        a.yaxis.set_label_position("right")
         for spine in a.spines.values():
             spine.set_color(GRID)
 
@@ -826,7 +835,9 @@ def macd_chart(candles, symbol: str, tf: str, direction: str,
     fig.text(0.97, 0.955, title, fontsize=13, fontweight="bold", color=col,
              ha="right")
 
-    fig.subplots_adjust(left=0.062, right=0.985, top=0.885, bottom=0.05)
+    # Narx yorliqlari o'ngga ko'chgani uchun chap chekka torayadi, o'ng
+    # chekkada esa ularga joy ochiladi.
+    fig.subplots_adjust(left=0.022, right=0.925, top=0.885, bottom=0.05)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
