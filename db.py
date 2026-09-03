@@ -304,6 +304,23 @@ CREATE TABLE IF NOT EXISTS market_hashtags (
 -- mavjud ham emas.
 ALTER TABLE signals ALTER COLUMN sl DROP NOT NULL;
 ALTER TABLE signals ALTER COLUMN sl_initial DROP NOT NULL;
+
+-- MACD kesishmasi xabarlari uchun takrorlanishni bloklash. Skaner har
+-- necha daqiqada QAYTA ishga tushadi va AYNAN O'SHA yopilgan sham hamon
+-- "kesishma" bo'lib turadi — kalitsiz har skanerda bir xil xabar qayta
+-- yuborilardi. Kalit `symbol+timeframe+candle_open_ms`: bitta juftlikning
+-- bitta timeframe'idagi bitta shami FAQAT BIR MARTA postlanadi.
+-- `direction` faqat ma'lumot uchun (statistika/tekshiruv), kalitga
+-- kirmaydi — bitta shamda ikkala yo'nalish bo'lishi mumkin emas.
+CREATE TABLE IF NOT EXISTS macd_alerts (
+    symbol         TEXT        NOT NULL,
+    timeframe      TEXT        NOT NULL,
+    candle_open_ms BIGINT      NOT NULL,
+    direction      TEXT        NOT NULL,
+    posted_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (symbol, timeframe, candle_open_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_macd_alerts_posted ON macd_alerts(posted_at);
 """
 
 
@@ -1170,6 +1187,35 @@ async def econ_mark_sent(kind: str, event_key: str) -> None:
         await c.execute(
             "INSERT INTO econ_calendar_state (kind, event_key) VALUES ($1,$2) "
             "ON CONFLICT (kind, event_key) DO NOTHING", kind, event_key)
+
+
+# ───────────────── MACD kesishmasi (dedup) ─────────────────
+
+async def claim_macd_alert(symbol: str, timeframe: str, candle_open_ms: int,
+                            direction: str) -> bool:
+    """Shu (symbol, timeframe, sham) uchun xabar BIRINCHI marta
+    yuborilyaptimi — shuni ATOMAR aniqlaydi va darhol "band" qilib qo'yadi.
+
+    `INSERT ... ON CONFLICT DO NOTHING` ataylab: "avval tekshirib, keyin
+    yozish" ikki bosqichli bo'lgani uchun ikkita skaner bir vaqtda ishga
+    tushsa (masalan deploy paytida eski va yangi jarayon ustma-ust kelsa)
+    bir xil xabar IKKI MARTA ketishi mumkin edi. Bu yerda esa qaysi biri
+    yozuvni birinchi kiritsa — o'shanda True, ikkinchisida False."""
+    async with pool().acquire() as c:
+        r = await c.execute(
+            "INSERT INTO macd_alerts (symbol, timeframe, candle_open_ms, direction) "
+            "VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+            symbol, timeframe, candle_open_ms, direction)
+    return r.endswith("1")
+
+
+async def purge_old_macd_alerts(days: int = 30) -> None:
+    """Eski dedup yozuvlarini tozalash — jadval cheksiz o'smasligi uchun.
+    `volume_snapshots`dagi bilan bir xil yondashuv (alohida job kerak
+    emas, skanerning o'zi davriy chaqiradi)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            f"DELETE FROM macd_alerts WHERE posted_at < now() - interval '{int(days)} days'")
 
 
 # ───────────────── Hajm portlashi (volume surge) ─────────────────

@@ -4294,3 +4294,73 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yangi `UPDATE` funksiyasi qo'shildi. `test_tracker.py` 15/15
        o'zgarishsiz (bu o'zgarish faqat `bot.py`/`db.py`da,
        `tracker.py`ga tegmaydi).
+
+138. **Foydalanuvchi (Bulltard.com kanali skrinshoti bilan): "Biz ham
+     shunaqa chart va shunaqa indikator qo'shilgan alohida keladigan
+     xabar qo'sha olamizmi?"** — MACD kesishmasi skaneri qo'shildi: top
+     hajmli juftliklarda MACD(12,26,9) chizig'i signal chizig'ini kesib
+     o'tsa, sham grafigi + MACD paneli bilan `NEWS_CHANNEL_ID` kanaliga
+     alohida xabar.
+     - **Foydalanuvchi tanlovlari** (so'ralib aniqlangan): juftliklar —
+       24s hajmi $10M dan yuqorilari (surge skaneridagi bilan bir xil
+       mantiq); timeframe — **4h va 1d** (30m ataylab OLINMADI: kuniga
+       100-200 xabar spamga aylanardi); kanal — mavjud NEWS kanali
+       (yangi kanal ochilmadi).
+     - **`indicators.py` (YANGI, kutubxonasiz)**: `ema()`, `macd()`,
+       `crossover()`, `is_strong()`. Sof Python — `numpy`/`pandas`
+       qo'shilmadi (requirements.txt o'zgarmadi). `is_strong()` —
+       "super" kesishma: (1) kesishma nol chizig'ining TO'G'RI tomonida
+       (trend yo'nalishi bo'yicha), (2) gistogramma oxirgi 20 ustunning
+       o'rtacha mutlaq qiymatidan katta (shovqin emas).
+     - **`chart.py` -> `macd_chart()`**: ikki panel bitta x-o'qida —
+       yuqorida shamlar (`_draw_candles` QAYTA ISHLATILDI, yangi chizish
+       kodi yozilmadi), pastda MACD/signal chiziqlari + rangli
+       gistogramma. Kesishma shami ikkala panelda vertikal chiziq bilan
+       belgilanadi. Hajm profili ATAYLAB chizilmaydi (MACD paneliga joy
+       kerak va bu yerda profilning ma'nosi yo'q).
+     - **TEZLIK CHEGARASI — asosiy dizayn qarori**: 250 juftlik x 2
+       timeframe = har skanerda 500 so'rov bo'lardi. Lekin 4h shami har
+       4 soatda, 1d shami kuniga BIR MARTA yopiladi — yopilmagan sham
+       bo'yicha qayta skanerlash mutlaqo keraksiz. Shu sabab job har
+       `MACD_SCAN_SECONDS` (300s) uyg'onadi, lekin har timeframe uchun
+       oxirgi skanerlangan sham chegarasi `bot_settings`da saqlanadi va
+       YANGI sham yopilmagan bo'lsa job **birjaga bitta ham so'rov
+       yubormasdan** darhol qaytadi. Natijada kuniga ~1750 so'rov
+       (6x4h + 1x1d skaner), har biri `MACD_CONCURRENCY=5` bilan
+       cheklangan.
+     - **Faqat YOPILGAN sham**: `_last_closed_open_ms()` joriy
+       (shakllanayotgan) shamni ATAYLAB hisobga olmaydi va
+       `_macd_check_symbol()` `c.open_ms <= expected_open_ms` bo'yicha
+       filtrlaydi — bu #136 (signal #134) dagi bilan AYNAN BIR XIL
+       tamoyil: yopilmagan shamning low/high/close'i hali yakuniy emas,
+       MACD ham o'zgarib turadi.
+     - **Takrorni bloklash ATOMAR**: yangi `macd_alerts` jadvali
+       (PRIMARY KEY `symbol+timeframe+candle_open_ms`), `claim_macd_
+       alert()` esa `INSERT ... ON CONFLICT DO NOTHING` — "avval
+       tekshir, keyin yoz" ikki bosqichli bo'lgani uchun deploy paytida
+       ikki jarayon ustma-ust kelsa bir xil xabar IKKI marta ketishi
+       mumkin edi; endi qaysi biri yozuvni birinchi kiritsa — faqat
+       o'sha postlaydi. 30 kundan eski yozuvlar skanerning o'zi
+       tomonidan tozalanadi (alohida job kerak emas).
+     - Tekshirildi: (1) `indicators.py` — 12 ta holat (EMA
+       o'zgarmas/monoton, MACD nol/musbat, bullish va bearish kesishma
+       aniqlanishi, `is_strong` nol chizig'i sharti, bo'sh/qisqa
+       ro'yxatlarda yiqilmaslik); (2) `macd_chart()` — haqiqiy PNG
+       chiqarildi va KO'RIB tekshirildi; (3) **HAQIQIY Postgres** bilan
+       11 ta holat: MIGRATE o'tishi, ustunlar, birinchi/takroriy
+       chaqiruv, boshqa timeframe/juftlik mustaqilligi, **5 ta parallel
+       chaqiruvdan faqat bittasi True**, eski yozuv tozalanishi, MIGRATE
+       idempotentligi; (4) to'liq `macd_scan_job()` oqimi soxta birja va
+       soxta Telegram bilan — 11 ta holat, jumladan **ikkinchi
+       chaqiruvda birjaga umuman so'rov yuborilmasligi** va belgi
+       tozalansa ham dedup jadvali takrorni bloklashi.
+       `test_tracker.py` 15/15 o'zgarishsiz.
+     - Sozlamalar: `MACD_TIMEFRAMES` (4h,1d), `MACD_SCAN_SECONDS` (300),
+       `MACD_MIN_VOLUME_USD` (10M), `MACD_MAX_SYMBOLS` (200),
+       `MACD_CONCURRENCY` (5), `MACD_CANDLES` (120), `MACD_ONLY_STRONG`
+       (0 — yoqilsa faqat "super" kesishmalar, xabar soni keskin
+       kamayadi).
+     - **Ishlashi Railway logi orqali TEKSHIRILISHI SHART** — keyingi
+       4h sham yopilgandan keyin (UTC 00/04/08/12/16/20:00) logda
+       "MACD skaner: 4h — N juftlikdan M ta kesishma" qatori chiqishi
+       kerak.

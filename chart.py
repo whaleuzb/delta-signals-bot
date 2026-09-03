@@ -753,3 +753,83 @@ def surge_profile_chart(candles, news_idx: int, symbol: str, live_pct: float,
     plt.close(fig)
     buf.seek(0)
     return buf
+
+
+# --- MACD kesishmasi uchun: narx + MACD paneli ---
+# Foydalanuvchi namunasi (Bulltard.com kanali): yuqorida sham grafigi,
+# pastida alohida MACD paneli (MACD chizig'i, signal chizig'i va
+# gistogramma). `news_chart()`dan farqi — bu yerda IKKI panel bor va
+# ular bir xil x-o'qini baham ko'radi; hajm profili chizilmaydi (MACD
+# paneli uchun joy kerak va bu yerda profilning ma'nosi yo'q).
+def macd_chart(candles, symbol: str, tf: str, direction: str,
+               macd_line: list[float], signal_line: list[float],
+               hist: list[float], strong: bool = False) -> io.BytesIO:
+    """`macd_line`/`signal_line`/`hist` — `indicators.macd()` natijasi,
+    uzunligi `candles` bilan BIR XIL bo'lishi kerak (chaqiruvchi ikkalasini
+    ham bir xil manbadan hisoblaydi). `direction` — "bullish"/"bearish",
+    kesishma belgisi va sarlavha rangi shunga qarab tanlanadi."""
+    fig, (ax, axm) = plt.subplots(
+        2, 1, figsize=(9, 6.2), dpi=160, sharex=True,
+        gridspec_kw={"height_ratios": [2.6, 1], "hspace": 0.06})
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+    axm.set_facecolor(BG)
+
+    lo = min(c.low for c in candles)
+    hi = max(c.high for c in candles)
+    pad = (hi - lo) * 0.08 or hi * 0.01
+    lo -= pad
+    hi += pad
+
+    _draw_candles(ax, candles, hi, lo)
+
+    col = GREEN if direction == "bullish" else RED
+    idx = len(candles) - 1
+
+    # Kesishma shami — ikkala panelda ham bir xil vertikal chiziq bilan
+    # belgilanadi (foydalanuvchi qaysi shamda sodir bo'lganini darhol
+    # ko'rishi uchun).
+    for a in (ax, axm):
+        a.axvline(idx, color=col, lw=1.1, ls="--", alpha=0.85, zorder=1)
+
+    last_close = candles[-1].close
+    ax.scatter([idx], [last_close], color=col, s=70, zorder=5,
+               edgecolor=BG, linewidth=1.3)
+
+    # --- MACD paneli ---
+    xs = list(range(len(candles)))
+    axm.axhline(0, color=GRID, lw=0.9, alpha=0.9)
+    for i, h in enumerate(hist):
+        axm.bar(i, h, width=0.7, color=(GREEN if h >= 0 else RED), alpha=0.55,
+                linewidth=0)
+    axm.plot(xs, macd_line, color=ACC, lw=1.3, zorder=3)
+    axm.plot(xs, signal_line, color="#f0a12e", lw=1.2, zorder=3)
+
+    ax.set_ylim(lo, hi)
+    for a in (ax, axm):
+        a.set_xlim(-1.5, len(candles) + max(2.0, len(candles) * 0.04))
+        a.grid(True, color=GRID, lw=0.6, alpha=0.6)
+        a.set_xticks([])
+        a.tick_params(colors=TXT, labelsize=9)
+        for spine in a.spines.values():
+            spine.set_color(GRID)
+
+    axm.text(0.012, 0.86, "MACD 12·26·9", transform=axm.transAxes,
+             color=TXT, fontsize=8.5, fontweight="bold")
+
+    title = "MACD Bullish crossover" if direction == "bullish" else "MACD Bearish crossover"
+    if strong:
+        title = ("MACD Super bullish crossover" if direction == "bullish"
+                 else "MACD Super bearish crossover")
+    fig.text(0.045, 0.958, symbol, fontsize=16, fontweight="bold", color=TITLE)
+    fig.text(0.045, 0.928, f"· {tf}", fontsize=11, color=TXT)
+    fig.text(0.97, 0.955, title, fontsize=13, fontweight="bold", color=col,
+             ha="right")
+
+    fig.subplots_adjust(left=0.062, right=0.985, top=0.885, bottom=0.05)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf

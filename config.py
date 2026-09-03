@@ -188,3 +188,35 @@ TELEGRAM_NEWS_CHANNELS = [
 # EMAS) kunlik limit ~50,000 so'zgacha ko'tariladi. Shaxsiy email emas —
 # faqat shu loyiha uchun umumiy/tasodifiy manzil.
 TRANSLATE_EMAIL = os.getenv("TRANSLATE_EMAIL", "newstradeai.bot@tradecontroller.app")
+
+# --- MACD kesishmasi skaneri (foydalanuvchi so'rovi — Bulltard.com
+#     kanali namunasi: "$CATI/USDT (1d) MACD Bearish crossover") ---
+#     Top hajmli juftliklar bo'yicha 4h va 1d shamlarida MACD(12,26,9)
+#     kesishmasi topilsa, grafik bilan NEWS_CHANNEL_ID kanaliga post.
+#     NEWS_CHANNEL_ID bo'sh bo'lsa butun funksiya o'chiq (boshqa
+#     skanerlar bilan bir xil qoida).
+#
+#     MUHIM — TEZLIK CHEGARASI: skaner har chaqirilganda YUZLAB juftlikni
+#     so'ramaydi. 4h shami har 4 soatda, 1d shami kuniga bir marta
+#     YOPILADI — yopilmagan sham uchun qayta skanerlashning ma'nosi yo'q.
+#     Shu sabab job tez-tez (MACD_SCAN_SECONDS) uyg'onadi, lekin haqiqiy
+#     so'rovlarni FAQAT yangi sham yopilgan bo'lsa yuboradi (oxirgi
+#     skanerlangan sham chegarasi `bot_settings`da saqlanadi).
+MACD_TIMEFRAMES = [t.strip() for t in
+                    os.getenv("MACD_TIMEFRAMES", "4h,1d").split(",") if t.strip()]
+MACD_SCAN_SECONDS = int(os.getenv("MACD_SCAN_SECONDS", "300"))
+# Skanerlanadigan juftliklar: 24 soatlik hajmi shu chegaradan yuqorilari
+# (hajm portlashi skaneridagi bilan bir xil mantiq — likvidligi past
+# juftliklarda MACD signali ishonchsiz).
+MACD_MIN_VOLUME_USD = float(os.getenv("MACD_MIN_VOLUME_USD", "10000000"))
+# Eng ko'p nechta juftlik skanerlanadi (hajm bo'yicha yuqoridan) — MEXC
+# tezlik chegarasiga zarba bermaslik uchun qattiq shift.
+MACD_MAX_SYMBOLS = int(os.getenv("MACD_MAX_SYMBOLS", "200"))
+# Bir vaqtda nechta klines so'rovi (sekin, lekin xavfsiz).
+MACD_CONCURRENCY = int(os.getenv("MACD_CONCURRENCY", "5"))
+# Grafikda ko'rsatiladigan sham soni (MACD 26+9 shamdan keyin ishonchli
+# bo'lgani uchun kamida 60 kerak).
+MACD_CANDLES = int(os.getenv("MACD_CANDLES", "120"))
+# TRUE bo'lsa faqat "super" (trend yo'nalishi bo'yicha, kuchli
+# gistogramma) kesishmalar postlanadi — xabar sonini keskin kamaytiradi.
+MACD_ONLY_STRONG = os.getenv("MACD_ONLY_STRONG", "0") == "1"

@@ -38,6 +38,7 @@ import db
 import econcalendar
 import exchange
 import forex
+import indicators
 import liquidations
 import listings
 import news
@@ -5191,6 +5192,172 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
 
 
+# ─────────────────────────── MACD kesishmasi ───────────────────────────
+# Foydalanuvchi so'rovi (Bulltard.com kanali namunasi: "$CATI/USDT (1d)
+# MACD Bearish crossover, Last price: 0.05176" + sham grafigi va MACD
+# paneli): top hajmli juftliklarda MACD(12,26,9) chizig'i signal
+# chizig'ini kesib o'tsa — grafik bilan alohida xabar.
+#
+# TEZLIK CHEGARASI bo'yicha asosiy qaror: 4h shami har 4 soatda, 1d shami
+# kuniga bir marta YOPILADI. Yopilmagan sham bo'yicha qayta-qayta
+# skanerlash 250 ta juftlikka yuzlab keraksiz so'rov degani. Shu sabab
+# job tez-tez uyg'onadi, lekin har timeframe uchun OXIRGI SKANERLANGAN
+# sham chegarasi (`bot_settings`da) saqlanadi — yangi sham yopilmagan
+# bo'lsa job HECH QANDAY so'rov yubormasdan darhol qaytadi.
+
+def _last_closed_open_ms(tf: str, now_ms: int) -> int:
+    """Shu paytda TO'LIQ YOPILGAN oxirgi shamning ochilish vaqti.
+    Hali shakllanayotgan (joriy) sham ATAYLAB hisobga olinmaydi — uning
+    low/high/close'i hali yakuniy emas, MACD ham o'zgarib turadi (bu
+    signal #134'dagi bilan bir xil tamoyil)."""
+    step = chart.TF_MINUTES[tf] * 60_000
+    return (now_ms // step) * step - step
+
+
+async def _macd_symbols() -> list[str]:
+    """Skanerlanadigan juftliklar — 24 soatlik hajmi bo'yicha yuqoridan
+    `MACD_MAX_SYMBOLS` tagacha, `MACD_MIN_VOLUME_USD` chegarasidan
+    yuqorilari. Hajm surati BITTA so'rovda olinadi."""
+    vols = await exchange.volume_ticker_24hr()
+    rows = [(s, v) for s, v in vols.items()
+            if s.endswith(config.QUOTE) and v >= config.MACD_MIN_VOLUME_USD]
+    rows.sort(key=lambda r: r[1], reverse=True)
+    return [s for s, _ in rows[:config.MACD_MAX_SYMBOLS]]
+
+
+async def _macd_check_symbol(symbol: str, tf: str, expected_open_ms: int):
+    """Bitta juftlik/timeframe — kesishma bo'lsa ma'lumot qaytaradi.
+
+    `expected_open_ms` — kutilayotgan OXIRGI YOPILGAN sham. Birjadan
+    kelgan oxirgi sham undan boshqa bo'lsa (masalan hali yopilmagan
+    sham qaytgan, yoki juftlikda savdo bo'lmagan) — bu juftlik jimgina
+    o'tkazib yuboriladi."""
+    step = chart.TF_MINUTES[tf] * 60_000
+    start_ms = expected_open_ms - step * (config.MACD_CANDLES - 1)
+    candles = await exchange.klines(symbol, start_ms, limit=config.MACD_CANDLES,
+                                     tf=tf, end_ms=expected_open_ms + step - 1)
+    # Hali yopilmagan shamlar tashlab yuboriladi (#134 tamoyili).
+    candles = [c for c in candles if c.open_ms <= expected_open_ms]
+    if len(candles) < 40 or candles[-1].open_ms != expected_open_ms:
+        return None
+
+    closes = [c.close for c in candles]
+    line, sig, hist = indicators.macd(closes)
+    direction = indicators.crossover(line, sig, -1)
+    if not direction:
+        return None
+    strong = indicators.is_strong(line, sig, hist, direction, -1)
+    if config.MACD_ONLY_STRONG and not strong:
+        return None
+    return {"symbol": symbol, "tf": tf, "direction": direction, "strong": strong,
+            "candles": candles, "line": line, "sig": sig, "hist": hist,
+            "open_ms": expected_open_ms, "price": candles[-1].close}
+
+
+async def _post_macd_alert(ctx: ContextTypes.DEFAULT_TYPE, hit: dict) -> None:
+    symbol, tf = hit["symbol"], hit["tf"]
+    # Dedup ATOMAR: xabar yuborishdan OLDIN band qilinadi — aks holda
+    # deploy paytida ikkita jarayon ustma-ust kelsa bir xil xabar ikki
+    # marta ketishi mumkin edi.
+    if not await db.claim_macd_alert(symbol, tf, hit["open_ms"], hit["direction"]):
+        return
+
+    arrow = "🟢" if hit["direction"] == "bullish" else "🔴"
+    kind = "Bullish" if hit["direction"] == "bullish" else "Bearish"
+    if hit["strong"]:
+        kind = f"Super {kind.lower()}"
+    caption = (f"{arrow} <b>{html.escape(symbol)}</b> ({tf}) — MACD {kind} crossover\n"
+               f"Joriy narx: <b>{fmt_price(hit['price'])}</b>")
+
+    photo = None
+    try:
+        photo = chart.macd_chart(hit["candles"], symbol, tf, hit["direction"],
+                                 hit["line"], hit["sig"], hit["hist"], hit["strong"])
+    except Exception:
+        log.warning("MACD grafigi yasalmadi (%s %s)", symbol, tf, exc_info=True)
+
+    buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
+    try:
+        if photo:
+            sent = await ctx.bot.send_photo(
+                config.NEWS_CHANNEL_ID, InputFile(photo, "macd.png"),
+                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
+        else:
+            sent = await ctx.bot.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True, reply_markup=buttons)
+    except Exception:
+        log.exception("MACD xabari postlanmadi (%s %s)", symbol, tf)
+        return
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+
+
+async def macd_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.NEWS_CHANNEL_ID or not config.MACD_TIMEFRAMES:
+        return
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # Qaysi timeframe'larda YANGI sham yopilgan — faqat o'shalar ishlanadi.
+    todo: list[tuple[str, int]] = []
+    for tf in config.MACD_TIMEFRAMES:
+        if tf not in chart.TF_MINUTES:
+            log.warning("MACD: noma'lum timeframe o'tkazib yuborildi: %s", tf)
+            continue
+        open_ms = _last_closed_open_ms(tf, now_ms)
+        try:
+            seen = await db.get_setting(f"macd_last_scan_{tf}")
+        except Exception:
+            log.exception("MACD: oxirgi skaner belgisi o'qilmadi (%s)", tf)
+            continue
+        if seen and int(seen) >= open_ms:
+            continue          # bu sham allaqachon skanerlangan
+        todo.append((tf, open_ms))
+    if not todo:
+        return
+
+    try:
+        symbols = await _macd_symbols()
+    except Exception:
+        log.exception("MACD: juftliklar ro'yxati olinmadi")
+        return
+    if not symbols:
+        return
+
+    sem = asyncio.Semaphore(max(1, config.MACD_CONCURRENCY))
+
+    for tf, open_ms in todo:
+        async def one(sym: str, _tf=tf, _open=open_ms):
+            async with sem:
+                try:
+                    return await _macd_check_symbol(sym, _tf, _open)
+                except Exception:
+                    log.debug("MACD tekshiruvi xato (%s %s)", sym, _tf, exc_info=True)
+                    return None
+
+        results = await asyncio.gather(*[one(s) for s in symbols])
+        hits = [h for h in results if h]
+        log.info("MACD skaner: %s — %d juftlikdan %d ta kesishma (sham=%s)",
+                  tf, len(symbols), len(hits), open_ms)
+
+        for hit in hits:
+            try:
+                await _post_macd_alert(ctx, hit)
+            except Exception:
+                log.exception("MACD xabari ishlanmadi (%s %s)", hit["symbol"], tf)
+
+        # Belgi FAQAT muvaffaqiyatli o'tgandan keyin yoziladi — xato
+        # bo'lsa keyingi chaqiruvda qaytadan urinadi.
+        try:
+            await db.set_setting(f"macd_last_scan_{tf}", str(open_ms))
+        except Exception:
+            log.exception("MACD: oxirgi skaner belgisi yozilmadi (%s)", tf)
+
+    try:
+        await db.purge_old_macd_alerts()
+    except Exception:
+        log.warning("MACD: eski yozuvlar tozalanmadi", exc_info=True)
+
+
 async def surge_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
@@ -5872,6 +6039,10 @@ def main() -> None:
                                 interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
     app.job_queue.run_repeating(surge_scan_job,
                                 interval=config.SURGE_SCAN_SECONDS, first=120)
+    # MACD kesishmasi — job tez-tez uyg'onadi, lekin YANGI sham yopilmagan
+    # bo'lsa hech qanday so'rov yubormaydi (macd_scan_job izohiga qarang).
+    app.job_queue.run_repeating(macd_scan_job,
+                                interval=config.MACD_SCAN_SECONDS, first=150)
     # Kit (whale) faolligi — faqat portlash nomzodlarida (WHALE_SCAN_SECONDS).
     app.job_queue.run_repeating(whale_scan_job,
                                 interval=config.WHALE_SCAN_SECONDS, first=100)
