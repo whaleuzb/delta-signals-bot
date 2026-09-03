@@ -5222,6 +5222,12 @@ async def _macd_symbols() -> list[str]:
     rows = [(s, v) for s, v in vols.items()
             if s.endswith(config.QUOTE) and v >= config.MACD_MIN_VOLUME_USD]
     rows.sort(key=lambda r: r[1], reverse=True)
+    # Diagnostika: birinchi ishga tushirishda kutilganidan (200) ANCHA kam
+    # (12 ta) juftlik chiqdi — manba ma'lumoti qanaqaligini ko'rish uchun.
+    top = ", ".join(f"{s}={v/1e6:.1f}M" for s, v in rows[:5])
+    log.info("MACD juftliklari: ticker %d ta qaytardi, %.0fM$ chegarasidan "
+              "%d tasi o'tdi (eng yiriklari: %s)",
+              len(vols), config.MACD_MIN_VOLUME_USD / 1e6, len(rows), top or "—")
     return [s for s, _ in rows[:config.MACD_MAX_SYMBOLS]]
 
 
@@ -5277,15 +5283,36 @@ async def _post_macd_alert(ctx: ContextTypes.DEFAULT_TYPE, hit: dict) -> None:
         log.warning("MACD grafigi yasalmadi (%s %s)", symbol, tf, exc_info=True)
 
     buttons = await _signal_buttons(symbol, "crypto", ctx.bot.username)
-    try:
+
+    async def _send():
         if photo:
-            sent = await ctx.bot.send_photo(
+            photo.seek(0)
+            return await ctx.bot.send_photo(
                 config.NEWS_CHANNEL_ID, InputFile(photo, "macd.png"),
                 caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
-        else:
-            sent = await ctx.bot.send_message(
-                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True, reply_markup=buttons)
+        return await ctx.bot.send_message(
+            config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True, reply_markup=buttons)
+
+    # Bitta skanerda o'nlab kesishma topilishi mumkin (ayniqsa keskin
+    # bozorda yoki bot birinchi marta ishga tushganda) — Telegram esa
+    # bitta kanalga daqiqasiga ~20 ta xabarni o'tkazadi. Flood-limitga
+    # urilganda xabarni TASHLAB YUBORISH mumkin emas: dedup yozuvi
+    # ALLAQACHON band qilingan, ya'ni bu kesishma boshqa hech qachon
+    # qayta postlanmasdi. Shu sabab `broadcast`dagi bilan bir xil
+    # yondashuv — kutamiz va qayta urinamiz.
+    try:
+        sent = await _send()
+    except RetryAfter as e:
+        log.warning("MACD flood-limit: %s s kutilmoqda (%s %s)",
+                     e.retry_after, symbol, tf)
+        await asyncio.sleep(e.retry_after + 1)
+        try:
+            sent = await _send()
+        except Exception:
+            log.exception("MACD xabari qayta urinishda ham postlanmadi (%s %s)",
+                          symbol, tf)
+            return
     except Exception:
         log.exception("MACD xabari postlanmadi (%s %s)", symbol, tf)
         return
@@ -5339,7 +5366,13 @@ async def macd_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.info("MACD skaner: %s — %d juftlikdan %d ta kesishma (sham=%s)",
                   tf, len(symbols), len(hits), open_ms)
 
-        for hit in hits:
+        for i, hit in enumerate(hits):
+            # Telegram bitta kanalga daqiqasiga ~20 xabar o'tkazadi —
+            # xabarlar orasida kichik oraliq flood-limitga UMUMAN
+            # urilmaslikni ta'minlaydi (urilib qolsa `_post_macd_alert`
+            # ichida kutib qayta urinish ham bor, bu esa oldini oladi).
+            if i:
+                await asyncio.sleep(config.MACD_POST_DELAY)
             try:
                 await _post_macd_alert(ctx, hit)
             except Exception:

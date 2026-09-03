@@ -220,3 +220,6 @@ MACD_CANDLES = int(os.getenv("MACD_CANDLES", "120"))
 # TRUE bo'lsa faqat "super" (trend yo'nalishi bo'yicha, kuchli
 # gistogramma) kesishmalar postlanadi — xabar sonini keskin kamaytiradi.
 MACD_ONLY_STRONG = os.getenv("MACD_ONLY_STRONG", "0") == "1"
+# Kanalga ketma-ket xabarlar orasidagi oraliq (soniya) — Telegram bitta
+# kanalga daqiqasiga ~20 ta xabarni o'tkazadi. 3.5s ~ daqiqasiga 17 ta.
+MACD_POST_DELAY = float(os.getenv("MACD_POST_DELAY", "3.5"))
