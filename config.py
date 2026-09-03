@@ -205,13 +205,15 @@ TRANSLATE_EMAIL = os.getenv("TRANSLATE_EMAIL", "newstradeai.bot@tradecontroller.
 MACD_TIMEFRAMES = [t.strip() for t in
                     os.getenv("MACD_TIMEFRAMES", "4h,1d").split(",") if t.strip()]
 MACD_SCAN_SECONDS = int(os.getenv("MACD_SCAN_SECONDS", "300"))
-# Skanerlanadigan juftliklar: 24 soatlik hajmi shu chegaradan yuqorilari
-# (hajm portlashi skaneridagi bilan bir xil mantiq — likvidligi past
-# juftliklarda MACD signali ishonchsiz).
-MACD_MIN_VOLUME_USD = float(os.getenv("MACD_MIN_VOLUME_USD", "10000000"))
-# Eng ko'p nechta juftlik skanerlanadi (hajm bo'yicha yuqoridan) — MEXC
-# tezlik chegarasiga zarba bermaslik uchun qattiq shift.
-MACD_MAX_SYMBOLS = int(os.getenv("MACD_MAX_SYMBOLS", "200"))
+# Foydalanuvchi qarori: "Top 500 ta" — ya'ni tanlovni CHEGARA emas, HAJM
+# REYTINGI hal qiladi. Avval $10M chegarasi qo'yilgan edi, jonli logda
+# undan ATIGI 12 ta juftlik o'tgani ko'rindi (SKHYB kabi o'rta tangalar
+# butunlay tushib qolardi). Chegara endi faqat mutlaqo o'lik juftliklarni
+# (savdo deyarli yo'q -> sham ma'lumoti ishonchsiz, MACD ma'nosiz)
+# chetlab o'tish uchun past qiymatda qoldirildi.
+MACD_MIN_VOLUME_USD = float(os.getenv("MACD_MIN_VOLUME_USD", "100000"))
+# Eng ko'p nechta juftlik skanerlanadi (hajm bo'yicha yuqoridan).
+MACD_MAX_SYMBOLS = int(os.getenv("MACD_MAX_SYMBOLS", "500"))
 # Bir vaqtda nechta klines so'rovi (sekin, lekin xavfsiz).
 MACD_CONCURRENCY = int(os.getenv("MACD_CONCURRENCY", "5"))
 # Grafikda ko'rsatiladigan sham soni (MACD 26+9 shamdan keyin ishonchli
