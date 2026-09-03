@@ -213,7 +213,10 @@ MACD_SCAN_SECONDS = int(os.getenv("MACD_SCAN_SECONDS", "300"))
 # chetlab o'tish uchun past qiymatda qoldirildi.
 MACD_MIN_VOLUME_USD = float(os.getenv("MACD_MIN_VOLUME_USD", "100000"))
 # Eng ko'p nechta juftlik skanerlanadi (hajm bo'yicha yuqoridan).
-MACD_MAX_SYMBOLS = int(os.getenv("MACD_MAX_SYMBOLS", "500"))
+# 500 sinab ko'rildi — 4h shamida 25 ta kesishma chiqdi (kuniga ~150
+# xabar), foydalanuvchi "ko'payib ketarkan" deb 300 ga tushirishni
+# so'radi (taxminan kuniga ~90 xabar).
+MACD_MAX_SYMBOLS = int(os.getenv("MACD_MAX_SYMBOLS", "300"))
 # Bir vaqtda nechta klines so'rovi (sekin, lekin xavfsiz).
 MACD_CONCURRENCY = int(os.getenv("MACD_CONCURRENCY", "5"))
 # Grafikda ko'rsatiladigan sham soni (MACD 26+9 shamdan keyin ishonchli
