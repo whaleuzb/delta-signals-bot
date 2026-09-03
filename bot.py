@@ -5268,10 +5268,17 @@ async def _post_macd_alert(ctx: ContextTypes.DEFAULT_TYPE, hit: dict) -> None:
     if not await db.claim_macd_alert(symbol, tf, hit["open_ms"], hit["direction"]):
         return
 
-    arrow = "🟢" if hit["direction"] == "bullish" else "🔴"
-    kind = "Bullish" if hit["direction"] == "bullish" else "Bearish"
+    # To'rt ko'rinish — kuchli (super) kesishmalar ALOHIDA ajralib tursin
+    # (foydalanuvchi namunasi: "Super bearish crossover 💀" / "Super
+    # bullish crossover 🔥", oddiylari esa belgisiz). Oddiy kesishmalarda
+    # 🟢/🔴 qoladi — yo'nalish bir qarashda ko'rinishi uchun.
+    bullish = hit["direction"] == "bullish"
     if hit["strong"]:
-        kind = f"Super {kind.lower()}"
+        arrow = "🔥" if bullish else "💀"
+        kind = "Super bullish" if bullish else "Super bearish"
+    else:
+        arrow = "🟢" if bullish else "🔴"
+        kind = "Bullish" if bullish else "Bearish"
     caption = (f"{arrow} <b>{html.escape(symbol)}</b> ({tf}) — MACD {kind} crossover\n"
                f"Joriy narx: <b>{fmt_price(hit['price'])}</b>")
 
