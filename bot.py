@@ -646,17 +646,15 @@ HELP_TOPICS = {
         "📈 <b>Signal kiritish</b>\n\n"
         "Signal <b>botning shaxsiy chatiga</b> yoziladi — guruhga emas! "
         "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.\n\n"
-        "<b>1. To'liq</b> — hamma daraja bitta xabarda:\n"
+        "<b>Yo'l 1 — sehrgar:</b> <code>/new</code> yozing, bot har bir darajani "
+        "navbat bilan so'raydi.\n\n"
+        "<b>Yo'l 2 — bitta xabar:</b>\n"
         "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
         "Bular ham ishlaydi:\n"
         "<code>ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80</code>\n"
         "<code>eth long 3200 3400 3550 3100</code>\n"
         "  ↳ kalit so'zsiz: birinchi raqam — kirish, oxirgisi — stop, "
         "o'rtadagilari TP.\n\n"
-        "<b>2. Limit</b> — faqat kirish narxi, TP/SL limit to'lgach so'raladi:\n"
-        "<code>BTCUSDT long 65000</code>\n\n"
-        "<b>3. Darhol (market)</b> — narxni bot o'zi oladi:\n"
-        "<code>BTCUSDT long market</code>\n\n"
         "<b>Rasm bilan:</b> izoh (caption) bo'lsa undan o'qiydi, bo'lmasa "
         "sun'iy intellekt grafikdan topishga urinadi.\n\n"
         "✅ Hech narsa tasdiqsiz saqlanmaydi — bot avval o'qiganini ko'rsatadi."
@@ -669,8 +667,7 @@ HELP_TOPICS = {
         "<b>Darhol ochish uchun</b> matnga <code>market</code> yoki "
         "<code>bozor</code> so'zini qo'shing:\n"
         "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
-        "Narxni yozmasangiz ham bo'ladi — bot jonli narxni o'zi oladi:\n"
-        "<code>BTCUSDT long market</code>\n\n"
+        "Sehrgarda esa <b>🎯 Oddiy (darhol)</b> tugmasini tanlaysiz.\n\n"
         "💡 Pozitsiyaga allaqachon kirgan bo'lsangiz — <code>market</code> "
         "yozishni unutmang, aks holda bot narxni kutib turaveradi."
     ),
@@ -1761,9 +1758,21 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await refresh_logo(ctx.bot, wid, chat.id)
 
 
-# ─────────────────────────── Narx matnini o'qish ───────────────────────────
-# (Ilgari sehrgar blokining ichida edi — sehrgar OLIB TASHLANDI, lekin bu
-#  yordamchi stop/entry/maqsad tahririda va depozitda ham ishlatiladi.)
+# ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
+
+# Rasm bosqichi ATAYLAB yo'q: rasm tanlovi (yuklash / bot grafigi / rasmsiz)
+# barcha darajalar kiritilgandan KEYIN, show_preview() da so'raladi — shunda
+# foydalanuvchi avval signalni ko'radi, keyin rasmni tanlaydi.
+WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
+
+WIZ_CANCEL_KB = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")]])
+WIZ_MODE_KB = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🎯 Oddiy (darhol)", callback_data="wiz_mode:market"),
+     InlineKeyboardButton("⏳ Limit (narxni kutadi)", callback_data="wiz_mode:limit")],
+    [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+])
+
 
 def _parse_price(raw: str) -> float | None:
     try:
@@ -1772,36 +1781,203 @@ def _parse_price(raw: str) -> float | None:
         return None
 
 
-# ─────────────────────────── Signal kiritish — yo'riqnoma ───────────────────────────
-# Sehrgar olib tashlangach "➕ Yangi signal" tugmasi endi FORMATNI
-# ko'rsatadi — odam signalni to'g'ridan-to'g'ri yozadi. Uchala usul
-# (to'liq / limit / market) bitta ekranda, chunki eng ko'p beriladigan
-# savol aynan "qanday yozaman?" edi.
-NEW_SIGNAL_HELP = (
-    "✍️ <b>Signalni shunchaki yozib yuboring.</b>\n\n"
-    "<b>1. To'liq</b> — hamma daraja birga:\n"
-    "<code>BTCUSDT long entry 65000 tp 67000 68500 sl 64000</code>\n"
-    "yoki qisqa: <code>BTCUSDT long 65000 67000 68500 64000</code>\n\n"
-    "<b>2. Limit</b> — faqat kirish narxi, TP/SL limit to'lgach so'raladi:\n"
-    "<code>BTCUSDT long 65000</code>\n\n"
-    "<b>3. Darhol (market)</b> — narxni bot o'zi oladi:\n"
-    "<code>BTCUSDT long market</code>\n\n"
-    "<i>SHORT uchun \"long\" o'rniga \"short\" yozing. "
-    "Grafik rasmini yuborsangiz ham o'qiyman.</i>"
-)
+async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    if q:
+        await q.answer()
+    target = q.message if q else update.effective_message
+    if update.effective_chat.type != "private":
+        await target.reply_text("Iltimos, botga shaxsiy xabar (DM) yozib, shu yerda qayta urining.")
+        return ConversationHandler.END
+
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return ConversationHandler.END
+    uid = (q.from_user if q else update.effective_user).id
+    if not can_manage(uid, ws):
+        await target.reply_text("Sizda bu joy uchun signal kiritish huquqi yo'q.")
+        return ConversationHandler.END
+
+    ctx.user_data["wiz"] = {"workspace_id": ws["id"], "file_id": None}
+    await target.reply_text("1/6 — Juftlik nomini yozing (masalan BTCUSDT):",
+                            reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SYMBOL
 
 
-async def on_new_signal_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+async def _wiz_or_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Sehrgar holati yo'qolgan bo'lsa (masalan /bekor bosilgan, yoki bot qayta
+    ishga tushgan) — KeyError o'rniga tushunarli xabar va toza tugatish."""
+    wiz = ctx.user_data.get("wiz")
+    if wiz is None:
+        await update.effective_message.reply_text(
+            "Sehrgar bekor qilingan. Qaytadan boshlash uchun /new yozing.",
+            reply_markup=MENU_BACK_KB)
+    return wiz
+
+
+async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    raw = (msg.text or "").strip()
+    # Butun matn ham, undan ajratilgan nomzodlar ham sinaladi: odam "btc",
+    # "BTC/USDT" yoki "menga btc kerak" deb yozishi mumkin.
+    cands = [raw] + [c for c in parsing.symbol_candidates(raw) if c != raw]
+    # Juftlik tekshiruvi tarmoqqa chiqadi (birja ro'yxati, aksiya narxi) va
+    # ba'zan 5-7 soniya davom etadi — jimlik "bot ishlamayapti" degan
+    # taassurot qoldirardi.
+    async with busy(ctx.bot, msg.chat_id, "🔎 Juftlikni tekshiryapman…"):
+        sym, market = await resolve_symbol(cands)
+    if not sym:
+        await msg.reply_text(
+            f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto, forex yoki aksiya). "
+            "Qayta yozing:",
+            parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+        return WIZ_SYMBOL
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["symbol"] = sym
+    wiz["market"] = market
+    await msg.reply_text(
+        f"2/6 — {sym}: qanday kirasiz?\n\n"
+        "🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda "
+        "allaqachon kirgandek).\n"
+        "⏳ <b>Limit</b> — narx kirish darajasiga tegmaguncha kutadi (standart).",
+        parse_mode=ParseMode.HTML, reply_markup=WIZ_MODE_KB)
+    return WIZ_MODE
+
+
+async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
-    await q.edit_message_text(NEW_SIGNAL_HELP, parse_mode=ParseMode.HTML,
-                              reply_markup=menu_back_kb(await user_lang(q.from_user.id)))
+    mode = q.data.split(":", 1)[1]
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["entry_mode"] = mode
+    label = "🎯 Oddiy" if mode == "market" else "⏳ Limit"
+    await q.edit_message_text(f"2/6 — Kirish rejimi: {label}")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
+         InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
+        [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+    ])
+    await q.message.reply_text("3/6 — Yo'nalishni tanlang:", reply_markup=kb)
+    return WIZ_SIDE
 
 
-async def cmd_new_signal_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.effective_message.reply_text(
-        NEW_SIGNAL_HELP, parse_mode=ParseMode.HTML,
-        reply_markup=menu_back_kb(await user_lang(update.effective_user.id)))
+async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    side = q.data.split(":", 1)[1]
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["side"] = side
+    await q.edit_message_text(f"3/6 — Yo'nalish: {side}")
+
+    if wiz.get("entry_mode") == "market":
+        # Oddiy (darhol) rejimida entry QO'LDA SO'RALMAYDI — turli admin
+        # "joriy narx"ni turlicha taxmin qilib yozishi (kechikish, xatolik)
+        # bir xil vaqtda ochilgan signalga guruhlar o'rtasida turlicha %
+        # hisoblanishiga olib kelardi. Bot o'zi jonli narxni (keshsiz,
+        # `fresh=True`) shu zahoti olib, to'g'ridan-to'g'ri entry sifatida
+        # ishlatadi.
+        price = await safe_last_price(wiz["market"], wiz["symbol"], fresh=True)
+        if price:
+            wiz["entry"] = price
+            await q.message.reply_text(
+                f"4/6 — Entry avtomatik: <b>{fmt_price(price)}</b> (joriy bozor narxi)\n\n"
+                "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan "
+                "ajrating, masalan: 67000 68500):",
+                parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+            return WIZ_TP
+        # Narx olinmadi (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan
+        # qo'lda so'raladi, sehrgar to'xtab qolmaydi.
+        await q.message.reply_text(
+            "⚠️ Joriy bozor narxini olib bo'lmadi — entryni qo'lda kiriting:",
+            reply_markup=WIZ_CANCEL_KB)
+        return WIZ_ENTRY
+
+    await q.message.reply_text(
+        "4/6 — Entry (limit) narxini kiriting.\nTP/SL narx to'lgach so'raladi:",
+        reply_markup=WIZ_CANCEL_KB)
+    return WIZ_ENTRY
+
+
+async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    entry = _parse_price(msg.text or "")
+    if entry is None or entry <= 0:
+        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_ENTRY
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    wiz["entry"] = entry
+
+    if wiz.get("entry_mode") == "limit":
+        # Foydalanuvchi so'roviga ko'ra ("boshida faqat limitni kiritamiz,
+        # TP/SL limit aktivlashgandan keyin so'ralsin"): Limit rejimida TP/SL
+        # HOZIR SO'RALMAYDI — signal `sl=None, tps=[]` bilan yaratiladi
+        # (`db.create_signal`/`tracker.process` buni qo'llab-quvvatlaydi —
+        # kuzatuv entry to'lgunicha, KEYIN esa TP/SL kiritilgunicha kutadi).
+        # Bu #126/#127'dagi "hali limitga kelmagandi ham TP bilan yopildi"
+        # muammosining tub yechimi: TP/SL entry to'lganidan KEYIN, HAQIQIY
+        # tasdiqlangan narx asosida kiritiladi — hech qachon oldindan
+        # taxmin qilinmaydi.
+        wiz2 = ctx.user_data.pop("wiz")
+        draft = {"symbol": wiz2["symbol"], "side": wiz2["side"], "entry": wiz2["entry"],
+                 "sl": None, "tps": [], "market": wiz2.get("market", "crypto"),
+                 "entry_mode": "limit"}
+        await show_preview(msg, ctx, draft, wiz2.get("file_id"), "wizard", wiz2["workspace_id"])
+        return ConversationHandler.END
+
+    await msg.reply_text(
+        "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
+        "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
+    return WIZ_TP
+
+
+async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    tps = [x for x in (_parse_price(x) for x in (msg.text or "").split()) if x and x > 0]
+    if not tps:
+        await msg.reply_text("Noto'g'ri format. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_TP
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    side = wiz["side"]
+    wiz["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
+    await msg.reply_text("6/6 — SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
+    return WIZ_SL
+
+
+async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.effective_message
+    sl = _parse_price(msg.text or "")
+    if sl is None or sl <= 0:
+        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        return WIZ_SL
+    if await _wiz_or_end(update, ctx) is None:
+        return ConversationHandler.END
+    wiz = ctx.user_data.pop("wiz")
+    draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
+             "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto"),
+             "entry_mode": wiz.get("entry_mode", "limit")}
+    await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard", wiz["workspace_id"])
+    return ConversationHandler.END
+
+
+async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    ctx.user_data.pop("wiz", None)
+    if q:
+        await q.answer()
+        await q.edit_message_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
+    else:
+        await update.effective_message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
+    return ConversationHandler.END
 
 
 # ─────────────────────────── Signal kiritish — tezkor usul ───────────────────────────
@@ -1972,12 +2148,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await show_preview(msg, ctx, draft, item["file_id"], "tahrir", ws["id"], token)
         return
 
-    # `allow_partial=True` — sehrgar olib tashlangani sabab uning ikki
-    # imkoniyati shu yerga ko'chirildi: "BTC long market" (narx jonli
-    # olinadi) va "BTC long 65000" (TP/SL limit to'lgach so'raladi).
-    # Oddiy suhbatni signal deb o'qib yubormaslik uchun bu formatlarda
-    # long/short so'zi majburiy (parsing.parse izohiga qarang).
-    draft = parsing.parse(text, allow_partial=True)
+    draft = parsing.parse(text)
     if not draft:
         return  # oddiy suhbat — signalga o'xshamaydi, e'tiborsiz qoldiramiz
 
@@ -1986,28 +2157,6 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         return
     if not can_manage(uid, ws):
         return
-
-    # "market" yozilgan, lekin narx ko'rsatilmagan — jonli narxni O'ZIMIZ
-    # olamiz (avval sehrgarning "Darhol" tugmasi shuni qilardi).
-    # Tasdiqlash lahzasida narx yana bir marta yangilanadi (#128) — bu
-    # yerdagi narx ko'rikda ko'rsatish uchun.
-    if draft.get("entry") is None:
-        sym, market = await resolve_symbol(draft.get("symbols") or [draft["symbol"]])
-        if not sym:
-            await msg.reply_text(
-                f"❌ <code>{html.escape(draft['symbol'])}</code> topilmadi.",
-                parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(await user_lang(uid)))
-            return
-        price = await safe_last_price(market, sym)
-        if not price:
-            await msg.reply_text(
-                "Narx olinmadi — narxni o'zingiz yozing, masalan:\n"
-                f"<code>{html.escape(sym)} long 65000</code>",
-                parse_mode=ParseMode.HTML)
-            return
-        draft["symbol"], draft["symbols"], draft["market"] = sym, [sym], market
-        draft["entry"] = price
-
     await show_preview(msg, ctx, draft, None, "matn", ws["id"])
 
 
@@ -3001,7 +3150,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         sym, market = await resolve_symbol([raw])
         if not sym:
             await update.message.reply_text(
-                f"❌ <code>{html.escape(raw)}</code> topilmadi. Signalni qo'lda yozing, masalan:\n<code>BTCUSDT long 65000</code>",
+                f"❌ <code>{html.escape(raw)}</code> topilmadi. /new yozib qo'lda kiriting.",
                 parse_mode=ParseMode.HTML)
             return
         personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
@@ -5854,7 +6003,7 @@ async def post_init(app: Application) -> None:
     await _run_one_time_fixes()
     await app.bot.set_my_commands([
         ("start", "Bosh menyu"),
-        ("new", "Signal qanday yoziladi"),
+        ("new", "Yangi signal (sehrgar)"),
         ("stats", "Statistika"),
         ("symbols", "Juftliklar"),
         ("open", "Ochiq signallar"),
@@ -5980,13 +6129,35 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_pdf_button, pattern=r"^pdfrep$"))
     app.add_handler(CallbackQueryHandler(on_help, pattern=r"^help:"))
 
-    # Sehrgar (ConversationHandler) OLIB TASHLANDI — foydalanuvchi qarori:
-    # "Shu sehrgar kerak emas... Hamma signallarni birma bir qo'lda
-    # kiritishsa qulayroq bo'ladi." Uning ikki imkoniyati matn usuliga
-    # ko'chirildi (parsing.parse(allow_partial=True) izohiga qarang):
-    # "BTC long market" va "BTC long 65000".
-    app.add_handler(CallbackQueryHandler(on_new_signal_help, pattern=r"^newsig$"))
-    app.add_handler(CommandHandler("new", cmd_new_signal_help))
+    app.add_handler(ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(wizard_start, pattern=r"^newsig$"),
+            CommandHandler("new", wizard_start),
+        ],
+        states={
+            WIZ_SYMBOL: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_symbol)],
+            WIZ_MODE: [CallbackQueryHandler(wizard_mode, pattern=r"^wiz_mode:")],
+            WIZ_SIDE: [CallbackQueryHandler(wizard_side, pattern=r"^wiz_side:")],
+            WIZ_ENTRY: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_entry)],
+            WIZ_TP: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_tp)],
+            WIZ_SL: [MessageHandler(
+                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_sl)],
+        },
+        fallbacks=[
+            CallbackQueryHandler(wizard_cancel, pattern=r"^wiz_cancel$"),
+            # /bekor MAJBURIY fallback: aks holda u faqat user_data ni tozalab,
+            # suhbatni OCHIQ qoldirardi — va allow_reentry yo'qligi sababli
+            # "Yangi signal" tugmasi 15 daqiqa davomida umuman ishlamasdi.
+            CommandHandler("bekor", wizard_cancel),
+        ],
+        # Sehrgar yarim yo'lda tashlab ketilgan bo'lsa ham "Yangi signal"
+        # bosilishi uni QAYTADAN boshlaydi (avval jimgina hech narsa bo'lmasdi).
+        allow_reentry=True,
+        conversation_timeout=900,
+    ))
 
     app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, on_photo))
     app.add_handler(MessageHandler(

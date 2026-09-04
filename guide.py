@@ -132,7 +132,19 @@ def content(img: dict | None = None) -> list:
             "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.",
         ]},
 
-        _h("Yo'l 1 — to'liq signal (bitta xabar)", 4),
+        _h("Yo'l 1 — sehrgar (yangi boshlovchilar uchun)", 4),
+        _p("Botga ", _code("/new"), " yozing yoki menyudagi «➕ Yangi signal» tugmasini "
+           "bosing. Bot har bir darajani navbat bilan so'raydi — hech narsani yodlash "
+           "shart emas."),
+        _pre("Siz:  /new\n"
+             "Bot:  1/6 — 📈 Grafik rasmni yuboring.\n"
+             "      [⏭ Rasmsiz davom etish]\n"
+             "Bot:  Juftlikni yozing (masalan BTCUSDT)\n"
+             "Siz:  BTCUSDT\n"
+             "Bot:  Kirish turini tanlang\n"
+             "      [🎯 Oddiy (darhol)] [⏳ Limit (kutadi)]"),
+
+        _h("Yo'l 2 — bitta xabar (tezkor)", 4),
         _p("Barcha darajalarni bitta xabarda yuboring:"),
         *_fig(img.get("format"), "Signal qismlari: juftlik · yo'nalish · kirish · maqsadlar · stop"),
         _pre("BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000"),
@@ -143,24 +155,6 @@ def content(img: dict | None = None) -> list:
         _p("Kalit so'zsiz ham bo'ladi — ", _b("birinchi raqam kirish"), ", ",
            _b("oxirgisi stop"), ", o'rtadagilari TP. Kamida 3 ta raqam kerak:"),
         _pre("eth long 3200 3400 3550 3100"),
-
-        _h("Yo'l 2 — faqat kirish narxi (TP/SL keyin)", 4),
-        _p("Faqat juftlik, yo'nalish va kirish narxini yozsangiz — signal ",
-           _b("limit"), " sifatida kutadi. Narx kirish darajasiga tegib, signal "
-           "ochilgandan keyin bot sizdan TP va SL ni so'raydi:"),
-        _pre("BTCUSDT long 65000"),
-        {"tag": "blockquote", "children": [
-            "Bu usul ", _b("eng xavfsizi"), ": TP/SL signal ochilgunicha umuman "
-            "mavjud bo'lmaydi, ya'ni \"kirishdan oldin TP tegdi\" degan holat "
-            "texnik jihatdan ham mumkin emas.",
-        ]},
-
-        _h("Yo'l 3 — darhol, jonli narxda (market)", 4),
-        _p("Narxni yozish shart emas — bot bozor narxini o'zi oladi va signal "
-           "darhol ochiq deb belgilanadi:"),
-        _pre("BTCUSDT long market"),
-        _p("Shu tarzda bir vaqtda kiritilgan signal barcha guruhlarda ",
-           _b("bir xil narx"), " bilan hisoblanadi."),
 
         _h("Rasm bilan yuborish", 4),
         _p("Grafik rasmini tashlasangiz: izoh (caption) bo'lsa — bot o'shandan o'qiydi. "

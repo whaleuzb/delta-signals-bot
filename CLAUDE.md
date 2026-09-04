@@ -4486,3 +4486,46 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (ya'ni onboarding ko'rsatilishi) va til tasdig'i baribir
        chiqishi. Jami 19/19 (avval 16 ta edi). `test_tracker.py` 15/15,
        matn oqimi 13/13 o'zgarishsiz.
+
+142. **Foydalanuvchi: "menga bu yoqmadi avvalgisini qaytar. 2 chi
+     rasmdagidek harbir tp sl alohida alohida so'rasin. Darhol tugmasida
+     avtomatik narxni belgilasin."** — #140 (sehrgarni olib tashlash)
+     BEKOR QILINDI, sehrgar to'liq qaytarildi (`git revert 5c1c782`,
+     tarix qayta yozilmadi).
+     - **Sabab**: #140 da sehrgarning imkoniyatlari matn formatiga
+       ko'chirilgan edi (`"BTC long market"`, `"BTC long 65000"`), lekin
+       amalda foydalanuvchi juftlik nomini "btc" deb yozganda yoki
+       kalit so'zsiz yozganda bot jim qolardi — ya'ni **matn usuli
+       xatoga yo'l qo'yishga umuman toqat qilmaydi**, sehrgar esa har
+       qadamda aniq savol beradi va noto'g'ri kiritilganda qayta so'raydi
+       ("Noto'g'ri raqam. Qayta kiriting"). Qadamma-qadam so'rash —
+       xatoni O'SHA ZAHOTI ko'rsatadi, bitta uzun satr esa faqat
+       "tanilmadi" deydi.
+     - **Saboq**: ishlab turgan, o'rganilgan UI oqimini "endi ortiqcha"
+       deb o'chirishdan oldin, uning o'rniga qo'yiladigan yo'l AYNAN SHU
+       xatolarga bardosh berishini tekshirish kerak. Bu yerda matn usuli
+       funksional jihatdan teng edi, lekin kechirimli emas edi.
+     - **Nima qaytdi**: `ConversationHandler` (WIZ_SYMBOL → WIZ_MODE →
+       WIZ_SIDE → WIZ_ENTRY → WIZ_TP → WIZ_SL), "➕ Yangi signal" tugmasi
+       va `/new` yana sehrgarni ochadi, `guide.py` dagi "Yo'l 1 —
+       sehrgar" bo'limi.
+     - **Nima YO'QOLDI (ataylab)**: `parsing.parse()` dagi
+       `allow_partial` va u bilan kelgan qisqa formatlar. Ular sehrgar
+       bilan birga turolmaydi: `allow_partial` yoqilgan holda oddiy
+       suhbat ("BTC long 65000" kabi yozuv) signal loyihasini ochib
+       yuborardi — bu #140 dan OLDIN mavjud bo'lmagan xatti-harakat va
+       foydalanuvchi uni so'ramagan. Sehrgar bu ikki imkoniyatni
+       (avtomatik entry, limit-keyin-TP/SL) allaqachon o'z ichida
+       beradi, shuning uchun yo'qotish yo'q.
+     - **Foydalanuvchi nomlagan ikki xatti-harakat MAVJUDLIGI
+       tasdiqlandi**: (a) "🎯 Oddiy (darhol)" bosilganda `wizard_side()`
+       `safe_last_price(..., fresh=True)` bilan jonli narxni oladi va
+       "4/6 — Entry avtomatik: <narx> (joriy bozor narxi)" deb ko'rsatib,
+       entry qadamini butunlay o'tkazib yuboradi; (b) TP (5/6) va SL
+       (6/6) — ALOHIDA qadamlar.
+     - Tekshirildi: sehrgar oqimi uchun YANGI test yozildi — 24 ta holat
+       (darhol rejimida avtomatik entry va `fresh=True`, TP/SL alohida
+       qadamlar, limit rejimida `sl=None, tps=[]`, noto'g'ri kiritishda
+       qayta so'rash, bekor qilish, narx olinmaganda qo'lda so'rashga
+       qaytish). `test_tracker.py` 15/15, til oqimi 19/19,
+       `parse()` to'liq format o'zgarishsiz.
