@@ -410,13 +410,19 @@ TG_SCRIPT = """
 </script>"""
 
 
-def page(title: str, body: str, bot: str | None) -> str:
+def page(title: str, body: str, bot: str | None, embed: bool = False) -> str:
     link = f'<a href="https://t.me/{e(bot)}">@{e(bot)}</a>' if bot else "Trade Controller"
+    # `embed` — sahifa BOSHQA Mini App ichidagi iframe'da ochilyapti. U yerda
+    # Telegram skripti KERAK EMAS va ZARARLI: u sahifani "to'liq oyna" deb
+    # hisoblab, Telegram sarlavhasi ostidan chiqish uchun tepaga 72px bo'sh
+    # joy qo'shadi — iframe ichida esa Telegram sarlavhasi yo'q, faqat
+    # chaqiruvchining o'z sarlavhasi bor, natijada katta bo'sh chiziq qolardi.
+    tg = "" if embed else TG_SCRIPT
     return (
         "<!doctype html><html lang='uz'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='color-scheme' content='dark'>"
-        f"<title>{e(title)}</title>{FONTS}<style>{CSS}</style>{TG_SCRIPT}</head><body>"
+        f"<title>{e(title)}</title>{FONTS}<style>{CSS}</style>{tg}</head><body>"
         f"<div class='wrap'>{body}"
         f"<footer><div>Trade Controller — {link}</div>"
         f"<div>Ma'lumot bazadan jonli o'qiladi</div></footer></div></body></html>")
@@ -589,9 +595,10 @@ async def stats_json(request):
             "net_label": n["net_label"],
             "avg_r": round(n["avg_r"], 2),
             "open": len(live),
-            # Sahifaga havola — `solo=1` bo'lsa "Barcha guruhlar" havolasi
-            # ko'rinmaydi (chaqiruvchi faqat SHU guruhni ko'rsatmoqchi).
-            "url": f"/g/{ws_id}?solo=1",
+            # Sahifaga havola. `embed=1` — chaqiruvchi (to'lov botining Mini
+            # App'i) buni O'Z ichida, iframe'da ochadi: "Barcha guruhlar"
+            # havolasi ham, Telegram skripti ham chiqmaydi.
+            "url": f"/g/{ws_id}?embed=1",
             "cards": [{"label": k, "value": v} for k, v, _c in n["tiles"]],
         })
     return web.json_response(cached, headers=JSON_HEADERS)
@@ -607,9 +614,13 @@ async def group_page(request):
     # `?solo=1` — sahifa boshqa saytdan (masalan to'lov botining Mini App'idan)
     # ochilgan: o'sha odam FAQAT shu guruhni ko'rmoqchi, boshqa guruhlar
     # ro'yxatiga havola ortiqcha va chalg'ituvchi.
-    solo = request.query.get("solo") in ("1", "true", "yes")
+    # `?embed=1` — bundan ham ichkarida: sahifa boshqa Mini App ichidagi
+    # iframe'da. `solo`ning hammasi amal qiladi, ustiga Telegram skripti
+    # ham chiqarilmaydi (`page()`dagi izohga qarang).
+    embed = request.query.get("embed") in ("1", "true", "yes")
+    solo = embed or request.query.get("solo") in ("1", "true", "yes")
 
-    cache_key = f"g{ws_id}" + ("s" if solo else "")
+    cache_key = f"g{ws_id}" + ("e" if embed else "s" if solo else "")
     cached = _cached(cache_key)
     if cached is not None:
         return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
@@ -724,7 +735,7 @@ async def group_page(request):
            if trades else "")
         + ("<div class='empty'>Hali yopilgan signal yo'q.</div>" if not total else ""))
 
-    out = page(f"{ws['name']} — natijalar", body, bot)
+    out = page(f"{ws['name']} — natijalar", body, bot, embed=embed)
     _put(cache_key, out)
     return web.Response(text=out, content_type="text/html", headers=NO_CACHE)
 

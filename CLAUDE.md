@@ -4564,3 +4564,27 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        HTML sahifadagi raqamlar bilan bir xilligi, `solo=1` da havola
        yo'qolishi, ikki kesh kalitining aralashmasligi, ochiq bo'lmagan
        guruhda 404. `test_tracker.py` 15/15.
+
+144. **`?embed=1` — sahifa boshqa Mini App ichidagi iframe'da.** Foydalanuvchi:
+     "tugmani bossam brauzerga otib yuboryabti. Buni web sahifada saqlab
+     qolish kerak. Balki alohida oyna sifatida. Brauzerga otib yuborsa
+     to'lov qilish uchun mijoz yana qaytishi kerak bo'ladi telegramga."
+     - To'lov botining Mini App'i endi `tg.openLink()` ishlatmaydi (u tashqi
+       brauzerni ochadi) — sahifani O'Z ichida, ustidan chiqadigan oynada
+       (iframe) ko'rsatadi. Sabab sof tijoriy: brauzerga chiqqan mijoz to'lov
+       uchun Telegram'ga QAYTISHI kerak bo'ladi va ko'pi qaytmaydi.
+     - Shu sabab `page()`ga `embed` argumenti qo'shildi: `embed=1` bo'lganda
+       **`TG_SCRIPT` chiqarilmaydi**. Aks holda `applyTop()` mobil mijozda
+       tepaga 72px bo'sh joy qo'shardi — u Telegram'ning suzuvchi sarlavhasi
+       uchun, iframe ichida esa unday sarlavha yo'q va faqat katta bo'sh
+       chiziq qolardi.
+     - `embed` `solo`ni ham anglatadi ("Barcha guruhlar" havolasi yo'q).
+       Kesh kaliti uchinchi ko'rinish uchun ajratildi: `g<id>` / `g<id>s` /
+       `g<id>e` — aks holda iframe uchun tayyorlangan sahifa oddiy
+       foydalanuvchiga ham berilib ketardi.
+     - `stats.json` dagi `url` endi `?embed=1` qaytaradi (avval `?solo=1`).
+       `solo` o'zi olib tashlanmadi — havolani oddiy joyda ulashish uchun
+       hamon foydali.
+     - Tekshirildi: 30/30 (avvalgi 24 tasiga embed uchun 6 ta yangi holat
+       qo'shildi — Telegram skripti chiqmasligi, oddiy sahifada esa hamon
+       chiqishi, uchta kesh kalitining aralashmasligi). `test_tracker.py` 15/15.
