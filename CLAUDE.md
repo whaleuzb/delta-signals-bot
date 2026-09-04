@@ -4414,3 +4414,51 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        statistika/ochiq signallar ekranlari, yordam matni, xato
        xabarlari, guruhga ketadigan signal/TP/SL xabarlari
        (`workspaces.lang` ustuni tayyor, lekin hali ishlatilmayapti).
+
+140. **Foydalanuvchi: "Shu sehrgar kerak emas chunki bizda limit order va
+     market order bor. Sehrgarni qo'llanmadan ham umumiy ish jarayonidan
+     ham olib tashlash kerak. Hamma signallarni birma bir qo'lda
+     kiritishsa qulayroq bo'ladi."** — sehrgar (ConversationHandler, ~220
+     qator) BUTUNLAY olib tashlandi, lekin uning IKKI imkoniyati matn
+     usuliga KO'CHIRILDI (foydalanuvchi shu variantni tanladi).
+     - **Nega ko'chirish kerak edi**: sehrgar orqali AYNAN SHU SESSIYADA
+       qo'shilgan ikki funksiya ishlardi — (a) #128/#132 "Darhol" rejimida
+       entry avtomatik (foydalanuvchi: "bot o'zi bozor narxini olib
+       entryni avtomatik xisoblasin"), (b) #130 limit-keyin-TP/SL
+       (foydalanuvchining O'Z taklifi, #133/#134 muammosining eng
+       ishonchli yechimi). Sehrgarni shundoq o'chirsak, ikkalasi ham
+       yo'qolardi — shu sabab avval foydalanuvchidan so'raldi.
+     - **`parsing.parse()` ga `allow_partial` qo'shildi**: `"BTC long
+       market"` -> `entry=None` (chaqiruvchi jonli narxni oladi),
+       `"BTC long 65000"` -> `sl=None, tps=[]` (TP/SL limit to'lgach
+       so'raladi).
+     - **XAVF va uning yechimi**: `side` matnda ko'rsatilmasa AVTOMATIK
+       "LONG" bo'ladi — ya'ni to'liq formatda yagona himoya "entry+SL+TP
+       uchalasi bo'lsin" qoidasi edi. Uni yumshatganda oddiy suhbat
+       ("BTC 65000 ga chiqadi") signal bo'lib qolardi. Shu sabab qisqa
+       formatlarda **long/short so'zi MAJBURIY** (`explicit_side`), va
+       raqamlar faqat SOF raqamli bo'laklardan olinadi (juftlik nomidagi
+       raqam narx deb o'qilmasin). `allow_partial` standart holda
+       `False` — vision (rasm) va tahrir oqimlari o'zgarishsiz qoldi.
+     - **"➕ Yangi signal" tugmasi** endi sehrgarni emas, FORMAT
+       yo'riqnomasini ko'rsatadi (uchala usul bitta ekranda) — `/new`
+       ham shunga qaraydi. Tugma o'chirilmadi: eng ko'p beriladigan
+       savol aynan "qanday yozaman?" edi.
+     - **`_parse_price()` SAQLANDI** — u sehrgar blokining ichida edi,
+       lekin stop/entry/maqsad tahririda va depozitda ham ishlatiladi
+       (8 joyda); blok o'chirilganda ajratib olindi.
+     - **Qo'llanma** (`guide.py`) va bot ichidagi yordam matni qayta
+       yozildi: "sehrgar" bo'limi olib tashlandi, o'rniga uchta yo'l
+       (to'liq / faqat kirish narxi / market) tushuntirildi.
+     - Tekshirildi: (1) `parse()` 30 ta holat — eski to'liq format
+       o'zgarmagani, ikki yangi format, **8 xil oddiy suhbat rad
+       etilishi**, chegara holatlari (raqamsiz, ikkita raqam,
+       yarim-yorti TP/SL); (2) `on_text_signal` oqimi 13 ta holat —
+       market'da jonli narx olinishi, limit'da TP/SL kutilishi, suhbatga
+       jim qolish, narx olinmaganda tushunarli xabar. `test_tracker.py`
+       15/15, MACD 11/11, til oqimi 16/16 o'zgarishsiz.
+     - **Yo'l-yo'lakay topilgan ESKI kamchilik** (tuzatilmadi, alohida
+       ish): raqam bilan BOSHLANADIGAN juftliklar (`1INCHUSDT`,
+       `1000PEPEUSDT`) `symbol_candidates()` tomonidan umuman tanilmaydi
+       — to'liq formatda ham ishlamaydi, ya'ni sehrgar bilan bog'liq
+       emas.

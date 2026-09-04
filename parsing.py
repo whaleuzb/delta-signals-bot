@@ -72,17 +72,34 @@ def symbol_candidates(text: str) -> list[str]:
     return out
 
 
-def parse(text: str) -> dict | None:
+def parse(text: str, allow_partial: bool = False) -> dict | None:
     """Muvaffaqiyatli bo'lsa {symbol, symbols, side, entry, sl, tps} qaytaradi.
 
     `symbols` — juftlik nomzodlari (tartibda). Chaqiruvchi ularni birjada
-    birma-bir tekshiradi; `symbol` shunchaki birinchisi."""
+    birma-bir tekshiradi; `symbol` shunchaki birinchisi.
+
+    `allow_partial` — sehrgar o'rniga kelgan IKKI qisqa format uchun
+    (sehrgar olib tashlandi, uning imkoniyatlari shu yerga ko'chirildi):
+
+      * "BTC long market"  -> entry=None — chaqiruvchi JONLI narxni oladi
+        (avval sehrgarning "Darhol" tugmasi shuni qilardi);
+      * "BTC long 65000"   -> sl=None, tps=[] — limit to'lgandan KEYIN
+        TP/SL so'raladi (avval sehrgarning limit rejimi).
+
+    Bu rejimlarda **long/short so'zi MAJBURIY**. Sabab: pastdagi `side`
+    aniqlanmasa AVTOMATIK "LONG" bo'ladi — ya'ni to'liq signalda yagona
+    himoya "entry+SL+TP uchalasi bo'lsin" qoidasi edi. Uni yumshatib,
+    ustiga tomonni ham talab qilmasak, oddiy suhbat ("BTC 65000 ga
+    chiqadi") signal bo'lib qolardi."""
     if not text:
         return None
     t = text.replace("\u00a0", " ")
     low = t.lower()
 
     # --- tomon ---
+    # `explicit_side` — tomon MATNDA aniq yozilganmi (pastdagi standart
+    # "LONG"dan farqli). Qisqa formatlar FAQAT shu holatda ishlaydi.
+    explicit_side = bool(re.search(r"\b(long|buy|xarid|short|sell|sotish)\b", low))
     if re.search(r"\b(short|sell|sotish)\b", low):
         side = "SHORT"
     else:
@@ -132,7 +149,34 @@ def parse(text: str) -> dict | None:
             tps = mid
 
     if entry is None or sl is None or not tps:
-        return None
+        # --- Sehrgar o'rnini bosuvchi IKKI qisqa format ---
+        # Faqat `allow_partial` bilan VA tomon aniq yozilgan bo'lsa
+        # (yuqoridagi `explicit_side` izohiga qarang — busiz oddiy
+        # suhbat signal bo'lib qolardi).
+        if not (allow_partial and explicit_side):
+            return None
+
+        # Matndagi SOF raqamli bo'laklar. Harf aralashganlari ("1INCHUSDT")
+        # ATAYLAB tashlanadi — aks holda juftlik nomidagi raqam narx deb
+        # o'qilishi mumkin edi.
+        pure = [_f(tok) for tok in re.split(r"[\s,]+", t)
+                if re.fullmatch(r"\d+(?:[.,]\d+)?", tok)]
+
+        if entry_mode == "market" and entry is None and sl is None and not tps:
+            # "BTC long market" — narxni chaqiruvchi JONLI oladi.
+            # Raqam yozilgan bo'lsa (masalan "BTC long market 65000") uni
+            # entry sifatida qabul qilamiz — odam ataylab yozgan.
+            entry = pure[0] if len(pure) == 1 else None
+        elif sl is None and not tps:
+            # "BTC long 65000" — limit, TP/SL keyin so'raladi.
+            if entry is None:
+                if len(pure) != 1:
+                    return None      # noaniq: raqam yo'q yoki bir nechta
+                entry = pure[0]
+        else:
+            # Yarim-yorti (masalan TP bor, SL yo'q) — nima nazarda
+            # tutilganini bilib bo'lmaydi, xavfsizroq: qabul qilmaymiz.
+            return None
 
     tps = sorted(set(tps), reverse=(side == "SHORT"))
     return {"symbol": symbol, "symbols": cands, "side": side, "entry": entry,
