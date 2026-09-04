@@ -4529,3 +4529,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        qayta so'rash, bekor qilish, narx olinmaganda qo'lda so'rashga
        qaytish). `test_tracker.py` 15/15, til oqimi 19/19,
        `parse()` to'liq format o'zgarishsiz.
+
+143. **To'lov boti (whale-payment-bot) Mini App'iga jonli statistika berish —
+     `/g/<id>/stats.json` va `?solo=1`.** Foydalanuvchi: "webdagi statistikani
+     mamurjonpaybotdagi statistikaga mos ravishda ulay olasanmi? Faqat meni
+     guruhimini sahifasi ko'rinsin. Mamurjonpaybot web sahifasidagi umumiy
+     statitika tagida umumiy ko'rish tugmasi bo'lsin va uni bosish orqali
+     huddi tradecontrbot dagi web whales uzb sahifasi ochilsin."
+     - **`_group_numbers(ws)` — yangi funksiya**: guruh sahifasidagi 4 plita
+       (Yopilgan signallar / Winrate / Jami natija / O'rtacha R) endi SHU
+       yerda hisoblanadi. `group_page` ham, yangi JSON nuqtasi ham o'shani
+       chaqiradi. **Sabab**: to'lov botining Mini App'ida ko'rinadigan son
+       guruh sahifasidagi son bilan bir xil bo'lishi SHART — ikki joyda ikki
+       marta hisoblansa, kelajakdagi tuzatish bittasiga tegib, ikkinchisi
+       eskirib qolardi.
+     - **`GET /g/<id>/stats.json`** — `{name, total, wins, winrate, net_pct,
+       net_label, avg_r, open, url, cards[]}`. `cards` — aynan plitalar
+       ro'yxati, chaqiruvchi hech narsani qayta formatlamasligi uchun tayyor
+       matn ko'rinishida.
+     - **Darvoza YANGI EMAS**: `public_workspace()` — HTML sahifa bilan bir
+       xil. Ochiq bo'lmagan guruh 404 qaytaradi. Ya'ni bu nuqta hech qanday
+       yangi ma'lumot oshkor qilmaydi, allaqachon ochiq sahifada ko'rinib
+       turgan raqamlarni mashina o'qiy oladigan shaklda beradi — shu sabab
+       `Access-Control-Allow-Origin: *` ham xavfsiz.
+     - **`?solo=1`** (guruh sahifasida) — "← Barcha guruhlar" havolasini
+       yashiradi. Foydalanuvchining "Faqat meni guruhimini sahifasi
+       ko'rinsin" talabi: sahifa boshqa botning Mini App'idan ochiladi va u
+       yerdan boshqa guruhlar ro'yxatiga o'tish chalg'ituvchi. Kesh kaliti
+       ham ajratildi (`g<id>` va `g<id>s`) — aks holda birinchi so'ragan
+       ko'rinish ikkinchisiga ham berilib ketardi.
+     - `open` — faqat ACTIVE pozitsiyalar soni (PENDING sanalmaydi, ular hali
+       ochilmagan). Juftlik nomi berilmaydi — ochiq sahifadagi qoida bilan bir xil.
+     - Tekshirildi: `aiohttp` test klienti bilan 24 ta holat — JSON raqamlari
+       HTML sahifadagi raqamlar bilan bir xilligi, `solo=1` da havola
+       yo'qolishi, ikki kesh kalitining aralashmasligi, ochiq bo'lmagan
+       guruhda 404. `test_tracker.py` 15/15.

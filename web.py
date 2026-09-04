@@ -34,6 +34,11 @@ log = logging.getLogger("web")
 # yangilanish chiqqanda foydalanuvchini adashtirardi.
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
+# JSON nuqtasi boshqa domendan (to'lov botining Mini App'i) o'qiladi.
+# Ma'lumot allaqachon ochiq sahifada ko'rinib turibdi — CORS yangi
+# hech narsa oshkor qilmaydi, faqat o'qishni mumkin qiladi.
+JSON_HEADERS = {**NO_CACHE, "Access-Control-Allow-Origin": "*"}
+
 # Kichik grafik rasmi brauzerda 24 soat keshlanadi (yopilgan savdo
 # o'zgarmaydi). Chizish uslubi o'zgarganda esa eski rasm ko'rinib
 # qolmasligi uchun havolaga versiya qo'shiladi — yangi manzil eski
@@ -514,17 +519,14 @@ async def index(request):
     return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
 
-async def group_page(request):
-    ws_id = int(request.match_info["wid"])
-    bot = request.app["bot_username"]
-    ws = await db.public_workspace(ws_id)
-    if not ws:
-        raise web.HTTPNotFound(text="Bunday sahifa yo'q yoki u ochiq emas.")
+async def _group_numbers(ws) -> dict:
+    """Guruhning asosiy raqamlari — HTML sahifa ham, JSON ham SHU yerdan oladi.
 
-    cached = _cached(f"g{ws_id}")
-    if cached is not None:
-        return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
-
+    Ataylab bitta funksiya: to'lov boti (whale-payment-bot) Mini App'i
+    `/g/<id>/stats.json`ni o'qiydi va u yerda ko'rinadigan son guruh
+    sahifasidagi son bilan AYNAN bir xil bo'lishi shart. Ikki joyda ikki
+    marta hisoblansa, ular vaqt o'tib bir-biridan uzilib ketardi."""
+    ws_id = ws["id"]
     s = await db.period_stats(ws_id)
     rows = await db.equity_series(ws_id)
     deposit = ws["deposit"]
@@ -541,15 +543,84 @@ async def group_page(request):
     wr = (s["wins"] / total * 100) if total else 0
     avg_r = float(s["avg_r"] or 0)
 
-    tiles = [
-        ("Yopilgan signallar", f"{total}", ""),
-        ("Winrate", f"{wr:.1f}%", ""),
-        (net_label, f"{net:+.2f}%", _cls(net)),
-        ("O'rtacha R", f"{avg_r:+.2f}", _cls(avg_r)),
-    ]
+    return {
+        "total": total,
+        "wins": s["wins"] or 0,
+        "winrate": wr,
+        "net": net,
+        "net_label": net_label,
+        "avg_r": avg_r,
+        # Grafik faqat kamida ikkita nuqta bo'lsa chiziladi (chaqiruvchiga kerak).
+        "n_pnl": len(pnls),
+        # Plitalar — sahifadagi va JSON'dagi ro'yxat AYNAN shu.
+        "tiles": [
+            ("Yopilgan signallar", f"{total}", ""),
+            ("Winrate", f"{wr:.1f}%", ""),
+            (net_label, f"{net:+.2f}%", _cls(net)),
+            ("O'rtacha R", f"{avg_r:+.2f}", _cls(avg_r)),
+        ],
+    }
+
+
+async def stats_json(request):
+    """Guruh raqamlari JSON ko'rinishida — to'lov botining Mini App'i uchun.
+
+    Darvoza `group_page` bilan BIR XIL (`public_workspace`): bu nuqta yangi
+    ruxsat ochmaydi, allaqachon ochiq sahifada ko'rinib turgan raqamlarnigina
+    mashina o'qiy oladigan shaklda beradi. Shu sabab CORS ham ochiq."""
+    ws_id = int(request.match_info["wid"])
+    ws = await db.public_workspace(ws_id)
+    if not ws:
+        return web.json_response({"error": "not_public"}, status=404,
+                                 headers=JSON_HEADERS)
+
+    cached = _cached(f"j{ws_id}")
+    if cached is None:
+        n = await _group_numbers(ws)
+        # Ochiq (ACTIVE) pozitsiyalar soni — juftlik nomisiz, faqat son.
+        live = [r for r in await db.live_signals(ws_id) if r["status"] == "ACTIVE"]
+        cached = _put(f"j{ws_id}", {
+            "id": ws_id,
+            "name": ws["name"],
+            "total": n["total"],
+            "wins": n["wins"],
+            "winrate": round(n["winrate"], 1),
+            "net_pct": round(n["net"], 2),
+            "net_label": n["net_label"],
+            "avg_r": round(n["avg_r"], 2),
+            "open": len(live),
+            # Sahifaga havola — `solo=1` bo'lsa "Barcha guruhlar" havolasi
+            # ko'rinmaydi (chaqiruvchi faqat SHU guruhni ko'rsatmoqchi).
+            "url": f"/g/{ws_id}?solo=1",
+            "cards": [{"label": k, "value": v} for k, v, _c in n["tiles"]],
+        })
+    return web.json_response(cached, headers=JSON_HEADERS)
+
+
+async def group_page(request):
+    ws_id = int(request.match_info["wid"])
+    bot = request.app["bot_username"]
+    ws = await db.public_workspace(ws_id)
+    if not ws:
+        raise web.HTTPNotFound(text="Bunday sahifa yo'q yoki u ochiq emas.")
+
+    # `?solo=1` — sahifa boshqa saytdan (masalan to'lov botining Mini App'idan)
+    # ochilgan: o'sha odam FAQAT shu guruhni ko'rmoqchi, boshqa guruhlar
+    # ro'yxatiga havola ortiqcha va chalg'ituvchi.
+    solo = request.query.get("solo") in ("1", "true", "yes")
+
+    cache_key = f"g{ws_id}" + ("s" if solo else "")
+    cached = _cached(cache_key)
+    if cached is not None:
+        return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
+
+    n = await _group_numbers(ws)
+    total = n["total"]
+    pnls_n = n["n_pnl"]
+
     tiles_html = "".join(
         f"<div class='tile'><div class='k'>{e(k)}</div>"
-        f"<div class='v {c}'>{e(v)}</div></div>" for k, v, c in tiles)
+        f"<div class='v {c}'>{e(v)}</div></div>" for k, v, c in n["tiles"])
 
     # Oylik
     months = await db.monthly_breakdown(ws_id, limit=12)
@@ -629,15 +700,20 @@ async def group_page(request):
                 if ws["logo"] else
                 f"<span class='blogo ph'>{e(ws['name'][:1].upper())}</span>")
 
+    # `solo` bo'lsa boshqa guruhlar ro'yxatiga qaytish havolasi chiqmaydi.
+    back_link = ("" if solo else
+                 "<div class='sub'><a class='ghost back' href='/'>"
+                 "← Barcha guruhlar</a></div>")
+
     body = (
         f"<header><div class='brand'>Trade Controller</div>"
         f"<div class='htitle'>{big_logo}<h1>{e(ws['name'])}</h1></div>"
-        f"<div class='sub'><a class='ghost back' href='/'>← Barcha guruhlar</a></div>"
+        f"{back_link}"
         f"{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
         + (f"<h2>Balans o'zgarishi</h2>"
            f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"
-           if len(pnls) >= 2 else "")
+           if pnls_n >= 2 else "")
         + section("Oylik natijalar",
                   "<th>Oy</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", mon_rows)
         + (f"<h2>Hozir ochiq</h2><div class='trades'>{opens}</div>"
@@ -649,7 +725,7 @@ async def group_page(request):
         + ("<div class='empty'>Hali yopilgan signal yo'q.</div>" if not total else ""))
 
     out = page(f"{ws['name']} — natijalar", body, bot)
-    _put(f"g{ws_id}", out)
+    _put(cache_key, out)
     return web.Response(text=out, content_type="text/html", headers=NO_CACHE)
 
 
@@ -735,6 +811,7 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", group_page),
+        web.get(r"/g/{wid:\d+}/stats.json", stats_json),
         web.get(r"/g/{wid:\d+}/equity.png", equity_png),
         web.get(r"/g/{wid:\d+}/logo.png", logo_png),
         web.get(r"/s/{sid:\d+}/mini.png", mini_png),
