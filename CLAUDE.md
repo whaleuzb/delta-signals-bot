@@ -4462,3 +4462,27 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        `1000PEPEUSDT`) `symbol_candidates()` tomonidan umuman tanilmaydi
        — to'liq formatda ham ishlamaydi, ya'ni sehrgar bilan bog'liq
        emas.
+
+141. **Foydalanuvchi: "Til o'zgartirildi yozuvidan keyin xechnarsa
+     chiqmayabti. Til tanlangan bosh menyuga avtomatik o'tqizib
+     yuborsin."** — #139 dagi `on_lang_set()` da boshi berk ko'cha bor
+     edi: u `resolve_workspace()` chaqirardi, u esa YANGI odamda (hali
+     workspace yo'q, birinchi `/start`da til so'ralgan holat — ya'ni
+     AYNAN eng ko'p uchraydigan yo'l!) `None` qaytarardi va ekranda
+     faqat "✅ Til o'zgartirildi." qolib ketardi — tugmasiz, davom etish
+     imkonisiz.
+     - Tuzatish: endi `/start`dagi AYNAN o'sha oqim (`get_ws_or_prompt`)
+       ishlatiladi — u workspace bo'lmasa onboarding/tanlov ekranini
+       O'ZI ko'rsatadi, bo'lsa bosh menyu YANGI xabar sifatida yuboriladi
+       (`q.message.reply_text`, eski xabar esa til tasdig'iga o'zgaradi).
+       `can_view` tekshiruvi ham `/start`dagidek qo'shildi.
+     - **Sabab (saboq)**: `resolve_workspace()` — sof "topib ber"
+       funksiyasi, `get_ws_or_prompt()` esa "topib ber YOKI keyingi
+       qadamni ko'rsat". Callback ichida birinchisini ishlatish oson
+       xato — natijada foydalanuvchi hech qanday yo'l ko'rsatilmagan
+       ekranda qoladi.
+     - Tekshirildi: til oqimi testiga YANGI holat qo'shildi —
+       `get_ws_or_prompt` workspace `None` qaytarganda ham chaqirilishi
+       (ya'ni onboarding ko'rsatilishi) va til tasdig'i baribir
+       chiqishi. Jami 19/19 (avval 16 ta edi). `test_tracker.py` 15/15,
+       matn oqimi 13/13 o'zgarishsiz.

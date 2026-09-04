@@ -598,17 +598,23 @@ async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.set_user_lang(uid, code)
     _LANG_CACHE[uid] = code
     await q.answer(i18n.t("lang.saved", code))
-    # Til o'zgargach darhol YANGI tildagi menyuni ko'rsatamiz — odam
-    # natijani shu zahoti ko'radi. Workspace topilmasa (masalan hali
-    # guruh ulanmagan) shunchaki tasdiq matni qoladi.
-    try:
-        ws = await resolve_workspace(update, ctx)
-    except Exception:
-        ws = None
+    await q.edit_message_text(i18n.t("lang.saved", code))
+
+    # Til tanlangach DARHOL bosh menyuga o'tkazamiz. `/start`dagi AYNAN
+    # o'sha oqim (`get_ws_or_prompt`) ishlatiladi. Avval bu yerda
+    # `resolve_workspace()` chaqirilardi va u YANGI odamda `None`
+    # qaytarib, ekranda faqat "Til o'zgartirildi" qolib ketardi —
+    # tugmasiz, boshi berk ko'cha (foydalanuvchi: "Til o'zgartirildi
+    # yozuvidan keyin xechnarsa chiqmayabti"). `get_ws_or_prompt` esa
+    # workspace bo'lmasa onboarding/tanlov ekranini O'ZI ko'rsatadi.
+    ws = await get_ws_or_prompt(update, ctx)
     if not ws:
-        await q.edit_message_text(i18n.t("lang.saved", code))
         return
-    await q.edit_message_text(
+    if not await can_view(ctx.bot, uid, ws):
+        text, kb = access_denied(ws)
+        await q.message.reply_text(text, reply_markup=kb)
+        return
+    await q.message.reply_text(
         i18n.t("menu.title", code, name=ws["name"]),
         reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", code))
 
