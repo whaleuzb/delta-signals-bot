@@ -321,6 +321,16 @@ CREATE TABLE IF NOT EXISTS macd_alerts (
     PRIMARY KEY (symbol, timeframe, candle_open_ms)
 );
 CREATE INDEX IF NOT EXISTS idx_macd_alerts_posted ON macd_alerts(posted_at);
+
+-- Ko'p tillilik (o'zbek/rus/ingliz). IKKI xil til ATAYLAB ajratilgan:
+--   users.lang      — odamning SHAXSIY menyusi tili;
+--   workspaces.lang — GURUHGA ketadigan xabarlar tili (guruh posti
+--                     hammaga BITTA ketadi, uni har kimga o'z tilida
+--                     yuborib bo'lmaydi — tilni guruh tanlaydi).
+-- NULL = hali tanlanmagan -> i18n.normalize() o'zbekchaga tushiradi,
+-- shu sabab eski qatorlar hech narsa yo'qotmaydi.
+ALTER TABLE users      ADD COLUMN IF NOT EXISTS lang TEXT;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS lang TEXT;
 """
 
 
@@ -1187,6 +1197,31 @@ async def econ_mark_sent(kind: str, event_key: str) -> None:
         await c.execute(
             "INSERT INTO econ_calendar_state (kind, event_key) VALUES ($1,$2) "
             "ON CONFLICT (kind, event_key) DO NOTHING", kind, event_key)
+
+
+# ───────────────── Til (i18n) ─────────────────
+
+async def get_user_lang(user_id: int) -> str | None:
+    """Odamning shaxsiy menyu tili. NULL — hali tanlamagan (chaqiruvchi
+    shunda til tanlashni taklif qiladi)."""
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT lang FROM users WHERE user_id=$1", user_id)
+
+
+async def set_user_lang(user_id: int, lang: str) -> None:
+    """`users` qatori hali bo'lmasligi mumkin (odam /start bosgan, lekin
+    `touch_user` hali ishlamagan holat) — shu sabab UPSERT."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO users (user_id, lang) VALUES ($1,$2) "
+            "ON CONFLICT (user_id) DO UPDATE SET lang=EXCLUDED.lang",
+            user_id, lang)
+
+
+async def set_workspace_lang(workspace_id: int, lang: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET lang=$2 WHERE id=$1",
+                        workspace_id, lang)
 
 
 # ───────────────── MACD kesishmasi (dedup) ─────────────────

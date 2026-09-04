@@ -38,6 +38,7 @@ import db
 import econcalendar
 import exchange
 import forex
+import i18n
 import indicators
 import liquidations
 import listings
@@ -494,21 +495,25 @@ def web_page_url(ws) -> str | None:
     return f"{config.WEB_URL}/g/{ws['id']}"
 
 
-def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
+def main_menu_kb(uid: int, ws, private: bool = True,
+                  lang: str | None = None) -> InlineKeyboardMarkup:
+    """`lang` — odamning SHAXSIY tili (`users.lang`). Berilmasa
+    o'zbekcha (i18n.normalize) — hali tarjimaga o'tkazilmagan eski
+    chaqiruv joylari shu sabab o'zgarishsiz ishlayveradi."""
     rows = []
     if can_manage(uid, ws):
-        rows.append([InlineKeyboardButton("➕ Yangi signal", callback_data="newsig"),
-                     InlineKeyboardButton("💰 Depozit", callback_data="m:deposit")])
+        rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig"),
+                     InlineKeyboardButton(i18n.t("menu.deposit", lang), callback_data="m:deposit")])
     rows += [
-        [InlineKeyboardButton("📊 Statistika", callback_data="m:stats"),
-         InlineKeyboardButton("📉 Juftliklar", callback_data="m:symbols")],
-        [InlineKeyboardButton("🔓 Ochiq signallar", callback_data="m:open"),
-         InlineKeyboardButton("📈 Equity", callback_data="m:equity")],
+        [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
+         InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")],
+        [InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open"),
+         InlineKeyboardButton(i18n.t("menu.equity", lang), callback_data="m:equity")],
     ]
     # News Trade AI kanaliga havola — sozlanmagan bo'lsa (NEWS_CHANNEL_ID
     # bo'sh) butun funksiya o'chiq, tugma ham chiqmaydi.
     if config.NEWS_CHANNEL_ID:
-        rows.append([InlineKeyboardButton("📰 News Trade AI",
+        rows.append([InlineKeyboardButton(i18n.t("menu.news", lang),
                                           url=f"https://t.me/{NEWS_CHANNEL_USERNAME}")])
     url = web_page_url(ws)
     if url:
@@ -520,15 +525,97 @@ def main_menu_kb(uid: int, ws, private: bool = True) -> InlineKeyboardMarkup:
         # Yonida "🔗 Havola" tugmasi ham bor edi — olib tashlandi: ikkalasi
         # ham AYNI sahifaga olib borardi. Havolani ulashish kerak bo'lsa
         # /sahifa buyrug'i bor (u manzilni <code> ichida yuboradi).
-        page = (InlineKeyboardButton("🌐 Ochiq sahifa", web_app=WebAppInfo(url=url))
-                if private else InlineKeyboardButton("🌐 Ochiq sahifa", url=url))
+        page_label = i18n.t("menu.page", lang)
+        page = (InlineKeyboardButton(page_label, web_app=WebAppInfo(url=url))
+                if private else InlineKeyboardButton(page_label, url=url))
         rows.append([page])
-    rows.append([InlineKeyboardButton("❓ Yordam", callback_data="help:home"),
-                 InlineKeyboardButton("🔁 Boshqa joyga o'tish", callback_data="switch")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.help", lang), callback_data="help:home"),
+                 InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
     return InlineKeyboardMarkup(rows)
 
 
-MENU_BACK_KB = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")]])
+def menu_back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    """Tarjimaga o'tkazilgan joylar shuni ishlatadi. Qolgan (hali
+    o'zbekcha) joylar `MENU_BACK_KB` konstantasidan foydalanishda davom
+    etadi — tarjima bosqichma-bosqich ko'chirilyapti."""
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")]])
+
+
+MENU_BACK_KB = menu_back_kb()
+
+
+# ─────────────────────────── Til (i18n) ───────────────────────────
+# Til deyarli HAR BIR xabarda kerak — har safar bazaga so'rov yuborish
+# ortiqcha yuk bo'lardi. Shu sabab kichik kesh: odam tilini o'zgartirsa
+# `set_user_lang` orqali darhol yangilanadi, boshqa hech qachon
+# eskirmaydi (til faqat shu bot orqali o'zgaradi).
+_LANG_CACHE: dict[int, str] = {}
+
+
+async def user_lang(uid: int) -> str:
+    """Odamning shaxsiy menyu tili. Tanlanmagan bo'lsa — o'zbekcha."""
+    cached = _LANG_CACHE.get(uid)
+    if cached:
+        return cached
+    try:
+        lang = i18n.normalize(await db.get_user_lang(uid))
+    except Exception:
+        log.warning("Til o'qilmadi (%s)", uid, exc_info=True)
+        return i18n.DEFAULT_LANG
+    _LANG_CACHE[uid] = lang
+    return lang
+
+
+async def has_chosen_lang(uid: int) -> bool:
+    """Odam tilni ATAYLAB tanlaganmi (NULL — hali tanlamagan)."""
+    if uid in _LANG_CACHE:
+        return True
+    try:
+        return await db.get_user_lang(uid) is not None
+    except Exception:
+        return True     # baza xato bersa til so'rab bezovta qilmaymiz
+
+
+def lang_kb(prefix: str = "lang:set") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(title, callback_data=f"{prefix}:{code}")]
+         for code, title in i18n.LANGS.items()])
+
+
+async def on_lang_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    lang = await user_lang(q.from_user.id)
+    await q.edit_message_text(i18n.t("lang.choose", lang), reply_markup=lang_kb())
+
+
+async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    code = i18n.normalize(q.data.rsplit(":", 1)[1])
+    uid = q.from_user.id
+    await db.set_user_lang(uid, code)
+    _LANG_CACHE[uid] = code
+    await q.answer(i18n.t("lang.saved", code))
+    # Til o'zgargach darhol YANGI tildagi menyuni ko'rsatamiz — odam
+    # natijani shu zahoti ko'radi. Workspace topilmasa (masalan hali
+    # guruh ulanmagan) shunchaki tasdiq matni qoladi.
+    try:
+        ws = await resolve_workspace(update, ctx)
+    except Exception:
+        ws = None
+    if not ws:
+        await q.edit_message_text(i18n.t("lang.saved", code))
+        return
+    await q.edit_message_text(
+        i18n.t("menu.title", code, name=ws["name"]),
+        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", code))
+
+
+async def cmd_til(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = await user_lang(update.effective_user.id)
+    await update.message.reply_text(i18n.t("lang.choose", lang), reply_markup=lang_kb())
 
 
 # ─────────────────────────── Yordam / yo'riqnoma ───────────────────────────
@@ -3071,6 +3158,15 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode=ParseMode.HTML)
         return
 
+    # Birinchi marta kelgan odamdan tilni SO'RAYMIZ (uchala tilda yozilgan
+    # savol bilan — qaysi tilni tushunishini hali bilmaymiz). Tanlagach
+    # `on_lang_set` darhol menyuni ko'rsatadi. Guruhda so'ralmaydi: u
+    # yerda til guruh sozlamasi.
+    if update.effective_chat.type == "private" and not await has_chosen_lang(uid):
+        await update.message.reply_text(
+            i18n.t("lang.choose_first"), reply_markup=lang_kb())
+        return
+
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -3078,9 +3174,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(uid)
     await update.message.reply_text(
-        f"Trade Controller — {ws['name']} 👇",
-        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private"))
+        i18n.t("menu.title", lang, name=ws["name"]),
+        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private", lang))
 
 
 async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5919,6 +6016,7 @@ async def post_init(app: Application) -> None:
         ("sahifa", "Guruhning ochiq natijalar sahifasi"),
         ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
         ("bekor", "Joriy amalni bekor qilish"),
+        ("til", "Til / Язык / Language"),
     ])
     # Avvalgi ishga tushirishda /tg_login bilan allaqachon login qilingan
     # bo'lsa (sessiya Postgres'da saqlangan) — qayta login talab qilinmasdan
@@ -5966,6 +6064,11 @@ def main() -> None:
     app.add_handler(CommandHandler("menu", cmd_start))
     app.add_handler(CommandHandler("setup", cmd_setup))
     app.add_handler(CommandHandler("bekor", cmd_bekor))
+    app.add_handler(CommandHandler("til", cmd_til))
+    # `lang:set:<kod>` AVVAL kelishi kerak — `lang:menu` bilan bir xil
+    # prefiksda, aniqrog'i birinchi tekshirilsin.
+    app.add_handler(CallbackQueryHandler(on_lang_set, pattern=r"^lang:set:"))
+    app.add_handler(CallbackQueryHandler(on_lang_menu, pattern=r"^lang:menu$"))
     app.add_handler(CommandHandler("stats", cmd_stats))
     # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
     # (oddiy foydalanuvchi menyusida ko'rinmasin).

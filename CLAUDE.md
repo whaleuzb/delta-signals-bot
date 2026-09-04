@@ -4364,3 +4364,53 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        4h sham yopilgandan keyin (UTC 00/04/08/12/16/20:00) logda
        "MACD skaner: 4h — N juftlikdan M ta kesishma" qatori chiqishi
        kerak.
+
+139. **Foydalanuvchi: "Endi 3 xil til qo'shaylik. Uzbek Rus Ingiliz
+     tili."** — ko'p tillilik BOSQICHMA-BOSQICH qo'shilyapti (kod bazasida
+     ~530 ta foydalanuvchiga ko'rinadigan matn, 122 ta tugma, 303 ta
+     xabar joyi bor — bir yo'la tarjima qilish xavfli). Bu **1-bosqich:
+     infratuzilma + til tanlash + asosiy menyu**.
+     - **Foydalanuvchi tanlovi** (so'ralib aniqlangan): qamrov — "menyu +
+       guruh xabarlari" (kanal posti hozircha tegilmaydi); usul —
+       bosqichma-bosqich.
+     - **IKKI xil til ATAYLAB ajratilgan** — bu eng muhim arxitektura
+       qarori: `users.lang` odamning SHAXSIY menyusi uchun,
+       `workspaces.lang` esa GURUHGA ketadigan xabarlar uchun. Sabab:
+       guruh posti hammaga BITTA ketadi, uni har bir a'zoga o'z tilida
+       yuborib bo'lmaydi — shuning uchun tilni guruhning O'ZI tanlaydi.
+     - **`i18n.py` (YANGI)**: `LANGS` (uz/ru/en), `STRINGS` lug'ati,
+       `t(key, lang, **kwargs)`, `normalize()`, `missing()`. Kalit yoki
+       tarjima topilmasa o'zbekchaga, u ham bo'lmasa kalitning O'ZIGA
+       qaytadi — ekran HECH QACHON bo'sh qolmaydi. `missing()` qaysi
+       kalitda qaysi til yozilmaganini qaytaradi (keyingi bosqichlarda
+       to'ldirib borish uchun).
+     - **Eski qatorlar buzilmaydi**: `lang` NULL = hali tanlanmagan ->
+       `normalize()` o'zbekchaga tushiradi. Ya'ni migratsiyadan keyin
+       hamma narsa avvalgidek o'zbekcha ko'rinadi.
+     - **Bosqichma-bosqich ko'chirish**: `main_menu_kb(...)` ga
+       ixtiyoriy `lang` parametri qo'shildi (berilmasa o'zbekcha), yangi
+       `menu_back_kb(lang)` yordamchisi qo'shildi, `MENU_BACK_KB`
+       konstantasi esa `menu_back_kb()` natijasi sifatida SAQLANDI —
+       shu sabab hali tarjimaga o'tkazilmagan ~100 ta chaqiruv joyi
+       o'zgarishsiz ishlayveradi.
+     - **Til tanlash**: birinchi `/start`da (faqat shaxsiy chatda)
+       UCHALA tilda yozilgan savol bilan so'raladi (odam qaysi tilni
+       tushunishini hali bilmaymiz), keyin menyudagi "🌐 Til" tugmasi
+       yoki `/til` buyrug'i orqali o'zgartiriladi. Til o'zgargach DARHOL
+       yangi tildagi menyu ko'rsatiladi.
+     - **Kesh**: til deyarli har xabarda kerak, shu sabab `_LANG_CACHE`
+       (o'zgartirilganda darhol yangilanadi; til faqat shu bot orqali
+       o'zgargani uchun boshqa eskirish yo'li yo'q).
+     - Tekshirildi: (1) `i18n` birliklari — 3 til, noma'lum til va
+       yo'q kalit fallback'i; (2) **HAQIQIY Postgres** bilan 10 ta holat
+       (ustunlar, NULL fallback, UPSERT, mavjud qatorga yozishda
+       `username` saqlanishi, guruh va odam tillari mustaqilligi,
+       MIGRATE idempotentligi); (3) to'liq oqim 16 ta holat — birinchi
+       `/start`da til so'ralishi, tanlangach menyu O'SHA tilda,
+       ikkinchi `/start`da qayta so'ralmasligi, tilni almashtirish,
+       `lang` berilmaganda o'zbekcha qolishi, eski `MENU_BACK_KB`
+       o'zgarmagani. `test_tracker.py` 15/15, MACD oqimi 11/11.
+     - **Keyingi bosqichlar** (hali QILINMAGAN): sehrgar (yangi signal),
+       statistika/ochiq signallar ekranlari, yordam matni, xato
+       xabarlari, guruhga ketadigan signal/TP/SL xabarlari
+       (`workspaces.lang` ustuni tayyor, lekin hali ishlatilmayapti).
