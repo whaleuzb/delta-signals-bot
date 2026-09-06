@@ -794,6 +794,23 @@ async def set_workspace_logo(workspace_id: int, data: bytes | None) -> None:
             workspace_id, data)
 
 
+async def workspace_logo(workspace_id: int) -> bytes | None:
+    """Guruh logotipi — DARVOZASIZ.
+
+    `public_logo()` dan farqi: u ochiq veb sahifa uchun va guruh ommaga
+    ochilganini talab qiladi. Bu esa ichki foydalanish uchun (ulashish
+    kartasi) — karta faqat o'sha guruhning o'z xabariga qo'shiladi, ya'ni
+    rasmni allaqachon ko'radigan odamlarga boradi."""
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT logo FROM workspaces WHERE id=$1", workspace_id)
+
+
+async def get_user(user_id: int) -> asyncpg.Record | None:
+    """Foydalanuvchi qatori (username/first_name uchun)."""
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM users WHERE user_id=$1", user_id)
+
+
 async def public_logo(workspace_id: int) -> bytes | None:
     """Ochiq sahifa uchun logotip. Darvoza `public_workspace()` bilan bir xil —
     yopiq guruhning rasmi id taxmin qilib olinmasin."""

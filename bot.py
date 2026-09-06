@@ -31,6 +31,7 @@ from telegram.ext import (
     CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
 )
 
+import card
 import chart
 import config
 import cryptonews
@@ -493,6 +494,50 @@ def web_page_url(ws) -> str | None:
     if not (ws["public"] and ws["public_approved"] and not ws["archived"]):
         return None
     return f"{config.WEB_URL}/g/{ws['id']}"
+
+
+async def build_pnl_card(sig, ws, bot_username: str | None):
+    """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
+
+    Grafik (`chart.signal_chart`) tahlil uchun — unda shamlar, darajalar,
+    chiqish nuqtasi bor. Bu esa ULASHISH uchun: bitta katta foiz, juftlik va
+    QR. Ikkalasi bitta albomda ketadi.
+
+    QR qayerga olib boradi: guruhning ochiq sahifasi bo'lsa — o'shanga
+    (u yerda barcha natijalar va guruhga qo'shilish tugmasi bor), aks holda
+    botning o'ziga. Ochiq bo'lmagan guruhning sahifasiga QR qo'yish ma'nosiz
+    edi — bosgan odam 404 olardi.
+    """
+    if sig["exit_price"] is None or sig["pnl_pct"] is None or not sig["closed_at"]:
+        return None
+
+    page = web_page_url(ws)
+    qr_url = page or (f"https://t.me/{bot_username}" if bot_username else None)
+    if not qr_url:
+        return None
+
+    logo = None
+    try:
+        logo = await db.workspace_logo(ws["id"])
+    except Exception:
+        log.warning("Karta: logotip o'qilmadi (#%s)", ws["id"], exc_info=True)
+
+    username = None
+    if sig["author_id"]:
+        try:
+            u = await db.get_user(sig["author_id"])
+            username = u["username"] if u else None
+        except Exception:
+            log.warning("Karta: muallif o'qilmadi (#%s)", sig["id"], exc_info=True)
+
+    return card.pnl_card(
+        symbol=sig["symbol"], side=sig["side"],
+        entry=float(sig["entry"]), exit_price=float(sig["exit_price"]),
+        pnl_pct=float(sig["pnl_pct"]),
+        r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
+        closed_at=sig["closed_at"].astimezone(stats.TZ),
+        username=username, ws_name=ws["name"], logo=logo,
+        qr_url=qr_url, sig_id=sig["id"], market=sig["market"])
 
 
 def main_menu_kb(uid: int, ws, private: bool = True,
@@ -2833,25 +2878,55 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # yuboriladi. Grafik ishlab chiqarilmasa (birja javob bermasa va h.k.)
         # jim tarzda oddiy matn xabariga qaytiladi — hech narsa buzilmaydi.
         photo = None
+        share = None
         if closed_pnl is not None and sig:
             try:
                 photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username)
             except Exception:
                 log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
+            # Ulashish kartasi — grafikdan ALOHIDA va undan mustaqil:
+            # biri chiqmasa ikkinchisi baribir ketadi.
+            try:
+                share = await build_pnl_card(sig, ws, ctx.bot.username)
+            except Exception:
+                log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
+
+        # Ikkala rasm ham bo'lsa — bitta ALBOM: bir xabar, ikki rasm.
+        # Alohida yuborilsa guruhga ketma-ket ikki bildirishnoma tushardi.
+        album = None
+        if photo and share:
+            album = [InputMediaPhoto(InputFile(photo, "signal.png"), caption=txt,
+                                      parse_mode=ParseMode.HTML),
+                     InputMediaPhoto(InputFile(share, "natija.png"))]
+        single = photo or share
+
+        async def _send_result(chat_id: int, reply_to, thread_id=None):
+            """Natijani yuborish: albom -> bitta rasm -> oddiy matn.
+
+            Albom qaytmasa (Telegram ba'zan media guruhni rad etadi) bitta
+            rasmga tushamiz — natija xabari HECH QACHON umuman yuborilmay
+            qolmasligi kerak."""
+            kw = {"reply_to_message_id": reply_to, "allow_sending_without_reply": True}
+            if thread_id is not None:
+                kw["message_thread_id"] = thread_id
+            if album:
+                try:
+                    await ctx.bot.send_media_group(chat_id, album, **kw)
+                    return
+                except Exception:
+                    log.warning("Albom yuborilmadi (#%s), bitta rasmga o'tamiz", sid,
+                                exc_info=True)
+            if single:
+                single.seek(0)
+                await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
+                                          caption=txt, parse_mode=ParseMode.HTML, **kw)
+            else:
+                await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
 
         if ws["type"] == "group" and ws["group_chat_id"]:
             reply_to = sig["group_msg_id"] if sig else None
             try:
-                if photo:
-                    await ctx.bot.send_photo(
-                        ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
-                        parse_mode=ParseMode.HTML, reply_to_message_id=reply_to,
-                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
-                else:
-                    await ctx.bot.send_message(
-                        ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
-                        reply_to_message_id=reply_to, allow_sending_without_reply=True,
-                        message_thread_id=ws["group_topic_id"])
+                await _send_result(ws["group_chat_id"], reply_to, ws["group_topic_id"])
             except Exception:
                 log.exception("Xabar yuborilmadi")
         elif ws["type"] == "personal":
@@ -2859,15 +2934,7 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             # shunda qaysi signal haqida ekani darrov ko'rinadi.
             reply_to = sig["group_msg_id"] if sig else None
             try:
-                if photo:
-                    await ctx.bot.send_photo(ws["owner_id"], InputFile(photo, "signal.png"),
-                                              caption=txt, parse_mode=ParseMode.HTML,
-                                              reply_to_message_id=reply_to,
-                                              allow_sending_without_reply=True)
-                else:
-                    await ctx.bot.send_message(ws["owner_id"], txt, parse_mode=ParseMode.HTML,
-                                                reply_to_message_id=reply_to,
-                                                allow_sending_without_reply=True)
+                await _send_result(ws["owner_id"], reply_to)
             except Exception:
                 log.exception("Shaxsiy xabar yuborilmadi")
 
@@ -5797,6 +5864,45 @@ async def liquidation_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Likvidatsiya hodisasi ishlanmadi (%s)", spike.symbol)
 
 
+async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/karta 142 — yopilgan signalning ulashish kartasini QAYTA yasaydi.
+
+    Karta signal yopilganda o'zi keladi; bu buyruq eski savdolarni ham
+    ulashish uchun (va yangi ko'rinishni sinab ko'rish uchun) kerak."""
+    msg = update.effective_message
+    if not ctx.args or not ctx.args[0].lstrip("#").isdigit():
+        await msg.reply_text("Foydalanish: <code>/karta 142</code> — signal raqami.",
+                             parse_mode=ParseMode.HTML)
+        return
+    sid = int(ctx.args[0].lstrip("#"))
+    sig = await db.get_signal(sid)
+    if not sig:
+        await msg.reply_text(f"#{sid} topilmadi.")
+        return
+
+    ws = await db.get_workspace(sig["workspace_id"])
+    # Karta savdo tafsilotlarini (kirish/chiqish narxi) ko'rsatadi — shuning
+    # uchun uni FAQAT o'sha joyni boshqara oladigan odam yasay oladi.
+    if not ws or not can_manage(update.effective_user.id, ws):
+        await msg.reply_text("Bu signal sizniki emas.")
+        return
+    if sig["exit_price"] is None or sig["pnl_pct"] is None:
+        await msg.reply_text(f"#{sid} hali yopilmagan — karta yopilgandan keyin tayyor bo'ladi.")
+        return
+
+    async with busy(ctx.bot, msg.chat_id, "🎨 Karta chizilyapti…"):
+        try:
+            img = await build_pnl_card(sig, ws, ctx.bot.username)
+        except Exception:
+            log.exception("Karta yasalmadi (#%s)", sid)
+            img = None
+    if not img:
+        await msg.reply_text("Kartani yasab bo'lmadi.")
+        return
+    await msg.reply_photo(InputFile(img, "natija.png"),
+                          caption=f"#{sid} {html.escape(sig['symbol'])} — ulashish uchun")
+
+
 async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """/charttest TLM (yoki TSLA, EURUSD) — FAQAT super-admin. News Trade AI
     jonli grafik mexanizmini (post + har necha soniyada qayta chizish)
@@ -6080,6 +6186,7 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("qaytar", cmd_qaytar))
+    app.add_handler(CommandHandler("karta", cmd_karta))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))

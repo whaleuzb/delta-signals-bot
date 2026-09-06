@@ -4588,3 +4588,45 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - Tekshirildi: 30/30 (avvalgi 24 tasiga embed uchun 6 ta yangi holat
        qo'shildi — Telegram skripti chiqmasligi, oddiy sahifada esa hamon
        chiqishi, uchta kesh kalitining aralashmasligi). `test_tracker.py` 15/15.
+
+145. **Yopilgan savdo uchun ULASHISH kartasi (`card.py`).** Foydalanuvchi
+     BingX'ning "PnL sharing" kartasini ko'rsatib: "harbir yopilgan signal
+     uchun shunday rasm generat qiladigan ishlab chiqishimiz kerak. Spotga
+     moslab. Birja logolari o'rniga username va tradecontrbot logosi va qr
+     kodi."
+     - **Grafikdan ALOHIDA maqsad**: `chart.signal_chart()` — TAHLIL uchun
+       (shamlar, darajalar, chiqish nuqtasi). `card.pnl_card()` — ULASHISH
+       uchun: bitta katta foiz, juftlik, QR. Ikkalasi bitta ALBOMDA ketadi
+       (`send_media_group`), aks holda guruhga ketma-ket ikki bildirishnoma
+       tushardi.
+     - **Nega matplotlib emas, Pillow**: bu grafik emas, MAKET. Matnni
+       pikselgacha joylashtirish, dumaloq avatar, QR paneli — Pillow'da
+       to'g'ridan-to'g'ri va tezroq.
+     - **Shriftlar matplotlib g'ildiragi ichidan olinadi**
+       (`mpl-data/fonts/ttf/DejaVuSans*.ttf`). Tizim shriftlariga tayanib
+       bo'lmaydi — Railway konteynerida ular bo'lmasligi mumkin, matplotlib
+       esa allaqachon talab qilinadi, ya'ni shrift HAR DOIM bor.
+     - **Spotga moslash**: yelka (`25X`) o'rnida `SPOT`; foiz esa
+       "nereallashgan" emas, YOPILGAN natija.
+     - **QR qayerga**: guruh OCHIQ bo'lsa `/g/<id>` sahifasiga (u yerda
+       barcha natijalar va qo'shilish tugmasi), aks holda botga. Ochiq
+       bo'lmagan guruh sahifasiga QR qo'yish ma'nosiz — bosgan odam 404
+       olardi. Manzil umuman topilmasa karta YASALMAYDI (bo'sh QR bo'lmasin).
+     - **QR oq panel ustida**: teskari (oq modul, qora fon) QR ko'p
+       skanerlarda o'qilmaydi.
+     - **Rang**: katta foiz uchun grafiklardagi `#26a69a` emas, yorqinroq
+       `#2BE08D`/`#FF5F5F` — karta telefon ekranida, qora fonda ko'riladi
+       va bosiq rang bu o'lchamda xira chiqadi. Grafiklar o'z rangida qoldi.
+     - **Yiqilmaydi**: logotip bayti buzuq bo'lsa harf-avatarga, baza
+       o'qilmasa username'siz, karta umuman chiqmasa faqat grafikka,
+       albom rad etilsa bitta rasmga, hech nima bo'lmasa oddiy matnga
+       qaytadi — natija xabari HECH QACHON yuborilmay qolmaydi.
+     - **`/karta <id>`** — eski yopilgan savdoni qayta ulashish uchun
+       (`can_manage` talab qilinadi: karta kirish/chiqish narxini ko'rsatadi).
+     - Tekshirildi: `card` 20 ta holat (o'lcham, foyda/zarar rangi, buzuq
+       logotip, uzun username, R yo'q, turli narx kattaliklari, ±9999%,
+       SHORT, aksiya) — jumladan **TAYYOR KARTADAGI QR OpenCV bilan
+       haqiqatan skanerlab** tekshirildi; `build_pnl_card` 11 ta holat
+       (QR ochiq guruhda sahifaga, yopiqda botga, yopilmagan signalda
+       karta yo'q, baza yiqilganda ham karta chiqishi). `test_tracker.py`
+       15/15, veb 30/30.
