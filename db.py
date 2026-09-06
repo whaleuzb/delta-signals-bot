@@ -8,6 +8,7 @@ Multi-tenant: har bir signal bitta workspace'ga tegishli.
                        faqat owner_id o'zi ko'ra oladi.
 """
 import json
+import secrets
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -331,6 +332,15 @@ CREATE INDEX IF NOT EXISTS idx_macd_alerts_posted ON macd_alerts(posted_at);
 -- shu sabab eski qatorlar hech narsa yo'qotmaydi.
 ALTER TABLE users      ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS lang TEXT;
+
+-- QISQA taklif kodi (masalan A7K3QM). Havolada `?start=ref_<uid>` ham
+-- ishlayveradi (eski havolalar buzilmasin), lekin ULASHISH KARTASIDA
+-- 10 xonali Telegram id'ni ko'rsatib bo'lmaydi — u na o'qiladi, na
+-- yodda qoladi. Kod TALAB QILINGANDA yaratiladi (`ensure_ref_code`),
+-- ya'ni bu migratsiya hech kimga kod tarqatmaydi.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_code TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(ref_code)
+    WHERE ref_code IS NOT NULL;
 """
 
 
@@ -646,6 +656,47 @@ async def referral_stats(limit: int = 10) -> tuple[int, list[asyncpg.Record]]:
             LIMIT $1
         """, limit)
     return total, top
+
+
+# Chalkashadigan belgilar (0/O, 1/I/L) ATAYLAB yo'q: kod og'zaki
+# aytiladi va qo'lda teriladi.
+REF_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+REF_LEN = 6
+
+
+async def ensure_ref_code(user_id: int) -> str:
+    """Odamning qisqa taklif kodi — bo'lmasa yaratadi.
+
+    Kod TALAB QILINGANDA yaratiladi: kartani ulashgan yoki `/taklif`
+    bergan odamgagina kerak, hammaga oldindan tarqatishning ma'nosi yo'q.
+    To'qnashuv ehtimoli juda kichik (31^6 ≈ 887 mln), lekin unikal indeks
+    bor — shuning uchun bir necha marta urinib ko'riladi.
+    """
+    async with pool().acquire() as c:
+        cur = await c.fetchval("SELECT ref_code FROM users WHERE user_id=$1", user_id)
+        if cur:
+            return cur
+        for _ in range(8):
+            code = "".join(secrets.choice(REF_ALPHABET) for _ in range(REF_LEN))
+            try:
+                got = await c.fetchval(
+                    "INSERT INTO users (user_id, ref_code) VALUES ($1,$2) "
+                    "ON CONFLICT (user_id) DO UPDATE SET "
+                    "ref_code = COALESCE(users.ref_code, EXCLUDED.ref_code) "
+                    "RETURNING ref_code", user_id, code)
+            except asyncpg.UniqueViolationError:
+                continue          # kod band — boshqasini sinaymiz
+            if got:
+                return got
+    raise RuntimeError("Taklif kodi yaratilmadi")
+
+
+async def user_by_ref_code(code: str) -> int | None:
+    """Kod bo'yicha taklif qiluvchining id'si. Katta-kichik harf farq qilmaydi
+    — odam kodni qo'lda terganda buni o'ylab o'tirmasligi kerak."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "SELECT user_id FROM users WHERE upper(ref_code)=upper($1)", code)
 
 
 async def count_referrals(referrer_id: int) -> int:

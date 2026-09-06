@@ -4658,3 +4658,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        guruhda farq yo'qligi, `ref_uid` ustunligi, muallif yo'q bo'lsa
        egasiga o'tishi) — QR har safar TAYYOR KARTADAN OpenCV bilan
        skanerlab tekshirildi. `card` 20/20, `test_tracker` 15/15, veb 30/30.
+
+147. **QISQA taklif kodi (`users.ref_code`) va uning kartada ko'rinishi.**
+     Foydalanuvchi: "referal kodi qr kod yuqorisida ko'rinsin."
+     - **Nega shunchaki ko'rsatib qo'yib bo'lmadi**: #146'gacha "kod"
+       degani Telegram user id edi (`ref_1101182189`). Uni kartada
+       "referal kodi" deb chiqarish mumkin emas — 10 xonali raqam na
+       o'qiladi, na yodda qoladi, na og'zaki aytiladi. Shuning uchun
+       BingX'dagi kabi QISQA kod qo'shildi.
+     - `users.ref_code` — 6 belgi, alifboda **0/O va 1/I/L YO'Q**
+       (kod og'zaki aytiladi va qo'lda teriladi). Qisman unikal indeks
+       (`WHERE ref_code IS NOT NULL`) — kodsiz odamlar yonma-yon tura
+       oladi, ya'ni migratsiya HECH KIMGA kod tarqatmaydi.
+     - **Kod TALAB QILINGANDA yaratiladi** (`db.ensure_ref_code`) — u
+       faqat kartani ulashgan yoki `/taklif` bergan odamga kerak.
+       `INSERT ... ON CONFLICT DO UPDATE SET ref_code = COALESCE(...)` —
+       mavjud qatorning `username`/`first_name`i buzilmaydi va ikkinchi
+       chaqiruv AYNI kodni qaytaradi.
+     - **`cmd_start` ikkala shaklni ham qabul qiladi**: `ref_A7K3QM`
+       (yangi) va `ref_<uid>` (eski). Allaqachon tarqatilgan havolalar
+       ishlab turishi shart — aks holda o'tmishdagi takliflar jimgina
+       yo'qolardi. Katta-kichik harf farq qilmaydi (`upper()`).
+     - **Kod yaratilmasa uid'ga qaytiladi** (`referral_token`): chiroyli
+       kod — qulaylik, havolaning ISHLASHI esa majburiy.
+     - Kartada QR **ustida** ikki qator: kichik "Taklif kodi" yorlig'i va
+       katta kod. QR faqat kamerasi ochiq odam uchun; kodni skrinshotdan
+       ko'chirib olish yoki aytib berish mumkin. Ajratuvchi chiziq
+       qisqartirildi — u kod ostidan o'tsa siqilgan ko'rinardi.
+     - Tekshirildi: **HAQIQIY Postgres**da 16 ta holat (kod barqarorligi,
+       chalkash belgilar yo'qligi, katta-kichik harf, mavjud qatorning
+       buzilmasligi, UNIQUE, qisman indeks, MIGRATE idempotentligi);
+       `build_pnl_card` 20 ta holat — jumladan **TO'LIQ AYLANMA**:
+       kartadagi QR OpenCV bilan skanerlandi -> payload `cmd_start`ga
+       berildi -> `add_referral(muallif, skanerlagan)` chaqirilgani
+       tasdiqlandi, eski `ref_<uid>` shakli ham, yo'q kod ham sinaldi.
+       `card` 22/22, `test_tracker` 15/15, veb 30/30.

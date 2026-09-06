@@ -144,7 +144,8 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
              pnl_pct: float, r_multiple: float | None,
              closed_at: datetime, username: str | None, ws_name: str,
              logo: bytes | None, qr_url: str, sig_id: int | None = None,
-             market: str = "crypto", qr_caption: str = "") -> io.BytesIO:
+             market: str = "crypto", qr_caption: str = "",
+             qr_code: str | None = None) -> io.BytesIO:
     """Ulashish kartasini chizadi va PNG bayt oqimini qaytaradi."""
     acc = PROFIT if pnl_pct >= 0 else LOSS
 
@@ -220,7 +221,9 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
         ky += 54
 
     # ── Pastki chiziq ───────────────────────────────────────────────────
-    d.line((PAD, H - 232, W - PAD, H - 232), fill=LINE, width=2)
+    # Chiziq faqat CHAP tomonda: o'ng tomonda endi taklif kodi turibdi,
+    # chiziq uning ostidan o'tsa siqilgan ko'rinardi.
+    d.line((PAD, H - 232, W - PAD - 300, H - 232), fill=LINE, width=2)
 
     # ── Pastki chap: avatar + username + sana ───────────────────────────
     av_px = 88
@@ -249,9 +252,19 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
     px0, py0 = W - PAD - panel, H - 172 - 14
     d.rounded_rectangle((px0, py0, px0 + panel, py0 + panel), radius=16, fill="white")
     img.paste(_qr(qr_url, qr_px), (px0 + quiet, py0 + quiet))
-    # QR ustidagi yozuv — skanerlaydigan odam QAYERGA borishini bilsin.
-    # Bo'sh bo'lsa umuman chizilmaydi.
-    if qr_caption:
+    # QR USTIDA: yorliq va TAKLIF KODI. Kod ko'rinib turishi kerak —
+    # QR faqat kamerasi ochiq odam uchun; kodni esa skrinshotdan ko'chirib
+    # olish yoki og'zaki aytish mumkin.
+    if qr_code:
+        f_code = _f(34, bold=True)
+        f_cap = _f(23)
+        right = px0 + panel
+        if qr_caption:
+            _tracked(d, (right - _tracked_width(d, qr_caption, f_cap, 2.4), py0 - 78),
+                     qr_caption, f_cap, MUTED, spacing=2.4)
+        _tracked(d, (right - _tracked_width(d, qr_code, f_code, 3.0), py0 - 46),
+                 qr_code, f_code, TXT, spacing=3.0)
+    elif qr_caption:
         f_cap = _f(25)
         d.text((px0 + panel - d.textlength(qr_caption, font=f_cap), py0 - 38),
                qr_caption, font=f_cap, fill=MUTED)

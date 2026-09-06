@@ -496,13 +496,24 @@ def web_page_url(ws) -> str | None:
     return f"{config.WEB_URL}/g/{ws['id']}"
 
 
-def referral_link(uid: int, bot_username: str | None) -> str | None:
-    """Odamning SHAXSIY taklif havolasi — `/taklif` bergani bilan AYNI.
+def referral_link(token, bot_username: str | None) -> str | None:
+    """Shaxsiy taklif havolasi. `token` — qisqa kod (A7K3QM) yoki oddiy uid.
 
-    Bitta joyda turishi shart: `cmd_start` `ref_<uid>` payload'ini shu
+    Bitta joyda turishi shart: `cmd_start` `ref_<token>` payload'ini shu
     shaklda kutadi, ya'ni havola formati o'zgarsa taklif hisobga olinmay
     qoladi."""
-    return f"https://t.me/{bot_username}?start=ref_{uid}" if bot_username else None
+    return f"https://t.me/{bot_username}?start=ref_{token}" if bot_username else None
+
+
+async def referral_token(uid: int, bot_username: str | None) -> tuple[str | None, str | None]:
+    """(kod, havola). Kod yaratib bo'lmasa uid'ga qaytamiz — havola baribir
+    ishlashi kerak, chiroyli kod esa qo'shimcha qulaylik."""
+    try:
+        code = await db.ensure_ref_code(uid)
+    except Exception:
+        log.warning("Taklif kodi yaratilmadi (%s)", uid, exc_info=True)
+        code = None
+    return code, referral_link(code or uid, bot_username)
 
 
 async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None):
@@ -521,7 +532,8 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
     if sig["exit_price"] is None or sig["pnl_pct"] is None or not sig["closed_at"]:
         return None
 
-    qr_url = referral_link(ref_uid or sig["author_id"] or ws["owner_id"], bot_username)
+    code, qr_url = await referral_token(
+        ref_uid or sig["author_id"] or ws["owner_id"], bot_username)
     if not qr_url:
         return None
 
@@ -547,7 +559,7 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         closed_at=sig["closed_at"].astimezone(stats.TZ),
         username=username, ws_name=ws["name"], logo=logo,
         qr_url=qr_url, sig_id=sig["id"], market=sig["market"],
-        qr_caption=f"@{bot_username}" if bot_username else "")
+        qr_caption="Taklif kodi", qr_code=code)
 
 
 def main_menu_kb(uid: int, ws, private: bool = True,
@@ -3211,12 +3223,16 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if ctx.args and ctx.args[0].startswith("ref_"):
+        token = ctx.args[0][4:]
+        # Ikki shakl ham qabul qilinadi: qisqa kod (A7K3QM) va ESKI, oddiy
+        # uid — allaqachon tarqatilgan havolalar ishlab turishi kerak.
         try:
-            referrer_id = int(ctx.args[0][4:])
-            if referrer_id != uid:
-                await db.add_referral(referrer_id, uid)
-        except ValueError:
-            pass
+            referrer_id = int(token) if token.isdigit() else await db.user_by_ref_code(token)
+        except Exception:
+            log.warning("Taklif kodi o'qilmadi: %r", token, exc_info=True)
+            referrer_id = None
+        if referrer_id and referrer_id != uid:
+            await db.add_referral(referrer_id, uid)
 
     # News Trade AI/surge posti ostidagi "📝 Jurnalga kiritish" tugmasi —
     # tiker allaqachon ma'lum (postdan), shuning uchun bu yerda tikerni
@@ -4342,10 +4358,12 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     bot_username = ctx.bot.username
     count = await db.count_referrals(uid)
-    link = referral_link(uid, bot_username)
+    code, link = await referral_token(uid, bot_username)
     link_txt = f"<code>{link}</code>" if link else "(havola olinmadi, birozdan so'ng qayta urining)"
+    code_txt = f"Taklif kodingiz: <code>{code}</code>\n\n" if code else ""
     await update.message.reply_text(
         f"🎁 Do'stlaringizni taklif qiling!\n\n"
+        f"{code_txt}"
         f"Sizning shaxsiy havolangiz:\n{link_txt}\n\n"
         f"Siz orqali botga kelganlar: <b>{count}</b>",
         parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
