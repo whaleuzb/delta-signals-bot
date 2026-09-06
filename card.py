@@ -144,7 +144,7 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
              pnl_pct: float, r_multiple: float | None,
              closed_at: datetime, username: str | None, ws_name: str,
              logo: bytes | None, qr_url: str, sig_id: int | None = None,
-             market: str = "crypto") -> io.BytesIO:
+             market: str = "crypto", qr_caption: str = "") -> io.BytesIO:
     """Ulashish kartasini chizadi va PNG bayt oqimini qaytaradi."""
     acc = PROFIT if pnl_pct >= 0 else LOSS
 
@@ -249,10 +249,12 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
     px0, py0 = W - PAD - panel, H - 172 - 14
     d.rounded_rectangle((px0, py0, px0 + panel, py0 + panel), radius=16, fill="white")
     img.paste(_qr(qr_url, qr_px), (px0 + quiet, py0 + quiet))
-    cap = "Barcha natijalar"
-    f_cap = _f(25)
-    d.text((px0 + panel - d.textlength(cap, font=f_cap), py0 - 38),
-           cap, font=f_cap, fill=MUTED)
+    # QR ustidagi yozuv — skanerlaydigan odam QAYERGA borishini bilsin.
+    # Bo'sh bo'lsa umuman chizilmaydi.
+    if qr_caption:
+        f_cap = _f(25)
+        d.text((px0 + panel - d.textlength(qr_caption, font=f_cap), py0 - 38),
+               qr_caption, font=f_cap, fill=MUTED)
 
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)

@@ -496,23 +496,32 @@ def web_page_url(ws) -> str | None:
     return f"{config.WEB_URL}/g/{ws['id']}"
 
 
-async def build_pnl_card(sig, ws, bot_username: str | None):
+def referral_link(uid: int, bot_username: str | None) -> str | None:
+    """Odamning SHAXSIY taklif havolasi — `/taklif` bergani bilan AYNI.
+
+    Bitta joyda turishi shart: `cmd_start` `ref_<uid>` payload'ini shu
+    shaklda kutadi, ya'ni havola formati o'zgarsa taklif hisobga olinmay
+    qoladi."""
+    return f"https://t.me/{bot_username}?start=ref_{uid}" if bot_username else None
+
+
+async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None):
     """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
 
     Grafik (`chart.signal_chart`) tahlil uchun — unda shamlar, darajalar,
     chiqish nuqtasi bor. Bu esa ULASHISH uchun: bitta katta foiz, juftlik va
     QR. Ikkalasi bitta albomda ketadi.
 
-    QR qayerga olib boradi: guruhning ochiq sahifasi bo'lsa — o'shanga
-    (u yerda barcha natijalar va guruhga qo'shilish tugmasi bor), aks holda
-    botning o'ziga. Ochiq bo'lmagan guruhning sahifasiga QR qo'yish ma'nosiz
-    edi — bosgan odam 404 olardi.
+    QR — kartani ULASHAYOTGAN ODAMNING shaxsiy taklif havolasi. Avval u
+    guruhning ochiq sahifasiga olib borardi, lekin kartaning butun ma'nosi
+    tarqalishda: skanerlagan odam bot orqali kelsa, taklif o'sha odamga
+    yoziladi. `ref_uid` berilmasa — signal muallifi, u ham bo'lmasa
+    (eski signallar) workspace egasi.
     """
     if sig["exit_price"] is None or sig["pnl_pct"] is None or not sig["closed_at"]:
         return None
 
-    page = web_page_url(ws)
-    qr_url = page or (f"https://t.me/{bot_username}" if bot_username else None)
+    qr_url = referral_link(ref_uid or sig["author_id"] or ws["owner_id"], bot_username)
     if not qr_url:
         return None
 
@@ -537,7 +546,8 @@ async def build_pnl_card(sig, ws, bot_username: str | None):
         r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
         closed_at=sig["closed_at"].astimezone(stats.TZ),
         username=username, ws_name=ws["name"], logo=logo,
-        qr_url=qr_url, sig_id=sig["id"], market=sig["market"])
+        qr_url=qr_url, sig_id=sig["id"], market=sig["market"],
+        qr_caption=f"@{bot_username}" if bot_username else "")
 
 
 def main_menu_kb(uid: int, ws, private: bool = True,
@@ -4332,7 +4342,7 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     bot_username = ctx.bot.username
     count = await db.count_referrals(uid)
-    link = f"https://t.me/{bot_username}?start=ref_{uid}" if bot_username else None
+    link = referral_link(uid, bot_username)
     link_txt = f"<code>{link}</code>" if link else "(havola olinmadi, birozdan so'ng qayta urining)"
     await update.message.reply_text(
         f"🎁 Do'stlaringizni taklif qiling!\n\n"
@@ -5892,7 +5902,10 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     async with busy(ctx.bot, msg.chat_id, "🎨 Karta chizilyapti…"):
         try:
-            img = await build_pnl_card(sig, ws, ctx.bot.username)
+            # QR — buyruqni bergan odamning O'Z taklif havolasi: kartani
+            # aynan u ulashadi, demak taklif ham unga yozilishi kerak.
+            img = await build_pnl_card(sig, ws, ctx.bot.username,
+                                       ref_uid=update.effective_user.id)
         except Exception:
             log.exception("Karta yasalmadi (#%s)", sid)
             img = None

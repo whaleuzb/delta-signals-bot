@@ -4630,3 +4630,31 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (QR ochiq guruhda sahifaga, yopiqda botga, yopilmagan signalda
        karta yo'q, baza yiqilganda ham karta chiqishi). `test_tracker.py`
        15/15, veb 30/30.
+
+146. **Kartadagi QR — guruh sahifasi emas, ODAMNING SHAXSIY taklif
+     havolasi.** Foydalanuvchi: "qr kodni harbir odamni referal havolasi
+     ochiladigan qilaylik. Umumiy natijalar shart emas menimcha."
+     - #145'da QR `/g/<id>` sahifasiga olib borardi. To'g'ri e'tiroz:
+       kartaning butun ma'nosi TARQALISHDA — skanerlagan odam bot orqali
+       kelsa, taklif ulashgan odamga yozilishi kerak. Sahifa esa shunchaki
+       ma'lumot beradi va hech kimga hech narsa qaytarmaydi.
+     - QR endi `https://t.me/<bot>?start=ref_<uid>` — `/taklif` beradigan
+       havola bilan AYNAN bir xil. `cmd_start` `ref_<uid>` payload'ini
+       o'qib `db.add_referral()` chaqiradi, ya'ni skanerlash haqiqiy
+       taklif sifatida hisobga olinadi.
+     - **Havola endi bitta joyda** — yangi `referral_link(uid, bot_username)`.
+       `cmd_invite` ham shunga o'tkazildi: format ikki joyda yozilsa,
+       birини o'zgartirganda taklif jimgina hisobga olinmay qolardi.
+     - **Kimning havolasi**: avtomatik kartada — signal MUALLIFI
+       (`author_id`), u yo'q bo'lsa (eski signallar) workspace EGASI.
+       `/karta <id>` da — buyruqni bergan odam (`ref_uid`), chunki kartani
+       aynan u ulashadi.
+     - QR ustidagi yozuv endi `@<bot_username>` — skanerlaydigan odam
+       qayerga borishini oldindan ko'rsin ("Barcha natijalar" o'rniga).
+     - Karta endi `config.WEB_URL`ga umuman bog'liq emas — sahifa ochiq
+       bo'lmasa ham ishlaydi.
+     - Tekshirildi: `build_pnl_card` 16 ta holat (jumladan payload'ning
+       `cmd_start` kutgan `ref_<raqam>` shaklida ekani, ochiq/yopiq
+       guruhda farq yo'qligi, `ref_uid` ustunligi, muallif yo'q bo'lsa
+       egasiga o'tishi) — QR har safar TAYYOR KARTADAN OpenCV bilan
+       skanerlab tekshirildi. `card` 20/20, `test_tracker` 15/15, veb 30/30.
