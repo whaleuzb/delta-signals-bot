@@ -4693,3 +4693,41 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        berildi -> `add_referral(muallif, skanerlagan)` chaqirilgani
        tasdiqlandi, eski `ref_<uid>` shakli ham, yo'q kod ham sinaldi.
        `card` 22/22, `test_tracker` 15/15, veb 30/30.
+
+148. **O'z taklif kodini tanlash — 20 ta taklifdan keyin ochiladigan
+     MUKOFOT.** Foydalanuvchi: "odamlar o'zi uchun referal kod
+     yaratadigan funksiya qo'shaylik. u faqat hamma uchun emas kamida 20
+     ta odam taklif qilgan odamlarga bu imkoniyat ochilsin. Menga esa
+     hozir ochib ber."
+     - **Nega chegara kerak**: imkoniyat hammaga ochiq bo'lsa, qisqa va
+       chiroyli kodlar (`BTC`, `WHALE`, `VIP`) birinchi kelgan bo'sh
+       akkauntlar tomonidan darrov band qilinardi. Chegara uni MUKOFOTGA
+       aylantiradi. `config.REF_CUSTOM_MIN` (standart 20) — Railway
+       o'zgaruvchisi orqali kod tegmasdan sozlanadi.
+     - **"Menga hozir ochib ber"**: `can_pick_ref_code()` super-adminlarni
+       chegaradan o'tkazadi, ya'ni imkoniyat egasiga DARHOL ochiq —
+       bazaga qo'lda tegilmadi (bu loyihaning qat'iy qoidasi).
+     - **Chegara ochiq aytiladi**: `/taklif` ekranida "yana N ta odam
+       taklif qilsangiz..." deb yozilади. Yashirin mukofot hech kimni
+       harakatga undamaydi.
+     - **FAQAT RAQAMDAN iborat kod TAQIQLANGAN** — eng muhim tekshiruv:
+       `cmd_start` `ref_<raqam>`ni ESKI shakl (Telegram id) deb o'qiydi,
+       ya'ni raqamli kod hech qachon egasiga bog'lanmasdi va taklif
+       BOSHQA odamga yozilib ketishi mumkin edi.
+     - Qolgan qoidalar: 3–12 belgi (qisqasi ma'noli so'zlarni band qilib
+       yuborardi, uzuni kartaga sig'maydi), faqat lotin harf/raqam,
+       `REF/START/ADMIN/BOT/...` taqiqlangan.
+     - **Band qilish katta-kichik harfga sezgir EMAS** (`upper()`):
+       `whales` va `WHALES` bitta kod, aks holda ikki xil odamga tegib
+       ketardi. Tekshiruv bilan yozuv orasida boshqasi ulgurib qolsa —
+       unikal indeks oxirgi himoya (`UniqueViolationError` -> `False`).
+     - **Kod o'zgarganda eski havolalar ishlamay qoladi** — yo'riqnomada
+       ochiq ogohlantiriladi va test bilan ham tasdiqlangan.
+     - Tekshirildi: 39 ta holat — validatsiya (11 xil kiritma), chegara
+       (0/19/20/50/super-admin), **HAQIQIY Postgres**da band qilish
+       (boshqa odam ololmasligi, kichik harf bilan ham ololmasligi, egasi
+       o'zgartira olishi, eski kod bo'shashi), to'liq oqim (tugma ->
+       matn -> saqlanish, xato kiritmada qayta so'rash, band kodda qayta
+       so'rash, `/bekor` tozalashi) va yangi kod bilan kelgan odam taklif
+       bo'lib yozilishi. `test_tracker` 15/15, `card` 22/22,
+       `build_pnl_card` 20/20, `ref_code` 16/16, veb 30/30.

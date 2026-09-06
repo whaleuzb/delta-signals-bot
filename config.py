@@ -228,3 +228,11 @@ MACD_ONLY_STRONG = os.getenv("MACD_ONLY_STRONG", "0") == "1"
 # Kanalga ketma-ket xabarlar orasidagi oraliq (soniya) — Telegram bitta
 # kanalga daqiqasiga ~20 ta xabarni o'tkazadi. 3.5s ~ daqiqasiga 17 ta.
 MACD_POST_DELAY = float(os.getenv("MACD_POST_DELAY", "3.5"))
+
+# ------------ O'z taklif kodini tanlash ------------
+# Odam o'ziga chiroyli kod (masalan WHALES) tanlay olishi uchun shuncha
+# TASDIQLANGAN taklifi bo'lishi kerak. Bu imkoniyat hammaga ochiq bo'lsa,
+# qisqa va chiroyli kodlar birinchi kelgan bo'sh akkauntlar tomonidan
+# darrov band qilinardi — shuning uchun u MUKOFOT sifatida beriladi.
+# Super-adminlarga bu chegara qo'llanmaydi.
+REF_CUSTOM_MIN = int(os.getenv("REF_CUSTOM_MIN", "20"))

@@ -81,6 +81,9 @@ PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, messag
 # allaqachon ma'lum, shuning uchun endi faqat yo'nalish/kirish/TP/SL kutiladi.
 AWAITING_JOURNAL_SYMBOL: dict[int, tuple[str, int]] = {}
 
+# O'z taklif kodini yozishi kutilayotgan odamlar.
+AWAITING_REF_CODE: dict[int, bool] = {}
+
 
 def is_admin(uid: int) -> bool:
     """Super-admin — barcha workspace'larga kirish (qo'llab-quvvatlash uchun)."""
@@ -2153,6 +2156,9 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await handle_broadcast_input(update, ctx)
         return
 
+    if await handle_ref_code_input(update, ctx):
+        return
+
     # News Trade AI/surge posti ostidagi "📝 Jurnalga kiritish" tugmasidan
     # kelgan — tiker allaqachon ma'lum, xabarga QO'SHIB parsing.parse()ga
     # beriladi (parse() tikersiz ishlamaydi, shuning uchun bu yerda oddiy
@@ -3290,6 +3296,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
     AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
+    AWAITING_REF_CODE.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
     await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
 
@@ -4361,12 +4368,118 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     code, link = await referral_token(uid, bot_username)
     link_txt = f"<code>{link}</code>" if link else "(havola olinmadi, birozdan so'ng qayta urining)"
     code_txt = f"Taklif kodingiz: <code>{code}</code>\n\n" if code else ""
+
+    rows = []
+    if can_pick_ref_code(uid, count):
+        rows.append([InlineKeyboardButton("✏️ O'z kodimni tanlash",
+                                          callback_data="refcode")])
+        extra = ""
+    else:
+        # Chegara ochiq aytiladi: bu maqsad, ya'ni odamni taklif qilishga
+        # undaydigan narsa. Yashirin bo'lsa hech kim unga intilmaydi.
+        left = config.REF_CUSTOM_MIN - count
+        extra = (f"\n\n✨ Yana <b>{left}</b> ta odam taklif qilsangiz, "
+                 f"o'zingizga chiroyli kod tanlay olasiz "
+                 f"(masalan <code>WHALES</code>).")
+    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+
     await update.message.reply_text(
         f"🎁 Do'stlaringizni taklif qiling!\n\n"
         f"{code_txt}"
         f"Sizning shaxsiy havolangiz:\n{link_txt}\n\n"
-        f"Siz orqali botga kelganlar: <b>{count}</b>",
+        f"Siz orqali botga kelganlar: <b>{count}</b>{extra}",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(rows))
+
+
+# Kod uzunligi: 3 dan qisqasi deyarli barcha ma'noli so'zlarni band qilib
+# yuborardi, 12 dan uzuni esa kartada sig'maydi va qo'lda terilmaydi.
+REF_CODE_MIN, REF_CODE_MAX = 3, 12
+REF_CODE_RE = re.compile(r"^[A-Za-z0-9]+$")
+
+# Bot ichida ma'no anglatuvchi so'zlar — ular kod bo'lib ketsa, xabarlarda
+# chalkashlik tug'ilardi.
+REF_CODE_BANNED = {"REF", "START", "ADMIN", "BOT", "NULL", "NONE", "TEST"}
+
+
+def can_pick_ref_code(uid: int, referrals: int) -> bool:
+    """O'z kodini tanlash huquqi. Super-adminlarda chegara yo'q."""
+    return is_admin(uid) or referrals >= config.REF_CUSTOM_MIN
+
+
+def validate_ref_code(code: str) -> str | None:
+    """Xato matni yoki None (hammasi joyida)."""
+    if not REF_CODE_RE.match(code):
+        return "Faqat lotin harflari va raqamlar bo'lishi mumkin (bo'sh joysiz)."
+    if not (REF_CODE_MIN <= len(code) <= REF_CODE_MAX):
+        return f"Uzunligi {REF_CODE_MIN} dan {REF_CODE_MAX} tagacha bo'lsin."
+    # FAQAT RAQAMDAN iborat kod MUMKIN EMAS: `cmd_start` `ref_<raqam>`ni
+    # ESKI shakl (Telegram id) deb o'qiydi, ya'ni bunday kod hech qachon
+    # egasiga bog'lanmasdi va taklif boshqa odamga yozilib ketishi mumkin edi.
+    if code.isdigit():
+        return "Faqat raqamdan iborat bo'lmasin — kamida bitta harf qo'shing."
+    if code.upper() in REF_CODE_BANNED:
+        return "Bu so'z band. Boshqasini tanlang."
+    return None
+
+
+async def on_ref_code_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    uid = q.from_user.id
+    count = await db.count_referrals(uid)
+    if not can_pick_ref_code(uid, count):
+        await q.answer("Bu imkoniyat hali ochilmagan.", show_alert=True)
+        return
+    await q.answer()
+    AWAITING_REF_CODE[uid] = True
+    await q.message.reply_text(
+        "✏️ Yangi kodingizni yozing.\n\n"
+        f"• {REF_CODE_MIN}–{REF_CODE_MAX} ta belgi\n"
+        "• Lotin harflari va raqamlar (masalan <code>WHALES</code>)\n"
+        "• Faqat raqamdan iborat bo'lmasin\n\n"
+        "⚠️ Kodni o'zgartirsangiz, ESKI kod bilan tarqatilgan havolalar "
+        "ishlamay qoladi.\n\nBekor qilish: /bekor",
+        parse_mode=ParseMode.HTML)
+
+
+async def handle_ref_code_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """O'z taklif kodi matni. Ishlov berilgan bo'lsa True."""
+    uid = update.effective_user.id
+    if not AWAITING_REF_CODE.pop(uid, None):
+        return False
+    msg = update.effective_message
+    code = (msg.text or "").strip().lstrip("@")
+
+    count = await db.count_referrals(uid)
+    if not can_pick_ref_code(uid, count):
+        await msg.reply_text("Bu imkoniyat hali ochilmagan.", reply_markup=MENU_BACK_KB)
+        return True
+
+    err = validate_ref_code(code)
+    if err:
+        AWAITING_REF_CODE[uid] = True
+        await msg.reply_text(f"❌ {err}\n\nQayta yozing yoki /bekor.")
+        return True
+
+    try:
+        ok = await db.set_custom_ref_code(uid, code)
+    except Exception:
+        log.exception("Taklif kodi saqlanmadi (%s)", uid)
+        await msg.reply_text("Saqlab bo'lmadi, birozdan so'ng qayta urining.",
+                             reply_markup=MENU_BACK_KB)
+        return True
+
+    if not ok:
+        AWAITING_REF_CODE[uid] = True
+        await msg.reply_text("❌ Bu kod band. Boshqasini yozing yoki /bekor.")
+        return True
+
+    link = referral_link(code, ctx.bot.username)
+    await msg.reply_text(
+        f"✅ Kodingiz o'zgartirildi: <code>{html.escape(code)}</code>\n\n"
+        f"Yangi havolangiz:\n<code>{link}</code>",
         parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    return True
 
 
 # ─────────────────────────── News Trade AI ───────────────────────────
@@ -6241,6 +6354,7 @@ def main() -> None:
     app.add_handler(CommandHandler("yordam", cmd_help))
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
+    app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))

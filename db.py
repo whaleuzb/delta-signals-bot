@@ -691,6 +691,29 @@ async def ensure_ref_code(user_id: int) -> str:
     raise RuntimeError("Taklif kodi yaratilmadi")
 
 
+async def set_custom_ref_code(user_id: int, code: str) -> bool:
+    """O'ZI TANLAGAN kodni saqlaydi. Band bo'lsa `False` (o'zinikidan boshqa).
+
+    Katta-kichik harf farq qilmaydi: `user_by_ref_code()` ham `upper()`
+    bilan qidiradi, ya'ni "abc" va "ABC" bitta kod hisoblanadi va ular
+    ikki xil odamga tegib ketmasligi kerak."""
+    async with pool().acquire() as c:
+        owner = await c.fetchval(
+            "SELECT user_id FROM users WHERE upper(ref_code)=upper($1)", code)
+        if owner is not None and owner != user_id:
+            return False
+        try:
+            await c.execute(
+                "INSERT INTO users (user_id, ref_code) VALUES ($1,$2) "
+                "ON CONFLICT (user_id) DO UPDATE SET ref_code = EXCLUDED.ref_code",
+                user_id, code)
+        except asyncpg.UniqueViolationError:
+            # Ikki odam bir vaqtda bir xil kodni olsa — tekshiruv bilan
+            # yozuv orasida boshqasi ulgurgan. Indeks oxirgi himoya.
+            return False
+    return True
+
+
 async def user_by_ref_code(code: str) -> int | None:
     """Kod bo'yicha taklif qiluvchining id'si. Katta-kichik harf farq qilmaydi
     — odam kodni qo'lda terganda buni o'ylab o'tirmasligi kerak."""
