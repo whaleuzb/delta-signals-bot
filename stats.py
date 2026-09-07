@@ -14,6 +14,7 @@ import config
 import db
 import exchange
 import forex
+import i18n
 import stocks
 import tracker
 
@@ -52,6 +53,19 @@ async def _safe_price(market: str, symbol: str):
         return None
 MONTHS_UZ = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
              "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"]
+_MONTHS = {
+    "uz": MONTHS_UZ,
+    "ru": ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+           "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
+    "en": ["January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"],
+}
+
+
+def months(lang: str | None = None) -> list[str]:
+    """Oy nomlari — tanlangan tilda. `MONTHS_UZ` eski chaqiruvchilar uchun
+    qoldirildi (o'zbekcha ro'yxatning AYNAN o'zi)."""
+    return _MONTHS[i18n.normalize(lang)]
 
 
 def _compound(pcts: list[float]) -> float:
@@ -62,7 +76,8 @@ def _compound(pcts: list[float]) -> float:
     return (eq - 1) * 100
 
 
-async def _open_summary(workspace_id: int, deposit, show_money: bool) -> str | None:
+async def _open_summary(workspace_id: int, deposit, show_money: bool,
+                         lang: str | None = None) -> str | None:
     """Hali yopilmagan (PENDING/ACTIVE) pozitsiyalar qisqacha holati — /symbols'dagi
     kabi hisobot davri "joriy"ga tegishli bo'lsa summary() shuni ham qo'shadi,
     aks holda foydalanuvchi "nega ochiq pozitsiyalar hisobotda yo'q" deb
@@ -73,9 +88,9 @@ async def _open_summary(workspace_id: int, deposit, show_money: bool) -> str | N
     if not pending and not active:
         return None
 
-    lines = ["<b>Jarayondagi pozitsiyalar</b>"]
+    lines = [i18n.t("st.open_head", lang)]
     if pending:
-        lines.append(f"🕐 Kutilmoqda: <b>{len(pending)}</b> ta (hali limitga yetmagan)")
+        lines.append(i18n.t("st.open_pending", lang, n=len(pending)))
 
     if active:
         live_sum_pct = 0.0
@@ -92,21 +107,21 @@ async def _open_summary(workspace_id: int, deposit, show_money: bool) -> str | N
                 live_sum_pct += pnl * float(r["alloc_amount"]) / float(deposit)
 
         if not live_count:
-            lines.append(f"⏳ Jarayonda: <b>{len(active)}</b> ta ochiq (narx olinmadi)")
+            lines.append(i18n.t("st.open_noprice", lang, n=len(active)))
         elif deposit:
-            txt = f"⏳ Jarayonda: <b>{live_count}</b> ta ochiq — joriy: <b>{live_sum_pct:+.2f}%</b>"
+            txt = i18n.t("st.open_live", lang, n=live_count, p=live_sum_pct)
             if show_money:
                 txt += f"  ({live_money:+,.2f})"
             lines.append(txt)
         else:
-            lines.append(f"⏳ Jarayonda: <b>{live_count}</b> ta ochiq "
-                          f"(joriy foiz uchun /depozit belgilang)")
+            lines.append(i18n.t("st.open_no_dep", lang, n=live_count))
 
     return "\n".join(lines)
 
 
-async def summary(workspace_id: int, since=None, until=None, title="Umumiy statistika",
-                   deposit=None, show_money: bool = True) -> str:
+async def summary(workspace_id: int, since=None, until=None, title=None,
+                   deposit=None, show_money: bool = True,
+                   lang: str | None = None) -> str:
     """deposit — workspace'ning joriy umumiy depoziti. Bo'lsa, "Jami natija"/
     "Kompaund" har bir signalning haqiqiy pozitsiya hajmiga (alloc_amount)
     qarab depozitga nisbatan hisoblanadi — narx harakati foizi emas, depozitning
@@ -115,11 +130,13 @@ async def summary(workspace_id: int, since=None, until=None, title="Umumiy stati
     belgilanmagan bo'lsa — eski, pozitsiya hajmisiz (raw) narx-harakati foizi
     ko'rsatiladi. show_money — real summani ko'rsatish kerakmi (guruh
     a'zolariga faqat foiz, admin/shaxsiy egasiga pul ham)."""
+    if title is None:
+        title = i18n.t("st.title_all", lang)
     s = await db.period_stats(workspace_id, since, until)
     show_open = since is None or until is None or until > datetime.now(timezone.utc)
 
     if not s or s["total"] == 0:
-        t = [f"<b>{title}</b>", "", "Hali yopilgan signal yo'q."]
+        t = [f"<b>{title}</b>", "", i18n.t("st.no_closed", lang)]
     else:
         total = s["total"]
         wr = s["wins"] / total * 100
@@ -137,43 +154,48 @@ async def summary(workspace_id: int, since=None, until=None, title="Umumiy stati
                         if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
 
         t = [f"<b>{title}</b>", ""]
-        t.append(f"Signallar: <b>{total}</b>  ({s['wins']}✅ / {s['losses']}❌ / {s['be']}⚪)")
-        t.append(f"Winrate: <b>{wr:.1f}%</b>")
+        t.append(i18n.t("st.signals", lang, n=total, w=s["wins"],
+                        l=s["losses"], b=s["be"]))
+        t.append(i18n.t("st.winrate", lang, wr=wr))
 
         if weighted:
             real_sum_pct = sum(weighted)
-            t.append(f"Jami natija (depozitga nisbatan): <b>{real_sum_pct:+.2f}%</b>")
-            t.append(f"Kompaund: <b>{_compound(weighted):+.2f}%</b>")
+            t.append(i18n.t("st.total_dep", lang, p=real_sum_pct))
+            t.append(i18n.t("st.compound", lang, p=_compound(weighted)))
             if show_money and s["real_pnl_money"] is not None:
-                t.append(f"💰 Real natija: <b>{float(s['real_pnl_money']):+,.2f}</b>")
+                t.append(i18n.t("st.real_money", lang, m=float(s["real_pnl_money"])))
         else:
             pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
-            t.append(f"Jami foiz (pozitsiya hajmisiz): <b>{float(s['sum_pct']):+.2f}%</b>")
-            t.append(f"Kompaund: <b>{_compound(pcts):+.2f}%</b>")
+            t.append(i18n.t("st.total_raw", lang, p=float(s["sum_pct"])))
+            t.append(i18n.t("st.compound", lang, p=_compound(pcts)))
 
-        t.append(f"O'rtacha R: <b>{float(s['avg_r']):+.2f}R</b>   |   Jami: <b>{float(s['sum_r']):+.1f}R</b>")
-        t.append(f"O'rt. foyda: {float(s['avg_win']):+.2f}%   |   O'rt. zarar: {float(s['avg_loss']):+.2f}%")
+        t.append(i18n.t("st.avg_r", lang, avg=float(s["avg_r"]), tot=float(s["sum_r"])))
+        t.append(i18n.t("st.avg_win_loss", lang, w=float(s["avg_win"]),
+                        l=float(s["avg_loss"])))
         if pf:
-            t.append(f"Profit factor: <b>{pf:.2f}</b>")
+            t.append(i18n.t("st.profit_factor", lang, pf=pf))
 
     if show_open:
-        open_txt = await _open_summary(workspace_id, deposit, show_money)
+        open_txt = await _open_summary(workspace_id, deposit, show_money, lang)
         if open_txt:
             t += ["", open_txt]
 
     return "\n".join(t)
 
 
-async def monthly_table(workspace_id: int, limit: int = 12) -> str:
+async def monthly_table(workspace_id: int, limit: int = 12,
+                         lang: str | None = None) -> str:
     rows = await db.monthly_breakdown(workspace_id, limit)
     if not rows:
-        return "Ma'lumot yo'q."
-    t = ["<b>Oylik natijalar</b>", "<pre>"]
-    t.append(f"{'Oy':<12}{'N':>4}{'WR':>7}{'Foiz':>9}{'R':>7}")
+        return i18n.t("st.no_data", lang)
+    mon = months(lang)
+    t = [i18n.t("st.monthly_head", lang), "<pre>"]
+    t.append(f"{i18n.t('st.col_month', lang):<12}{'N':>4}{'WR':>7}"
+             f"{i18n.t('st.col_pct', lang):>9}{'R':>7}")
     for r in rows:
         m = r["month"]
         # [:4] — [:3] bo'lsa "Iyun" va "Iyul" ikkalasi ham "Iyu" bo'lib qolardi.
-        name = f"{MONTHS_UZ[m.month - 1][:4]} {m.year}"
+        name = f"{mon[m.month - 1][:4]} {m.year}"
         wr = r["wins"] / r["total"] * 100 if r["total"] else 0
         t.append(f"{name:<12}{r['total']:>4}{wr:>6.0f}%{float(r['sum_pct']):>+9.2f}{float(r['avg_r']):>+7.2f}")
     t.append("</pre>")
@@ -181,18 +203,22 @@ async def monthly_table(workspace_id: int, limit: int = 12) -> str:
 
 
 async def symbols_table(workspace_id: int, since=None, until=None,
-                         title: str = "Barcha davr") -> str:
+                         title: str | None = None,
+                         lang: str | None = None) -> str:
     """since/until berilmasa — butun davr. Berilsa — shu oraliqda yopilganlar
     (o'tgan, tugagan oylarda ochiq pozitsiya ko'rinmaydi — yopilganda avtomatik
     o'z oyiga tushadi). Joriy (hali davom etayotgan) davrda — hozir ochiq
     pozitsiyalar ham ko'rinadi: ⏳ allaqachon ochilgan (joriy foizi bilan),
     🕐 hali entry/limitga tegmagan (foizsiz — hisoblash uchun asos yo'q)."""
+    if title is None:
+        title = i18n.t("st.all_period", lang)
     show_open = since is None or until is None or until > datetime.now(timezone.utc)
     rows = await db.top_symbols(workspace_id, since, until)
     open_data = await db.open_signals_summary(workspace_id) if show_open else {}
     symbols = {r["symbol"] for r in rows} | set(open_data)
     if not symbols:
-        return f"<b>Juftliklar — {title}</b>\n\nMa'lumot yo'q."
+        return (i18n.t("st.symbols_head", lang, title=title) + "\n\n"
+                + i18n.t("st.no_data", lang))
 
     by_sym = {r["symbol"]: r for r in rows}
     ordered = sorted(symbols, key=lambda s: -float(by_sym[s]["sum_pct"]) if s in by_sym else 0)
@@ -200,7 +226,7 @@ async def symbols_table(workspace_id: int, since=None, until=None,
     def badge(icon: str, n: int) -> str:
         return icon if n == 1 else f"{icon}{n}"
 
-    t = [f"<b>Juftliklar — {title}</b>", ""]
+    t = [i18n.t("st.symbols_head", lang, title=title), ""]
     for sym in ordered:
         r = by_sym.get(sym)
         closed = r["closed"] if r else 0
@@ -234,8 +260,8 @@ async def symbols_table(workspace_id: int, since=None, until=None,
         if closed:
             parts.append(f"<b>{sum_pct:+.2f}%</b>")
         if live_count:
-            parts.append(f"<i>{live_sum:+.2f}% jarayonda</i>")
-        pct_txt = "  ".join(parts) if parts else "<i>ochiq</i>"
+            parts.append(i18n.t("st.running", lang, p=live_sum))
+        pct_txt = "  ".join(parts) if parts else i18n.t("st.open_word", lang)
 
         t.append(f"{badge_txt} <b>{sym}</b>  {pct_txt}")
     return "\n".join(t)

@@ -669,6 +669,226 @@ STRINGS: dict[str, dict[str, str]] = {
                "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
     },
 
+    # --- Statistika ---
+    "st.title_all": {
+        "uz": "Umumiy statistika", "ru": "Общая статистика", "en": "Overall stats",
+    },
+    "st.title_year": {
+        "uz": "{y}-yil natijalari", "ru": "Итоги {y} года", "en": "{y} results",
+    },
+    "st.no_closed": {
+        "uz": "Hali yopilgan signal yo'q.",
+        "ru": "Закрытых сигналов пока нет.",
+        "en": "No closed signals yet.",
+    },
+    "st.signals": {
+        "uz": "Signallar: <b>{n}</b>  ({w}✅ / {l}❌ / {b}⚪)",
+        "ru": "Сигналов: <b>{n}</b>  ({w}✅ / {l}❌ / {b}⚪)",
+        "en": "Signals: <b>{n}</b>  ({w}✅ / {l}❌ / {b}⚪)",
+    },
+    "st.winrate": {
+        "uz": "Winrate: <b>{wr:.1f}%</b>", "ru": "Винрейт: <b>{wr:.1f}%</b>",
+        "en": "Win rate: <b>{wr:.1f}%</b>",
+    },
+    "st.total_dep": {
+        "uz": "Jami natija (depozitga nisbatan): <b>{p:+.2f}%</b>",
+        "ru": "Общий результат (к депозиту): <b>{p:+.2f}%</b>",
+        "en": "Total result (vs deposit): <b>{p:+.2f}%</b>",
+    },
+    "st.total_raw": {
+        "uz": "Jami foiz (pozitsiya hajmisiz): <b>{p:+.2f}%</b>",
+        "ru": "Общий процент (без размера позиции): <b>{p:+.2f}%</b>",
+        "en": "Total percent (position size ignored): <b>{p:+.2f}%</b>",
+    },
+    "st.compound": {
+        "uz": "Kompaund: <b>{p:+.2f}%</b>", "ru": "Сложный процент: <b>{p:+.2f}%</b>",
+        "en": "Compounded: <b>{p:+.2f}%</b>",
+    },
+    "st.real_money": {
+        "uz": "💰 Real natija: <b>{m:+,.2f}</b>",
+        "ru": "💰 Реальный результат: <b>{m:+,.2f}</b>",
+        "en": "💰 Real result: <b>{m:+,.2f}</b>",
+    },
+    "st.avg_r": {
+        "uz": "O'rtacha R: <b>{avg:+.2f}R</b>   |   Jami: <b>{tot:+.1f}R</b>",
+        "ru": "Средний R: <b>{avg:+.2f}R</b>   |   Всего: <b>{tot:+.1f}R</b>",
+        "en": "Average R: <b>{avg:+.2f}R</b>   |   Total: <b>{tot:+.1f}R</b>",
+    },
+    "st.avg_win_loss": {
+        "uz": "O'rt. foyda: {w:+.2f}%   |   O'rt. zarar: {l:+.2f}%",
+        "ru": "Ср. прибыль: {w:+.2f}%   |   Ср. убыток: {l:+.2f}%",
+        "en": "Avg win: {w:+.2f}%   |   Avg loss: {l:+.2f}%",
+    },
+    "st.profit_factor": {
+        "uz": "Profit factor: <b>{pf:.2f}</b>", "ru": "Профит-фактор: <b>{pf:.2f}</b>",
+        "en": "Profit factor: <b>{pf:.2f}</b>",
+    },
+    "st.open_head": {
+        "uz": "<b>Jarayondagi pozitsiyalar</b>", "ru": "<b>Позиции в работе</b>",
+        "en": "<b>Positions in progress</b>",
+    },
+    "st.open_pending": {
+        "uz": "🕐 Kutilmoqda: <b>{n}</b> ta (hali limitga yetmagan)",
+        "ru": "🕐 Ожидают: <b>{n}</b> (лимит ещё не достигнут)",
+        "en": "🕐 Waiting: <b>{n}</b> (the limit has not been reached)",
+    },
+    "st.open_noprice": {
+        "uz": "⏳ Jarayonda: <b>{n}</b> ta ochiq (narx olinmadi)",
+        "ru": "⏳ В работе: <b>{n}</b> открытых (цена недоступна)",
+        "en": "⏳ In progress: <b>{n}</b> open (price unavailable)",
+    },
+    "st.open_live": {
+        "uz": "⏳ Jarayonda: <b>{n}</b> ta ochiq — joriy: <b>{p:+.2f}%</b>",
+        "ru": "⏳ В работе: <b>{n}</b> открытых — текущий: <b>{p:+.2f}%</b>",
+        "en": "⏳ In progress: <b>{n}</b> open — current: <b>{p:+.2f}%</b>",
+    },
+    "st.open_no_dep": {
+        "uz": "⏳ Jarayonda: <b>{n}</b> ta ochiq (joriy foiz uchun /depozit belgilang)",
+        "ru": "⏳ В работе: <b>{n}</b> открытых (для текущего процента задайте /depozit)",
+        "en": "⏳ In progress: <b>{n}</b> open (set /depozit to see the running percent)",
+    },
+    "st.no_data": {
+        "uz": "Ma'lumot yo'q.", "ru": "Нет данных.", "en": "No data.",
+    },
+    "st.monthly_head": {
+        "uz": "<b>Oylik natijalar</b>", "ru": "<b>Результаты по месяцам</b>",
+        "en": "<b>Monthly results</b>",
+    },
+    "st.col_month": {"uz": "Oy", "ru": "Мес", "en": "Mon"},
+    "st.col_pct": {"uz": "Foiz", "ru": "Проц", "en": "Pct"},
+    "st.symbols_head": {
+        "uz": "<b>Juftliklar — {title}</b>", "ru": "<b>Пары — {title}</b>",
+        "en": "<b>Pairs — {title}</b>",
+    },
+    "st.all_period": {
+        "uz": "Barcha davr", "ru": "Весь период", "en": "All time",
+    },
+    "st.running": {
+        "uz": "<i>{p:+.2f}% jarayonda</i>", "ru": "<i>{p:+.2f}% в работе</i>",
+        "en": "<i>{p:+.2f}% running</i>",
+    },
+    "st.open_word": {
+        "uz": "<i>ochiq</i>", "ru": "<i>открыт</i>", "en": "<i>open</i>",
+    },
+    "st.tab_all": {"uz": "Barchasi", "ru": "Всё", "en": "All"},
+    "st.tab_month": {"uz": "Oy", "ru": "Месяц", "en": "Month"},
+    "st.tab_year": {"uz": "Yil", "ru": "Год", "en": "Year"},
+    "st.btn_pdf": {
+        "uz": "📄 PDF hisobot", "ru": "📄 PDF-отчёт", "en": "📄 PDF report",
+    },
+    "st.pdf_making": {
+        "uz": "📄 Hisobot tayyorlanmoqda…", "ru": "📄 Готовлю отчёт…",
+        "en": "📄 Preparing the report…",
+    },
+    "st.pdf_empty": {
+        "uz": "Hali yopilgan signal yo'q — hisobot bo'sh bo'lardi.",
+        "ru": "Закрытых сигналов пока нет — отчёт был бы пустым.",
+        "en": "No closed signals yet — the report would be empty.",
+    },
+
+    # --- Ochiq signallar ro'yxati ---
+    "op.none": {
+        "uz": "Ochiq signal yo'q.", "ru": "Открытых сигналов нет.",
+        "en": "No open signals.",
+    },
+    "op.head": {
+        "uz": "<b>Ochiq signallar</b>", "ru": "<b>Открытые сигналы</b>",
+        "en": "<b>Open signals</b>",
+    },
+    "op.btn_manage": {
+        "uz": "⚙️ #{sid} {sym} — boshqarish",
+        "ru": "⚙️ #{sid} {sym} — управление",
+        "en": "⚙️ #{sid} {sym} — manage",
+    },
+    "eq.too_few": {
+        "uz": "Grafik uchun kamida 2 ta yopilgan signal kerak.",
+        "ru": "Для графика нужно минимум 2 закрытых сигнала.",
+        "en": "The chart needs at least 2 closed signals.",
+    },
+
+    # --- Depozit ---
+    "dep.unset": {
+        "uz": "belgilanmagan", "ru": "не задан", "en": "not set",
+    },
+    "dep.current": {
+        "uz": "Joriy depozit ({name}): <b>{v}</b>\n\nYangilash uchun: <code>/depozit 1000</code>",
+        "ru": "Текущий депозит ({name}): <b>{v}</b>\n\nИзменить: <code>/depozit 1000</code>",
+        "en": "Current deposit ({name}): <b>{v}</b>\n\nTo change it: <code>/depozit 1000</code>",
+    },
+    "menu.open_title": {
+        "uz": "Bosh menyu:", "ru": "Главное меню:", "en": "Main menu:",
+    },
+
+    "dep.help": {
+        "uz": ("Joriy depozit ({name}): <b>{v}</b>\n\n"
+               "Yangilash uchun: <code>/depozit 1000</code>\n\n"
+               "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
+               "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
+               "foyda/zarar hisoblanadi."),
+        "ru": ("Текущий депозит ({name}): <b>{v}</b>\n\n"
+               "Изменить: <code>/depozit 1000</code>\n\n"
+               "Если депозит задан, после подтверждения каждого сигнала бот спросит "
+               "«сколько денег вы вкладываете» (по желанию) — из этого считается "
+               "реальная прибыль/убыток в деньгах."),
+        "en": ("Current deposit ({name}): <b>{v}</b>\n\n"
+               "To change it: <code>/depozit 1000</code>\n\n"
+               "With a deposit set, each confirmed signal asks how much money you "
+               "are putting in (optional) — the real money profit/loss is computed "
+               "from that."),
+    },
+    "dep.bad_amount": {
+        "uz": "Noto'g'ri summa. Masalan: /depozit 1000",
+        "ru": "Неверная сумма. Например: /depozit 1000",
+        "en": "Invalid amount. For example: /depozit 1000",
+    },
+    "dep.updated": {
+        "uz": "✅ Depozit yangilandi: <b>{v:,.2f}</b>",
+        "ru": "✅ Депозит обновлён: <b>{v:,.2f}</b>",
+        "en": "✅ Deposit updated: <b>{v:,.2f}</b>",
+    },
+
+    # --- Kun yakuni (guruhga ketadi -> guruh tili) ---
+    "dg.head": {
+        "uz": "📊 <b>Kun yakuni — {d}</b>", "ru": "📊 <b>Итоги дня — {d}</b>",
+        "en": "📊 <b>Daily wrap-up — {d}</b>",
+    },
+    "dg.closed": {
+        "uz": "Yopilgan signallar: <b>{n}</b>  ({w}✅ / {l}❌{be})",
+        "ru": "Закрытых сигналов: <b>{n}</b>  ({w}✅ / {l}❌{be})",
+        "en": "Closed signals: <b>{n}</b>  ({w}✅ / {l}❌{be})",
+    },
+    "dg.winrate": {
+        "uz": "Winrate: <b>{wr:.0f}%</b>", "ru": "Винрейт: <b>{wr:.0f}%</b>",
+        "en": "Win rate: <b>{wr:.0f}%</b>",
+    },
+    "dg.result": {
+        "uz": "{icon} Natija ({label}): <b>{p:+.2f}%</b>",
+        "ru": "{icon} Результат ({label}): <b>{p:+.2f}%</b>",
+        "en": "{icon} Result ({label}): <b>{p:+.2f}%</b>",
+    },
+    "dg.label_dep": {
+        "uz": "depozitga nisbatan", "ru": "к депозиту", "en": "vs deposit",
+    },
+    "dg.label_sum": {
+        "uz": "yig'indi", "ru": "сумма", "en": "sum",
+    },
+    "dg.best": {
+        "uz": "Eng yaxshi: <b>{sym}</b> {p:+.2f}%",
+        "ru": "Лучшая: <b>{sym}</b> {p:+.2f}%",
+        "en": "Best: <b>{sym}</b> {p:+.2f}%",
+    },
+    "dg.worst": {
+        "uz": "Eng yomon: <b>{sym}</b> {p:+.2f}%",
+        "ru": "Худшая: <b>{sym}</b> {p:+.2f}%",
+        "en": "Worst: <b>{sym}</b> {p:+.2f}%",
+    },
+    "dg.open_n": {
+        "uz": "{n} ta ochiq", "ru": "{n} открытых", "en": "{n} open",
+    },
+    "dg.pending_n": {
+        "uz": "{n} ta kutilmoqda", "ru": "{n} ожидают", "en": "{n} waiting",
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",

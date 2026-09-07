@@ -972,11 +972,12 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                 reply_markup=InlineKeyboardMarkup(kb))
 
 
-async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | None]:
+async def open_signals_view(ws, uid: int,
+                             lang: str | None = None) -> tuple[str, InlineKeyboardMarkup | None]:
     rows = await db.live_signals(ws["id"])
     if not rows:
-        return "Ochiq signal yo'q.", None
-    lines = ["<b>Ochiq signallar</b>", ""]
+        return i18n.t("op.none", lang), None
+    lines = [i18n.t("op.head", lang), ""]
     kb_rows = []
     manage = can_manage(uid, ws)
     for s in rows:
@@ -998,7 +999,7 @@ async def open_signals_view(ws, uid: int) -> tuple[str, InlineKeyboardMarkup | N
         )
         if manage:
             kb_rows.append([InlineKeyboardButton(
-                f"⚙️ #{s['id']} {s['symbol']} — boshqarish",
+                i18n.t("op.btn_manage", lang, sid=s["id"], sym=s["symbol"]),
                 callback_data=f"mng:{s['id']}")])
     kb = InlineKeyboardMarkup(kb_rows) if kb_rows else None
     return "\n".join(lines), kb
@@ -1091,7 +1092,7 @@ async def _manage_guard(q):
     lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(int(q.data.split(":")[1]))
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=menu_back_kb(lang))
         return None, None
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -1268,7 +1269,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     if sig_id:
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=menu_back_kb(lang))
             return True
         price = _parse_price(text)
         if price is None or price <= 0:
@@ -1315,14 +1316,14 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig_id,
                                             sym=sig["symbol"], p=fmt_price(price)))
         await msg.reply_text(i18n.t("man.stop_set", lang, p=fmt_price(price)),
-                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                              parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
 
     sig_id = AWAITING_TPS.pop(uid, None)
     if sig_id:
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=menu_back_kb(lang))
             return True
         tps = [x for x in (_parse_price(x) for x in text.split()) if x and x > 0]
         if not tps:
@@ -1344,7 +1345,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         await notify_group(ctx, ws, sig, tw("ev.tps_changed", ws, sid=sig_id,
                                             sym=sig["symbol"], tps=f"<b>{shown}</b>"))
         await msg.reply_text(i18n.t("man.tps_set", lang, tps=shown),
-                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                              parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
 
     sig_id = AWAITING_ENTRY.pop(uid, None)
@@ -1352,7 +1353,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] != "PENDING":
             await msg.reply_text(i18n.t("man.entry_locked", lang),
-                                  reply_markup=MENU_BACK_KB)
+                                  reply_markup=menu_back_kb(lang))
             return True
         price = _parse_price(text)
         if price is None or price <= 0:
@@ -1382,7 +1383,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig_id,
                                             sym=sig["symbol"], p=fmt_price(price)))
         await msg.reply_text(i18n.t("man.entry_set", lang, p=fmt_price(price)),
-                              parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                              parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
 
     return False
@@ -1409,7 +1410,7 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
     if not sig or sig["status"] != "ACTIVE" or sig["sl"] is not None:
         # Signal allaqachon yopilgan, yoki (masalan boshqa yo'l bilan)
         # TP/SL allaqachon o'rnatilgan bo'lsa — bu javob endi ma'nosiz.
-        await msg.reply_text(i18n.t("tpsl.not_needed", lang), reply_markup=MENU_BACK_KB)
+        await msg.reply_text(i18n.t("tpsl.not_needed", lang), reply_markup=menu_back_kb(lang))
         return True
 
     parsed = parsing.parse_tp_sl(text)
@@ -1437,7 +1438,7 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
                         "sl": parsed["sl"], "tps": tps, "market": sig["market"]},
                        sig_id, ws_lang(ws))
     await msg.reply_text(i18n.t("tpsl.placed", lang, body=body),
-                          parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                          parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
                                         sym=sig["symbol"], body=body))
     return True
@@ -1470,7 +1471,7 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -1505,7 +1506,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(sig_id)
     if not sig:
-        await q.edit_message_text(i18n.t("close.not_found", lang), reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("close.not_found", lang), reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -1513,13 +1514,13 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
     ev = await tracker.close_now(sig_id)
     if not ev:
-        await q.edit_message_text(i18n.t("close.failed", lang), reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("close.failed", lang), reply_markup=menu_back_kb(lang))
         return
 
     if ev["status"] == "CANCELLED":
         await q.edit_message_text(
             i18n.t("close.cancelled_sig", lang, sid=sig_id, sym=ev["symbol"]),
-            reply_markup=MENU_BACK_KB)
+            reply_markup=menu_back_kb(lang))
         return
 
     pnl, r = ev["pnl"], ev["r"]
@@ -1534,7 +1535,7 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     await q.edit_message_text(
         i18n.t("close.done", lang, icon=icon, sid=sig_id, sym=ev["symbol"],
                p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt),
-        reply_markup=MENU_BACK_KB)
+        reply_markup=menu_back_kb(lang))
 
     txt = tw("ev.manual_close", ws, icon=icon, sid=sig_id, sym=ev["symbol"],
              p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt)
@@ -1559,25 +1560,32 @@ def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
     return idx // 12, idx % 12 + 1
 
 
-def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> InlineKeyboardMarkup:
+def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None,
+                  lang: str | None = None) -> InlineKeyboardMarkup:
     now = datetime.now(stats.TZ)
+    mon = stats.months(lang)
+
+    def tab(key: str, active: bool) -> str:
+        label = i18n.t(key, lang)
+        return f"• {label}" if active else label
+
     tabs = [
-        InlineKeyboardButton("• Barchasi" if mode == "all" else "Barchasi", callback_data="st:all"),
+        InlineKeyboardButton(tab("st.tab_all", mode == "all"), callback_data="st:all"),
         InlineKeyboardButton(
-            "• Oy" if mode == "m" else "Oy",
+            tab("st.tab_month", mode == "m"),
             callback_data=f"st:m:{y}:{m}" if mode == "m" else f"st:m:{now.year}:{now.month}"),
         InlineKeyboardButton(
-            "• Yil" if mode == "y" else "Yil",
+            tab("st.tab_year", mode == "y"),
             callback_data=f"st:y:{y}" if mode == "y" else f"st:y:{now.year}"),
     ]
     rows = [tabs]
 
     if mode == "m":
         py, pm = _shift_month(y, m, -1)
-        nav = [InlineKeyboardButton(f"◀ {stats.MONTHS_UZ[pm - 1][:3]}", callback_data=f"st:m:{py}:{pm}")]
+        nav = [InlineKeyboardButton(f"◀ {mon[pm - 1][:3]}", callback_data=f"st:m:{py}:{pm}")]
         ny, nm = _shift_month(y, m, 1)
         if (ny, nm) <= (now.year, now.month):
-            nav.append(InlineKeyboardButton(f"{stats.MONTHS_UZ[nm - 1][:3]} ▶", callback_data=f"st:m:{ny}:{nm}"))
+            nav.append(InlineKeyboardButton(f"{mon[nm - 1][:3]} ▶", callback_data=f"st:m:{ny}:{nm}"))
         rows.append(nav)
     elif mode == "y":
         nav = [InlineKeyboardButton(f"◀ {y - 1}", callback_data=f"st:y:{y - 1}")]
@@ -1585,8 +1593,8 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None) -> Inlin
             nav.append(InlineKeyboardButton(f"{y + 1} ▶", callback_data=f"st:y:{y + 1}"))
         rows.append(nav)
 
-    rows.append([InlineKeyboardButton("📄 PDF hisobot", callback_data="pdfrep")])
-    rows.append(list(MENU_BACK_KB.inline_keyboard[0]))
+    rows.append([InlineKeyboardButton(i18n.t("st.btn_pdf", lang), callback_data="pdfrep")])
+    rows.append(list(menu_back_kb(lang).inline_keyboard[0]))
     return InlineKeyboardMarkup(rows)
 
 
@@ -1603,7 +1611,8 @@ async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         await msg.reply_text(text, reply_markup=kb)
         return
 
-    note = await msg.reply_text("📄 Hisobot tayyorlanmoqda…")
+    lang = await user_lang(uid)
+    note = await msg.reply_text(i18n.t("st.pdf_making", lang))
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     try:
         buf = await stats.pdf_report(ws["id"], ws["name"], deposit, can_manage(uid, ws))
@@ -1613,11 +1622,10 @@ async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         except Exception:
             pass
     if buf is None:
-        await msg.reply_text("Hali yopilgan signal yo'q — hisobot bo'sh bo'lardi.",
-                              reply_markup=MENU_BACK_KB)
+        await msg.reply_text(i18n.t("st.pdf_empty", lang), reply_markup=menu_back_kb(lang))
         return
     fname = f"hisobot-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
-    await msg.reply_document(InputFile(buf, fname), reply_markup=MENU_BACK_KB)
+    await msg.reply_document(InputFile(buf, fname), reply_markup=menu_back_kb(lang))
 
 
 async def cmd_pdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1629,18 +1637,21 @@ async def on_pdf_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await send_pdf_report(update, ctx)
 
 
-async def stats_view_text(ws, uid: int, mode: str, y: int | None = None, m: int | None = None) -> str:
+async def stats_view_text(ws, uid: int, mode: str, y: int | None = None,
+                           m: int | None = None, lang: str | None = None) -> str:
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     show_money = can_manage(uid, ws)
     if mode == "m":
         a, b = stats.month_bounds(y, m)
-        return await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[m - 1]} {y}",
-                                    deposit=deposit, show_money=show_money)
+        return await stats.summary(ws["id"], a, b,
+                                    f"{stats.months(lang)[m - 1]} {y}",
+                                    deposit=deposit, show_money=show_money, lang=lang)
     if mode == "y":
         a, b = stats.year_bounds(y)
-        return await stats.summary(ws["id"], a, b, f"{y}-yil natijalari",
-                                    deposit=deposit, show_money=show_money)
-    return await stats.summary(ws["id"], deposit=deposit, show_money=show_money)
+        return await stats.summary(ws["id"], a, b, i18n.t("st.title_year", lang, y=y),
+                                    deposit=deposit, show_money=show_money, lang=lang)
+    return await stats.summary(ws["id"], deposit=deposit, show_money=show_money,
+                                lang=lang)
 
 
 async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1653,16 +1664,20 @@ async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await q.edit_message_text(text, reply_markup=kb)
         return
+    lang = await user_lang(q.from_user.id)
     parts = q.data.split(":")  # st:all | st:m:Y:M | st:y:Y
     mode = parts[1]
     y = int(parts[2]) if mode in ("m", "y") else None
     m = int(parts[3]) if mode == "m" else None
-    text = await stats_view_text(ws, q.from_user.id, mode, y, m)
-    await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=stats_nav_kb(mode, y, m))
+    text = await stats_view_text(ws, q.from_user.id, mode, y, m, lang)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML,
+                               reply_markup=stats_nav_kb(mode, y, m, lang))
 
 
-def symbols_nav_kb(y: int | None, m: int | None) -> InlineKeyboardMarkup:
+def symbols_nav_kb(y: int | None, m: int | None,
+                    lang: str | None = None) -> InlineKeyboardMarkup:
     now = datetime.now(stats.TZ)
+    mon = stats.months(lang)
     if y is None:  # "Barchasi" ko'rinishidan — orqaga joriy oyga
         py, pm = now.year, now.month
         ny, nm = None, None
@@ -1671,19 +1686,21 @@ def symbols_nav_kb(y: int | None, m: int | None) -> InlineKeyboardMarkup:
         ny_, nm_ = _shift_month(y, m, 1)
         ny, nm = (ny_, nm_) if (ny_, nm_) <= (now.year, now.month) else (None, None)
 
-    row = [InlineKeyboardButton(f"◀ {stats.MONTHS_UZ[pm - 1][:3]}", callback_data=f"sym:{py}:{pm}")]
+    row = [InlineKeyboardButton(f"◀ {mon[pm - 1][:3]}", callback_data=f"sym:{py}:{pm}")]
     if y is not None:
-        row.append(InlineKeyboardButton("Barchasi", callback_data="sym:all"))
+        row.append(InlineKeyboardButton(i18n.t("st.tab_all", lang), callback_data="sym:all"))
     if ny is not None:
-        row.append(InlineKeyboardButton(f"{stats.MONTHS_UZ[nm - 1][:3]} ▶", callback_data=f"sym:{ny}:{nm}"))
-    return InlineKeyboardMarkup([row, list(MENU_BACK_KB.inline_keyboard[0])])
+        row.append(InlineKeyboardButton(f"{mon[nm - 1][:3]} ▶", callback_data=f"sym:{ny}:{nm}"))
+    return InlineKeyboardMarkup([row, list(menu_back_kb(lang).inline_keyboard[0])])
 
 
-async def symbols_view_text(ws_id: int, y: int | None, m: int | None) -> str:
+async def symbols_view_text(ws_id: int, y: int | None, m: int | None,
+                             lang: str | None = None) -> str:
     if y is None:
-        return await stats.symbols_table(ws_id, title="Barcha davr")
+        return await stats.symbols_table(ws_id, lang=lang)
     a, b = stats.month_bounds(y, m)
-    return await stats.symbols_table(ws_id, a, b, title=f"{stats.MONTHS_UZ[m - 1]} {y}")
+    return await stats.symbols_table(ws_id, a, b,
+                                      title=f"{stats.months(lang)[m - 1]} {y}", lang=lang)
 
 
 async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1698,8 +1715,10 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         return
     parts = q.data.split(":")
     y, m = (None, None) if parts[1] == "all" else (int(parts[1]), int(parts[2]))
-    text = await symbols_view_text(ws["id"], y, m)
-    await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=symbols_nav_kb(y, m))
+    lang = await user_lang(q.from_user.id)
+    text = await symbols_view_text(ws["id"], y, m, lang)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML,
+                               reply_markup=symbols_nav_kb(y, m, lang))
 
 
 async def send_web_link(target, ws) -> None:
@@ -1755,6 +1774,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text(text, reply_markup=kb)
         return
     action = q.data.split(":", 1)[1]
+    lang = await user_lang(q.from_user.id)
 
     if action == "weblink":
         await send_web_link(q.message, ws)
@@ -1762,37 +1782,36 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # Statistika ochiq signallar uchun jonli narx so'raydi — sekin bo'lishi
         # mumkin, shuning uchun "yozmoqda" belgisi ko'rsatiladi.
         async with busy(ctx.bot, q.message.chat_id):
-            text = await stats_view_text(ws, q.from_user.id, "all")
+            text = await stats_view_text(ws, q.from_user.id, "all", lang=lang)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=stats_nav_kb("all"))
+                                    reply_markup=stats_nav_kb("all", lang=lang))
     elif action == "symbols":
         async with busy(ctx.bot, q.message.chat_id):
-            text = await symbols_view_text(ws["id"], None, None)
+            text = await symbols_view_text(ws["id"], None, None, lang)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=symbols_nav_kb(None, None))
+                                    reply_markup=symbols_nav_kb(None, None, lang))
     elif action == "open":
         async with busy(ctx.bot, q.message.chat_id):
-            text, kb = await open_signals_view(ws, q.from_user.id)
-        rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
+            text, kb = await open_signals_view(ws, q.from_user.id, lang)
+        rows = (list(kb.inline_keyboard) if kb else []) + list(menu_back_kb(lang).inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
     elif action == "deposit":
         if not can_manage(q.from_user.id, ws):
             return
         cur = ws["deposit"]
-        txt = f"{float(cur):,.2f}" if cur is not None else "belgilanmagan"
+        txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await q.message.reply_text(
-            f"Joriy depozit ({ws['name']}): <b>{txt}</b>\n\n"
-            "Yangilash uchun: <code>/depozit 1000</code>", parse_mode=ParseMode.HTML,
-            reply_markup=MENU_BACK_KB)
+            i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     elif action == "equity":
         deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
         buf = await stats.equity_chart(ws["id"], deposit)
         if buf is None:
-            await q.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
-                                        reply_markup=MENU_BACK_KB)
+            await q.message.reply_text(i18n.t("eq.too_few", lang),
+                                        reply_markup=menu_back_kb(lang))
         else:
-            await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=MENU_BACK_KB)
+            await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=menu_back_kb(lang))
 
 
 async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1808,7 +1827,7 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(text, reply_markup=kb)
         return
     await update.effective_message.reply_text(
-        "Bosh menyu:",
+        i18n.t("menu.open_title", await user_lang(uid)),
         reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private"))
 
 
@@ -2353,7 +2372,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         shown = html.escape(", ".join(cands[:3]))
         await msg.reply_text(
             i18n.t("prev.not_found", lang, sym=shown),
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang),
         )
         return
     draft["symbol"] = sym
@@ -2367,7 +2386,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     if draft.get("sl") is not None:
         err = parsing.validate(draft, lang)
         if err:
-            await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
             return
 
     warn = []
@@ -2589,17 +2608,18 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         token = rest
     item = PENDING.get(token)
+    # Ko'rik yaratilganda tanlangan til ustun (item["lang"]); ko'rik
+    # eskirgan bo'lsa uni bazadan so'raymiz.
+    lang = (item or {}).get("lang") or await user_lang(q.from_user.id)
     if not item:
-        await _edit(q, i18n.t("prev.expired", await user_lang(q.from_user.id)),
-                    reply_markup=MENU_BACK_KB)
+        await _edit(q, i18n.t("prev.expired", lang), reply_markup=menu_back_kb(lang))
         return
     if q.from_user.id != item["user"]:
         return
-    lang = item.get("lang")
 
     if action == "no":
         PENDING.pop(token, None)
-        await _edit(q, i18n.t("prev.cancelled", lang), reply_markup=MENU_BACK_KB)
+        await _edit(q, i18n.t("prev.cancelled", lang), reply_markup=menu_back_kb(lang))
         return
 
     if action == "okc":
@@ -2712,7 +2732,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 await _edit(
                     q, i18n.t("prev.price_moved", lang,
                               p=fmt_price(fresh_price), err=err),
-                    parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                    parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
                 return
             d = refreshed
             item["draft"] = d
@@ -2733,7 +2753,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await _clear_kb(q)
     await q.message.reply_text(
         i18n.t("sig.accepted", lang, sid=sig_id),
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
@@ -3019,33 +3039,36 @@ async def build_digest(ws) -> str | None:
                     for r in rows
                     if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
     total = sum(weighted) if weighted else sum(pnls)
-    label = "depozitga nisbatan" if weighted else "yig'indi"
+    # Kun yakuni GURUHGA ketadi — til workspace'niki (ws_lang), odamning
+    # shaxsiy tili emas.
+    lang = ws_lang(ws)
+    label = i18n.t("dg.label_dep" if weighted else "dg.label_sum", lang)
 
     icon = "🟢" if total > 0 else ("🔴" if total < 0 else "⚪")
     wr = wins / len(pnls) * 100
-    t = [f"📊 <b>Kun yakuni — {now:%d.%m.%Y}</b>", "",
-         f"Yopilgan signallar: <b>{len(pnls)}</b>  ({wins}✅ / {losses}❌"
-         + (f" / {be}⚪" if be else "") + ")",
-         f"Winrate: <b>{wr:.0f}%</b>",
-         f"{icon} Natija ({label}): <b>{total:+.2f}%</b>"]
+    t = [i18n.t("dg.head", lang, d=f"{now:%d.%m.%Y}"), "",
+         i18n.t("dg.closed", lang, n=len(pnls), w=wins, l=losses,
+                be=(f" / {be}⚪" if be else "")),
+         i18n.t("dg.winrate", lang, wr=wr),
+         i18n.t("dg.result", lang, icon=icon, label=label, p=total)]
 
     syms = await db.top_symbols(ws["id"], since, None)
     if syms:
         best = syms[0]
         if float(best["sum_pct"]) > 0:
-            t.append(f"Eng yaxshi: <b>{html.escape(best['symbol'])}</b> "
-                     f"{float(best['sum_pct']):+.2f}%")
+            t.append(i18n.t("dg.best", lang, sym=html.escape(best["symbol"]),
+                            p=float(best["sum_pct"])))
         worst = syms[-1]
         if float(worst["sum_pct"]) < 0 and worst["symbol"] != best["symbol"]:
-            t.append(f"Eng yomon: <b>{html.escape(worst['symbol'])}</b> "
-                     f"{float(worst['sum_pct']):+.2f}%")
+            t.append(i18n.t("dg.worst", lang, sym=html.escape(worst["symbol"]),
+                            p=float(worst["sum_pct"])))
 
     live = await db.live_signals(ws["id"])
     if live:
         act = sum(1 for s in live if s["status"] == "ACTIVE")
         pend = len(live) - act
-        parts = ([f"{act} ta ochiq"] if act else []) + \
-                ([f"{pend} ta kutilmoqda"] if pend else [])
+        parts = ([i18n.t("dg.open_n", lang, n=act)] if act else []) + \
+                ([i18n.t("dg.pending_n", lang, n=pend)] if pend else [])
         t += ["", "⏳ " + ", ".join(parts)]
     return "\n".join(t)
 
@@ -3435,10 +3458,11 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(update.effective_user.id)
     async with busy(ctx.bot, update.effective_chat.id):
-        text = await stats_view_text(ws, update.effective_user.id, "all")
+        text = await stats_view_text(ws, update.effective_user.id, "all", lang=lang)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                     reply_markup=stats_nav_kb("all"))
+                                     reply_markup=stats_nav_kb("all", lang=lang))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3450,14 +3474,17 @@ async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(uid)
     now = datetime.now(stats.TZ)
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     show_money = can_manage(uid, ws)
     a, b = stats.month_bounds(now.year, now.month)
-    cur = await stats.summary(ws["id"], a, b, f"{stats.MONTHS_UZ[now.month - 1]} {now.year}",
-                               deposit=deposit, show_money=show_money)
+    cur = await stats.summary(ws["id"], a, b,
+                               f"{stats.months(lang)[now.month - 1]} {now.year}",
+                               deposit=deposit, show_money=show_money, lang=lang)
     await update.message.reply_text(
-        cur + "\n\n" + await stats.monthly_table(ws["id"]), parse_mode=ParseMode.HTML)
+        cur + "\n\n" + await stats.monthly_table(ws["id"], lang=lang),
+        parse_mode=ParseMode.HTML)
 
 
 async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3469,13 +3496,14 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(uid)
     y = datetime.now(stats.TZ).year
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     show_money = can_manage(uid, ws)
     a, b = stats.year_bounds(y)
     await update.message.reply_text(
-        await stats.summary(ws["id"], a, b, f"{y}-yil natijalari",
-                             deposit=deposit, show_money=show_money),
+        await stats.summary(ws["id"], a, b, i18n.t("st.title_year", lang, y=y),
+                             deposit=deposit, show_money=show_money, lang=lang),
         parse_mode=ParseMode.HTML)
 
 
@@ -3487,9 +3515,10 @@ async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws)
         await update.message.reply_text(text, reply_markup=kb)
         return
-    text = await symbols_view_text(ws["id"], None, None)
+    lang = await user_lang(update.effective_user.id)
+    text = await symbols_view_text(ws["id"], None, None, lang)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                     reply_markup=symbols_nav_kb(None, None))
+                                     reply_markup=symbols_nav_kb(None, None, lang))
 
 
 async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3503,8 +3532,9 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     buf = await stats.equity_chart(ws["id"], deposit)
     if buf is None:
-        await update.message.reply_text("Grafik uchun kamida 2 ta yopilgan signal kerak.",
-                                         reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(
+            i18n.t("eq.too_few", await user_lang(update.effective_user.id)),
+            reply_markup=MENU_BACK_KB)
         return
     async with busy(ctx.bot, update.effective_chat.id):
         await update.message.reply_photo(InputFile(buf, "equity.png"),
@@ -3520,7 +3550,8 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     async with busy(ctx.bot, update.effective_chat.id):
-        text, kb = await open_signals_view(ws, update.effective_user.id)
+        text, kb = await open_signals_view(ws, update.effective_user.id,
+                                            await user_lang(update.effective_user.id))
     rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
                                      reply_markup=InlineKeyboardMarkup(rows))
@@ -3548,29 +3579,26 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     if not can_manage(uid, ws):
-        await update.message.reply_text("Ruxsat yo'q.")
+        await update.message.reply_text(i18n.t("man.no_right", lang))
         return
 
     if not ctx.args:
         cur = ws["deposit"]
-        txt = f"{float(cur):,.2f}" if cur is not None else "belgilanmagan"
+        txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await update.message.reply_text(
-            f"Joriy depozit ({html.escape(ws['name'])}): <b>{txt}</b>\n\n"
-            "Yangilash uchun: <code>/depozit 1000</code>\n\n"
-            "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
-            "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
-            "foyda/zarar hisoblanadi.",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            i18n.t("dep.help", lang, name=html.escape(ws["name"]), v=txt),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return
 
     amount = _parse_price(ctx.args[0])
     if amount is None or amount <= 0:
-        await update.message.reply_text("Noto'g'ri summa. Masalan: /depozit 1000")
+        await update.message.reply_text(i18n.t("dep.bad_amount", lang))
         return
     await db.set_deposit(ws["id"], amount)
-    await update.message.reply_text(f"✅ Depozit yangilandi: <b>{amount:,.2f}</b>",
-                                     parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    await update.message.reply_text(i18n.t("dep.updated", lang, v=amount),
+                                     parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
