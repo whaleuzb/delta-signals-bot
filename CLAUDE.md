@@ -4853,3 +4853,35 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        poyga holatida `partial_close`ning qayta urinib muvaffaqiyat
        qozonishi. `test_tracker.py` 15/15 (fixture'ga `rev` qo'shildi) va
        qolgan barcha to'plamlar (154 holat) o'zgarishsiz.
+
+152. **Natija kartasi endi UCHALA yopilish yo'lida ham keladi
+     (`send_close_result`).** Foydalanuvchi: "vaqtidan oldin yopilgan
+     signalda natija kartasi kelmayabti. Yoki faqat tp orqali
+     yopilganlarga sozlanganmidi?" — Ha, aynan shunday bo'lgan; kamchilik.
+     - Signal UCH xil yo'l bilan yopiladi: (a) avtomatik TP/SL
+       (`poll_job`), (b) "🔒 To'liq yopish" (`on_close_confirm`),
+       (c) "✂️" oxirgi qismni yopganda (`on_manage_partial`). #145'da
+       karta FAQAT (a) ga ulangan edi.
+     - **Bu uchinchi marta shu joyda uzilish bo'ldi**: ilgari GRAFIK ham
+       faqat (a) da bor edi va (b) ga alohida qo'shilgan (kod izohida
+       yozilib qolgan), (c) da esa hamon faqat matn bor edi — shaxsiy
+       jurnalda umuman hech narsa kelmasdi.
+     - Shu sabab tuzatish nuqtaviy emas: yuborish mantig'i BITTA
+       `send_close_result(ctx, ws, sig, txt, ref_uid)` funksiyasiga
+       ko'chirildi va uchala yo'l ham SHUNI chaqiradi. Endi yangi yopilish
+       yo'li qo'shilsa ham u avtomatik ravishda grafik + karta oladi.
+     - Ichida eski xatti-harakat saqlangan: albom (grafik + karta) →
+       bitta rasm → oddiy matn. Karta yoki grafik chiqmasa, hatto ISTISNO
+       bersa ham natija xabari BARIBIR ketadi.
+     - `ref_uid`: (b) va (c) da kartadagi QR — TUGMANI BOSGAN odamning
+       taklif havolasi (kartani aynan u ulashadi); (a) da esa signal
+       muallifiniki.
+     - Qisman yopish TUGAMAGAN bo'lsa (signal ochiqligicha qoladi) karta
+       ATAYLAB yuborilmaydi — savdo hali tugamagan.
+     - Tekshirildi: 15 ta holat — guruhda va shaxsiy jurnalda albom
+       ketishi, mavzuga va signal postiga javob bo'lishi, karta/grafik
+       yo'q bo'lganda va istisno bo'lganda ham xabar ketishi, albom rad
+       etilganda bitta rasmga tushishi, "To'liq yopish" va "✂️ oxirgi
+       qism" yo'llarining natijani yuborishi, tugamagan qisman yopishda
+       yubormasligi. `test_tracker.py` 15/15 va qolgan to'plamlar
+       (168 holat) o'zgarishsiz.

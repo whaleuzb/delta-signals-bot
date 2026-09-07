@@ -565,6 +565,69 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         qr_caption="Taklif kodi", qr_code=code)
 
 
+async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:
+    """Yopilgan signal natijasi: matn + tahliliy grafik + ulashish kartasi.
+
+    Signal UCH xil yo'l bilan yopiladi — avtomatik (TP/SL, `poll_job`),
+    qo'lda to'liq ("🔒 To'liq yopish") va qisman yopish oxirida qolgan
+    qismning tugashi. Avval har bir yo'l xabarni O'ZICHA yuborardi va
+    ular vaqt o'tib bir-biridan uzilib qolgan edi: grafik faqat ikkitasida,
+    ulashish kartasi esa FAQAT avtomatik yo'lda ishlardi (foydalanuvchi:
+    "vaqtidan oldin yopilgan signalda natija kartasi kelmayabti").
+    Shu sabab uchala yo'l endi SHU funksiyani chaqiradi.
+
+    Hech narsa chiqmasa ham xabar KETADI: albom -> bitta rasm -> oddiy matn.
+    """
+    sid = sig["id"]
+    photo = share = None
+    try:
+        photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username)
+    except Exception:
+        log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
+    # Karta grafikdan MUSTAQIL: biri chiqmasa ikkinchisi baribir ketadi.
+    try:
+        share = await build_pnl_card(sig, ws, ctx.bot.username, ref_uid=ref_uid)
+    except Exception:
+        log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
+
+    # Ikkalasi ham bo'lsa bitta ALBOM: bir bildirishnoma, ikki rasm.
+    album = None
+    if photo and share:
+        album = [InputMediaPhoto(InputFile(photo, "signal.png"), caption=txt,
+                                  parse_mode=ParseMode.HTML),
+                 InputMediaPhoto(InputFile(share, "natija.png"))]
+    single = photo or share
+
+    if ws["type"] == "group" and ws["group_chat_id"]:
+        chat_id, thread_id = ws["group_chat_id"], ws["group_topic_id"]
+    elif ws["type"] == "personal":
+        chat_id, thread_id = ws["owner_id"], None
+    else:
+        return
+
+    kw = {"reply_to_message_id": sig["group_msg_id"],
+          "allow_sending_without_reply": True}
+    if thread_id is not None:
+        kw["message_thread_id"] = thread_id
+
+    try:
+        if album:
+            try:
+                await ctx.bot.send_media_group(chat_id, album, **kw)
+                return
+            except Exception:
+                log.warning("Albom yuborilmadi (#%s), bitta rasmga o'tamiz", sid,
+                            exc_info=True)
+        if single:
+            single.seek(0)
+            await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
+                                      caption=txt, parse_mode=ParseMode.HTML, **kw)
+        else:
+            await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
+    except Exception:
+        log.exception("Natija xabari yuborilmadi (#%s)", sid)
+
+
 def main_menu_kb(uid: int, ws, private: bool = True,
                   lang: str | None = None) -> InlineKeyboardMarkup:
     """`lang` — odamning SHAXSIY tili (`users.lang`). Berilmasa
@@ -1114,10 +1177,18 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
                 ws["id"], ev["pnl"] / 100 * float(sig["alloc_amount"]))
         icon = "✅" if (ev["pnl"] or 0) >= 0 else "❌"
         rtxt = f" ({ev['r']:+.2f}R)" if ev["r"] is not None else ""
-        await notify_group(ctx, ws, sig,
-                            f"{icon} <b>#{sig['id']} {sig['symbol']}</b> — qolgan qism "
-                            f"yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
-                            f"Yakuniy: <b>{ev['pnl']:+.2f}%</b>{rtxt}")
+        # Qisman yopish OXIRGI qismni ham yopdi — bu ham TO'LIQ yopilish,
+        # shuning uchun natija boshqa ikki yo'l bilan AYNI ko'rinishda
+        # (grafik + ulashish kartasi) ketadi. Avval bu yerda faqat matn
+        # bor edi va shaxsiy jurnalda umuman hech narsa kelmasdi.
+        sig2 = await db.get_signal(sig["id"])
+        if sig2:
+            await send_close_result(
+                ctx, ws, sig2,
+                f"{icon} <b>#{sig['id']} {sig['symbol']}</b> — qolgan qism "
+                f"yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
+                f"Yakuniy: <b>{ev['pnl']:+.2f}%</b>{rtxt}",
+                ref_uid=q.from_user.id)
         await q.edit_message_text(
             f"{icon} #{sig['id']} {sig['symbol']} to'liq yopildi: "
             f"<b>{ev['pnl']:+.2f}%</b>{rtxt}",
@@ -1419,53 +1490,15 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
         f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
 
-    if ws["type"] in ("group", "personal"):
-        txt = (f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
-               f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}")
-        # close_now() endi natijani bazaga yozib bo'lgan — yangilangan yozuv
-        # (closed_at/exit_price/pnl_pct) bilan xuddi avtomatik TP/SL yopilishidagi
-        # kabi grafik chiziladi (chart.py — real shamlar + entry/TP/SL chiziqlari).
-        photo = None
-        sig2 = await db.get_signal(sig_id)
-        if sig2:
-            try:
-                photo = await chart.signal_chart(sig2, ws["name"], ctx.bot.username)
-            except Exception:
-                log.warning("Grafik yasalmadi (qo'lda yopish, #%s)", sig_id, exc_info=True)
-        if ws["type"] == "group" and ws["group_chat_id"]:
-            try:
-                if photo:
-                    await ctx.bot.send_photo(
-                        ws["group_chat_id"], InputFile(photo, "signal.png"), caption=txt,
-                        parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
-                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
-                else:
-                    await ctx.bot.send_message(
-                        ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
-                        reply_to_message_id=sig["group_msg_id"],
-                        allow_sending_without_reply=True, message_thread_id=ws["group_topic_id"])
-            except Exception:
-                log.exception("Guruhga yuborilmadi (qo'lda yopish)")
-        elif ws["type"] == "personal":
-            # Avtomatik (TP/SL) yopilishda shaxsiy chatga grafik ALLAQACHON
-            # yuborilardi (news_scan_job'dagi emas, tracker/poll_job orqali
-            # ishlovchi yo'lda) — lekin QO'LDA yopishda bu shoxcha umuman
-            # yozilmagan edi (faqat matn tahrirlanardi, qo'shimcha xabar/
-            # grafik yo'q). Foydalanuvchi: "shaxsiy kabinetda natija grafik
-            # bilan kelmayabti" — aynan shu qo'lda yopish yo'li edi.
-            try:
-                if photo:
-                    await ctx.bot.send_photo(
-                        ws["owner_id"], InputFile(photo, "signal.png"), caption=txt,
-                        parse_mode=ParseMode.HTML, reply_to_message_id=sig["group_msg_id"],
-                        allow_sending_without_reply=True)
-                else:
-                    await ctx.bot.send_message(
-                        ws["owner_id"], txt, parse_mode=ParseMode.HTML,
-                        reply_to_message_id=sig["group_msg_id"],
-                        allow_sending_without_reply=True)
-            except Exception:
-                log.exception("Shaxsiy xabar yuborilmadi (qo'lda yopish)")
+    txt = (f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
+           f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}")
+    # `close_now()` natijani bazaga allaqachon yozdi — yangilangan yozuv
+    # (closed_at/exit_price/pnl_pct) bilan grafik ham, ulashish kartasi ham
+    # avtomatik yopilishdagi kabi chiqadi. Kartadagi QR — yopgan odamning
+    # taklif havolasi (kartani aynan u ulashadi).
+    sig2 = await db.get_signal(sig_id)
+    if sig2:
+        await send_close_result(ctx, ws, sig2, txt, ref_uid=q.from_user.id)
 
 
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2898,70 +2931,26 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             money_delta = float(closed_pnl) / 100 * float(sig["alloc_amount"])
             await db.apply_deposit_delta(ws["id"], money_delta)
 
-        # Signal shu hodisada yopilgan bo'lsa (STOP yoki yakuniy TP) — matn bilan
-        # birga real narx grafigi (entry/TP/SL chiziqlari + chiqish nuqtasi)
-        # yuboriladi. Grafik ishlab chiqarilmasa (birja javob bermasa va h.k.)
-        # jim tarzda oddiy matn xabariga qaytiladi — hech narsa buzilmaydi.
-        photo = None
-        share = None
+        # Signal shu hodisada yopilgan bo'lsa (STOP yoki yakuniy TP) — matn,
+        # grafik va ulashish kartasi bitta yo'l orqali yuboriladi
+        # (`send_close_result`), qo'lda yopish bilan AYNI.
         if closed_pnl is not None and sig:
-            try:
-                photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username)
-            except Exception:
-                log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
-            # Ulashish kartasi — grafikdan ALOHIDA va undan mustaqil:
-            # biri chiqmasa ikkinchisi baribir ketadi.
-            try:
-                share = await build_pnl_card(sig, ws, ctx.bot.username)
-            except Exception:
-                log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
-
-        # Ikkala rasm ham bo'lsa — bitta ALBOM: bir xabar, ikki rasm.
-        # Alohida yuborilsa guruhga ketma-ket ikki bildirishnoma tushardi.
-        album = None
-        if photo and share:
-            album = [InputMediaPhoto(InputFile(photo, "signal.png"), caption=txt,
-                                      parse_mode=ParseMode.HTML),
-                     InputMediaPhoto(InputFile(share, "natija.png"))]
-        single = photo or share
-
-        async def _send_result(chat_id: int, reply_to, thread_id=None):
-            """Natijani yuborish: albom -> bitta rasm -> oddiy matn.
-
-            Albom qaytmasa (Telegram ba'zan media guruhni rad etadi) bitta
-            rasmga tushamiz — natija xabari HECH QACHON umuman yuborilmay
-            qolmasligi kerak."""
-            kw = {"reply_to_message_id": reply_to, "allow_sending_without_reply": True}
-            if thread_id is not None:
-                kw["message_thread_id"] = thread_id
-            if album:
-                try:
-                    await ctx.bot.send_media_group(chat_id, album, **kw)
-                    return
-                except Exception:
-                    log.warning("Albom yuborilmadi (#%s), bitta rasmga o'tamiz", sid,
-                                exc_info=True)
-            if single:
-                single.seek(0)
-                await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
-                                          caption=txt, parse_mode=ParseMode.HTML, **kw)
+            await send_close_result(ctx, ws, sig, txt)
+        else:
+            kw = {"reply_to_message_id": sig["group_msg_id"] if sig else None,
+                  "allow_sending_without_reply": True}
+            if ws["type"] == "group" and ws["group_chat_id"]:
+                kw["message_thread_id"] = ws["group_topic_id"]
+                target = ws["group_chat_id"]
+            elif ws["type"] == "personal":
+                target = ws["owner_id"]
             else:
-                await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
-
-        if ws["type"] == "group" and ws["group_chat_id"]:
-            reply_to = sig["group_msg_id"] if sig else None
-            try:
-                await _send_result(ws["group_chat_id"], reply_to, ws["group_topic_id"])
-            except Exception:
-                log.exception("Xabar yuborilmadi")
-        elif ws["type"] == "personal":
-            # Guruhdagi kabi — natija signal kartasiga javob bo'lib keladi,
-            # shunda qaysi signal haqida ekani darrov ko'rinadi.
-            reply_to = sig["group_msg_id"] if sig else None
-            try:
-                await _send_result(ws["owner_id"], reply_to)
-            except Exception:
-                log.exception("Shaxsiy xabar yuborilmadi")
+                target = None
+            if target is not None:
+                try:
+                    await ctx.bot.send_message(target, txt, parse_mode=ParseMode.HTML, **kw)
+                except Exception:
+                    log.exception("Xabar yuborilmadi")
 
         if sig and sig["ambiguous"] and e["type"] == "STOP":
             try:
