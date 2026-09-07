@@ -4911,3 +4911,45 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yo'riqnoma berilishi, `vision` moduli/sozlamasining qolmagani,
        `ANTHROPIC_API_KEY`ning saqlanib qolgani. `test_tracker.py` 15/15 va
        qolgan barcha to'plamlar (183 holat) o'zgarishsiz.
+
+154. **⭐ BUTUN BOT UCHALA TILDA (o'zbek / rus / ingliz).** Foydalanuvchi:
+     "Yaxshi endi barcha funksiyalar 3 xil tilda bo'lsin. Barcha
+     barchasini hozirdan boshla."
+     - **Eng muhim qaror — IKKI XIL TIL, ataylab:**
+       `users.lang` — odamning SHAXSIY menyu tili; `workspaces.lang` —
+       GURUHGA ketadigan xabar tili. Guruh posti hammaga BITTA ketadi,
+       uni har bir a'zoga o'z tilida yozib bo'lmaydi. Shuning uchun
+       `user_lang(uid)` va `ws_lang(ws)`/`tw(key, ws)` alohida.
+     - **Ikkalasi bir ekranda uchrashadigan joy — ko'rik (preview):**
+       signal KARTASI guruh tilida (u aynan shu ko'rinishda guruhga
+       ketadi — "tasdiqlasangiz shunday yuboriladi" va'dasi buzilmasin),
+       tugma/savol/ogohlantirish esa odamning tilida. Ikkalasi
+       `PENDING[token]` ga (`lang`/`glang`) yoziladi, keyingi qadamlar
+       bazani qayta so'ramaydi.
+     - Bosqichlar (har biri alohida commit va sinov): guruh xabarlari →
+       sehrgar → ko'rik va boshqaruv → statistika → onboarding/yordam/
+       taklif → guruh sozlamalari va qolgan xabarlar → ochiq veb sahifa →
+       Telegraph qo'llanmasi → admin panel.
+     - **`i18n.STRINGS` — 506 ta kalit, `i18n.missing()` BO'SH.** Har bir
+       til to'plamining borligini SINOV tekshiradi, ya'ni yangi kalit
+       qo'shilib, tarjimasi unutilsa sinov yiqiladi.
+     - `i18n.t()` tarjima topilmasa **o'zbekchaga**, u ham bo'lmasa
+       kalitning o'ziga qaytadi — ekran hech qachon bo'sh qolmaydi.
+     - `MENU_BACK_KB` va `ADMIN_BACK_KB` konstantalari OLIB TASHLANDI:
+       modul yuklanganda til hali ma'lum emas, shuning uchun tugma
+       funksiya bo'lishi shart (`menu_back_kb(lang)`).
+     - **Veb sahifada til boshqacha aniqlanadi** (`web.req_lang`):
+       `?lang=` → GURUH tili (guruh sahifasi o'sha auditoriya uchun) →
+       brauzerning `Accept-Language` (bosh sahifada) → o'zbekcha. Kesh
+       kalitlariga til qo'shildi, aks holda birinchi tashrifchining tili
+       keyingilarga berilib ketardi.
+     - Qo'llanma (Telegraph) — har til uchun ALOHIDA sahifa
+       (`TELEGRAPH_PATH_RU/EN`), matn `guide.G` jadvalida, TUZILMA esa
+       bitta joyda. `GUIDE_URL_RU/EN` bo'sh bo'lsa tugma o'zbekchasiga
+       qaytadi.
+     - **QOLGANI (ataylab o'zbekcha):** News Trade AI / surge / makro
+       taqvim / MACD kanaliga ketadigan postlar — kanal BITTA va
+       o'zbekzabon auditoriya uchun; guruh posti kabi, uni bir vaqtda
+       uch tilda yozib bo'lmaydi.
+     - Tekshirildi: 383 ta yangi holat (9 ta til to'plami) + mavjud
+       to'plamlar o'zgarishsiz.
