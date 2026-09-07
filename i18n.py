@@ -1343,6 +1343,365 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "❌ Bekor qilindi.", "ru": "❌ Отменено.", "en": "❌ Cancelled.",
     },
 
+    # --- /setup (guruhni ro'yxatdan o'tkazish) ---
+    "su.group_only": {
+        "uz": "Bu buyruq faqat guruh ichida ishlaydi.",
+        "ru": "Эта команда работает только внутри группы.",
+        "en": "This command only works inside a group.",
+    },
+    "su.check_failed": {
+        "uz": "Guruh a'zoligini tekshirib bo'lmadi.",
+        "ru": "Не удалось проверить членство в группе.",
+        "en": "Could not check the group membership.",
+    },
+    "su.admin_only": {
+        "uz": "Faqat guruh admini /setup qila oladi.",
+        "ru": "Команду /setup может выполнить только админ группы.",
+        "en": "Only a group admin can run /setup.",
+    },
+    "su.already": {
+        "uz": "Bu guruh allaqachon ro'yxatdan o'tgan: {name}",
+        "ru": "Эта группа уже зарегистрирована: {name}",
+        "en": "This group is already registered: {name}",
+    },
+    "su.have_other": {
+        "uz": ("Sizda allaqachon boshqa guruh bor: \"{name}\". "
+               "Har bir admin faqat bitta guruhni boshqara oladi."),
+        "ru": ("У вас уже есть другая группа: «{name}». "
+               "Один админ может вести только одну группу."),
+        "en": ("You already have another group: \"{name}\". "
+               "Each admin can run only one group."),
+    },
+    "su.done": {
+        "uz": ("✅ \"{name}\" workspace sifatida ro'yxatdan o'tdi!\n"
+               "Endi botga shaxsiy xabar yozib (/start) signal kirita olasiz."),
+        "ru": ("✅ «{name}» зарегистрирована как рабочее пространство!\n"
+               "Теперь можно писать сигналы боту в личном чате (/start)."),
+        "en": ("✅ \"{name}\" is registered as a workspace!\n"
+               "You can now send signals to the bot in private (/start)."),
+    },
+    "su.group_ws_only": {
+        "uz": "Bu buyruq faqat guruh workspace uchun ishlaydi.",
+        "ru": "Эта команда работает только для группового рабочего пространства.",
+        "en": "This command only works for a group workspace.",
+    },
+    "su.not_registered": {
+        "uz": "Bu guruh hali ro'yxatdan o'tmagan — /setup yozing.",
+        "ru": "Эта группа ещё не зарегистрирована — напишите /setup.",
+        "en": "This group is not registered yet — type /setup.",
+    },
+    "su.group_admin_only": {
+        "uz": "Faqat guruh admini o'zgartira oladi.",
+        "ru": "Изменить может только админ группы.",
+        "en": "Only a group admin can change this.",
+    },
+
+    # --- Ochiq sahifa (/sahifa) ---
+    "web.off": {
+        "uz": ("🌐 Ochiq sahifa hali yoqilmagan.\n\n"
+               "Yoqish uchun: <code>/public on</code> yozing — so'rov moderatorga "
+               "boradi. Tasdiqlangach guruhingiz uchun jonli havola paydo bo'ladi: "
+               "unda statistika, equity grafigi va savdolar tarixi ko'rinadi."),
+        "ru": ("🌐 Публичная страница ещё не включена.\n\n"
+               "Чтобы включить, напишите <code>/public on</code> — запрос уйдёт "
+               "модератору. После одобрения у группы появится живая ссылка со "
+               "статистикой, графиком эквити и историей сделок."),
+        "en": ("🌐 The public page is not enabled yet.\n\n"
+               "To enable it, type <code>/public on</code> — the request goes to a "
+               "moderator. Once approved your group gets a live link with the stats, "
+               "the equity chart and the trade history."),
+    },
+    "web.link": {
+        "uz": ("🌐 <b>{name}</b> — ochiq natijalar sahifasi:\n\n<code>{url}</code>\n\n"
+               "Bu havolani guruhga pin qilib qo'ysangiz yoki reklamada ulashsangiz "
+               "bo'ladi. Sahifa bazadan jonli o'qiladi — har yangi natija o'zi "
+               "qo'shiladi, qo'lda yangilash shart emas."),
+        "ru": ("🌐 <b>{name}</b> — публичная страница результатов:\n\n"
+               "<code>{url}</code>\n\n"
+               "Ссылку можно закрепить в группе или использовать в рекламе. Страница "
+               "читает данные вживую — каждый новый результат добавляется сам, "
+               "обновлять вручную не нужно."),
+        "en": ("🌐 <b>{name}</b> — public results page:\n\n<code>{url}</code>\n\n"
+               "You can pin this link in the group or share it in ads. The page reads "
+               "live from the database — every new result is added by itself, no "
+               "manual refresh needed."),
+    },
+    "web.btn_open": {
+        "uz": "🌐 Sahifani ochish", "ru": "🌐 Открыть страницу", "en": "🌐 Open the page",
+    },
+
+    # --- /public (reytingda ko'rinish) ---
+    "pub.state_off": {"uz": "o'chirilgan 🔒", "ru": "выключено 🔒", "en": "off 🔒"},
+    "pub.state_on": {"uz": "yoqilgan ✅", "ru": "включено ✅", "en": "on ✅"},
+    "pub.state_wait": {
+        "uz": "tasdiqlanishi kutilmoqda ⏳", "ru": "ожидает одобрения ⏳",
+        "en": "waiting for approval ⏳",
+    },
+    "pub.current": {
+        "uz": ("\"{name}\" guruhingizning <code>/top</code> reytingida ko'rinishi: "
+               "<b>{state}</b>\n\nYoqish: <code>/public on</code>\n"
+               "O'chirish: <code>/public off</code>"),
+        "ru": ("Показ группы «{name}» в рейтинге <code>/top</code>: <b>{state}</b>\n\n"
+               "Включить: <code>/public on</code>\nВыключить: <code>/public off</code>"),
+        "en": ("Your group \"{name}\" in the <code>/top</code> ranking: "
+               "<b>{state}</b>\n\nEnable: <code>/public on</code>\n"
+               "Disable: <code>/public off</code>"),
+    },
+    "pub.usage": {
+        "uz": "Foydalanish: /public on  yoki  /public off",
+        "ru": "Использование: /public on  или  /public off",
+        "en": "Usage: /public on  or  /public off",
+    },
+    "pub.off_done": {
+        "uz": "🔒 Guruhingiz reytingdan olib tashlandi.",
+        "ru": "🔒 Группа убрана из рейтинга.",
+        "en": "🔒 Your group was removed from the ranking.",
+    },
+    "pub.on_done": {
+        "uz": "✅ Guruhingiz endi /top reytingida ko'rinadi.",
+        "ru": "✅ Ваша группа теперь видна в рейтинге /top.",
+        "en": "✅ Your group now shows in the /top ranking.",
+    },
+    "pub.requested": {
+        "uz": ("⏳ So'rov yuborildi. Guruhingiz moderator tasdig'idan keyin "
+               "<code>/top</code> reytingida ko'rinadi."),
+        "ru": ("⏳ Запрос отправлен. Группа появится в рейтинге <code>/top</code> "
+               "после одобрения модератором."),
+        "en": ("⏳ Request sent. Your group appears in the <code>/top</code> ranking "
+               "once a moderator approves it."),
+    },
+    "pub.approved_dm": {
+        "uz": "✅ Guruhingiz <code>/top</code> reytingida ko'rina boshladi.",
+        "ru": "✅ Ваша группа появилась в рейтинге <code>/top</code>.",
+        "en": "✅ Your group is now visible in the <code>/top</code> ranking.",
+    },
+    "pub.rejected_dm": {
+        "uz": ("🚫 Guruhingiz <code>/top</code> reytingiga qo'shilmadi. "
+               "Guruh nomi yoki havolasini to'g'rilab, qayta urinib ko'ring."),
+        "ru": ("🚫 Группа не добавлена в рейтинг <code>/top</code>. Исправьте название "
+               "или ссылку группы и попробуйте снова."),
+        "en": ("🚫 Your group was not added to the <code>/top</code> ranking. Fix the "
+               "group name or link and try again."),
+    },
+    "top.empty": {
+        "uz": ("Hali hech qanday ochiq guruh reytingda yo'q.\n\n"
+               "Guruh admini bo'lsangiz, guruhingizni ko'rsatish uchun "
+               "<code>/public on</code> yozing."),
+        "ru": ("В рейтинге пока нет ни одной публичной группы.\n\n"
+               "Если вы админ группы, напишите <code>/public on</code>, чтобы "
+               "показать её."),
+        "en": ("No public group is in the ranking yet.\n\n"
+               "If you are a group admin, type <code>/public on</code> to show yours."),
+    },
+
+    # --- /havola (guruh taklif havolasi) ---
+    "inv.current": {
+        "uz": ("\"{name}\" guruhingizning taklif havolasi: <b>{link}</b>\n\n"
+               "<code>/top</code> reytingida guruh nomi shu havolaga link qilinadi.\n\n"
+               "Belgilash: <code>/havola https://t.me/+abc123</code>\n"
+               "O'chirish: <code>/havola off</code>"),
+        "ru": ("Пригласительная ссылка группы «{name}»: <b>{link}</b>\n\n"
+               "В рейтинге <code>/top</code> название группы ведёт на эту ссылку.\n\n"
+               "Задать: <code>/havola https://t.me/+abc123</code>\n"
+               "Убрать: <code>/havola off</code>"),
+        "en": ("The invite link of \"{name}\": <b>{link}</b>\n\n"
+               "In the <code>/top</code> ranking the group name links here.\n\n"
+               "Set it: <code>/havola https://t.me/+abc123</code>\n"
+               "Remove it: <code>/havola off</code>"),
+    },
+    "inv.off_done": {
+        "uz": "🔒 Taklif havolasi o'chirildi.", "ru": "🔒 Пригласительная ссылка убрана.",
+        "en": "🔒 The invite link was removed.",
+    },
+
+    # --- /hisobot (kunlik yakun sozlamasi) ---
+    "dg.owner_only": {
+        "uz": "Bu sozlamani faqat egasi o'zgartira oladi.",
+        "ru": "Эту настройку может менять только владелец.",
+        "en": "Only the owner can change this setting.",
+    },
+    "dg.state_on": {
+        "uz": "yoqilgan, har kuni <b>{h:02d}:00</b>",
+        "ru": "включён, каждый день в <b>{h:02d}:00</b>",
+        "en": "on, every day at <b>{h:02d}:00</b>",
+    },
+    "dg.state_off": {"uz": "o'chirilgan", "ru": "выключен", "en": "off"},
+    "dg.where_group": {"uz": "guruhga", "ru": "в группу", "en": "to the group"},
+    "dg.where_here": {"uz": "shu yerga", "ru": "сюда", "en": "here"},
+    "dg.settings": {
+        "uz": ("📊 Kunlik hisobot: {state}\n\n"
+               "Yoqish: <code>/hisobot 21</code> (mahalliy vaqt, 0–23)\n"
+               "O'chirish: <code>/hisobot off</code>\n\n"
+               "Belgilangan soatda {where} kun yakuni chiqadi: nechta signal "
+               "yopildi, winrate, umumiy natija, eng yaxshi juftlik."),
+        "ru": ("📊 Ежедневный отчёт: {state}\n\n"
+               "Включить: <code>/hisobot 21</code> (местное время, 0–23)\n"
+               "Выключить: <code>/hisobot off</code>\n\n"
+               "В указанный час {where} придут итоги дня: сколько сигналов "
+               "закрыто, винрейт, общий результат, лучшая пара."),
+        "en": ("📊 Daily report: {state}\n\n"
+               "Enable: <code>/hisobot 21</code> (local time, 0–23)\n"
+               "Disable: <code>/hisobot off</code>\n\n"
+               "At that hour the wrap-up goes {where}: how many signals closed, "
+               "the win rate, the overall result and the best pair."),
+    },
+    "dg.turned_off": {
+        "uz": "📊 Kunlik hisobot o'chirildi.", "ru": "📊 Ежедневный отчёт выключен.",
+        "en": "📊 The daily report is off.",
+    },
+    "dg.bad_hour": {
+        "uz": "Soat 0 dan 23 gacha bo'lishi kerak. Masalan: /hisobot 21",
+        "ru": "Час должен быть от 0 до 23. Например: /hisobot 21",
+        "en": "The hour must be between 0 and 23. For example: /hisobot 21",
+    },
+    "dg.turned_on": {
+        "uz": ("✅ Kunlik hisobot yoqildi — har kuni <b>{h:02d}:00</b> da ({tz}) "
+               "{where} chiqadi.\n\n"
+               "<i>Bugun yopilgan signal bo'lmasa post yuborilmaydi.</i>"),
+        "ru": ("✅ Ежедневный отчёт включён — каждый день в <b>{h:02d}:00</b> ({tz}) "
+               "{where}.\n\n"
+               "<i>Если за день не закрыт ни один сигнал, пост не отправляется.</i>"),
+        "en": ("✅ Daily report enabled — every day at <b>{h:02d}:00</b> ({tz}) it goes "
+               "{where}.\n\n"
+               "<i>If no signal closed that day, nothing is posted.</i>"),
+    },
+
+    # --- Pozitsiya hajmi (alloc) ---
+    "al.no_deposit": {
+        "uz": "Depozit belgilanmagan.", "ru": "Депозит не задан.",
+        "en": "No deposit is set.",
+    },
+    "al.set": {
+        "uz": ("✅ #{sid} {sym} — hajm: <b>{amt:,.2f}</b>\n"
+               "Stop tegsa yo'qotish: <b>{risk:,.2f}</b> (depozitning {pct:.2f}%)"),
+        "ru": ("✅ #{sid} {sym} — объём: <b>{amt:,.2f}</b>\n"
+               "Потеря при стопе: <b>{risk:,.2f}</b> ({pct:.2f}% депозита)"),
+        "en": ("✅ #{sid} {sym} — size: <b>{amt:,.2f}</b>\n"
+               "Loss if the stop hits: <b>{risk:,.2f}</b> ({pct:.2f}% of the deposit)"),
+    },
+    "al.skipped": {
+        "uz": "⏭ O'tkazib yuborildi.", "ru": "⏭ Пропущено.", "en": "⏭ Skipped.",
+    },
+    "al.bad_amount": {
+        "uz": "Noto'g'ri summa. Qayta kiriting yoki ⏭ tugmasini bosing.",
+        "ru": "Неверная сумма. Введите снова или нажмите ⏭.",
+        "en": "Invalid amount. Enter it again or press ⏭.",
+    },
+    "al.saved": {
+        "uz": "✅ Belgilandi: <b>{amt:,.2f}</b>",
+        "ru": "✅ Записано: <b>{amt:,.2f}</b>",
+        "en": "✅ Saved: <b>{amt:,.2f}</b>",
+    },
+
+    # --- Jurnalga kiritish (post ostidagi tugmadan) ---
+    "jr.not_found": {
+        "uz": "❌ <code>{sym}</code> topilmadi. /new yozib qo'lda kiriting.",
+        "ru": "❌ <code>{sym}</code> не найден. Введите вручную через /new.",
+        "en": "❌ <code>{sym}</code> not found. Use /new to enter it manually.",
+    },
+    "jr.ask_levels": {
+        "uz": ("✅ <b>{sym}</b> — endi yo'nalish va narxlarni yozing (tiker yozish "
+               "shart emas), masalan:\n\n"
+               "<code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "Yoki qisqa: <code>long 65000 67000 68500 64000</code>\n\n"
+               "Bekor qilish uchun /bekor yozing."),
+        "ru": ("✅ <b>{sym}</b> — теперь напишите направление и цены (тикер писать не "
+               "нужно), например:\n\n"
+               "<code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "Или коротко: <code>long 65000 67000 68500 64000</code>\n\n"
+               "Для отмены напишите /bekor."),
+        "en": ("✅ <b>{sym}</b> — now send the direction and the prices (no ticker "
+               "needed), for example:\n\n"
+               "<code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "Or short: <code>long 65000 67000 68500 64000</code>\n\n"
+               "Send /bekor to cancel."),
+    },
+    "jr.unreadable": {
+        "uz": ("O'qiy olmadim. Namuna: <code>LONG entry 65000 tp 67000 68500 "
+               "sl 64000</code>\n\nYoki /bekor yozing."),
+        "ru": ("Не смог прочитать. Пример: <code>LONG entry 65000 tp 67000 68500 "
+               "sl 64000</code>\n\nИли напишите /bekor."),
+        "en": ("Could not read that. Example: <code>LONG entry 65000 tp 67000 68500 "
+               "sl 64000</code>\n\nOr send /bekor."),
+    },
+    "ed.unreadable": {
+        "uz": "O'qiy olmadim. Yana urinib ko'ring yoki /bekor yozing.",
+        "ru": "Не смог прочитать. Попробуйте ещё раз или напишите /bekor.",
+        "en": "Could not read that. Try again or send /bekor.",
+    },
+
+    # --- Rasm ostidagi signal ---
+    "ph.need_caption": {
+        "uz": ("Rasm ostiga signalni yozib yuboring, masalan:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+        "ru": ("Напишите сигнал в подписи к картинке, например:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+        "en": ("Put the signal in the image caption, for example:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+    },
+
+    # --- Umumiy ---
+    "cmd.cancel_usage": {
+        "uz": "Foydalanish: /cancel 12", "ru": "Использование: /cancel 12",
+        "en": "Usage: /cancel 12",
+    },
+    "cmd.cancel_done": {
+        "uz": "✅ Bekor qilindi.", "ru": "✅ Отменено.", "en": "✅ Cancelled.",
+    },
+    "cmd.cancel_gone": {
+        "uz": "Topilmadi yoki allaqachon yopilgan.",
+        "ru": "Не найдено или уже закрыто.",
+        "en": "Not found, or already closed.",
+    },
+    "err.generic": {
+        "uz": ("⚠️ Xatolik yuz berdi (masalan, narx serveriga vaqtincha ulanib "
+               "bo'lmadi). Birozdan so'ng qayta urinib ko'ring."),
+        "ru": ("⚠️ Произошла ошибка (например, временно нет связи с сервером цен). "
+               "Попробуйте чуть позже."),
+        "en": ("⚠️ Something went wrong (for example the price server was briefly "
+               "unreachable). Please try again shortly."),
+    },
+
+    # --- Bosqich (milestone) va noaniq sham (guruhga/egasiga) ---
+    "ms.step": {
+        "uz": "{mark} <b>#{sid} {sym}</b> — joriy natija: <b>{pnl:+.2f}%</b> ({band:+d}% bosqichi)",
+        "ru": "{mark} <b>#{sid} {sym}</b> — текущий результат: <b>{pnl:+.2f}%</b> (рубеж {band:+d}%)",
+        "en": "{mark} <b>#{sid} {sym}</b> — running result: <b>{pnl:+.2f}%</b> ({band:+d}% step)",
+    },
+    "ev.ambiguous": {
+        "uz": ("⚠️ #{sid} — TP va SL bitta 1m shamda tegdi. Konservativ hisob "
+               "ishlatildi (SL). Qo'lda tekshiring."),
+        "ru": ("⚠️ #{sid} — TP и SL задеты в одной 1m свече. Взят консервативный "
+               "вариант (SL). Проверьте вручную."),
+        "en": ("⚠️ #{sid} — TP and SL were both hit in the same 1m candle. The "
+               "conservative result (SL) was used. Please check manually."),
+    },
+
+    "al.saved_dep": {
+        "uz": "✅ Belgilandi: <b>{amt:,.2f}</b> (depozit: {dep:,.2f})",
+        "ru": "✅ Записано: <b>{amt:,.2f}</b> (депозит: {dep:,.2f})",
+        "en": "✅ Saved: <b>{amt:,.2f}</b> (deposit: {dep:,.2f})",
+    },
+    "top.footer": {
+        "uz": ("Guruhingizni shu reytingda ko'rsatish uchun admin "
+               "<code>/public on</code> yozsin.\nGuruh nomini bosilganda o'z "
+               "guruhingizga yo'naltirish uchun: <code>/havola &lt;link&gt;</code>"),
+        "ru": ("Чтобы группа попала в этот рейтинг, админ должен написать "
+               "<code>/public on</code>.\nЧтобы клик по названию вёл в вашу "
+               "группу: <code>/havola &lt;link&gt;</code>"),
+        "en": ("To show your group in this ranking, its admin should type "
+               "<code>/public on</code>.\nTo make the group name link to your "
+               "group: <code>/havola &lt;link&gt;</code>"),
+    },
+    "top.trades": {
+        "uz": "{n} savdo", "ru": "{n} сделок", "en": "{n} trades",
+    },
+    "top.head": {
+        "uz": "🏆 <b>Eng yaxshi guruhlar — {month} {y}</b>",
+        "ru": "🏆 <b>Лучшие группы — {month} {y}</b>",
+        "en": "🏆 <b>Top groups — {month} {y}</b>",
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",

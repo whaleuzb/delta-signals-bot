@@ -792,10 +792,11 @@ async def cmd_til(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         ws = await db.get_workspace_by_group(chat.id)
         if not ws:
             await update.message.reply_text(
-                "Bu guruh hali ro'yxatdan o'tmagan — /setup yozing.")
+                i18n.t("su.not_registered", await user_lang(update.effective_user.id)))
             return
         if not can_manage(update.effective_user.id, ws):
-            await update.message.reply_text("Faqat guruh admini o'zgartira oladi.")
+            await update.message.reply_text(
+                i18n.t("su.group_admin_only", await user_lang(update.effective_user.id)))
             return
         await update.message.reply_text(
             i18n.t("lang.choose_group", ws_lang(ws)), reply_markup=lang_kb("lang:ws"))
@@ -1196,10 +1197,11 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
                    sym=sig["symbol"], p=fmt_price(ev["price"]),
                    pnl=ev["pnl"], rtxt=rtxt),
                 ref_uid=q.from_user.id)
+        plang = await user_lang(q.from_user.id)
         await q.edit_message_text(
-            i18n.t("man.closed_full", await user_lang(q.from_user.id), icon=icon,
-                   sid=sig["id"], sym=sig["symbol"], pnl=ev["pnl"], rtxt=rtxt),
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            i18n.t("man.closed_full", plang, icon=icon, sid=sig["id"],
+                   sym=sig["symbol"], pnl=ev["pnl"], rtxt=rtxt),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(plang))
         return
 
     await notify_group(ctx, ws, sig, tw(
@@ -1501,8 +1503,9 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    await q.edit_message_text(i18n.t("close.kept", await user_lang(q.from_user.id)),
-                               reply_markup=MENU_BACK_KB)
+    lang = await user_lang(q.from_user.id)
+    await q.edit_message_text(i18n.t("close.kept", lang),
+                               reply_markup=menu_back_kb(lang))
 
 
 def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
@@ -1671,33 +1674,26 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
                                reply_markup=symbols_nav_kb(y, m, lang))
 
 
-async def send_web_link(target, ws) -> None:
+async def send_web_link(target, ws, lang: str | None = None) -> None:
     """Ochiq sahifa havolasi — ulashish uchun. Havola ALOHIDA qatorda va
     <code> ichida: shunda uzun manzil ko'chirishga qulay bo'ladi va Telegram
     uni oldindan ko'rish rasmiga aylantirib yubormaydi."""
     url = web_page_url(ws)
     if not url:
-        await target.reply_text(
-            "🌐 Ochiq sahifa hali yoqilmagan.\n\n"
-            "Yoqish uchun: <code>/public on</code> yozing — so'rov moderatorga "
-            "boradi. Tasdiqlangach guruhingiz uchun jonli havola paydo bo'ladi: "
-            "unda statistika, equity grafigi va savdolar tarixi ko'rinadi.",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        await target.reply_text(i18n.t("web.off", lang), parse_mode=ParseMode.HTML,
+                                 reply_markup=menu_back_kb(lang))
         return
     await target.reply_text(
-        f"🌐 <b>{html.escape(ws['name'])}</b> — ochiq natijalar sahifasi:\n\n"
-        f"<code>{html.escape(url)}</code>\n\n"
-        "Bu havolani guruhga pin qilib qo'ysangiz yoki reklamada ulashsangiz "
-        "bo'ladi. Sahifa bazadan jonli o'qiladi — har yangi natija o'zi "
-        "qo'shiladi, qo'lda yangilash shart emas.",
+        i18n.t("web.link", lang, name=html.escape(ws["name"]), url=html.escape(url)),
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([
             # Mini App tugmasi faqat shaxsiy chatda ishlaydi; guruhda oddiy
             # URL tugmasi (main_menu_kb dagi bilan bir xil sabab).
-            [InlineKeyboardButton("🌐 Sahifani ochish", web_app=WebAppInfo(url=url))
+            [InlineKeyboardButton(i18n.t("web.btn_open", lang),
+                                  web_app=WebAppInfo(url=url))
              if target.chat.type == "private"
-             else InlineKeyboardButton("🌐 Sahifani ochish", url=url)],
-            [InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")],
+             else InlineKeyboardButton(i18n.t("web.btn_open", lang), url=url)],
+            [InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")],
         ]))
 
 
@@ -1710,7 +1706,8 @@ async def cmd_page(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
-    await send_web_link(update.message, ws)
+    await send_web_link(update.message, ws,
+                         await user_lang(update.effective_user.id))
 
 
 async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1727,7 +1724,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     lang = await user_lang(q.from_user.id)
 
     if action == "weblink":
-        await send_web_link(q.message, ws)
+        await send_web_link(q.message, ws, lang)
     elif action == "stats":
         # Statistika ochiq signallar uchun jonli narx so'raydi — sekin bo'lishi
         # mumkin, shuning uchun "yozmoqda" belgisi ko'rsatiladi.
@@ -1834,31 +1831,31 @@ async def logo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     chat = update.effective_chat
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
     if chat.type not in ("group", "supergroup"):
-        await update.message.reply_text("Bu buyruq faqat guruh ichida ishlaydi.")
+        await update.message.reply_text(i18n.t("su.group_only", lang))
         return
 
-    uid = update.effective_user.id
     try:
         member = await ctx.bot.get_chat_member(chat.id, uid)
     except Exception:
-        await update.message.reply_text("Guruh a'zoligini tekshirib bo'lmadi.")
+        await update.message.reply_text(i18n.t("su.check_failed", lang))
         return
     if member.status not in ("creator", "administrator") and not is_admin(uid):
-        await update.message.reply_text("Faqat guruh admini /setup qila oladi.")
+        await update.message.reply_text(i18n.t("su.admin_only", lang))
         return
 
     existing = await db.get_workspace_by_group(chat.id)
     if existing:
-        await update.message.reply_text(f"Bu guruh allaqachon ro'yxatdan o'tgan: {existing['name']}")
+        await update.message.reply_text(i18n.t("su.already", lang, name=existing["name"]))
         return
 
     if not is_admin(uid):
         owned = await db.get_group_workspace_by_owner(uid)
         if owned:
-            await update.message.reply_text(
-                f"Sizda allaqachon boshqa guruh bor: \"{owned['name']}\". "
-                "Har bir admin faqat bitta guruhni boshqara oladi.")
+            await update.message.reply_text(i18n.t("su.have_other", lang,
+                                                    name=owned["name"]))
             return
 
     topic_id = update.message.message_thread_id
@@ -1866,10 +1863,7 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     wid = await db.create_group_workspace(uid, chat.id, name, topic_id)
     log.info("Yangi workspace: #%s %s (owner=%s chat=%s topic=%s)",
               wid, name, uid, chat.id, topic_id)
-    await update.message.reply_text(
-        f"✅ \"{name}\" workspace sifatida ro'yxatdan o'tdi!\n"
-        "Endi botga shaxsiy xabar yozib (/start) signal kirita olasiz."
-    )
+    await update.message.reply_text(i18n.t("su.done", lang, name=name))
     # Guruh avatari darhol olinadi — ochiq sahifada logotip bo'lib turadi.
     await refresh_logo(ctx.bot, wid, chat.id)
 
@@ -2108,6 +2102,7 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     # Kanaldan forward qilingan post rasm bo'lishi mumkin — signal deb
     # o'qilmasin, kanal qo'shish oqimiga yo'naltiramiz.
     if AWAITING_CHANNEL.pop(uid, None) and is_admin(uid):
@@ -2123,14 +2118,13 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if token:
         item = PENDING.get(token)
         if not item:
-            await msg.reply_text("Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("prev.expired", lang),
+                                  reply_markup=menu_back_kb(lang))
             return
         item["file_id"] = msg.photo[-1].file_id
         item["gen"] = None
         item["want_bot_chart"] = False
-        await msg.reply_text(
-            "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
-            reply_markup=tf_kb(token))
+        await msg.reply_text(i18n.t("prev.ask_tf", lang), reply_markup=tf_kb(token))
         return
 
     ws = await get_ws_or_prompt(update, ctx)
@@ -2149,9 +2143,8 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # lekin darajalar endi FAQAT rasm ostidagi yozuvdan o'qiladi.
     if draft is None:
         await msg.reply_text(
-            "Rasm ostiga signalni yozib yuboring, masalan:\n"
-            "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
+            i18n.t("ph.need_caption", lang),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang),
         )
         return
 
@@ -2190,9 +2183,8 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         draft = parsing.parse(f"{symbol} {text}")
         if draft is None:
             AWAITING_JOURNAL_SYMBOL[uid] = pending_journal
-            await msg.reply_text(
-                "O'qiy olmadim. Namuna: <code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
-                "Yoki /bekor yozing.", parse_mode=ParseMode.HTML)
+            await msg.reply_text(i18n.t("jr.unreadable", await user_lang(uid)),
+                                  parse_mode=ParseMode.HTML)
             return
         ws = await db.get_workspace(journal_ws_id)
         if not ws:
@@ -2212,16 +2204,17 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     if alloc_sig_id:
         amount = _parse_price(text)
         if amount is None or amount <= 0:
-            await msg.reply_text("Noto'g'ri summa. Qayta kiriting yoki ⏭ tugmasini bosing.")
+            await msg.reply_text(i18n.t("al.bad_amount", await user_lang(uid)))
             return
         AWAITING_ALLOC.pop(uid, None)
         sig = await db.get_signal(alloc_sig_id)
         ws = await db.get_workspace(sig["workspace_id"]) if sig else None
         if sig and ws and ws["deposit"] is not None:
             await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
+            alang = await user_lang(uid)
             await msg.reply_text(
-                f"✅ Belgilandi: <b>{amount:,.2f}</b> (depozit: {float(ws['deposit']):,.2f})",
-                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+                i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
+                parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
         return
 
     token = AWAITING_EDIT.get(uid)
@@ -2230,7 +2223,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         draft = parsing.parse(text)
         if draft is None:
             AWAITING_EDIT[uid] = token
-            await msg.reply_text("O'qiy olmadim. Yana urinib ko'ring yoki /bekor yozing.")
+            await msg.reply_text(i18n.t("ed.unreadable", await user_lang(uid)))
             return
         item = PENDING[token]
         ws = await db.get_workspace(item["workspace_id"])
@@ -2824,11 +2817,12 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     sig_id, amount = int(sid_s), float(amt_s)
     sig = await db.get_signal(sig_id)
     ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    lang = await user_lang(q.from_user.id)
     if not sig or not ws or not can_manage(q.from_user.id, ws):
-        await q.answer("Ruxsat yo'q.", show_alert=True)
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
     if ws["deposit"] is None:
-        await q.answer("Depozit belgilanmagan.", show_alert=True)
+        await q.answer(i18n.t("al.no_deposit", lang), show_alert=True)
         return
     AWAITING_ALLOC.pop(q.from_user.id, None)
     dep = float(ws["deposit"])
@@ -2836,17 +2830,18 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     entry, sl = float(sig["entry"]), float(sig["sl_initial"])
     risk_money = amount * abs(entry - sl) / entry
     await q.edit_message_text(
-        f"✅ #{sig_id} {html.escape(sig['symbol'])} — hajm: <b>{amount:,.2f}</b>\n"
-        f"Stop tegsa yo'qotish: <b>{risk_money:,.2f}</b> "
-        f"(depozitning {risk_money / dep * 100:.2f}%)",
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        i18n.t("al.set", lang, sid=sig_id, sym=html.escape(sig["symbol"]),
+               amt=amount, risk=risk_money, pct=risk_money / dep * 100),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
     AWAITING_ALLOC.pop(q.from_user.id, None)
-    await q.edit_message_text("⏭ O'tkazib yuborildi.", reply_markup=MENU_BACK_KB)
+    lang = await user_lang(q.from_user.id)
+    await q.edit_message_text(i18n.t("al.skipped", lang),
+                               reply_markup=menu_back_kb(lang))
 
 
 # ─────────────────────────── Kuzatuv sikli ───────────────────────────
@@ -2937,8 +2932,7 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 await ctx.bot.send_message(
                     ws["owner_id"],
-                    f"⚠️ #{sid} — TP va SL bitta 1m shamda tegdi. "
-                    f"Konservativ hisob ishlatildi (SL). Qo'lda tekshiring.",
+                    i18n.t("ev.ambiguous", await user_lang(ws["owner_id"]), sid=sid),
                 )
             except Exception:
                 pass
@@ -3057,43 +3051,38 @@ async def cmd_digest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
+    lang = await user_lang(update.effective_user.id)
     if not can_manage(update.effective_user.id, ws):
-        await update.message.reply_text("Bu sozlamani faqat egasi o'zgartira oladi.")
+        await update.message.reply_text(i18n.t("dg.owner_only", lang))
         return
+    where = i18n.t("dg.where_group" if ws["type"] == "group" else "dg.where_here", lang)
 
     if not ctx.args:
         cur = ws["digest_hour"]
-        state = f"yoqilgan, har kuni <b>{cur:02d}:00</b>" if cur is not None else "o'chirilgan"
+        state = (i18n.t("dg.state_on", lang, h=cur) if cur is not None
+                 else i18n.t("dg.state_off", lang))
         await update.message.reply_text(
-            f"📊 Kunlik hisobot: {state}\n\n"
-            "Yoqish: <code>/hisobot 21</code> (mahalliy vaqt, 0–23)\n"
-            "O'chirish: <code>/hisobot off</code>\n\n"
-            f"Belgilangan soatda {'guruhga' if ws['type'] == 'group' else 'shu yerga'} "
-            "kun yakuni chiqadi: nechta signal yopildi, winrate, umumiy natija, "
-            "eng yaxshi juftlik.",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            i18n.t("dg.settings", lang, state=state, where=where),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return
 
     arg = ctx.args[0].lower()
     if arg in ("off", "o'chir", "ochir"):
         await db.set_digest_hour(ws["id"], None)
-        await update.message.reply_text("📊 Kunlik hisobot o'chirildi.",
-                                         reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("dg.turned_off", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
     try:
         hour = int(arg)
     except ValueError:
         hour = -1
     if not 0 <= hour <= 23:
-        await update.message.reply_text("Soat 0 dan 23 gacha bo'lishi kerak. "
-                                         "Masalan: /hisobot 21")
+        await update.message.reply_text(i18n.t("dg.bad_hour", lang))
         return
     await db.set_digest_hour(ws["id"], hour)
     await update.message.reply_text(
-        f"✅ Kunlik hisobot yoqildi — har kuni <b>{hour:02d}:00</b> da "
-        f"({config.TZ}) {'guruhga' if ws['type'] == 'group' else 'shu yerga'} chiqadi.\n\n"
-        "<i>Bugun yopilgan signal bo'lmasa post yuborilmaydi.</i>",
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        i18n.t("dg.turned_on", lang, h=hour, tz=config.TZ, where=where),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 MILESTONE_STEP = 5
@@ -3175,8 +3164,10 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             continue
 
         mark = "📈" if band > 0 else "📉"
-        txt = (f"{mark} <b>#{s['id']} {s['symbol']}</b> — joriy natija: "
-               f"<b>{pnl:+.2f}%</b> ({band:+d}% bosqichi)")
+        # Bosqich xabari GURUHGA ketadi — guruh tilida (shaxsiy jurnalda
+        # ham xuddi shu ustun, egasi o'zi tanlagan).
+        txt = tw("ms.step", ws, mark=mark, sid=s["id"], sym=s["symbol"],
+                 pnl=pnl, band=band)
 
         if ws["type"] == "group" and ws["group_chat_id"]:
             try:
@@ -3217,20 +3208,18 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # yo'nalish/kirish/TP/SL kutiladi (on_text_signal shu holatni tekshiradi).
     if ctx.args and ctx.args[0].startswith("journal_"):
         raw = ctx.args[0][len("journal_"):]
+        jlang = await user_lang(uid)
         sym, market = await resolve_symbol([raw])
         if not sym:
             await update.message.reply_text(
-                f"❌ <code>{html.escape(raw)}</code> topilmadi. /new yozib qo'lda kiriting.",
+                i18n.t("jr.not_found", jlang, sym=html.escape(raw)),
                 parse_mode=ParseMode.HTML)
             return
-        personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+        personal = await db.get_or_create_personal_workspace(
+            uid, i18n.t("ws.personal_name", jlang))
         AWAITING_JOURNAL_SYMBOL[uid] = (sym, personal["id"])
         await update.message.reply_text(
-            f"✅ <b>{html.escape(sym)}</b> — endi yo'nalish va narxlarni yozing "
-            "(tiker yozish shart emas), masalan:\n\n"
-            "<code>LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
-            "Yoki qisqa: <code>long 65000 67000 68500 64000</code>\n\n"
-            "Bekor qilish uchun /bekor yozing.",
+            i18n.t("jr.ask_levels", jlang, sym=html.escape(sym)),
             parse_mode=ParseMode.HTML)
         return
 
@@ -3483,14 +3472,14 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     buf = await stats.equity_chart(ws["id"], deposit)
+    lang = await user_lang(update.effective_user.id)
     if buf is None:
-        await update.message.reply_text(
-            i18n.t("eq.too_few", await user_lang(update.effective_user.id)),
-            reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("eq.too_few", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
     async with busy(ctx.bot, update.effective_chat.id):
         await update.message.reply_photo(InputFile(buf, "equity.png"),
-                                          reply_markup=MENU_BACK_KB)
+                                          reply_markup=menu_back_kb(lang))
 
 
 async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3501,29 +3490,32 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(update.effective_user.id)
     async with busy(ctx.bot, update.effective_chat.id):
-        text, kb = await open_signals_view(ws, update.effective_user.id,
-                                            await user_lang(update.effective_user.id))
-    rows = (list(kb.inline_keyboard) if kb else []) + list(MENU_BACK_KB.inline_keyboard)
+        text, kb = await open_signals_view(ws, update.effective_user.id, lang)
+    rows = ((list(kb.inline_keyboard) if kb else [])
+            + list(menu_back_kb(lang).inline_keyboard))
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
                                      reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = await user_lang(update.effective_user.id)
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /cancel 12")
+        await update.message.reply_text(i18n.t("cmd.cancel_usage", lang))
         return
     sig = await db.get_signal(int(ctx.args[0]))
     if not sig:
-        await update.message.reply_text("Topilmadi.", reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("close.not_found", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(update.effective_user.id, ws):
         return
     ok = await db.cancel_signal(sig["id"])
     await update.message.reply_text(
-        "✅ Bekor qilindi." if ok else "Topilmadi yoki allaqachon yopilgan.",
-        reply_markup=MENU_BACK_KB)
+        i18n.t("cmd.cancel_done" if ok else "cmd.cancel_gone", lang),
+        reply_markup=menu_back_kb(lang))
 
 
 async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3558,48 +3550,46 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     if not can_manage(uid, ws):
-        await update.message.reply_text("Ruxsat yo'q.")
+        await update.message.reply_text(i18n.t("man.no_right", lang))
         return
     if ws["type"] != "group":
-        await update.message.reply_text("Bu buyruq faqat guruh workspace uchun ishlaydi.")
+        await update.message.reply_text(i18n.t("su.group_ws_only", lang))
         return
 
     if not ctx.args:
         if not ws["public"]:
-            cur = "o'chirilgan 🔒"
+            cur = i18n.t("pub.state_off", lang)
         elif ws["public_approved"]:
-            cur = "yoqilgan ✅"
+            cur = i18n.t("pub.state_on", lang)
         else:
-            cur = "tasdiqlanishi kutilmoqda ⏳"
+            cur = i18n.t("pub.state_wait", lang)
         await update.message.reply_text(
-            f"\"{html.escape(ws['name'])}\" guruhingizning <code>/top</code> reytingida "
-            f"ko'rinishi: <b>{cur}</b>\n\n"
-            "Yoqish: <code>/public on</code>\nO'chirish: <code>/public off</code>",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            i18n.t("pub.current", lang, name=html.escape(ws["name"]), state=cur),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return
 
     arg = ctx.args[0].lower()
     if arg not in ("on", "off"):
-        await update.message.reply_text("Foydalanish: /public on  yoki  /public off")
+        await update.message.reply_text(i18n.t("pub.usage", lang))
         return
 
     if arg == "off":
         await db.set_public(ws["id"], False)
-        await update.message.reply_text(
-            "🔒 Guruhingiz reytingdan olib tashlandi.", reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("pub.off_done", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
 
     await db.set_public(ws["id"], True)
     if ws["public_approved"]:
-        await update.message.reply_text(
-            "✅ Guruhingiz endi /top reytingida ko'rinadi.", reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("pub.on_done", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
     await request_public_approval(ctx, ws["id"])
     await update.message.reply_text(
-        "⏳ So'rov yuborildi. Guruhingiz moderator tasdig'idan keyin "
-        "<code>/top</code> reytingida ko'rinadi — tayyor bo'lganda xabar beramiz.",
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        i18n.t("pub.requested", lang),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 # ── /top moderatsiyasi (reytingdagi guruh nomi va havolasi hammaga ko'rinadi) ──
@@ -3650,12 +3640,10 @@ async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         parse_mode=ParseMode.HTML)
 
     try:
+        olang = await user_lang(ws["owner_id"])
         await ctx.bot.send_message(
             ws["owner_id"],
-            ("✅ Guruhingiz <code>/top</code> reytingida ko'rina boshladi."
-             if approved else
-             "🚫 Guruhingiz <code>/top</code> reytingiga qo'shilmadi. "
-             "Guruh nomi yoki havolasini to'g'rilab, qayta urinib ko'ring."),
+            i18n.t("pub.approved_dm" if approved else "pub.rejected_dm", olang),
             parse_mode=ParseMode.HTML)
     except Exception:
         log.exception("Egaga qaror yuborilmadi (ws=%s)", ws["id"])
@@ -4266,29 +4254,27 @@ async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     if not can_manage(uid, ws):
-        await update.message.reply_text("Ruxsat yo'q.")
+        await update.message.reply_text(i18n.t("man.no_right", lang))
         return
     if ws["type"] != "group":
-        await update.message.reply_text("Bu buyruq faqat guruh workspace uchun ishlaydi.")
+        await update.message.reply_text(i18n.t("su.group_ws_only", lang))
         return
 
     if not ctx.args:
-        cur = ws["invite_link"] or "belgilanmagan"
+        cur = ws["invite_link"] or i18n.t("dep.unset", lang)
         await update.message.reply_text(
-            f"\"{html.escape(ws['name'])}\" guruhingizning taklif havolasi: "
-            f"<b>{html.escape(cur)}</b>\n\n"
-            "<code>/top</code> reytingida guruh nomi shu havolaga link qilinadi.\n\n"
-            "Belgilash: <code>/havola https://t.me/+abc123</code>\n"
-            "O'chirish: <code>/havola off</code>",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+            i18n.t("inv.current", lang, name=html.escape(ws["name"]),
+                   link=html.escape(cur)),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return
 
     arg = ctx.args[0].strip()
     if arg.lower() == "off":
         await db.set_invite_link(ws["id"], None)
-        await update.message.reply_text(
-            "🔒 Taklif havolasi o'chirildi.", reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("inv.off_done", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
 
     if not arg.startswith(("http://", "https://")):
@@ -4305,23 +4291,23 @@ async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 "tasdiq yangilanishi kerak — moderator ko'rib chiqmaguncha "
                 "guruhingiz reytingda ko'rinmaydi.")
     await update.message.reply_text(txt, parse_mode=ParseMode.HTML,
-                                     reply_markup=MENU_BACK_KB)
+                                     reply_markup=menu_back_kb(lang))
 
 
 async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = await user_lang(update.effective_user.id)
     now = datetime.now(stats.TZ)
     a, b = stats.month_bounds(now.year, now.month)
     rows = await db.top_workspaces(a, b, limit=10)
     if not rows:
-        await update.message.reply_text(
-            "Hali hech qanday ochiq guruh reytingda yo'q.\n\n"
-            "Guruh admini bo'lsangiz, guruhingizni ko'rsatish uchun "
-            "<code>/public on</code> yozing.",
-            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("top.empty", lang),
+                                         parse_mode=ParseMode.HTML,
+                                         reply_markup=menu_back_kb(lang))
         return
 
     medals = ["🥇", "🥈", "🥉"]
-    lines = [f"🏆 <b>Eng yaxshi guruhlar — {stats.MONTHS_UZ[now.month - 1]} {now.year}</b>", ""]
+    lines = [i18n.t("top.head", lang, month=stats.months(lang)[now.month - 1],
+                    y=now.year), ""]
     for i, r in enumerate(rows):
         medal = medals[i] if i < 3 else f"{i + 1}."
         wr = r["wins"] / r["total"] * 100 if r["total"] else 0
@@ -4332,11 +4318,10 @@ async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             name_txt = name
         lines.append(
             f"{medal} <b>{name_txt}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
-            f"({r['total']} savdo, {wr:.0f}% WR)")
-    lines += ["", "Guruhingizni shu reytingda ko'rsatish uchun admin <code>/public on</code> yozsin.",
-              "Guruh nomini bosilganda o'z guruhingizga yo'naltirish uchun: <code>/havola &lt;link&gt;</code>"]
+            f"({i18n.t('top.trades', lang, n=r['total'])}, {wr:.0f}% WR)")
+    lines += ["", i18n.t("top.footer", lang)]
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML,
-                                     reply_markup=MENU_BACK_KB)
+                                     reply_markup=menu_back_kb(lang))
 
 
 async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6264,9 +6249,7 @@ async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if isinstance(update, Update) and update.effective_message:
         try:
             await update.effective_message.reply_text(
-                "⚠️ Xatolik yuz berdi (masalan, narx serveriga vaqtincha "
-                "ulanib bo'lmadi). Birozdan so'ng qayta urinib ko'ring."
-            )
+                i18n.t("err.generic", await user_lang(update.effective_user.id)))
         except Exception:
             pass
 
