@@ -2,8 +2,8 @@
 "bu bozorni haqiqatan qimirlatadimi" filtri va qaysi tiker nazarda
 tutilganini taxmin qilish.
 
-`vision.py`ning aynan o'zi andozasi (Claude client, structured output),
-lekin matn uchun — rasm yo'q."""
+Claude client + structured output andozasi (avval `vision.py` ham shunday
+edi, u rasm o'qish bilan birga olib tashlandi) — bu yerda faqat MATN."""
 import json
 import logging
 

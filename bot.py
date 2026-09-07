@@ -51,7 +51,6 @@ import stats
 import tgsource
 import tracker
 import translate
-import vision
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s", level=logging.INFO
@@ -2082,27 +2081,6 @@ async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 # ─────────────────────────── Signal kiritish — tezkor usul ───────────────────────────
 
-def _vision_symbols(draft: dict) -> None:
-    """Grafikdan o'qilgan juftlik nomidan nomzodlar ro'yxatini yasaydi.
-
-    TradingView skrinshotida nom ko'pincha "BINANCE:BTCUSDT.P" yoki
-    "MEXC:BTCUSDT" ko'rinishida bo'ladi. Bunday satr birjaga to'g'ridan-to'g'ri
-    berilsa topilmaydi (birja prefiksi qo'shilib ketadi), shuning uchun undan
-    ajratilgan so'zlar ham nomzod sifatida qo'shiladi — resolve_symbol
-    ularni birma-bir sinab ko'radi."""
-    raw = (draft.get("symbol") or "").strip()
-    if not raw:
-        return
-    cands = [raw]
-    if ":" in raw:
-        cands.append(raw.rsplit(":", 1)[1])
-    for c in parsing.symbol_candidates(raw):
-        if c not in cands:
-            cands.append(c)
-    draft["symbol"] = cands[0]
-    draft["symbols"] = cands
-
-
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     uid = update.effective_user.id
@@ -2140,32 +2118,20 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     caption = msg.caption or ""
     file_id = msg.photo[-1].file_id
     draft = parsing.parse(caption)
-    source = "caption"
 
+    # RASMNI AVTOMATIK O'QISH (Claude vision) OLIB TASHLANDI — har bir rasm
+    # pullik model chaqiruvi edi va foydalanuvchi buni ortiqcha xarajat deb
+    # topdi. Rasm hamon signalga BIRIKTIRILADI (guruhga u bilan ketadi),
+    # lekin darajalar endi FAQAT rasm ostidagi yozuvdan o'qiladi.
     if draft is None:
-        note = await msg.reply_text("🔎 Grafikni o'qiyapman…")
-        f = await ctx.bot.get_file(file_id)
-        data = bytes(await f.download_as_bytearray())
-        # Rasm ostidagi yozuv modelga MASLAHAT sifatida beriladi: ko'pincha
-        # juftlik nomi yoki tomon aynan shu yerda bo'ladi, garchi to'liq
-        # signal sifatida o'qib bo'lmagan bo'lsa ham.
-        async with busy(ctx.bot, msg.chat_id):
-            draft = await vision.read_chart(data, hint=caption.strip())
-        try:
-            await note.delete()      # o'qish tugadi — kutish xabari kerak emas
-        except Exception:
-            pass
-        source = "vision"
-        if draft is None:
-            await msg.reply_text(
-                "Darajalarni o'qiy olmadim. Rasm ostiga yozib yuboring, masalan:\n"
-                "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
-                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
-            )
-            return
-        _vision_symbols(draft)
+        await msg.reply_text(
+            "Rasm ostiga signalni yozib yuboring, masalan:\n"
+            "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
+            parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
+        )
+        return
 
-    await show_preview(msg, ctx, draft, file_id, source, ws["id"])
+    await show_preview(msg, ctx, draft, file_id, "caption", ws["id"])
 
 
 async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2355,12 +2321,6 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         warn.append("🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.")
     if draft.get("entry_mode") == "limit" and draft.get("sl") is None:
         warn.append("📐 Limit to'lganda TP/SL kiritishingiz so'raladi.")
-    if source == "vision":
-        conf = draft.get("confidence", 0)
-        warn.append(f"🤖 Rasmdan o'qildi (ishonch {conf:.0%}) — darajalarni tekshiring.")
-        if draft.get("reasoning"):
-            warn.append(f"<i>{draft['reasoning']}</i>")
-
     price = await safe_last_price(market, sym)
     if price:
         d = (price - draft["entry"]) / draft["entry"] * 100
@@ -4476,7 +4436,7 @@ async def handle_ref_code_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) 
 
 # Tiker taxmin qilinganda qaysi bozor turida qidirilishi — mavjud resolve()
 # funksiyalari orqali TASDIQLANADI (modelning o'zi noto'g'ri taxmin qilishi
-# mumkin, shu sabab bu yerda ham xuddi vision.py'dagi kabi ikkinchi bosqich
+# mumkin, shu sabab bu yerda ikkinchi bosqich — tasdiqlash — bor
 # bor). Kripto birinchi — News Trade AI'ning asosiy auditoriyasi shu.
 NEWS_MARKETS = (("crypto", exchange), ("stock", stocks), ("forex", forex))
 

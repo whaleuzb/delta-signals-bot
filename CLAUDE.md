@@ -4885,3 +4885,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        qism" yo'llarining natijani yuborishi, tugamagan qisman yopishda
        yubormasligi. `test_tracker.py` 15/15 va qolgan to'plamlar
        (168 holat) o'zgarishsiz.
+
+153. **Rasmdan darajalarni AVTOMATIK o'qish (`vision.py`) olib tashlandi.**
+     Foydalanuvchi: "rasm yuborsa o'qish funksiyasini olib tashla. Bu hozir
+     ortiqcha harajat."
+     - Har bir izohsiz rasm Claude'ga (eng kuchli modelga) yuborilardi —
+       ya'ni har bir skrinshot pul turardi. Endi bunday chaqiruv umuman yo'q.
+     - **Rasm oqimining O'ZI qolди**: grafik rasmi hamon signalga
+       biriktiriladi va guruhga u bilan birga ketadi. Faqat DARAJALAR endi
+       rasm ostidagi izohdan (caption) o'qiladi. Izohsiz (yoki o'qib
+       bo'lmaydigan izohli) rasmda bot namuna bilan tushuntirish beradi.
+     - Olib tashlandi: `vision.py`, `bot.py`dagi `import vision`,
+       `_vision_symbols()`, rasm yuklab olish bloki, ko'rikdagi
+       "🤖 Rasmdan o'qildi (ishonch %)" ogohlantirishi va
+       `config.VISION_MODEL`.
+     - **`ANTHROPIC_API_KEY` QOLDI** — u News Trade AI (`newsai.py`,
+       yangilik tarjimasi/tahlili) uchun hamon kerak. Faqat rasm o'qish
+       olib tashlandi, Claude'ga bog'liq hamma narsa emas.
+     - Qo'llanma (`guide.py`) ham yangilandi: "izoh bo'lmasa sun'iy
+       intellekt grafikdan o'zi topadi" degan va'da endi yo'q — mavjud
+       bo'lmagan xatti-harakatni tushuntirib turish chalg'itardi.
+     - Tekshirildi: 19 ta holat — izohli rasm eskisicha ko'rikka chiqishi va
+       `file_id` biriktirilishi, **izohsiz rasmda faylning YUKLAB
+       OLINMASLIGI** (ya'ni tarmoq/model xarajati yo'qligi), tushunarli
+       yo'riqnoma berilishi, `vision` moduli/sozlamasining qolmagani,
+       `ANTHROPIC_API_KEY`ning saqlanib qolgani. `test_tracker.py` 15/15 va
+       qolgan barcha to'plamlar (183 holat) o'zgarishsiz.

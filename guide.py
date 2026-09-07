@@ -157,8 +157,9 @@ def content(img: dict | None = None) -> list:
         _pre("eth long 3200 3400 3550 3100"),
 
         _h("Rasm bilan yuborish", 4),
-        _p("Grafik rasmini tashlasangiz: izoh (caption) bo'lsa — bot o'shandan o'qiydi. "
-           "Izoh bo'lmasa — sun'iy intellekt grafikning o'zidan darajalarni topishga urinadi."),
+        _p("Grafik rasmini tashlasangiz, signalni ", _b("rasm ostiga izoh (caption) "
+           "qilib yozing"), " — bot o'shandan o'qiydi va rasmni signalga biriktiradi. "
+           "Izohsiz rasm signal deb qabul qilinmaydi."),
         {"tag": "blockquote", "children": [
             _b("Hech narsa tasdiqsiz saqlanmaydi. "),
             "Bot o'qigan darajalarni har doim avval ko'rsatadi — siz tasdiqlaguningizcha "
