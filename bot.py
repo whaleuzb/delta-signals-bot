@@ -1909,13 +1909,21 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # foydalanuvchi avval signalni ko'radi, keyin rasmni tanlaydi.
 WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
 
-WIZ_CANCEL_KB = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")]])
-WIZ_MODE_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🎯 Oddiy (darhol)", callback_data="wiz_mode:market"),
-     InlineKeyboardButton("⏳ Limit (narxni kutadi)", callback_data="wiz_mode:limit")],
-    [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
-])
+
+# Klaviaturalar endi FUNKSIYA: matni tilga bog'liq, shuning uchun ular
+# modul yuklanganda bir marta emas, har chaqiruvda quriladi.
+def wiz_cancel_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang),
+                               callback_data="wiz_cancel")]])
+
+
+def wiz_mode_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("wiz.mode_market", lang), callback_data="wiz_mode:market"),
+         InlineKeyboardButton(i18n.t("wiz.mode_limit", lang), callback_data="wiz_mode:limit")],
+        [InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang), callback_data="wiz_cancel")],
+    ])
 
 
 def _parse_price(raw: str) -> float | None:
@@ -1930,21 +1938,22 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if q:
         await q.answer()
     target = q.message if q else update.effective_message
+    uid = (q.from_user if q else update.effective_user).id
+    lang = await user_lang(uid)
     if update.effective_chat.type != "private":
-        await target.reply_text("Iltimos, botga shaxsiy xabar (DM) yozib, shu yerda qayta urining.")
+        await target.reply_text(i18n.t("wiz.dm_only", lang))
         return ConversationHandler.END
 
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return ConversationHandler.END
-    uid = (q.from_user if q else update.effective_user).id
     if not can_manage(uid, ws):
-        await target.reply_text("Sizda bu joy uchun signal kiritish huquqi yo'q.")
+        await target.reply_text(i18n.t("wiz.no_right", lang))
         return ConversationHandler.END
 
     ctx.user_data["wiz"] = {"workspace_id": ws["id"], "file_id": None}
-    await target.reply_text("1/6 — Juftlik nomini yozing (masalan BTCUSDT):",
-                            reply_markup=WIZ_CANCEL_KB)
+    await target.reply_text(i18n.t("wiz.step_symbol", lang),
+                            reply_markup=wiz_cancel_kb(lang))
     return WIZ_SYMBOL
 
 
@@ -1953,14 +1962,15 @@ async def _wiz_or_end(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ishga tushgan) — KeyError o'rniga tushunarli xabar va toza tugatish."""
     wiz = ctx.user_data.get("wiz")
     if wiz is None:
+        lang = await user_lang(update.effective_user.id)
         await update.effective_message.reply_text(
-            "Sehrgar bekor qilingan. Qaytadan boshlash uchun /new yozing.",
-            reply_markup=MENU_BACK_KB)
+            i18n.t("wiz.lost", lang), reply_markup=menu_back_kb(lang))
     return wiz
 
 
 async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     raw = (msg.text or "").strip()
     # Butun matn ham, undan ajratilgan nomzodlar ham sinaladi: odam "btc",
     # "BTC/USDT" yoki "menga btc kerak" deb yozishi mumkin.
@@ -1968,56 +1978,53 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     # Juftlik tekshiruvi tarmoqqa chiqadi (birja ro'yxati, aksiya narxi) va
     # ba'zan 5-7 soniya davom etadi — jimlik "bot ishlamayapti" degan
     # taassurot qoldirardi.
-    async with busy(ctx.bot, msg.chat_id, "🔎 Juftlikni tekshiryapman…"):
+    async with busy(ctx.bot, msg.chat_id, i18n.t("wiz.checking", lang)):
         sym, market = await resolve_symbol(cands)
     if not sym:
         await msg.reply_text(
-            f"❌ <code>{html.escape(raw)}</code> topilmadi (kripto, forex yoki aksiya). "
-            "Qayta yozing:",
-            parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+            i18n.t("wiz.symbol_not_found", lang, raw=html.escape(raw)),
+            parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
         return WIZ_SYMBOL
     wiz = await _wiz_or_end(update, ctx)
     if wiz is None:
         return ConversationHandler.END
     wiz["symbol"] = sym
     wiz["market"] = market
-    await msg.reply_text(
-        f"2/6 — {sym}: qanday kirasiz?\n\n"
-        "🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda "
-        "allaqachon kirgandek).\n"
-        "⏳ <b>Limit</b> — narx kirish darajasiga tegmaguncha kutadi (standart).",
-        parse_mode=ParseMode.HTML, reply_markup=WIZ_MODE_KB)
+    await msg.reply_text(i18n.t("wiz.step_mode", lang, sym=sym),
+                         parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
     return WIZ_MODE
 
 
 async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
+    lang = await user_lang(q.from_user.id)
     mode = q.data.split(":", 1)[1]
     wiz = await _wiz_or_end(update, ctx)
     if wiz is None:
         return ConversationHandler.END
     wiz["entry_mode"] = mode
-    label = "🎯 Oddiy" if mode == "market" else "⏳ Limit"
-    await q.edit_message_text(f"2/6 — Kirish rejimi: {label}")
+    label = i18n.t("wiz.mode_market" if mode == "market" else "wiz.mode_limit", lang)
+    await q.edit_message_text(i18n.t("wiz.mode_picked", lang, label=label))
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🟢 LONG", callback_data="wiz_side:LONG"),
-         InlineKeyboardButton("🔴 SHORT", callback_data="wiz_side:SHORT")],
-        [InlineKeyboardButton("❌ Bekor qilish", callback_data="wiz_cancel")],
+        [InlineKeyboardButton(i18n.t("side.long", lang), callback_data="wiz_side:LONG"),
+         InlineKeyboardButton(i18n.t("side.short", lang), callback_data="wiz_side:SHORT")],
+        [InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang), callback_data="wiz_cancel")],
     ])
-    await q.message.reply_text("3/6 — Yo'nalishni tanlang:", reply_markup=kb)
+    await q.message.reply_text(i18n.t("wiz.step_side", lang), reply_markup=kb)
     return WIZ_SIDE
 
 
 async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     await q.answer()
+    lang = await user_lang(q.from_user.id)
     side = q.data.split(":", 1)[1]
     wiz = await _wiz_or_end(update, ctx)
     if wiz is None:
         return ConversationHandler.END
     wiz["side"] = side
-    await q.edit_message_text(f"3/6 — Yo'nalish: {side}")
+    await q.edit_message_text(i18n.t("wiz.side_picked", lang, side=side))
 
     if wiz.get("entry_mode") == "market":
         # Oddiy (darhol) rejimida entry QO'LDA SO'RALMAYDI — turli admin
@@ -2030,29 +2037,27 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         if price:
             wiz["entry"] = price
             await q.message.reply_text(
-                f"4/6 — Entry avtomatik: <b>{fmt_price(price)}</b> (joriy bozor narxi)\n\n"
-                "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan "
-                "ajrating, masalan: 67000 68500):",
-                parse_mode=ParseMode.HTML, reply_markup=WIZ_CANCEL_KB)
+                i18n.t("wiz.entry_auto", lang, p=fmt_price(price)),
+                parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
             return WIZ_TP
         # Narx olinmadi (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan
         # qo'lda so'raladi, sehrgar to'xtab qolmaydi.
-        await q.message.reply_text(
-            "⚠️ Joriy bozor narxini olib bo'lmadi — entryni qo'lda kiriting:",
-            reply_markup=WIZ_CANCEL_KB)
+        await q.message.reply_text(i18n.t("wiz.entry_auto_failed", lang),
+                                   reply_markup=wiz_cancel_kb(lang))
         return WIZ_ENTRY
 
-    await q.message.reply_text(
-        "4/6 — Entry (limit) narxini kiriting.\nTP/SL narx to'lgach so'raladi:",
-        reply_markup=WIZ_CANCEL_KB)
+    await q.message.reply_text(i18n.t("wiz.step_entry", lang),
+                               reply_markup=wiz_cancel_kb(lang))
     return WIZ_ENTRY
 
 
 async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     entry = _parse_price(msg.text or "")
     if entry is None or entry <= 0:
-        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        await msg.reply_text(i18n.t("wiz.bad_number", lang),
+                             reply_markup=wiz_cancel_kb(lang))
         return WIZ_ENTRY
     wiz = await _wiz_or_end(update, ctx)
     if wiz is None:
@@ -2076,32 +2081,34 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await show_preview(msg, ctx, draft, wiz2.get("file_id"), "wizard", wiz2["workspace_id"])
         return ConversationHandler.END
 
-    await msg.reply_text(
-        "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, "
-        "masalan: 67000 68500):", reply_markup=WIZ_CANCEL_KB)
+    await msg.reply_text(i18n.t("wiz.step_tp", lang), reply_markup=wiz_cancel_kb(lang))
     return WIZ_TP
 
 
 async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     tps = [x for x in (_parse_price(x) for x in (msg.text or "").split()) if x and x > 0]
     if not tps:
-        await msg.reply_text("Noto'g'ri format. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        await msg.reply_text(i18n.t("wiz.bad_format", lang),
+                             reply_markup=wiz_cancel_kb(lang))
         return WIZ_TP
     wiz = await _wiz_or_end(update, ctx)
     if wiz is None:
         return ConversationHandler.END
     side = wiz["side"]
     wiz["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
-    await msg.reply_text("6/6 — SL (stop-loss) narxini kiriting:", reply_markup=WIZ_CANCEL_KB)
+    await msg.reply_text(i18n.t("wiz.step_sl", lang), reply_markup=wiz_cancel_kb(lang))
     return WIZ_SL
 
 
 async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     sl = _parse_price(msg.text or "")
     if sl is None or sl <= 0:
-        await msg.reply_text("Noto'g'ri raqam. Qayta kiriting:", reply_markup=WIZ_CANCEL_KB)
+        await msg.reply_text(i18n.t("wiz.bad_number", lang),
+                             reply_markup=wiz_cancel_kb(lang))
         return WIZ_SL
     if await _wiz_or_end(update, ctx) is None:
         return ConversationHandler.END
@@ -2116,14 +2123,14 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 async def wizard_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     q = update.callback_query
     ctx.user_data.pop("wiz", None)
+    lang = await user_lang((q.from_user if q else update.effective_user).id)
+    txt, kb = i18n.t("wiz.cancelled", lang), menu_back_kb(lang)
     if q:
         await q.answer()
-        await q.edit_message_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(txt, reply_markup=kb)
     else:
-        await update.effective_message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
+        await update.effective_message.reply_text(txt, reply_markup=kb)
     return ConversationHandler.END
-
-
 # ─────────────────────────── Signal kiritish — tezkor usul ───────────────────────────
 
 async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

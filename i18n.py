@@ -63,6 +63,102 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "✅ Group message language changed.",
     },
 
+    # --- Sehrgar (yangi signal) ---
+    "wiz.cancel_btn": {
+        "uz": "❌ Bekor qilish", "ru": "❌ Отмена", "en": "❌ Cancel",
+    },
+    "wiz.mode_market": {
+        "uz": "🎯 Oddiy (darhol)", "ru": "🎯 Обычный (сразу)", "en": "🎯 Market (now)",
+    },
+    "wiz.mode_limit": {
+        "uz": "⏳ Limit (narxni kutadi)", "ru": "⏳ Лимит (ждёт цену)",
+        "en": "⏳ Limit (waits for price)",
+    },
+    "wiz.dm_only": {
+        "uz": "Iltimos, botga shaxsiy xabar (DM) yozib, shu yerda qayta urining.",
+        "ru": "Напишите боту в личные сообщения и повторите там.",
+        "en": "Please message the bot privately (DM) and try again there.",
+    },
+    "wiz.no_right": {
+        "uz": "Sizda bu joy uchun signal kiritish huquqi yo'q.",
+        "ru": "У вас нет прав добавлять сигналы в этом рабочем месте.",
+        "en": "You don't have permission to add signals here.",
+    },
+    "wiz.step_symbol": {
+        "uz": "1/6 — Juftlik nomini yozing (masalan BTCUSDT):",
+        "ru": "1/6 — Напишите название пары (например BTCUSDT):",
+        "en": "1/6 — Type the pair name (e.g. BTCUSDT):",
+    },
+    "wiz.lost": {
+        "uz": "Sehrgar bekor qilingan. Qaytadan boshlash uchun /new yozing.",
+        "ru": "Мастер отменён. Чтобы начать заново, напишите /new.",
+        "en": "The wizard was cancelled. Type /new to start again.",
+    },
+    "wiz.symbol_not_found": {
+        "uz": "❌ <code>{raw}</code> topilmadi (kripto, forex yoki aksiya). Qayta yozing:",
+        "ru": "❌ <code>{raw}</code> не найдено (крипто, форекс или акции). Напишите ещё раз:",
+        "en": "❌ <code>{raw}</code> not found (crypto, forex or stocks). Type it again:",
+    },
+    "wiz.checking": {
+        "uz": "🔎 Juftlikni tekshiryapman…", "ru": "🔎 Проверяю пару…",
+        "en": "🔎 Checking the pair…",
+    },
+    "wiz.step_mode": {
+        "uz": "2/6 — {sym}: qanday kirasiz?\n\n🎯 <b>Oddiy</b> — signal darhol \"ochiq\" deb hisoblanadi (xuddi shu narxda allaqachon kirgandek).\n⏳ <b>Limit</b> — narx kirish darajasiga tegmaguncha kutadi (standart).",
+        "ru": "2/6 — {sym}: как входите?\n\n🎯 <b>Обычный</b> — сигнал сразу считается \"открытым\" (как будто вы уже вошли по этой цене).\n⏳ <b>Лимит</b> — ждёт, пока цена дойдёт до уровня входа (по умолчанию).",
+        "en": "2/6 — {sym}: how do you enter?\n\n🎯 <b>Market</b> — the signal counts as \"open\" right away (as if you already entered at this price).\n⏳ <b>Limit</b> — waits until price reaches the entry level (default).",
+    },
+    "wiz.mode_picked": {
+        "uz": "2/6 — Kirish rejimi: {label}", "ru": "2/6 — Режим входа: {label}",
+        "en": "2/6 — Entry mode: {label}",
+    },
+    "wiz.step_side": {
+        "uz": "3/6 — Yo'nalishni tanlang:", "ru": "3/6 — Выберите направление:",
+        "en": "3/6 — Choose the direction:",
+    },
+    "wiz.side_picked": {
+        "uz": "3/6 — Yo'nalish: {side}", "ru": "3/6 — Направление: {side}",
+        "en": "3/6 — Direction: {side}",
+    },
+    "wiz.entry_auto": {
+        "uz": "4/6 — Entry avtomatik: <b>{p}</b> (joriy bozor narxi)\n\n5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, masalan: 67000 68500):",
+        "ru": "4/6 — Вход автоматически: <b>{p}</b> (текущая рыночная цена)\n\n5/6 — Введите цену(ы) TP (несколько — через пробел, например: 67000 68500):",
+        "en": "4/6 — Entry set automatically: <b>{p}</b> (current market price)\n\n5/6 — Enter the TP price(s) (separate several with spaces, e.g. 67000 68500):",
+    },
+    "wiz.entry_auto_failed": {
+        "uz": "⚠️ Joriy bozor narxini olib bo'lmadi — entryni qo'lda kiriting:",
+        "ru": "⚠️ Не удалось получить рыночную цену — введите вход вручную:",
+        "en": "⚠️ Couldn't fetch the market price — enter the entry manually:",
+    },
+    "wiz.step_entry": {
+        "uz": "4/6 — Entry (limit) narxini kiriting.\nTP/SL narx to'lgach so'raladi:",
+        "ru": "4/6 — Введите цену входа (лимит).\nTP/SL спросим после исполнения:",
+        "en": "4/6 — Enter the (limit) entry price.\nTP/SL will be asked once it fills:",
+    },
+    "wiz.step_tp": {
+        "uz": "5/6 — TP narx(lar)ini kiriting (bir nechta bo'lsa bo'sh joy bilan ajrating, masalan: 67000 68500):",
+        "ru": "5/6 — Введите цену(ы) TP (несколько — через пробел, например: 67000 68500):",
+        "en": "5/6 — Enter the TP price(s) (separate several with spaces, e.g. 67000 68500):",
+    },
+    "wiz.step_sl": {
+        "uz": "6/6 — SL (stop-loss) narxini kiriting:",
+        "ru": "6/6 — Введите цену SL (стоп-лосс):",
+        "en": "6/6 — Enter the SL (stop-loss) price:",
+    },
+    "wiz.bad_number": {
+        "uz": "Noto'g'ri raqam. Qayta kiriting:", "ru": "Неверное число. Введите ещё раз:",
+        "en": "Invalid number. Enter it again:",
+    },
+    "wiz.bad_format": {
+        "uz": "Noto'g'ri format. Qayta kiriting:", "ru": "Неверный формат. Введите ещё раз:",
+        "en": "Invalid format. Enter it again:",
+    },
+    "wiz.cancelled": {
+        "uz": "❌ Bekor qilindi.", "ru": "❌ Отменено.", "en": "❌ Cancelled.",
+    },
+    "side.long": {"uz": "🟢 LONG", "ru": "🟢 LONG", "en": "🟢 LONG"},
+    "side.short": {"uz": "🔴 SHORT", "ru": "🔴 SHORT", "en": "🔴 SHORT"},
+
     # --- Guruhga ketadigan signal xabarlari (workspaces.lang bo'yicha) ---
     "ev.open": {
         "uz": "▶️ <b>#{sid} {sym}</b> — pozitsiya ochildi @ <b>{p}</b>",
