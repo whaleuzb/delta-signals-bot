@@ -53,10 +53,11 @@ async def process(sig) -> list[dict]:
     # bu signal #126/#127'dagi "hali limitga kelmagandi ham TP bilan yopildi"
     # muammosining eng ISHONCHLI, tub yechimi.
     awaiting_tpsl = sig["sl"] is None
-    # Kuzatuv ISHNI BOSHLAGAN paytdagi xom qiymat — oxirida `save_progress()`
-    # shu bilan taqqoslab, odam orada stopni ko'chirgan bo'lsa uni bekor
-    # qilib yubormaydi (`db.save_progress` izohiga qarang).
-    sl_prev = sig["sl"]
+    # Kuzatuv ISHNI BOSHLAGAN paytdagi qator versiyasi. Oxirida
+    # `save_progress()` shuni tekshiradi: odam orada stop ko'chirgan yoki
+    # pozitsiyaning bir qismini yopgan bo'lsa, kuzatuvning eskirgan
+    # natijasi YOZILMAYDI (`db.save_progress` izohiga qarang).
+    rev_prev = sig["rev"]
     sl = float(sig["sl"]) if sig["sl"] is not None else None
     sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
     tps = [float(x) for x in sig["tps"]] if sig["tps"] else []
@@ -294,7 +295,7 @@ async def process(sig) -> list[dict]:
         r = round(pnl / risk, 3) if risk > 0 else None
 
     await db.save_progress(sig["id"], {
-        "sl": sl, "sl_prev": sl_prev, "tp_hit": tp_hit, "filled_pct": round(filled, 6),
+        "sl": sl, "rev_prev": rev_prev, "tp_hit": tp_hit, "filled_pct": round(filled, 6),
         "realized_pct": round(realized, 4), "status": status,
         "opened_at": opened_at, "closed_at": closed_at, "exit_price": exit_price,
         "pnl_pct": pnl, "r_multiple": r, "last_checked_ms": last_ms,
@@ -349,6 +350,9 @@ async def close_now(sig_id: int) -> dict | None:
     r = round(pnl / risk, 3) if risk > 0 else None
     status = "BREAKEVEN" if abs(pnl) < 1e-9 else ("TP" if pnl > 0 else "SL")
 
+    # `rev_prev` ATAYLAB berilmaydi: bu odamning ANIQ "to'liq yopish"
+    # buyrug'i — u kuzatuvning oraliqdagi yozuvidan qat'i nazar bajarilishi
+    # kerak (`db.save_progress` qulfni `rev_prev` yo'q bo'lganda o'tkazadi).
     await db.save_progress(sig_id, {
         "sl": float(sig["sl"]), "tp_hit": sig["tp_hit"], "filled_pct": 1.0,
         "realized_pct": pnl, "status": status,
@@ -360,7 +364,7 @@ async def close_now(sig_id: int) -> dict | None:
             "symbol": sig["symbol"], "status": status, "pnl": pnl, "r": r, "price": price}
 
 
-async def partial_close(sig_id: int, portion: float) -> dict | None:
+async def partial_close(sig_id: int, portion: float, _retry: bool = False) -> dict | None:
     """Ochiq pozitsiyaning bir QISMINI joriy narxda yopadi (masalan 50%).
 
     TP tegishi bilan bir xil hisob: ulush * shu narxdagi foiz `realized_pct` ga
@@ -408,13 +412,25 @@ async def partial_close(sig_id: int, portion: float) -> dict | None:
         closed_at = datetime.now(timezone.utc)
         exit_price = price
 
-    await db.save_progress(sig_id, {
-        "sl": float(sig["sl"]), "tp_hit": sig["tp_hit"],
+    ok = await db.save_progress(sig_id, {
+        "sl": float(sig["sl"]), "rev_prev": sig["rev"], "tp_hit": sig["tp_hit"],
         "filled_pct": round(new_filled, 6), "realized_pct": round(realized, 4),
         "status": status, "opened_at": sig["opened_at"], "closed_at": closed_at,
         "exit_price": exit_price, "pnl_pct": pnl, "r_multiple": r,
         "last_checked_ms": sig["last_checked_ms"], "ambiguous": sig["ambiguous"],
     })
+    if not ok:
+        # Kuzatuv aynan shu daqiqada qatorni yangilagan (masalan TP tegdi).
+        # Bir marta QAYTA urinamiz — endi yangi holat bilan, ya'ni qolgan
+        # ulush to'g'ri hisoblanadi. Ikkinchi marta ham bo'lmasa, tugma
+        # "yopib bo'lmadi" deydi va odam qaytadan bosadi (jimgina noto'g'ri
+        # ish qilishdan ko'ra shunisi xavfsiz).
+        if _retry:
+            log.warning("Qisman yopish yozilmadi (#%s) — qator band", sig_id)
+            return None
+        log.info("Qisman yopish paytida qator o'zgargan (#%s) — qayta urinamiz", sig_id)
+        return await partial_close(sig_id, portion, _retry=True)
+
     return {"type": "PARTIAL_CLOSE", "signal_id": sig_id,
             "workspace_id": sig["workspace_id"], "symbol": sig["symbol"],
             "share": share, "price": price, "running": round(realized, 4),

@@ -36,6 +36,9 @@ def signal(**kw):
         "tp_hit": 0, "filled_pct": 0.0, "realized_pct": 0.0, "status": "PENDING",
         "created_at": NOW, "opened_at": None, "last_checked_ms": None,
         "ambiguous": False,
+        # Optimistik qulf versiyasi (#151) — `process()` uni o'qib
+        # `save_progress`ga uzatadi.
+        "rev": 0,
     }
     d.update(kw)
     return d

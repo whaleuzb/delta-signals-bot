@@ -341,6 +341,13 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS lang TEXT;
 -- 10 xonali Telegram id'ni ko'rsatib bo'lmaydi — u na o'qiladi, na
 -- yodda qoladi. Kod TALAB QILINGANDA yaratiladi (`ensure_ref_code`),
 -- ya'ni bu migratsiya hech kimga kod tarqatmaydi.
+-- Optimistik qulf: signal qatorini KUZATUV ham, ODAM ham (stop ko'chirish,
+-- qisman yopish, TP/SL kiritish) o'zgartiradi. Kuzatuv qatorni o'qib,
+-- birjaga chiqib, keyin natijani yozadi — shu oraliqda odam biror amal
+-- qilsa, kuzatuvning eskirgan nusxasi uni USTIDAN yozib yuborardi
+-- (25% kesish izsiz yo'qolardi). `rev` har o'zgarishda oshadi; kuzatuv
+-- esa faqat o'zi o'qigan `rev` hamon o'sha bo'lsagina yozadi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS rev INT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_code TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(ref_code)
     WHERE ref_code IS NOT NULL;
@@ -763,7 +770,7 @@ async def set_tp_sl(sig_id: int, sl: float, tps: list[float]) -> None:
     NULL edi — `tracker.py` shu sabab kuzatuvni to'xtatib turgan)."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE signals SET sl=$2, sl_initial=$2, tps=$3 WHERE id=$1",
+            "UPDATE signals SET sl=$2, sl_initial=$2, tps=$3, rev=rev+1 WHERE id=$1",
             sig_id, _d(sl), [_d(t) for t in tps],
         )
 
@@ -969,14 +976,16 @@ async def set_stop(sig_id: int, sl: float) -> None:
     ko'chirish statistikani chiroyliroq ko'rsatib yuborardi."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE signals SET sl=$2 WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
+            "UPDATE signals SET sl=$2, rev=rev+1 "
+            "WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
             sig_id, _d(sl))
 
 
 async def set_tps(sig_id: int, tps: list[float]) -> None:
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE signals SET tps=$2 WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
+            "UPDATE signals SET tps=$2, rev=rev+1 "
+            "WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
             sig_id, [_d(t) for t in tps])
 
 
@@ -986,7 +995,7 @@ async def set_entry(sig_id: int, entry: float) -> None:
     hisoblanadi (`process()` uni endi tekshirmaydi)."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE signals SET entry=$2 WHERE id=$1 AND status='PENDING'",
+            "UPDATE signals SET entry=$2, rev=rev+1 WHERE id=$1 AND status='PENDING'",
             sig_id, _d(entry))
 
 
@@ -1032,51 +1041,43 @@ async def reset_workspace_stats(workspace_id: int) -> dict:
     return {"excluded_count": len(rows), "deposit_delta": -total_money}
 
 
-async def save_progress(sig_id: int, f: dict) -> None:
-    """Kuzatuv natijasini yozadi.
+async def save_progress(sig_id: int, f: dict) -> bool:
+    """Kuzatuv/qo'lda yopish natijasini yozadi. Yozilgan bo'lsa `True`.
 
-    `sl` — YAGONA ustun bo'lib, uni kuzatuv ham, ODAM ham o'zgartiradi
-    ("✏️ Stop", "🛡 Stop → breakeven", limit to'lgach TP/SL kiritish).
-    Shu sabab u SHARTLI yoziladi: bazadagi qiymat kuzatuv ISHNI BOSHLAGAN
-    paytdagi qiymat bo'lsagina yangilanadi (`sl_prev`).
+    OPTIMISTIK QULF (`rev`). Bu qatorni ikki manba o'zgartiradi: kuzatuv
+    sikli (TP/SL tegishi) va ODAM (stop ko'chirish, "✂️ 25%", TP/SL
+    kiritish). Kuzatuv qatorni o'qib, birjaga chiqib, KEYIN yozadi —
+    shu oraliqda odam biror amal qilsa, eski nusxa uning ustidan yozilib,
+    amal IZSIZ yo'qolardi (foydalanuvchi buni "25% cut umuman ishlamagan"
+    va "stop breakeven'ga ko'chmadi" deb ko'rgan).
 
-    Nega kerak: `run_once()` barcha ochiq signallarni bitta snapshot bilan
-    o'qiydi va har birini navbatma-navbat, tarmoqqa chiqib ishlaydi.
-    Shu oraliqda odam stopni ko'chirsa, eski kod snapshotdagi ESKI qiymatni
-    qaytarib yozib, odamning amalini JIMGINA bekor qilardi — foydalanuvchi
-    buni "stop breakeven'ga ko'chgani ishlamayapti" va "katta stop qo'yib
-    bo'lmayapti" deb ko'rgan. `sl IS NULL` holati ham shunga kiradi
-    (limit to'lgach TP/SL kiritilishi) — shuning uchun `IS NOT DISTINCT FROM`.
-
-    To'qnashuvda ODAM yutadi: u aniq va ataylab bosgan, kuzatuv esa eskirgan
-    ma'lumot bilan ishlayotgan bo'ladi."""
+    Endi yozuv faqat `rev` o'zgarmagan bo'lsagina o'tadi. O'tmasa —
+    `last_checked_ms` HAM yangilanmaydi, ya'ni o'sha shamlar keyingi
+    siklda YANGI holat bilan qaytadan ko'riladi va hech narsa yo'qolmaydi.
+    """
     q = """
     UPDATE signals SET
-        sl = CASE WHEN sl IS NOT DISTINCT FROM $14 THEN $2 ELSE sl END,
-        tp_hit=$3, filled_pct=$4, realized_pct=$5, status=$6,
+        sl=$2, tp_hit=$3, filled_pct=$4, realized_pct=$5, status=$6,
         opened_at=COALESCE(opened_at,$7), closed_at=$8, exit_price=$9,
-        pnl_pct=$10, r_multiple=$11, last_checked_ms=$12, ambiguous=$13
-    WHERE id=$1
+        pnl_pct=$10, r_multiple=$11, last_checked_ms=$12, ambiguous=$13,
+        rev = rev + 1
+    WHERE id=$1 AND ($14::int IS NULL OR rev = $14)
     """
     async with pool().acquire() as c:
-        kept = await c.fetchval(
-            q + " RETURNING sl",
-            sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
+        res = await c.execute(
+            q, sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
             f["status"], f.get("opened_at"), f.get("closed_at"), _d(f.get("exit_price")),
             _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"],
-            f["ambiguous"],
-            # ATAYLAB xom (Decimal/None) qiymat: float'ga o'tkazib qaytarish
-            # ba'zi narxlarda oxirgi raqamni o'zgartirib, taqqoslash HECH
-            # QACHON mos kelmasligiga olib kelardi.
-            f.get("sl_prev"),
+            f["ambiguous"], f.get("rev_prev"),
         )
-    # To'qnashuv HAQIQATAN bo'lganini ko'rsatadigan yagona iz — bu holat
-    # jimgina o'tib ketmasligi kerak, aks holda kelajakda yana "stop
-    # ishlamadi" degan shikoyat kelsa sababini topib bo'lmaydi.
-    want = _d(f["sl"])
-    if kept != want:
-        log.info("Signal #%s: stop kuzatuv ishlayotganda QO'LDA o'zgartirilgan — "
-                 "odamniki saqlandi (bazada=%s, kuzatuvda=%s)", sig_id, kept, want)
+    ok = not res.endswith(" 0")
+    if not ok:
+        # Bu holat jimgina o'tib ketmasligi kerak — aks holda kelajakda
+        # yana "amalim yo'qoldi" degan shikoyat kelsa sababini topib bo'lmaydi.
+        log.info("Signal #%s: qator kuzatuv ishlayotganda o'zgargan (rev=%s) — "
+                 "kuzatuv yozuvi O'TKAZIB YUBORILDI, keyingi siklda qayta ko'riladi",
+                 sig_id, f.get("rev_prev"))
+    return ok
 
 
 async def set_milestone(sig_id: int, milestone: int) -> None:
@@ -1088,7 +1089,7 @@ async def set_milestone(sig_id: int, milestone: int) -> None:
 async def cancel_signal(sig_id: int, status: str = "CANCELLED") -> bool:
     async with pool().acquire() as c:
         r = await c.execute(
-            "UPDATE signals SET status=$2, closed_at=now() "
+            "UPDATE signals SET status=$2, closed_at=now(), rev=rev+1 "
             "WHERE id=$1 AND status IN ('PENDING','ACTIVE')",
             sig_id, status,
         )

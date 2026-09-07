@@ -4807,3 +4807,49 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yaroqsiz raqam va yo'nalish adashuvi hamon rad etilishi; yordam
        matni va qo'llanmada eski izohning qolmagani. `test_tracker.py`
        15/15 va qolgan barcha to'plamlar (136 holat) o'zgarishsiz.
+
+151. **⭐ Qisman yopish (✂️ 25%) IZSIZ yo'qolardi — endi qatorga optimistik
+     qulf (`signals.rev`).** Foydalanuvchi: "qismlarga bo'lib yopishda ham
+     muammo bor. Misol uchun 25% cut qilish umuman ishlamagan. #169
+     signalda shunday muammo bo'lgan."
+     - **#149 bilan BIR OILADAN, lekin tuzatish TOR bo'lgan.** #149'da
+       faqat `sl` ustuni himoyalangan edi. Aslida `partial_close()`
+       `filled_pct`/`realized_pct` ni yozadi, kuzatuv esa oxirida ularni
+       ham eski nusxadan qaytarib yozardi — natijada 25% kesish BUTUNLAY
+       o'chib ketardi (foiz ham, ulush ham nolga qaytardi).
+     - **Isbot**: haqiqiy Postgres'da qayta ishlab chiqarildi — snapshot
+       o'qildi → `partial_close(0.25)` (bazada `filled=0.25`,
+       `realized=2.0`) → kuzatuv eski nusxa bilan yozdi → bazada
+       `filled=0.0, realized=0.0`. Tuzatishdan keyin 0.25/2.0 qoladi.
+     - **Yechim — bitta umumiy mexanizm**: `signals.rev` (INT, har
+       o'zgarishda +1). `save_progress()` endi
+       `WHERE id=$1 AND ($14::int IS NULL OR rev = $14)` bilan yozadi va
+       `bool` qaytaradi. Kuzatuv `process()` boshida `rev`ni o'qib, oxirida
+       shuni uzatadi — qator o'zgargan bo'lsa yozuv BUTUNLAY o'tkazib
+       yuboriladi. Ustun-ustun (`sl_prev`) CAS o'rniga shu — bitta joyda,
+       barcha ustunlar uchun.
+     - **`last_checked_ms` ham yangilanmaydi** rad etilganda — bu MUHIM:
+       o'sha shamlar keyingi siklda YANGI holat bilan qaytadan ko'riladi
+       va hech qanday TP/SL teginishi yo'qolmaydi.
+     - **`rev`ni oshiradigan odam tomonidagi yozuvlar**: `set_stop`,
+       `set_tps`, `set_tp_sl`, `set_entry`, `cancel_signal`.
+       `set_alloc`/`set_group_msg`/`set_excluded`/`set_milestone`
+       ATAYLAB oshirmaydi — ular kuzatuv hisobiga umuman ta'sir qilmaydi,
+       oshirilsa keraksiz rad etishlar paydo bo'lardi.
+     - **`close_now()` va `reopen_signal()` `rev_prev` BERMAYDI** —
+       ular odamning aniq buyrug'i (to'liq yopish / tuzatish) va
+       kuzatuvning oraliqdagi yozuvidan qat'i nazar bajarilishi kerak.
+       Shu sabab qulf `NULL`da o'tkazib yuboriladi.
+     - **`partial_close()` bir marta QAYTA urinadi**: rad etilsa yangi
+       holat bilan qaytadan hisoblab yozadi (qolgan ulush endi to'g'ri).
+       Ikkinchi marta ham bo'lmasa `None` — tugma "yopib bo'lmadi" deydi
+       va odam qayta bosadi; jimgina noto'g'ri ish qilishdan shunisi xavfsiz.
+     - **Saboq**: bitta qatorni ikki manba yozsa, himoya USTUN darajasida
+       emas, QATOR darajasida bo'lishi kerak. #149'dagi tor tuzatish
+       aynan shu sabab yetmadi.
+     - Tekshirildi: haqiqiy Postgres'da 14 ta holat — 25% kesishning
+       saqlanishi, kuzatuv YANGI holat bilan yozganda o'tishi, eski `rev`
+       bilan rad etilishi va `last_checked_ms`ning ham yangilanmasligi,
+       poyga holatida `partial_close`ning qayta urinib muvaffaqiyat
+       qozonishi. `test_tracker.py` 15/15 (fixture'ga `rev` qo'shildi) va
+       qolgan barcha to'plamlar (154 holat) o'zgarishsiz.
