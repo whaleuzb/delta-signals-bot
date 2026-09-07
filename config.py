@@ -60,6 +60,18 @@ WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rs
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")
+# Qo'llanma uchala tilda alohida Telegraph sahifasi. Ruscha/inglizchasi
+# hali chop etilmagan bo'lsa (env bo'sh) — o'zbekchasiga qaytamiz, ya'ni
+# tugma baribir ishlaydi, faqat maqola o'zbekcha bo'ladi.
+GUIDE_URLS = {
+    "uz": GUIDE_URL,
+    "ru": os.getenv("GUIDE_URL_RU", "").strip(),
+    "en": os.getenv("GUIDE_URL_EN", "").strip(),
+}
+
+
+def guide_url(lang: str | None = None) -> str:
+    return GUIDE_URLS.get(lang or "uz") or GUIDE_URL
 
 # --- News Trade AI: bozorni qimirlatadigan yangiliklarni avtomatik topib,
 #     grafik bilan alohida kanalga joylaydigan funksiya. NEWS_CHANNEL_ID

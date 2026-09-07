@@ -876,9 +876,9 @@ def help_menu_kb(lang: str | None = None) -> InlineKeyboardMarkup:
          InlineKeyboardButton(i18n.t("help.btn_errors", lang), callback_data="help:errors")],
         [InlineKeyboardButton(i18n.t("help.btn_images", lang), callback_data="help:rasm")],
     ]
-    if config.GUIDE_URL:
+    if config.guide_url(lang):
         rows.append([InlineKeyboardButton(i18n.t("help.btn_guide", lang),
-                                           url=config.GUIDE_URL)])
+                                           url=config.guide_url(lang))])
     rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return InlineKeyboardMarkup(rows)
 
@@ -914,9 +914,9 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     txt = i18n.t(f"help.{topic}", lang)
     kb = [[InlineKeyboardButton(i18n.t("help.btn_back", lang), callback_data="help:home")]]
-    if config.GUIDE_URL:
+    if config.guide_url(lang):
         kb.insert(0, [InlineKeyboardButton(i18n.t("help.btn_guide", lang),
-                                            url=config.GUIDE_URL)])
+                                            url=config.guide_url(lang))])
     # Rasm bo'lsa — avval rasm, keyin matn: rasm ko'zga birinchi tashlanadi.
     await send_help_photo(ctx.bot, chat_id, topic)
     await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML,
