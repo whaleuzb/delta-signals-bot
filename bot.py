@@ -710,6 +710,26 @@ async def has_chosen_lang(uid: int) -> bool:
         return True     # baza xato bersa til so'rab bezovta qilmaymiz
 
 
+def ws_lang(ws) -> str:
+    """GURUHGA ketadigan xabar tili.
+
+    Odamning shaxsiy tili (`user_lang`) bu yerda ISHLAMAYDI: guruh posti
+    hammaga BITTA ketadi, uni har bir a'zoga o'z tilida yozib bo'lmaydi.
+    Shaxsiy jurnalda esa "guruh" egasining o'zi — shuning uchun u yerda
+    ham shu ustun ishlatiladi (egasi `/til` bilan o'zgartiradi)."""
+    try:
+        return i18n.normalize(ws["lang"] if ws is not None else None)
+    except (KeyError, TypeError):
+        # Eski chaqiruvchida `lang` ustuni bo'lmagan qator kelib qolsa ham
+        # xabar YUBORILISHI kerak — o'zbekchaga tushamiz.
+        return i18n.DEFAULT_LANG
+
+
+def tw(key: str, ws, **kwargs) -> str:
+    """Guruh tilidagi tarjima — `t(key, ws_lang(ws))` ning qisqartmasi."""
+    return i18n.t(key, ws_lang(ws), **kwargs)
+
+
 def lang_kb(prefix: str = "lang:set") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(title, callback_data=f"{prefix}:{code}")]
@@ -752,8 +772,39 @@ async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_til(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shaxsiy chatda — O'Z tilini, guruhda — GURUH xabarlari tilini tanlaydi.
+
+    Ikkisi ataylab alohida: odam bot bilan ruscha yozishib, guruhiga esa
+    o'zbekcha post chiqarishni xohlashi mumkin."""
+    chat = update.effective_chat
+    if chat.type in ("group", "supergroup"):
+        ws = await db.get_workspace_by_group(chat.id)
+        if not ws:
+            await update.message.reply_text(
+                "Bu guruh hali ro'yxatdan o'tmagan — /setup yozing.")
+            return
+        if not can_manage(update.effective_user.id, ws):
+            await update.message.reply_text("Faqat guruh admini o'zgartira oladi.")
+            return
+        await update.message.reply_text(
+            i18n.t("lang.choose_group", ws_lang(ws)), reply_markup=lang_kb("lang:ws"))
+        return
     lang = await user_lang(update.effective_user.id)
     await update.message.reply_text(i18n.t("lang.choose", lang), reply_markup=lang_kb())
+
+
+async def on_lang_ws_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Guruh xabarlari tilini saqlaydi."""
+    q = update.callback_query
+    code = i18n.normalize(q.data.rsplit(":", 1)[1])
+    chat = q.message.chat
+    ws = await db.get_workspace_by_group(chat.id)
+    if not ws or not can_manage(q.from_user.id, ws):
+        await q.answer("Ruxsat yo'q.", show_alert=True)
+        return
+    await db.set_workspace_lang(ws["id"], code)
+    await q.answer(i18n.t("lang.group_saved", code))
+    await q.edit_message_text(i18n.t("lang.group_saved", code))
 
 
 # ─────────────────────────── Yordam / yo'riqnoma ───────────────────────────
@@ -1105,9 +1156,8 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 "yopish\"ni bosing.", show_alert=True)
             return
     await db.set_stop(sig["id"], entry)
-    await notify_group(ctx, ws, sig,
-                        f"🛡 <b>#{sig['id']} {sig['symbol']}</b> — stop breakeven'ga "
-                        f"ko'chirildi (<b>{fmt_price(entry)}</b>)")
+    await notify_group(ctx, ws, sig, tw("ev.be_moved", ws, sid=sig["id"],
+                                        sym=sig["symbol"], p=fmt_price(entry)))
     await _show_manage(q, sig["id"])
 
 
@@ -1184,9 +1234,9 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
         if sig2:
             await send_close_result(
                 ctx, ws, sig2,
-                f"{icon} <b>#{sig['id']} {sig['symbol']}</b> — qolgan qism "
-                f"yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
-                f"Yakuniy: <b>{ev['pnl']:+.2f}%</b>{rtxt}",
+                tw("ev.partial_rest", ws, icon=icon, sid=sig["id"],
+                   sym=sig["symbol"], p=fmt_price(ev["price"]),
+                   pnl=ev["pnl"], rtxt=rtxt),
                 ref_uid=q.from_user.id)
         await q.edit_message_text(
             f"{icon} #{sig['id']} {sig['symbol']} to'liq yopildi: "
@@ -1194,11 +1244,9 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
-    await notify_group(ctx, ws, sig,
-                        f"✂️ <b>#{sig['id']} {sig['symbol']}</b> — pozitsiyaning "
-                        f"<b>{pct}%</b> i yopildi @ <b>{fmt_price(ev['price'])}</b>\n"
-                        f"Joriy natija: <b>{ev['running']:+.2f}%</b> "
-                        f"(qolgan {(1 - ev['filled']) * 100:.0f}%)")
+    await notify_group(ctx, ws, sig, tw(
+        "ev.partial", ws, sid=sig["id"], sym=sig["symbol"], pct=pct,
+        p=fmt_price(ev["price"]), run=ev["running"], rest=(1 - ev["filled"]) * 100))
     await _show_manage(q, sig["id"])
 
 
@@ -1258,9 +1306,8 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         if not ws or not can_manage(uid, ws):
             return True
         await db.set_stop(sig_id, price)
-        await notify_group(ctx, ws, sig,
-                            f"🛡 <b>#{sig_id} {sig['symbol']}</b> — stop "
-                            f"<b>{fmt_price(price)}</b> ga ko'chirildi")
+        await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig_id,
+                                            sym=sig["symbol"], p=fmt_price(price)))
         await msg.reply_text(f"✅ Stop <b>{fmt_price(price)}</b> ga o'rnatildi.",
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
@@ -1290,9 +1337,8 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         tps = sorted(set(tps), reverse=(sig["side"] == "SHORT"))
         await db.set_tps(sig_id, tps)
         shown = " · ".join(fmt_price(t) for t in tps)
-        await notify_group(ctx, ws, sig,
-                            f"🎯 <b>#{sig_id} {sig['symbol']}</b> — maqsadlar "
-                            f"yangilandi: <b>{shown}</b>")
+        await notify_group(ctx, ws, sig, tw("ev.tps_changed", ws, sid=sig_id,
+                                            sym=sig["symbol"], tps=f"<b>{shown}</b>"))
         await msg.reply_text(f"✅ Maqsadlar: <b>{shown}</b>",
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
@@ -1333,9 +1379,8 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         if not ws or not can_manage(uid, ws):
             return True
         await db.set_entry(sig_id, price)
-        await notify_group(ctx, ws, sig,
-                            f"✏️ <b>#{sig_id} {sig['symbol']}</b> — entry "
-                            f"<b>{fmt_price(price)}</b> ga o'zgartirildi")
+        await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig_id,
+                                            sym=sig["symbol"], p=fmt_price(price)))
         await msg.reply_text(f"✅ Entry <b>{fmt_price(price)}</b> ga o'rnatildi.",
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
@@ -1396,8 +1441,8 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
                        sig_id)
     await msg.reply_text(f"✅ TP/SL joylashtirildi.\n\n{body}", parse_mode=ParseMode.HTML,
                           reply_markup=MENU_BACK_KB)
-    await notify_group(ctx, ws, sig,
-                        f"📐 <b>#{sig_id} {sig['symbol']}</b> — TP/SL joylashtirildi:\n{body}")
+    await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
+                                        sym=sig["symbol"], body=body))
     return True
 
 
@@ -1489,8 +1534,8 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
         f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
 
-    txt = (f"{icon} <b>#{sig_id} {ev['symbol']}</b> — vaqtidan oldin yopildi "
-           f"@ <b>{fmt_price(ev['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b>{rtxt}")
+    txt = tw("ev.manual_close", ws, icon=icon, sid=sig_id, sym=ev["symbol"],
+             p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt)
     # `close_now()` natijani bazaga allaqachon yozdi — yangilangan yozuv
     # (closed_at/exit_price/pnl_pct) bilan grafik ham, ulashish kartasi ham
     # avtomatik yopilishdagi kabi chiqadi. Kartadagi QR — yopgan odamning
@@ -2830,12 +2875,9 @@ async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Kuzatuv sikli ───────────────────────────
 
-EVENT_TEXT = {
-    "OPEN": "▶️ <b>#{sid} {sym}</b> — pozitsiya ochildi @ <b>{p}</b>",
-    "TP": "✅ <b>#{sid} {sym}</b> — TP{n} bajarildi @ <b>{p}</b>  ({share:.0%} sotildi)\nJoriy natija: <b>{run:+.2f}%</b>",
-    "BE": "🛡 <b>#{sid} {sym}</b> — stop breakeven'ga ko'chirildi",
-    "EXPIRED": "⌛️ <b>#{sid} {sym}</b> — entryga tegmadi, bekor qilindi",
-}
+# Hodisa turi -> tarjima kaliti. Matnlar `i18n.STRINGS`da, chunki bu
+# xabarlar GURUHGA ketadi va guruh tilida (`workspaces.lang`) yoziladi.
+EVENT_KEY = {"OPEN": "ev.open", "BE": "ev.be", "EXPIRED": "ev.expired"}
 
 
 async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2856,28 +2898,31 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         sid, sym = e["signal_id"], e["symbol"]
         ws = await get_ws(e["workspace_id"])
 
+        # Xabar GURUH tilida yoziladi (`ws_lang`) — u hammaga bitta ketadi.
+        if not ws:
+            continue
+        lang = ws_lang(ws)
+
         if e["type"] == "STOP":
             pnl = e["final_pnl"] or 0
             if e["was_be"]:
-                txt = f"🛡 <b>#{sid} {sym}</b> — breakeven'da yopildi ({pnl:+.2f}%)"
+                txt = i18n.t("ev.stop_be", lang, sid=sid, sym=sym, pnl=pnl)
             elif pnl >= 0:
-                txt = f"✅ <b>#{sid} {sym}</b> — stopda yopildi\nYakuniy: <b>{pnl:+.2f}%</b> ({e['r']:+.2f}R)"
+                txt = i18n.t("ev.stop_win", lang, sid=sid, sym=sym, pnl=pnl, r=e["r"] or 0)
             else:
-                txt = f"❌ <b>#{sid} {sym}</b> — stop loss @ <b>{fmt_price(e['price'])}</b>\nYakuniy: <b>{pnl:+.2f}%</b> ({e['r']:+.2f}R)"
+                txt = i18n.t("ev.stop_loss", lang, sid=sid, sym=sym,
+                             p=fmt_price(e["price"]), pnl=pnl, r=e["r"] or 0)
         elif e["type"] == "TP":
-            txt = EVENT_TEXT["TP"].format(
-                sid=sid, sym=sym, n=e["n"], p=fmt_price(e["price"]),
-                share=e["share"], run=e["running"])
+            txt = i18n.t("ev.tp", lang, sid=sid, sym=sym, n=e["n"],
+                         p=fmt_price(e["price"]), share=e["share"], run=e["running"])
             if e.get("closes") and e.get("final_pnl") is not None:
-                txt += f"\n🏁 Signal yopildi: <b>{e['final_pnl']:+.2f}%</b> ({e['r']:+.2f}R)"
+                txt += i18n.t("ev.tp_closes", lang, pnl=e["final_pnl"], r=e["r"] or 0)
         elif e["type"] == "OPEN":
-            txt = EVENT_TEXT["OPEN"].format(sid=sid, sym=sym, p=fmt_price(e["price"]))
+            txt = i18n.t("ev.open", lang, sid=sid, sym=sym, p=fmt_price(e["price"]))
         else:
-            txt = EVENT_TEXT.get(e["type"], "").format(sid=sid, sym=sym)
+            key = EVENT_KEY.get(e["type"])
+            txt = i18n.t(key, lang, sid=sid, sym=sym) if key else ""
         if not txt:
-            continue
-
-        if not ws:
             continue
 
         sig = await db.get_signal(sid)
@@ -6270,6 +6315,7 @@ def main() -> None:
     # `lang:set:<kod>` AVVAL kelishi kerak — `lang:menu` bilan bir xil
     # prefiksda, aniqrog'i birinchi tekshirilsin.
     app.add_handler(CallbackQueryHandler(on_lang_set, pattern=r"^lang:set:"))
+    app.add_handler(CallbackQueryHandler(on_lang_ws_set, pattern=r"^lang:ws:"))
     app.add_handler(CallbackQueryHandler(on_lang_menu, pattern=r"^lang:menu$"))
     app.add_handler(CommandHandler("stats", cmd_stats))
     # Faqat super-admin uchun — set_my_commands ro'yxatiga ataylab qo'shilmadi
