@@ -24,6 +24,7 @@ from aiohttp import web
 
 import chart
 import db
+import i18n
 import stats
 import tracker
 
@@ -410,7 +411,8 @@ TG_SCRIPT = """
 </script>"""
 
 
-def page(title: str, body: str, bot: str | None, embed: bool = False) -> str:
+def page(title: str, body: str, bot: str | None, embed: bool = False,
+          lang: str | None = None) -> str:
     link = f'<a href="https://t.me/{e(bot)}">@{e(bot)}</a>' if bot else "Trade Controller"
     # `embed` — sahifa BOSHQA Mini App ichidagi iframe'da ochilyapti. U yerda
     # Telegram skripti KERAK EMAS va ZARARLI: u sahifani "to'liq oyna" deb
@@ -419,37 +421,65 @@ def page(title: str, body: str, bot: str | None, embed: bool = False) -> str:
     # chaqiruvchining o'z sarlavhasi bor, natijada katta bo'sh chiziq qolardi.
     tg = "" if embed else TG_SCRIPT
     return (
-        "<!doctype html><html lang='uz'><head><meta charset='utf-8'>"
+        f"<!doctype html><html lang='{i18n.normalize(lang)}'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='color-scheme' content='dark'>"
         f"<title>{e(title)}</title>{FONTS}<style>{CSS}</style>{tg}</head><body>"
         f"<div class='wrap'>{body}"
         f"<footer><div>Trade Controller — {link}</div>"
-        f"<div>Ma'lumot bazadan jonli o'qiladi</div></footer></div></body></html>")
+        f"<div>{e(i18n.t('w.footer_live', lang))}</div></footer></div></body></html>")
 
 
 def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
-def join_cta(bot: str | None) -> str:
+def req_lang(request, ws=None) -> str:
+    """Sahifa tili.
+
+    Tartib ATAYLAB shunday:
+      1. `?lang=ru` — chaqiruvchi (masalan to'lov botining Mini App'i) aniq
+         so'rasa, uniki ustun;
+      2. guruh sahifasida — GURUH tili (`workspaces.lang`): sahifa o'sha
+         guruhning auditoriyasi uchun, tashrifchining brauzeri uchun emas;
+      3. bosh sahifada — brauzerning `Accept-Language` sarlavhasi (bu yerda
+         "kimning sahifasi" degan tushuncha yo'q);
+      4. hech biri mos kelmasa — o'zbekcha.
+    """
+    q = request.query.get("lang")
+    if q and i18n.normalize(q) == q.lower():
+        return q.lower()
+    if ws is not None:
+        try:
+            if ws["lang"]:
+                return i18n.normalize(ws["lang"])
+        except (KeyError, TypeError):
+            pass
+    header = request.headers.get("Accept-Language", "")
+    for part in header.split(","):
+        code = part.split(";")[0].strip().lower()[:2]
+        if code in i18n.LANGS:
+            return code
+    return i18n.DEFAULT_LANG
+
+
+def join_cta(bot: str | None, lang: str | None = None) -> str:
     """Guruhlar ostidagi chaqiruv: "o'z guruhingizni shu yerda ko'ring".
 
     Sahifaga kelgan odamning aksari — signal beruvchi yoki guruh egasi. Ular
     uchun keyingi qadam aniq bo'lishi kerak, aks holda sahifa shunchaki
     ko'rilib yopiladi."""
-    btn = (f"<a class='btn' href='https://t.me/{e(bot)}'>Botni ochish</a>"
-           if bot else "")
+    btn = (f"<a class='btn' href='https://t.me/{e(bot)}'>"
+           f"{e(i18n.t('w.cta_btn', lang))}</a>" if bot else "")
     return (
-        "<div class='cta'><h3>O'z guruhingizni shu yerda ko'rmoqchimisiz?</h3>"
-        "<p>Bot signallaringizni avtomatik kuzatadi va statistikani o'zi yig'adi. "
-        "Sahifani ochish uchun uch qadam:</p>"
+        f"<div class='cta'><h3>{e(i18n.t('w.cta_h3', lang))}</h3>"
+        f"<p>{e(i18n.t('w.cta_p', lang))}</p>"
         "<ol class='steps'>"
-        "<li>Botni guruhingizga qo'shib, admin qiling va guruhda "
-        "<code>/setup</code> yozing</li>"
-        "<li>Signallaringizni bot orqali kiriting — u qolganini o'zi bajaradi</li>"
-        "<li>Tayyor bo'lgach <code>/public on</code> yozing; moderator "
-        "tasdiqlagach guruhingiz shu ro'yxatda paydo bo'ladi</li>"
+        # `<code>` teglari ATAYLAB ekranlanmaydi — bu kalitlarning o'zida
+        # yozilgan tayyor belgilash, foydalanuvchi kiritgan matn emas.
+        f"<li>{i18n.t('w.cta_1', lang)}</li>"
+        f"<li>{i18n.t('w.cta_2', lang)}</li>"
+        f"<li>{i18n.t('w.cta_3', lang)}</li>"
         "</ol>"
         f"{btn}</div>")
 
@@ -464,7 +494,8 @@ def net_result(r) -> float:
 
 async def index(request):
     bot = request.app["bot_username"]
-    cached = _cached("index")
+    lang = req_lang(request)
+    cached = _cached(f"index:{lang}")
     if cached is not None:
         return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
@@ -482,7 +513,8 @@ async def index(request):
         net = net_result(r)
         when = (f"{r['last_closed'].astimezone(stats.TZ):%d.%m.%Y}"
                 if r["last_closed"] else "—")
-        openb = (f"<span class='chip'>{r['n_open']} ta ochiq</span>"
+        openb = (f"<span class='chip'>"
+                 f"{e(i18n.t('w.open_chip', lang, n=r['n_open']))}</span>"
                  if r["n_open"] else "")
         # O'rin raqami: ro'yxat daromad bo'yicha tartiblangan, shuning uchun
         # o'rin ma'noli. Birinchi uchtasi alohida rangda.
@@ -500,32 +532,30 @@ async def index(request):
             f"<span class='n'>{e(r['name'])}</span></div>"
             f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
             f"<div class='gstats'>"
-            f"<div><span>{total}</span> signal</div>"
-            f"<div><span>{wr:.0f}%</span> winrate</div>"
+            f"<div><span>{total}</span> {e(i18n.t('w.signal_word', lang))}</div>"
+            f"<div><span>{wr:.0f}%</span> {e(i18n.t('w.winrate_word', lang))}</div>"
             f"<div><span>{e(when)}</span></div></div>"
-            f"<div class='gfoot'>{openb}<span class='gbtn'>Batafsil →</span></div></a>")
+            f"<div class='gfoot'>{openb}"
+            f"<span class='gbtn'>{e(i18n.t('w.more', lang))}</span></div></a>")
 
     # "Botni ochish" faqat sahifa OXIRIDA (join_cta ichida). Avval u tepada
     # ham bor edi — bir sahifada bitta asosiy harakat yetadi, ikkitasi
     # e'tiborni bo'ladi.
     body = (
         "<header class='hero'><div class='brand'>Trade Controller</div>"
-        "<h1>Ochiq natijalar</h1>"
-        "<div class='sub'>Bu guruhlar o'z savdo statistikasini ommaga ochgan. "
-        "Har bir raqam bazadan jonli o'qiladi — signal kiritilganda yoziladi, "
-        "bozor TP yoki stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab "
-        "bo'lmaydi.</div></header>"
-        + (f"<h2>Top daromad beruvchi guruhlar</h2>"
+        f"<h1>{e(i18n.t('w.index_h1', lang))}</h1>"
+        f"<div class='sub'>{e(i18n.t('w.index_sub', lang))}</div></header>"
+        + (f"<h2>{e(i18n.t('w.index_top', lang))}</h2>"
            f"<div class='cards'>{''.join(cards)}</div>" if cards else
-           "<div class='empty'>Hozircha ochiq guruh yo'q.</div>")
-        + ("<div class='note'>Reyting joriy umumiy natija bo'yicha tartiblangan. "
-           "O'tmishdagi natija kelajakni kafolatlamaydi.</div>" if cards else "")
-        + join_cta(bot))
-    cached = _put("index", page("Ochiq natijalar — Trade Controller", body, bot))
+           f"<div class='empty'>{e(i18n.t('w.index_empty', lang))}</div>")
+        + (f"<div class='note'>{e(i18n.t('w.index_note', lang))}</div>" if cards else "")
+        + join_cta(bot, lang))
+    cached = _put(f"index:{lang}",
+                   page(i18n.t("w.index_title", lang), body, bot, lang=lang))
     return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
 
-async def _group_numbers(ws) -> dict:
+async def _group_numbers(ws, lang: str | None = None) -> dict:
     """Guruhning asosiy raqamlari — HTML sahifa ham, JSON ham SHU yerdan oladi.
 
     Ataylab bitta funksiya: to'lov boti (whale-payment-bot) Mini App'i
@@ -545,7 +575,7 @@ async def _group_numbers(ws) -> dict:
                     for r in rows
                     if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
     net = sum(weighted) if weighted else sum(pnls)
-    net_label = "Jami natija (depozitga nisbatan)" if weighted else "Jami natija"
+    net_label = i18n.t("w.tile_net_dep" if weighted else "w.tile_net", lang)
     wr = (s["wins"] / total * 100) if total else 0
     avg_r = float(s["avg_r"] or 0)
 
@@ -560,10 +590,10 @@ async def _group_numbers(ws) -> dict:
         "n_pnl": len(pnls),
         # Plitalar — sahifadagi va JSON'dagi ro'yxat AYNAN shu.
         "tiles": [
-            ("Yopilgan signallar", f"{total}", ""),
-            ("Winrate", f"{wr:.1f}%", ""),
+            (i18n.t("w.tile_closed", lang), f"{total}", ""),
+            (i18n.t("w.tile_winrate", lang), f"{wr:.1f}%", ""),
             (net_label, f"{net:+.2f}%", _cls(net)),
-            ("O'rtacha R", f"{avg_r:+.2f}", _cls(avg_r)),
+            (i18n.t("w.tile_avg_r", lang), f"{avg_r:+.2f}", _cls(avg_r)),
         ],
     }
 
@@ -580,12 +610,13 @@ async def stats_json(request):
         return web.json_response({"error": "not_public"}, status=404,
                                  headers=JSON_HEADERS)
 
-    cached = _cached(f"j{ws_id}")
+    lang = req_lang(request, ws)
+    cached = _cached(f"j{ws_id}:{lang}")
     if cached is None:
-        n = await _group_numbers(ws)
+        n = await _group_numbers(ws, lang)
         # Ochiq (ACTIVE) pozitsiyalar soni — juftlik nomisiz, faqat son.
         live = [r for r in await db.live_signals(ws_id) if r["status"] == "ACTIVE"]
-        cached = _put(f"j{ws_id}", {
+        cached = _put(f"j{ws_id}:{lang}", {
             "id": ws_id,
             "name": ws["name"],
             "total": n["total"],
@@ -598,7 +629,13 @@ async def stats_json(request):
             # Sahifaga havola. `embed=1` — chaqiruvchi (to'lov botining Mini
             # App'i) buni O'Z ichida, iframe'da ochadi: "Barcha guruhlar"
             # havolasi ham, Telegram skripti ham chiqmaydi.
-            "url": f"/g/{ws_id}?embed=1",
+            # Til FAQAT chaqiruvchi uni aniq so'ragan bo'lsa qo'shiladi:
+            # aks holda guruh sahifasi baribir guruh tilida ochiladi, ya'ni
+            # `&lang=` hech narsani o'zgartirmasdi, lekin havola shaklini
+            # (to'lov boti Mini App'i shu satrni ishlatadi) o'zgartirib
+            # yuborardi.
+            "url": (f"/g/{ws_id}?embed=1&lang={lang}"
+                    if request.query.get("lang") else f"/g/{ws_id}?embed=1"),
             "cards": [{"label": k, "value": v} for k, v, _c in n["tiles"]],
         })
     return web.json_response(cached, headers=JSON_HEADERS)
@@ -609,7 +646,8 @@ async def group_page(request):
     bot = request.app["bot_username"]
     ws = await db.public_workspace(ws_id)
     if not ws:
-        raise web.HTTPNotFound(text="Bunday sahifa yo'q yoki u ochiq emas.")
+        raise web.HTTPNotFound(text=i18n.t("w.not_public", req_lang(request)))
+    lang = req_lang(request, ws)
 
     # `?solo=1` — sahifa boshqa saytdan (masalan to'lov botining Mini App'idan)
     # ochilgan: o'sha odam FAQAT shu guruhni ko'rmoqchi, boshqa guruhlar
@@ -620,12 +658,12 @@ async def group_page(request):
     embed = request.query.get("embed") in ("1", "true", "yes")
     solo = embed or request.query.get("solo") in ("1", "true", "yes")
 
-    cache_key = f"g{ws_id}" + ("e" if embed else "s" if solo else "")
+    cache_key = f"g{ws_id}:{lang}" + ("e" if embed else "s" if solo else "")
     cached = _cached(cache_key)
     if cached is not None:
         return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
-    n = await _group_numbers(ws)
+    n = await _group_numbers(ws, lang)
     total = n["total"]
     pnls_n = n["n_pnl"]
 
@@ -635,12 +673,16 @@ async def group_page(request):
 
     # Oylik
     months = await db.monthly_breakdown(ws_id, limit=12)
+    mon = stats.months(lang)
+    c_trades = e(i18n.t("w.col_trades", lang))
+    c_wr = e(i18n.t("w.col_winrate", lang))
+    c_res = e(i18n.t("w.col_result", lang))
     mon_rows = "".join(
-        f"<tr><td>{stats.MONTHS_UZ[r['month'].month - 1]} {r['month'].year}</td>"
-        f"<td data-k='Savdo'>{r['total']}</td>"
-        f"<td data-k='Winrate'>"
+        f"<tr><td>{e(mon[r['month'].month - 1])} {r['month'].year}</td>"
+        f"<td data-k='{c_trades}'>{r['total']}</td>"
+        f"<td data-k='{c_wr}'>"
         f"{(r['wins'] / r['total'] * 100) if r['total'] else 0:.0f}%</td>"
-        f"<td data-k='Natija' class='{_cls(float(r['sum_pct']))}'>"
+        f"<td data-k='{c_res}' class='{_cls(float(r['sum_pct']))}'>"
         f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in months)
 
@@ -664,8 +706,9 @@ async def group_page(request):
                  if r["opened_at"] else "—")
         opens += (
             f"<div class='open {_cls(p)}-edge'>"
-            f"<div class='ometa'><div class='oname'>Pozitsiya {i}</div>"
-            f"<div class='osub'>{e(since)} dan beri</div></div>"
+            f"<div class='ometa'><div class='oname'>"
+            f"{e(i18n.t('w.position_n', lang, i=i))}</div>"
+            f"<div class='osub'>{e(i18n.t('w.since', lang, d=since))}</div></div>"
             f"<div class='opnl {_cls(p)}'>{p:+.2f}%</div></div>")
 
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
@@ -702,7 +745,7 @@ async def group_page(request):
     invite = ""
     if ws["invite_link"]:
         invite = (f"<a class='btn join' href='{e(ws['invite_link'])}' "
-                  "rel='nofollow noopener'>Guruhga qo'shilish →</a>")
+                  f"rel='nofollow noopener'>{e(i18n.t('w.join_btn', lang))}</a>")
 
     # Katta logotip sarlavha yonida. Bo'lmasa — nomning birinchi harfi;
     # shunda sarlavha qatori har doim bir xil balandlikda turadi.
@@ -714,7 +757,7 @@ async def group_page(request):
     # `solo` bo'lsa boshqa guruhlar ro'yxatiga qaytish havolasi chiqmaydi.
     back_link = ("" if solo else
                  "<div class='sub'><a class='ghost back' href='/'>"
-                 "← Barcha guruhlar</a></div>")
+                 f"{e(i18n.t('w.back_all', lang))}</a></div>")
 
     body = (
         f"<header><div class='brand'>Trade Controller</div>"
@@ -722,20 +765,22 @@ async def group_page(request):
         f"{back_link}"
         f"{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
-        + (f"<h2>Balans o'zgarishi</h2>"
+        + (f"<h2>{e(i18n.t('w.equity_h2', lang))}</h2>"
            f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"
            if pnls_n >= 2 else "")
-        + section("Oylik natijalar",
-                  "<th>Oy</th><th>Savdo</th><th>Winrate</th><th>Natija</th>", mon_rows)
-        + (f"<h2>Hozir ochiq</h2><div class='trades'>{opens}</div>"
-           "<div class='note'>Juftlik nomi ko'rsatilmaydi — ochiq savdo "
-           "guruh a'zolari uchun. Foiz joriy bozor narxidan hisoblanadi.</div>"
+        + section(i18n.t("w.monthly_h2", lang),
+                  f"<th>{e(i18n.t('w.col_month', lang))}</th><th>{c_trades}</th>"
+                  f"<th>{c_wr}</th><th>{c_res}</th>", mon_rows)
+        + (f"<h2>{e(i18n.t('w.open_h2', lang))}</h2><div class='trades'>{opens}</div>"
+           f"<div class='note'>{e(i18n.t('w.open_note', lang))}</div>"
            if opens else "")
-        + (f"<h2>Oxirgi savdolar</h2><div class='trades'>{trades}</div>"
+        + (f"<h2>{e(i18n.t('w.recent_h2', lang))}</h2><div class='trades'>{trades}</div>"
            if trades else "")
-        + ("<div class='empty'>Hali yopilgan signal yo'q.</div>" if not total else ""))
+        + (f"<div class='empty'>{e(i18n.t('w.no_closed', lang))}</div>"
+           if not total else ""))
 
-    out = page(f"{ws['name']} — natijalar", body, bot, embed=embed)
+    out = page(i18n.t("w.group_title", lang, name=ws["name"]), body, bot,
+                embed=embed, lang=lang)
     _put(cache_key, out)
     return web.Response(text=out, content_type="text/html", headers=NO_CACHE)
 

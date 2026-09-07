@@ -1702,6 +1702,155 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "🏆 <b>Top groups — {month} {y}</b>",
     },
 
+    # --- Ochiq veb sahifa (web.py) ---
+    "w.index_title": {
+        "uz": "Ochiq natijalar — Trade Controller",
+        "ru": "Открытые результаты — Trade Controller",
+        "en": "Public results — Trade Controller",
+    },
+    "w.index_h1": {
+        "uz": "Ochiq natijalar", "ru": "Открытые результаты", "en": "Public results",
+    },
+    "w.index_sub": {
+        "uz": ("Bu guruhlar o'z savdo statistikasini ommaga ochgan. Har bir raqam "
+               "bazadan jonli o'qiladi — signal kiritilganda yoziladi, bozor TP yoki "
+               "stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab bo'lmaydi."),
+        "ru": ("Эти группы открыли свою торговую статистику публично. Каждое число "
+               "читается из базы вживую — записывается при вводе сигнала и "
+               "закрывается автоматически, когда рынок доходит до TP или стопа. "
+               "Вручную это не изменить."),
+        "en": ("These groups have made their trading stats public. Every number is "
+               "read live from the database — written when a signal is entered and "
+               "closed automatically when the market hits a TP or the stop. It "
+               "cannot be edited by hand."),
+    },
+    "w.index_top": {
+        "uz": "Top daromad beruvchi guruhlar", "ru": "Самые прибыльные группы",
+        "en": "Top performing groups",
+    },
+    "w.index_empty": {
+        "uz": "Hozircha ochiq guruh yo'q.", "ru": "Пока нет ни одной публичной группы.",
+        "en": "No public group yet.",
+    },
+    "w.index_note": {
+        "uz": ("Reyting joriy umumiy natija bo'yicha tartiblangan. O'tmishdagi "
+               "natija kelajakni kafolatlamaydi."),
+        "ru": ("Рейтинг отсортирован по текущему общему результату. Прошлые "
+               "результаты не гарантируют будущих."),
+        "en": ("The ranking is sorted by the current overall result. Past results "
+               "do not guarantee future ones."),
+    },
+    "w.signal_word": {"uz": "signal", "ru": "сигналов", "en": "signals"},
+    "w.winrate_word": {"uz": "winrate", "ru": "винрейт", "en": "win rate"},
+    "w.open_chip": {
+        "uz": "{n} ta ochiq", "ru": "{n} открытых", "en": "{n} open",
+    },
+    "w.more": {"uz": "Batafsil →", "ru": "Подробнее →", "en": "Details →"},
+    "w.cta_h3": {
+        "uz": "O'z guruhingizni shu yerda ko'rmoqchimisiz?",
+        "ru": "Хотите видеть здесь свою группу?",
+        "en": "Want to see your own group here?",
+    },
+    "w.cta_p": {
+        "uz": ("Bot signallaringizni avtomatik kuzatadi va statistikani o'zi yig'adi. "
+               "Sahifani ochish uchun uch qadam:"),
+        "ru": ("Бот сам отслеживает ваши сигналы и собирает статистику. Чтобы "
+               "открыть страницу — три шага:"),
+        "en": ("The bot tracks your signals automatically and collects the stats "
+               "itself. Three steps to open your page:"),
+    },
+    "w.cta_1": {
+        "uz": ("Botni guruhingizga qo'shib, admin qiling va guruhda "
+               "<code>/setup</code> yozing"),
+        "ru": ("Добавьте бота в группу, дайте права админа и напишите в группе "
+               "<code>/setup</code>"),
+        "en": ("Add the bot to your group, make it an admin and type "
+               "<code>/setup</code> in the group"),
+    },
+    "w.cta_2": {
+        "uz": "Signallaringizni bot orqali kiriting — u qolganini o'zi bajaradi",
+        "ru": "Вводите сигналы через бота — остальное он сделает сам",
+        "en": "Enter your signals through the bot — it does the rest itself",
+    },
+    "w.cta_3": {
+        "uz": ("Tayyor bo'lgach <code>/public on</code> yozing; moderator tasdiqlagach "
+               "guruhingiz shu ro'yxatda paydo bo'ladi"),
+        "ru": ("Когда будете готовы, напишите <code>/public on</code>; после одобрения "
+               "модератором группа появится в этом списке"),
+        "en": ("When ready, type <code>/public on</code>; once a moderator approves "
+               "it your group appears in this list"),
+    },
+    "w.cta_btn": {
+        "uz": "Botni ochish", "ru": "Открыть бота", "en": "Open the bot",
+    },
+    "w.tile_closed": {
+        "uz": "Yopilgan signallar", "ru": "Закрытых сигналов", "en": "Closed signals",
+    },
+    "w.tile_winrate": {"uz": "Winrate", "ru": "Винрейт", "en": "Win rate"},
+    "w.tile_net_dep": {
+        "uz": "Jami natija (depozitga nisbatan)", "ru": "Общий результат (к депозиту)",
+        "en": "Total result (vs deposit)",
+    },
+    "w.tile_net": {
+        "uz": "Jami natija", "ru": "Общий результат", "en": "Total result",
+    },
+    "w.tile_avg_r": {
+        "uz": "O'rtacha R", "ru": "Средний R", "en": "Average R",
+    },
+    "w.not_public": {
+        "uz": "Bunday sahifa yo'q yoki u ochiq emas.",
+        "ru": "Такой страницы нет или она не публичная.",
+        "en": "No such page, or it is not public.",
+    },
+    "w.group_title": {
+        "uz": "{name} — natijalar", "ru": "{name} — результаты", "en": "{name} — results",
+    },
+    "w.back_all": {
+        "uz": "← Barcha guruhlar", "ru": "← Все группы", "en": "← All groups",
+    },
+    "w.join_btn": {
+        "uz": "Guruhga qo'shilish →", "ru": "Вступить в группу →", "en": "Join the group →",
+    },
+    "w.equity_h2": {
+        "uz": "Balans o'zgarishi", "ru": "Изменение баланса", "en": "Balance over time",
+    },
+    "w.monthly_h2": {
+        "uz": "Oylik natijalar", "ru": "Результаты по месяцам", "en": "Monthly results",
+    },
+    "w.col_month": {"uz": "Oy", "ru": "Месяц", "en": "Month"},
+    "w.col_trades": {"uz": "Savdo", "ru": "Сделки", "en": "Trades"},
+    "w.col_winrate": {"uz": "Winrate", "ru": "Винрейт", "en": "Win rate"},
+    "w.col_result": {"uz": "Natija", "ru": "Результат", "en": "Result"},
+    "w.open_h2": {
+        "uz": "Hozir ochiq", "ru": "Открыто сейчас", "en": "Open right now",
+    },
+    "w.position_n": {
+        "uz": "Pozitsiya {i}", "ru": "Позиция {i}", "en": "Position {i}",
+    },
+    "w.since": {
+        "uz": "{d} dan beri", "ru": "с {d}", "en": "since {d}",
+    },
+    "w.open_note": {
+        "uz": ("Juftlik nomi ko'rsatilmaydi — ochiq savdo guruh a'zolari uchun. "
+               "Foiz joriy bozor narxidan hisoblanadi."),
+        "ru": ("Название пары не показывается — открытая сделка для участников "
+               "группы. Процент считается по текущей рыночной цене."),
+        "en": ("The pair is not shown — an open trade belongs to the group members. "
+               "The percentage is computed from the current market price."),
+    },
+    "w.recent_h2": {
+        "uz": "Oxirgi savdolar", "ru": "Последние сделки", "en": "Recent trades",
+    },
+    "w.no_closed": {
+        "uz": "Hali yopilgan signal yo'q.", "ru": "Закрытых сигналов пока нет.",
+        "en": "No closed signals yet.",
+    },
+    "w.footer_live": {
+        "uz": "Ma'lumot bazadan jonli o'qiladi",
+        "ru": "Данные читаются из базы вживую",
+        "en": "The data is read live from the database",
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",
