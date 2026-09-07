@@ -679,14 +679,9 @@ def main_menu_kb(uid: int, ws, private: bool = True,
 
 
 def menu_back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
-    """Tarjimaga o'tkazilgan joylar shuni ishlatadi. Qolgan (hali
-    o'zbekcha) joylar `MENU_BACK_KB` konstantasidan foydalanishda davom
-    etadi — tarjima bosqichma-bosqich ko'chirilyapti."""
+    """Yagona "🏠 Bosh menyu" tugmasi — odamning tilida."""
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")]])
-
-
-MENU_BACK_KB = menu_back_kb()
 
 
 # ─────────────────────────── Til (i18n) ───────────────────────────
@@ -3275,28 +3270,27 @@ def _fix_row(s) -> str:
     return f"{mark}#{s['id']} {s['symbol']} {pnl} · {when}"
 
 
-async def _fix_view(ws, symbol: str | None):
+async def _fix_view(ws, symbol: str | None, lang: str | None = None):
     """Matn + tugmalar. Har bir signal uchun bitta tugma: bosilsa hisobdan
     chiqariladi yoki qaytariladi."""
     rows = await db.admin_list_signals(ws["id"], symbol, FIX_LIMIT)
     if not rows:
-        what = f" <code>{html.escape(symbol)}</code> bo'yicha" if symbol else ""
-        return f"Signal topilmadi{what}.", MENU_BACK_KB
+        what = i18n.t("adm.fix_by", lang, sym=html.escape(symbol)) if symbol else ""
+        return i18n.t("adm.fix_none", lang, what=what), menu_back_kb(lang)
 
     n_off = sum(1 for s in rows if s["excluded"])
-    head = (f"🛠 <b>Signallarni tuzatish</b> — {html.escape(ws['name'])}\n"
-            f"Oxirgi {len(rows)} ta"
+    head = (i18n.t("adm.fix_head", lang, name=html.escape(ws["name"])) + "\n"
+            + i18n.t("adm.fix_last_n", lang, n=len(rows))
             + (f", <code>{html.escape(symbol)}</code>" if symbol else "")
-            + (f" · {n_off} tasi hisobdan chiqarilgan" if n_off else "") + "\n\n"
-            "Tugmani bosing — signal statistikadan olib tashlanadi. "
-            "Qayta bossangiz qaytariladi. Hech narsa o'chirilmaydi.")
+            + (i18n.t("adm.fix_off_n", lang, n=n_off) if n_off else "") + "\n\n"
+            + i18n.t("adm.fix_note", lang))
 
     kb = []
     for s in rows:
-        icon = "↩️ qaytarish" if s["excluded"] else "🚫 chiqarish"
+        icon = i18n.t("adm.fix_btn_on" if s["excluded"] else "adm.fix_btn_off", lang)
         kb.append([InlineKeyboardButton(f"{_fix_row(s)}  →  {icon}",
                                          callback_data=f"fix:{s['id']}:{symbol or '-'}")])
-    kb.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    kb.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return head, InlineKeyboardMarkup(kb)
 
 
@@ -3318,24 +3312,25 @@ async def cmd_tuzat(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         raw = ctx.args[0]
         found, _ = await resolve_symbol([raw])
         symbol = found or raw.upper()
-    text, kb = await _fix_view(ws, symbol)
+    text, kb = await _fix_view(ws, symbol, await user_lang(uid))
     await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 async def on_fix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     uid = q.from_user.id
+    lang = await user_lang(uid)
     if not is_admin(uid):
-        await q.answer("Ruxsat yo'q.", show_alert=True)
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
     _, sid_s, sym = q.data.split(":", 2)
     sig = await db.get_signal(int(sid_s))
     if not sig:
-        await q.answer("Topilmadi.", show_alert=True)
+        await q.answer(i18n.t("adm.not_found", lang), show_alert=True)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws:
-        await q.answer("Workspace topilmadi.", show_alert=True)
+        await q.answer(i18n.t("adm.ws_not_found", lang), show_alert=True)
         return
 
     new_state = not sig["excluded"]
@@ -3349,8 +3344,8 @@ async def on_fix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         money = float(sig["pnl_pct"]) / 100 * float(sig["alloc_amount"])
         await db.apply_deposit_delta(ws["id"], -money if new_state else money)
 
-    await q.answer("Hisobdan chiqarildi." if new_state else "Qaytarildi.")
-    text, kb = await _fix_view(ws, None if sym == "-" else sym)
+    await q.answer(i18n.t("adm.fix_done_off" if new_state else "adm.fix_done_on", lang))
+    text, kb = await _fix_view(ws, None if sym == "-" else sym, lang)
     try:
         await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception:
@@ -3366,19 +3361,18 @@ async def cmd_qaytar(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if not is_admin(uid):
         return
+    lang = await user_lang(uid)
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /qaytar <signal ID>")
+        await update.message.reply_text(i18n.t("adm.reopen_usage", lang))
         return
     try:
         sig_id = int(ctx.args[0])
     except ValueError:
-        await update.message.reply_text("Signal ID raqam bo'lishi kerak.")
+        await update.message.reply_text(i18n.t("adm.reopen_nan", lang))
         return
     ev = await tracker.reopen_signal(sig_id)
     if not ev:
-        await update.message.reply_text(
-            f"#{sig_id} topilmadi yoki allaqachon ochiq (faqat YOPILGAN "
-            "signalni qaytarish mumkin).")
+        await update.message.reply_text(i18n.t("adm.reopen_gone", lang, sid=sig_id))
         return
     # Depozit ham to'g'rilanadi — `cmd_tuzat`dagi bilan bir xil mantiq:
     # yopilganda unga qo'shilgan/ayirilgan pul endi qaytarib olinadi.
@@ -3386,9 +3380,8 @@ async def cmd_qaytar(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         money = ev["prev_pnl"] / 100 * ev["alloc_amount"]
         await db.apply_deposit_delta(ev["workspace_id"], -money)
     await update.message.reply_text(
-        f"↩️ <b>#{sig_id} {html.escape(ev['symbol'])}</b> — ACTIVE holatiga "
-        "qaytarildi.\nStop xavfsiz boshlang'ich qiymatga tushirildi, TP/SL "
-        "kuzatuvi hozirdan davom etadi.", parse_mode=ParseMode.HTML)
+        i18n.t("adm.reopen_done", lang, sid=sig_id, sym=html.escape(ev["symbol"])),
+        parse_mode=ParseMode.HTML)
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3621,10 +3614,11 @@ async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
     await q.answer()
     if not is_admin(q.from_user.id):
         return
+    lang = await user_lang(q.from_user.id)
     action, _, raw = q.data.partition(":")
     ws = await db.get_workspace(int(raw))
     if not ws:
-        await q.edit_message_text("Workspace topilmadi.")
+        await q.edit_message_text(i18n.t("adm.ws_not_found", lang))
         return
 
     approved = action == "pubok"
@@ -3634,9 +3628,7 @@ async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
 
     name = html.escape(ws["name"])
     await q.edit_message_text(
-        (f"✅ <b>{name}</b> tasdiqlandi — reytingda ko'rinadi."
-         if approved else
-         f"🚫 <b>{name}</b> rad etildi — reytingga chiqmaydi."),
+        i18n.t("adm.pub_approved" if approved else "adm.pub_rejected", lang, name=name),
         parse_mode=ParseMode.HTML)
 
     try:
@@ -3653,34 +3645,38 @@ async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Super-admin: tasdiq kutayotgan guruhlar ro'yxati."""
     if not is_admin(update.effective_user.id):
         return
+    lang = await user_lang(update.effective_user.id)
     rows = await db.list_pending_public()
     if not rows:
-        await update.message.reply_text("Tasdiq kutayotgan guruh yo'q. ✅",
-                                         reply_markup=MENU_BACK_KB)
+        await update.message.reply_text(i18n.t("adm.pend_none", lang),
+                                         reply_markup=menu_back_kb(lang))
         return
-    await update.message.reply_text(f"Tasdiq kutmoqda: {len(rows)} ta")
+    await update.message.reply_text(i18n.t("adm.pend_n", lang, n=len(rows)),
+                                     parse_mode=ParseMode.HTML)
     for ws in rows:
         await request_public_approval(ctx, ws["id"])
 
 
 # ─────────────────────────── Admin panel ───────────────────────────
 
-ADMIN_BACK_KB = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")]])
+def admin_back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    """"◀️ Admin panel" tugmasi — admin tilida."""
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")]])
 
 
-def admin_home_kb() -> InlineKeyboardMarkup:
+def admin_home_kb(lang: str | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📊 Statistika", callback_data="adm:stats"),
-         InlineKeyboardButton("🎁 Referrallar", callback_data="adm:refs")],
-        [InlineKeyboardButton("👥 Guruhlar", callback_data="adm:groups"),
-         InlineKeyboardButton("🙍 Foydalanuvchilar", callback_data="adm:users:0")],
-        [InlineKeyboardButton("📢 Majburiy obuna", callback_data="adm:ch"),
-         InlineKeyboardButton("🛡 Tasdiqlar", callback_data="adm:pend")],
-        [InlineKeyboardButton("📰 MarketTwits hashtaglar", callback_data="adm:mth")],
-        [InlineKeyboardButton("📣 Broadcast", callback_data="adm:bc")],
-        [InlineKeyboardButton("📄 Guruhlar PDF", callback_data="adm:pdfg"),
-         InlineKeyboardButton("📄 Userlar PDF", callback_data="adm:pdfu")],
+        [InlineKeyboardButton(i18n.t("adm.btn_stats", lang), callback_data="adm:stats"),
+         InlineKeyboardButton(i18n.t("adm.btn_refs", lang), callback_data="adm:refs")],
+        [InlineKeyboardButton(i18n.t("adm.btn_groups", lang), callback_data="adm:groups"),
+         InlineKeyboardButton(i18n.t("adm.btn_users", lang), callback_data="adm:users:0")],
+        [InlineKeyboardButton(i18n.t("adm.btn_channels", lang), callback_data="adm:ch"),
+         InlineKeyboardButton(i18n.t("adm.btn_pending", lang), callback_data="adm:pend")],
+        [InlineKeyboardButton(i18n.t("adm.btn_hashtags", lang), callback_data="adm:mth")],
+        [InlineKeyboardButton(i18n.t("adm.btn_broadcast", lang), callback_data="adm:bc")],
+        [InlineKeyboardButton(i18n.t("adm.btn_pdf_groups", lang), callback_data="adm:pdfg"),
+         InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu")],
     ])
 
 
@@ -3691,87 +3687,91 @@ def _who(username, first_name, uid) -> str:
     return first_name or str(uid)
 
 
-async def group_health(bot, ws) -> tuple[str, str]:
+async def group_health(bot, ws, lang: str | None = None) -> tuple[str, str]:
     """Bot guruhda hali bormi va admin'mi — "bloklash holati" shu yerda
     ko'rinadi. Har bir chaqiruv Telegram'ga so'rov yuboradi, shuning uchun
     faqat admin so'raganda (ro'yxat/karta ochilganda) bajariladi."""
     cid = ws["group_chat_id"]
     if not cid:
-        return "⚪", "guruh biriktirilmagan"
+        return "⚪", i18n.t("adm.h_no_group", lang)
     try:
         me = await bot.get_chat_member(cid, bot.id)
     except Exception as e:
-        return "🚫", f"bog'lanib bo'lmadi ({type(e).__name__})"
+        return "🚫", i18n.t("adm.h_unreachable", lang, err=type(e).__name__)
     if me.status in ("left", "kicked"):
-        return "🚫", "bot guruhdan chiqarilgan"
+        return "🚫", i18n.t("adm.h_kicked", lang)
     if me.status != "administrator":
-        return "⚠️", "bot admin emas — post/reply ishlamaydi"
+        return "⚠️", i18n.t("adm.h_not_admin", lang)
     try:
         n = await bot.get_chat_member_count(cid)
-        return "✅", f"admin • {n} a'zo"
+        return "✅", i18n.t("adm.h_ok_n", lang, n=n)
     except Exception:
-        return "✅", "admin"
+        return "✅", i18n.t("adm.h_ok", lang)
 
 
-async def _admin_groups_view(bot) -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_groups_view(bot, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     rows = await db.admin_list_groups()
     if not rows:
-        return "👥 Hali birorta guruh ulanmagan.", ADMIN_BACK_KB
+        return i18n.t("adm.groups_none", lang), admin_back_kb(lang)
 
-    lines = ["👥 <b>Ulangan guruhlar</b>", ""]
+    lines = [i18n.t("adm.groups_head", lang), ""]
     kb = []
     for ws in rows:
-        icon, _ = await group_health(bot, ws)
+        icon, _ = await group_health(bot, ws, lang)
         arch = " 📦" if ws["archived"] else ""
         name = html.escape(ws["name"])[:28]
-        lines.append(
-            f"{icon}{arch} <b>{name}</b> — {ws['n_signals']} signal, "
-            f"{ws['n_viewers']} kuzatuvchi")
+        lines.append(f"{icon}{arch} <b>{name}</b> — "
+                     + i18n.t("adm.groups_row", lang, n_sig=ws["n_signals"],
+                              n_view=ws["n_viewers"]))
         kb.append([InlineKeyboardButton(f"{icon} {ws['name']}"[:40],
                                          callback_data=f"adm:grp:{ws['id']}")])
-    lines += ["", "✅ ishlayapti · ⚠️ admin emas · 🚫 chiqarilgan · 📦 arxivlangan"]
-    kb.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    lines += ["", i18n.t("adm.groups_legend", lang)]
+    kb.append([InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")])
     return "\n".join(lines), InlineKeyboardMarkup(kb)
 
 
-async def _admin_group_card(bot, wid: int) -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_group_card(bot, wid: int,
+                             lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     rows = await db.admin_list_groups()
     ws = next((r for r in rows if r["id"] == wid), None)
     if not ws:
-        return "Topilmadi.", ADMIN_BACK_KB
-    icon, health = await group_health(bot, ws)
+        return i18n.t("adm.not_found", lang), admin_back_kb(lang)
+    icon, health = await group_health(bot, ws, lang)
     owner = _who(ws["owner_username"], ws["owner_name"], ws["owner_id"])
     dep = f"{float(ws['deposit']):,.2f}" if ws["deposit"] is not None else "—"
-    pub = ("✅ reytingda" if ws["public"] and ws["public_approved"]
-           else "⏳ tasdiq kutmoqda" if ws["public"] else "🔒 yashirin")
+    pub = i18n.t("adm.pub_ranked" if ws["public"] and ws["public_approved"]
+                 else "adm.pub_waiting" if ws["public"] else "adm.pub_hidden", lang)
     txt = (
         f"{icon} <b>{html.escape(ws['name'])}</b>\n\n"
-        f"Holat: <b>{health}</b>\n"
-        f"Egasi: {html.escape(owner)} (<code>{ws['owner_id']}</code>)\n"
+        f"{i18n.t('adm.card_state', lang)}: <b>{health}</b>\n"
+        f"{i18n.t('adm.card_owner', lang)}: {html.escape(owner)} "
+        f"(<code>{ws['owner_id']}</code>)\n"
         f"Chat ID: <code>{ws['group_chat_id']}</code>\n"
-        f"Signallar: <b>{ws['n_signals']}</b> (yopilgan {ws['n_closed']})\n"
-        f"Kuzatuvchilar: {ws['n_viewers']}\n"
-        f"Depozit: {dep}\n"
-        f"Reyting: {pub}\n"
-        f"Ochilgan: {ws['created_at']:%d.%m.%Y}"
-        + ("\n\n📦 <b>Arxivlangan</b> — reytingda va tanlovda ko'rinmaydi."
-           if ws["archived"] else "")
+        f"{i18n.t('adm.card_signals', lang)}: <b>{ws['n_signals']}</b> "
+        f"({i18n.t('adm.card_closed_n', lang, n=ws['n_closed'])})\n"
+        f"{i18n.t('adm.card_viewers', lang)}: {ws['n_viewers']}\n"
+        f"{i18n.t('adm.card_deposit', lang)}: {dep}\n"
+        f"{i18n.t('adm.card_ranking', lang)}: {pub}\n"
+        f"{i18n.t('adm.card_created', lang)}: {ws['created_at']:%d.%m.%Y}"
+        + ("\n\n" + i18n.t("adm.card_archived", lang) if ws["archived"] else "")
     )
-    act = ("♻️ Arxivdan chiqarish", f"adm:unarch:{wid}") if ws["archived"] \
-        else ("📦 Arxivlash", f"adm:arch:{wid}")
+    act = ((i18n.t("adm.btn_unarchive", lang), f"adm:unarch:{wid}") if ws["archived"]
+           else (i18n.t("adm.btn_archive", lang), f"adm:arch:{wid}"))
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔄 Holatni tekshirish", callback_data=f"adm:grp:{wid}")],
+        [InlineKeyboardButton(i18n.t("adm.btn_recheck", lang),
+                              callback_data=f"adm:grp:{wid}")],
         [InlineKeyboardButton(act[0], callback_data=act[1])],
-        [InlineKeyboardButton("◀️ Guruhlar", callback_data="adm:groups")],
+        [InlineKeyboardButton(i18n.t("adm.back_groups", lang), callback_data="adm:groups")],
     ])
     return txt, kb
 
 
-async def _admin_users_view(offset: int) -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_users_view(offset: int,
+                             lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     PER = 8
     total = await db.count_users()
     rows = await db.admin_list_users(PER, offset)
-    lines = [f"🙍 <b>Foydalanuvchilar</b> — jami {total} ta", ""]
+    lines = [i18n.t("adm.users_head", lang, n=total), ""]
     kb = []
     for u in rows:
         badges = []
@@ -3789,8 +3789,7 @@ async def _admin_users_view(offset: int) -> tuple[str, InlineKeyboardMarkup]:
         lines.append(f"{' '.join(badges) or '·'} {html.escape(who)}")
         kb.append([InlineKeyboardButton(f"{who}"[:40],
                                          callback_data=f"adm:usr:{u['user_id']}")])
-    lines += ["", "🧑 shaxsiy jurnal · 👑 guruh egasi · 👥 guruhga ulangan · "
-              "🎁 taklif qilgan · 🚫 botni bloklagan"]
+    lines += ["", i18n.t("adm.users_legend", lang)]
 
     nav = []
     if offset > 0:
@@ -3799,31 +3798,33 @@ async def _admin_users_view(offset: int) -> tuple[str, InlineKeyboardMarkup]:
         nav.append(InlineKeyboardButton("▶️", callback_data=f"adm:users:{offset + PER}"))
     if nav:
         kb.append(nav)
-    kb.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    kb.append([InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")])
     return "\n".join(lines), InlineKeyboardMarkup(kb)
 
 
-async def _admin_user_card(bot, uid: int, live: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_user_card(bot, uid: int, live: bool = False,
+                            lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     d = await db.admin_user_detail(uid)
     u = d["user"]
     if not u:
-        return "Topilmadi.", ADMIN_BACK_KB
+        return i18n.t("adm.not_found", lang), admin_back_kb(lang)
     who = _who(u["username"], u["first_name"], uid)
     t = [f"🙍 <b>{html.escape(who)}</b>", f"ID: <code>{uid}</code>", ""]
 
     personal = [w for w in d["owned"] if w["type"] == "personal"]
     groups = [w for w in d["owned"] if w["type"] == "group"]
-    t.append(f"Shaxsiy jurnal: {'bor 🧑' if personal else 'yo‘q'}")
+    yes_no = i18n.t("adm.u_yes" if personal else "adm.u_no", lang)
+    t.append(f"{i18n.t('adm.u_personal', lang)}: {yes_no}")
     if groups:
-        t.append("Egalik qiladigan guruhlar 👑:")
+        t.append(i18n.t("adm.u_owns", lang))
         for w in groups:
             t.append(f"  • {html.escape(w['name'])}" + (" 📦" if w["archived"] else ""))
     else:
-        t.append("Guruh egasi: yo‘q")
+        t.append(i18n.t("adm.u_owns_no", lang))
 
     if d["viewing"]:
         t.append("")
-        t.append("Ulangan yopiq guruhlar 👥:")
+        t.append(i18n.t("adm.u_joined", lang))
         for w in d["viewing"]:
             mark = ""
             if live:
@@ -3831,105 +3832,97 @@ async def _admin_user_card(bot, uid: int, live: bool = False) -> tuple[str, Inli
                 # bildiradi, hozir haqiqatan a'zomi yo'qmi Telegram aytadi.
                 try:
                     m = await bot.get_chat_member(w["group_chat_id"], uid)
-                    mark = " ✅" if m.status not in ("left", "kicked") else " 🚫 a'zo emas"
+                    mark = (" ✅" if m.status not in ("left", "kicked")
+                            else i18n.t("adm.u_not_member", lang))
                 except Exception:
-                    mark = " ❔ tekshirib bo'lmadi"
+                    mark = i18n.t("adm.u_uncheckable", lang)
             t.append(f"  • {html.escape(w['name'])}{mark}")
     else:
         t.append("")
-        t.append("Ulangan yopiq guruhlar: yo‘q")
+        t.append(i18n.t("adm.u_joined_no", lang))
 
-    t += ["", f"Taklif qilgan: <b>{d['invited']}</b> ta"]
+    t += ["", i18n.t("adm.u_invited", lang, n=d["invited"])]
     if d["invited_by"]:
-        t.append(f"Kim taklif qilgan: <code>{d['invited_by']}</code>")
-    t += [f"Birinchi: {u['first_seen']:%d.%m.%Y}",
-          f"Oxirgi faollik: {u['last_seen']:%d.%m.%Y %H:%M}"]
+        t.append(i18n.t("adm.u_invited_by", lang, id=d["invited_by"]))
+    t += [f"{i18n.t('adm.u_first', lang)}: {u['first_seen']:%d.%m.%Y}",
+          f"{i18n.t('adm.u_last', lang)}: {u['last_seen']:%d.%m.%Y %H:%M}"]
 
-    kb = [[InlineKeyboardButton("🔍 A'zolikni jonli tekshirish",
+    kb = [[InlineKeyboardButton(i18n.t("adm.btn_live_check", lang),
                                  callback_data=f"adm:usrchk:{uid}")]] if d["viewing"] else []
-    kb.append([InlineKeyboardButton("◀️ Foydalanuvchilar", callback_data="adm:users:0")])
+    kb.append([InlineKeyboardButton(i18n.t("adm.back_users", lang),
+                                     callback_data="adm:users:0")])
     return "\n".join(t), InlineKeyboardMarkup(kb)
 
 
 async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(update.effective_user.id):
         return
-    await update.message.reply_text("🛠 <b>Admin panel</b>", parse_mode=ParseMode.HTML,
-                                     reply_markup=admin_home_kb())
+    lang = await user_lang(update.effective_user.id)
+    await update.message.reply_text(i18n.t("adm.home", lang), parse_mode=ParseMode.HTML,
+                                     reply_markup=admin_home_kb(lang))
 
 
-async def _admin_stats_text() -> str:
+async def _admin_stats_text(lang: str | None = None) -> str:
     u = await db.user_stats()
     p = await db.platform_stats()
-    return (
-        "📊 <b>Statistika</b>\n\n"
-        "<b>Foydalanuvchilar</b>\n"
-        f"Jami: <b>{u['total']}</b>\n"
-        f"Yangi: {u['new_1d']} (24s)  •  {u['new_7d']} (7 kun)\n"
-        f"Faol: {u['act_1d']} (24s)  •  {u['act_7d']} (7 kun)\n\n"
-        "<b>Workspace'lar</b>\n"
-        f"Guruhlar: <b>{p['groups']}</b>  •  Shaxsiy: <b>{p['personals']}</b>\n"
-        f"Guruh kuzatuvchilari: {p['viewers']}\n"
-        f"Reytingda: {p['public_ok']} ta (so'rov: {p['public_req']})\n\n"
-        "<b>Signallar</b>\n"
-        f"Jami: <b>{p['signals_all']}</b>\n"
-        f"Ochiq: {p['signals_open']}  •  Yopilgan: {p['signals_closed']}"
-    )
+    return i18n.t(
+        "adm.stats", lang, u_total=u["total"], new1=u["new_1d"], new7=u["new_7d"],
+        act1=u["act_1d"], act7=u["act_7d"], groups=p["groups"],
+        personals=p["personals"], viewers=p["viewers"], pub_ok=p["public_ok"],
+        pub_req=p["public_req"], s_all=p["signals_all"], s_open=p["signals_open"],
+        s_closed=p["signals_closed"])
 
 
-async def _admin_refs_text() -> str:
+async def _admin_refs_text(lang: str | None = None) -> str:
     total, top = await db.referral_stats()
-    lines = ["🎁 <b>Referrallar</b>", "", f"Jami taklif qilinganlar: <b>{total}</b>", ""]
+    lines = [i18n.t("adm.refs_head", lang), "",
+             i18n.t("adm.refs_total", lang, n=total), ""]
     if not top:
-        lines.append("Hali hech kim taklif qilmagan.")
+        lines.append(i18n.t("adm.refs_none", lang))
     else:
-        lines.append("<b>Eng faol takliflovchilar:</b>")
+        lines.append(i18n.t("adm.refs_top", lang))
         for i, r in enumerate(top, 1):
             who = r["username"] and f"@{r['username']}" or (r["first_name"] or str(r["referrer_id"]))
-            lines.append(f"{i}. {html.escape(str(who))} — <b>{r['n']}</b> ta")
+            lines.append(f"{i}. {html.escape(str(who))} — <b>"
+                         + i18n.t("adm.refs_n", lang, n=r["n"]) + "</b>")
     return "\n".join(lines)
 
 
-async def _admin_channels_view() -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_channels_view(lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     chans = await db.list_required_channels()
     if chans:
-        lines = ["📢 <b>Majburiy obuna kanallari</b>", "",
-                 "Botga /start bosgan har bir foydalanuvchi shu kanallarga "
-                 "obuna bo'lishi shart (adminlar bundan mustasno).", ""]
+        lines = [i18n.t("adm.ch_head", lang), "", i18n.t("adm.ch_note", lang), ""]
         for ch in chans:
             name = ch["title"] or ch["username"] or str(ch["chat_id"])
             lines.append(f"• {html.escape(str(name))}")
     else:
-        lines = ["📢 <b>Majburiy obuna kanallari</b>", "",
-                 "Hozircha kanal yo'q — majburiy obuna <b>o'chirilgan</b>."]
+        lines = [i18n.t("adm.ch_head", lang), "", i18n.t("adm.ch_none", lang)]
     rows = [[InlineKeyboardButton(
         f"❌ {(ch['title'] or ch['username'] or ch['chat_id'])}"[:40],
         callback_data=f"adm:chdel:{ch['chat_id']}")] for ch in chans]
-    rows.append([InlineKeyboardButton("➕ Kanal qo'shish", callback_data="adm:chadd")])
-    rows.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    rows.append([InlineKeyboardButton(i18n.t("adm.ch_add_btn", lang),
+                                       callback_data="adm:chadd")])
+    rows.append([InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
-async def _admin_hashtags_view() -> tuple[str, InlineKeyboardMarkup]:
+async def _admin_hashtags_view(lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     """MarketTwits'da tikersiz ham "muhim" deb hisoblanadigan qo'shimcha
     #hashtag ro'yxati (masalan #geopolitika) — `_markettwits_symbol()`
     hech qanday tiker topmasa, shu ro'yxat orqali TEXT-ONLY post qilinadi
     (grafiksiz, chunki tiker yo'q)."""
     tags = await db.list_market_hashtags()
     if tags:
-        lines = ["📰 <b>MarketTwits — qo'shimcha #hashtaglar</b>", "",
-                 "Bu hashtaglardan biri postda bo'lsa — tiker topilmasa ham "
-                 "(matn-only) kanalga postlanadi.", ""]
+        lines = [i18n.t("adm.mth_head", lang), "", i18n.t("adm.mth_note", lang), ""]
         for t in tags:
             lines.append(f"• #{html.escape(t)}")
     else:
-        lines = ["📰 <b>MarketTwits — qo'shimcha #hashtaglar</b>", "",
-                 "Hozircha yo'q — faqat RESOLVE bo'ladigan tikerli postlar "
-                 "(masalan #BTC, #AAPL) o'tadi."]
+        lines = [i18n.t("adm.mth_head", lang), "", i18n.t("adm.mth_none", lang)]
     rows = [[InlineKeyboardButton(f"❌ #{t}"[:40], callback_data=f"adm:mthdel:{t}")]
             for t in tags]
-    rows.append([InlineKeyboardButton("➕ Hashtag qo'shish", callback_data="adm:mthadd")])
-    rows.append([InlineKeyboardButton("◀️ Admin panel", callback_data="adm:home")])
+    rows.append([InlineKeyboardButton(i18n.t("adm.mth_add_btn", lang),
+                                       callback_data="adm:mthadd")])
+    rows.append([InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -3938,16 +3931,18 @@ async def handle_hashtag_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
     ajratilgan, boshidagi # ixtiyoriy) alohida hashtag sifatida qo'shadi —
     bir martada bir nechtasini qo'shish uchun."""
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     raw = (msg.text or "").strip()
     tags = [t.lstrip("#").strip() for t in re.split(r"[,\s]+", raw) if t.strip("#, ")]
     if not tags:
-        await msg.reply_text("Hashtag topilmadi. Masalan: geopolitika, hisobot",
-                             reply_markup=ADMIN_BACK_KB)
+        await msg.reply_text(i18n.t("adm.mth_empty", lang),
+                             reply_markup=admin_back_kb(lang))
         return
     for t in tags:
         await db.add_market_hashtag(t.lower())
-    txt, kb = await _admin_hashtags_view()
-    await msg.reply_text(f"✅ Qo'shildi: {', '.join('#'+t for t in tags)}\n\n{txt}",
+    txt, kb = await _admin_hashtags_view(lang)
+    added = i18n.t("adm.mth_added", lang, tags=", ".join("#" + t for t in tags))
+    await msg.reply_text(f"{added}\n\n{txt}",
                          parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
@@ -3958,158 +3953,159 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await q.answer()
     action = q.data.split(":", 1)[1]
+    lang = await user_lang(q.from_user.id)
+    back = admin_back_kb(lang)
 
     if action == "home":
-        await q.edit_message_text("🛠 <b>Admin panel</b>", parse_mode=ParseMode.HTML,
-                                   reply_markup=admin_home_kb())
+        await q.edit_message_text(i18n.t("adm.home", lang), parse_mode=ParseMode.HTML,
+                                   reply_markup=admin_home_kb(lang))
     elif action == "stats":
-        await q.edit_message_text(await _admin_stats_text(), parse_mode=ParseMode.HTML,
-                                   reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(await _admin_stats_text(lang),
+                                   parse_mode=ParseMode.HTML, reply_markup=back)
     elif action == "refs":
-        await q.edit_message_text(await _admin_refs_text(), parse_mode=ParseMode.HTML,
-                                   reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(await _admin_refs_text(lang),
+                                   parse_mode=ParseMode.HTML, reply_markup=back)
     elif action == "ch":
-        txt, kb = await _admin_channels_view()
+        txt, kb = await _admin_channels_view(lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "chadd":
         AWAITING_CHANNEL[q.from_user.id] = True
-        await q.edit_message_text(
-            "➕ <b>Kanal qo'shish</b>\n\n"
-            "Kanal <code>@usernameni</code> yuboring, yoki o'sha kanaldan "
-            "istalgan postni shu yerga <b>forward</b> qiling.\n\n"
-            "⚠️ Bot o'sha kanalda <b>admin</b> bo'lishi shart — aks holda "
-            "obunani tekshirib bo'lmaydi.",
-            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(i18n.t("adm.ch_add", lang),
+                                   parse_mode=ParseMode.HTML, reply_markup=back)
     elif action.startswith("chdel:"):
         await db.remove_required_channel(int(action.split(":", 1)[1]))
         _sub_ok_until.clear()
-        txt, kb = await _admin_channels_view()
+        txt, kb = await _admin_channels_view(lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "mth":
-        txt, kb = await _admin_hashtags_view()
+        txt, kb = await _admin_hashtags_view(lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "mthadd":
         AWAITING_HASHTAG[q.from_user.id] = True
-        await q.edit_message_text(
-            "➕ <b>Hashtag qo'shish</b>\n\n"
-            "Bitta yoki bir nechta so'z yuboring (# bilan yoki #siz, "
-            "bo'shliq/vergul bilan ajratib) — masalan:\n"
-            "<code>geopolitika, hisobot, ETF</code>",
-            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(i18n.t("adm.mth_add", lang),
+                                   parse_mode=ParseMode.HTML, reply_markup=back)
     elif action.startswith("mthdel:"):
         await db.remove_market_hashtag(action.split(":", 1)[1])
-        txt, kb = await _admin_hashtags_view()
+        txt, kb = await _admin_hashtags_view(lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "pend":
         rows = await db.list_pending_public()
         if not rows:
-            await q.edit_message_text("🛡 Tasdiq kutayotgan guruh yo'q. ✅",
-                                       reply_markup=ADMIN_BACK_KB)
+            await q.edit_message_text(i18n.t("adm.pend_none", lang), reply_markup=back)
             return
-        await q.edit_message_text(f"🛡 Tasdiq kutmoqda: <b>{len(rows)}</b> ta",
-                                   parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(i18n.t("adm.pend_n", lang, n=len(rows)),
+                                   parse_mode=ParseMode.HTML, reply_markup=back)
         for ws in rows:
             await request_public_approval(ctx, ws["id"])
 
     # ── Guruhlar ──
     elif action == "groups":
-        await q.edit_message_text("👥 Guruhlar holati tekshirilmoqda…")
-        txt, kb = await _admin_groups_view(ctx.bot)
+        await q.edit_message_text(i18n.t("adm.checking_groups", lang))
+        txt, kb = await _admin_groups_view(ctx.bot, lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith("grp:"):
-        txt, kb = await _admin_group_card(ctx.bot, int(action.split(":", 1)[1]))
+        txt, kb = await _admin_group_card(ctx.bot, int(action.split(":", 1)[1]), lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith(("arch:", "unarch:")):
         wid = int(action.split(":", 1)[1])
         await db.set_archived(wid, action.startswith("arch:"))
-        txt, kb = await _admin_group_card(ctx.bot, wid)
+        txt, kb = await _admin_group_card(ctx.bot, wid, lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
     # ── Foydalanuvchilar ──
     elif action.startswith("users:"):
-        txt, kb = await _admin_users_view(int(action.split(":", 1)[1]))
+        txt, kb = await _admin_users_view(int(action.split(":", 1)[1]), lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith("usr:"):
-        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]))
+        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]), lang=lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith("usrchk:"):
-        await q.edit_message_text("🔍 A'zolik tekshirilmoqda…")
-        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]), live=True)
+        await q.edit_message_text(i18n.t("adm.checking_member", lang))
+        txt, kb = await _admin_user_card(ctx.bot, int(action.split(":", 1)[1]),
+                                          live=True, lang=lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
     # ── Broadcast ──
     elif action == "bc":
-        await _admin_broadcast_prompt(q)
+        await _admin_broadcast_prompt(q, lang)
     elif action == "bcgo":
         pend = PENDING_BROADCAST.pop(q.from_user.id, None)
         AWAITING_BROADCAST.pop(q.from_user.id, None)
         if not pend:
-            await q.edit_message_text("Yuboriladigan xabar topilmadi — qaytadan boshlang.",
-                                       reply_markup=ADMIN_BACK_KB)
+            await q.edit_message_text(i18n.t("adm.bc_lost", lang), reply_markup=back)
             return
         from_chat, msg_id = pend
         ctx.job_queue.run_once(
             run_broadcast, when=0,
             data={"admin": q.from_user.id, "from_chat": from_chat, "msg_id": msg_id})
-        await q.edit_message_text("📣 Yuborish boshlandi — tugagach hisobot keladi.",
-                                   reply_markup=ADMIN_BACK_KB)
+        await q.edit_message_text(i18n.t("adm.bc_started", lang), reply_markup=back)
 
     # ── PDF eksport ──
     elif action in ("pdfg", "pdfu"):
-        await q.message.reply_text("📄 Tayyorlanmoqda…")
+        await q.message.reply_text(i18n.t("adm.pdf_making", lang))
         if action == "pdfg":
-            buf, fname = await _admin_groups_pdf(ctx.bot)
+            buf, fname = await _admin_groups_pdf(ctx.bot, lang)
         else:
-            buf, fname = await _admin_users_pdf()
-        await q.message.reply_document(InputFile(buf, fname), reply_markup=ADMIN_BACK_KB)
+            buf, fname = await _admin_users_pdf(lang)
+        await q.message.reply_document(InputFile(buf, fname), reply_markup=back)
 
 
-async def _admin_groups_pdf(bot) -> tuple[io.BytesIO, str]:
+async def _admin_groups_pdf(bot, lang: str | None = None) -> tuple[io.BytesIO, str]:
     rows = await db.admin_list_groups()
-    header = f"{'Guruh':<26}{'Signal':>8}{'Yopilgan':>10}{'Kuzatuv':>9}  {'Holat':<16}"
+    header = (f"{i18n.t('adm.pdfg_col_group', lang):<26}"
+              f"{i18n.t('adm.pdfg_col_sig', lang):>8}"
+              f"{i18n.t('adm.pdfg_col_closed', lang):>10}"
+              f"{i18n.t('adm.pdfg_col_view', lang):>9}  "
+              f"{i18n.t('adm.pdfg_col_state', lang):<16}")
     lines = []
     n_bad = 0
+    state_key = {"✅": "adm.st_ok", "⚠️": "adm.st_notadmin",
+                 "🚫": "adm.st_kicked", "⚪": "adm.st_none"}
     for ws in rows:
         # Har guruh uchun BIR marta so'raladi — natija ham qatorga, ham
         # sarlavhadagi hisobga ishlatiladi (ikki marta chaqirilsa Telegram
         # so'rovlari bekorga ikki barobar bo'lardi).
-        icon, health = await group_health(bot, ws)
+        icon, health = await group_health(bot, ws, lang)
         if icon == "🚫":
             n_bad += 1
-        state = {"✅": "ishlayapti", "⚠️": "admin emas",
-                 "🚫": "chiqarilgan", "⚪": "biriktirilmagan"}.get(icon, health)
+        key = state_key.get(icon)
+        state = i18n.t(key, lang) if key else health
         if ws["archived"]:
-            state += " (arxiv)"
+            state += i18n.t("adm.st_archived", lang)
         col = stats.P_GREEN if icon == "✅" and not ws["archived"] else (
             stats.P_RED if icon == "🚫" else stats.P_TXT)
         lines.append((
             f"{ws['name'][:26]:<26}{ws['n_signals']:>8}{ws['n_closed']:>10}"
             f"{ws['n_viewers']:>9}  {state:<16}", col))
     buf = stats.pdf_table_report(
-        "Ulangan guruhlar", f"Jami {len(rows)} ta guruh · {n_bad} tasida muammo",
-        header, lines)
+        i18n.t("adm.pdfg_title", lang),
+        i18n.t("adm.pdfg_sub", lang, n=len(rows), bad=n_bad), header, lines)
     return buf, f"guruhlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
 
 
-async def _admin_users_pdf() -> tuple[io.BytesIO, str]:
+async def _admin_users_pdf(lang: str | None = None) -> tuple[io.BytesIO, str]:
     total = await db.count_users()
     rows = await db.admin_list_users(limit=10000, offset=0)
-    header = f"{'Foydalanuvchi':<24}{'ID':>12}  {'Rol':<20}{'Taklif':>7}  {'Oxirgi':<10}"
+    header = (f"{i18n.t('adm.pdfu_col_user', lang):<24}{'ID':>12}  "
+              f"{i18n.t('adm.pdfu_col_role', lang):<20}"
+              f"{i18n.t('adm.pdfu_col_inv', lang):>7}  "
+              f"{i18n.t('adm.pdfu_col_last', lang):<10}")
     lines = []
     for u in rows:
         roles = []
         if u["has_personal"]:
-            roles.append("shaxsiy")
+            roles.append(i18n.t("adm.role_personal", lang))
         if u["owned_groups"]:
-            roles.append(f"egasi×{u['owned_groups']}")
+            roles.append(i18n.t("adm.role_owner", lang, n=u["owned_groups"]))
         if u["viewer_links"]:
-            roles.append(f"a'zo×{u['viewer_links']}")
+            roles.append(i18n.t("adm.role_member", lang, n=u["viewer_links"]))
         who = _who(u["username"], u["first_name"], u["user_id"])
         lines.append((
             f"{who[:24]:<24}{u['user_id']:>12}  {', '.join(roles)[:20]:<20}"
             f"{u['invited']:>7}  {u['last_seen']:%d.%m.%y}", stats.P_TXT))
     buf = stats.pdf_table_report(
-        "Foydalanuvchilar", f"Jami {total} ta", header, lines)
+        i18n.t("adm.pdfu_title", lang), i18n.t("adm.pdfu_sub", lang, n=total),
+        header, lines)
     return buf, f"userlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
 
 
@@ -4121,18 +4117,13 @@ BROADCAST_PER_SEC = 20
 _BC_DELAY = 1.0 / BROADCAST_PER_SEC
 
 
-async def _admin_broadcast_prompt(q) -> None:
+async def _admin_broadcast_prompt(q, lang: str | None = None) -> None:
     AWAITING_BROADCAST[q.from_user.id] = True
     PENDING_BROADCAST.pop(q.from_user.id, None)
     n = len(await db.broadcast_targets())
     await q.edit_message_text(
-        "📣 <b>Broadcast</b>\n\n"
-        f"Xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n\n"
-        "Yubormoqchi bo'lgan xabaringizni shu yerga yuboring — matn, rasm, "
-        "video, nima bo'lsa ham. Qanday yuborsangiz, xuddi shundayligicha "
-        "yetkaziladi.\n\n"
-        "Bekor qilish uchun /bekor yozing.",
-        parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        i18n.t("adm.bc_prompt", lang, n=n),
+        parse_mode=ParseMode.HTML, reply_markup=admin_back_kb(lang))
 
 
 async def handle_broadcast_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4144,16 +4135,15 @@ async def handle_broadcast_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE)
     bo'lmaydi."""
     msg = update.effective_message
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     PENDING_BROADCAST[uid] = (msg.chat_id, msg.message_id)
     n = len(await db.broadcast_targets())
     await msg.reply_text(
-        f"⬆️ Shu xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n"
-        f"Taxminiy vaqt: ~{max(1, round(n * _BC_DELAY))} soniya.\n\n"
-        "Tasdiqlaysizmi?",
+        i18n.t("adm.bc_confirm", lang, n=n, sec=max(1, round(n * _BC_DELAY))),
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Ha, yuborilsin", callback_data="adm:bcgo")],
-            [InlineKeyboardButton("❌ Bekor qilish", callback_data="adm:home")],
+            [InlineKeyboardButton(i18n.t("adm.bc_yes", lang), callback_data="adm:bcgo")],
+            [InlineKeyboardButton(i18n.t("adm.bc_no", lang), callback_data="adm:home")],
         ]))
 
 
@@ -4190,14 +4180,12 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await asyncio.sleep(_BC_DELAY)
 
     try:
+        alang = await user_lang(admin_id)
         await ctx.bot.send_message(
             admin_id,
-            "📣 <b>Broadcast tugadi</b>\n\n"
-            f"✅ Yuborildi: <b>{sent}</b>\n"
-            f"🚫 Bloklaganlar: {blocked}\n"
-            f"⚠️ Xato: {failed}\n\n"
-            f"Jami: {len(targets)}",
-            parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+            i18n.t("adm.bc_done", alang, sent=sent, blocked=blocked, failed=failed,
+                   total=len(targets)),
+            parse_mode=ParseMode.HTML, reply_markup=admin_back_kb(alang))
     except Exception:
         log.exception("Broadcast hisoboti yuborilmadi")
 
@@ -4215,17 +4203,17 @@ async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         if raw:
             target = raw[0]
 
+    lang = await user_lang(update.effective_user.id)
     if not target:
-        await msg.reply_text("Kanalni aniqlab bo'lmadi. @username yuboring yoki "
-                             "kanaldan post forward qiling.", reply_markup=ADMIN_BACK_KB)
+        await msg.reply_text(i18n.t("adm.ch_unknown", lang),
+                             reply_markup=admin_back_kb(lang))
         return
 
     try:
         chat = await ctx.bot.get_chat(target)
     except Exception:
-        await msg.reply_text(
-            "❌ Kanal topilmadi. @username to'g'riligini va botning o'sha kanalda "
-            "admin ekanini tekshiring.", reply_markup=ADMIN_BACK_KB)
+        await msg.reply_text(i18n.t("adm.ch_notfound", lang),
+                             reply_markup=admin_back_kb(lang))
         return
 
     # Bot kanalda admin bo'lmasa obunani tekshirib bo'lmaydi va tekshiruv
@@ -4236,17 +4224,16 @@ async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         me = await ctx.bot.get_me()
         m = await ctx.bot.get_chat_member(chat.id, me.id)
         if m.status not in ("administrator", "creator"):
-            warn = ("\n\n⚠️ <b>Diqqat:</b> bot bu kanalda admin emas — obuna "
-                    "tekshiruvi ishlamaydi. Botni kanalga admin qilib qo'shing.")
+            warn = i18n.t("adm.ch_warn_notadmin", lang)
     except Exception:
-        warn = ("\n\n⚠️ <b>Diqqat:</b> botning kanaldagi holatini tekshirib "
-                "bo'lmadi. Bot kanalda admin ekaniga ishonch hosil qiling.")
+        warn = i18n.t("adm.ch_warn_unknown", lang)
 
     await db.add_required_channel(chat.id, chat.title, chat.username)
     _sub_ok_until.clear()
     await msg.reply_text(
-        f"✅ Qo'shildi: <b>{html.escape(chat.title or str(chat.id))}</b>{warn}",
-        parse_mode=ParseMode.HTML, reply_markup=ADMIN_BACK_KB)
+        i18n.t("adm.ch_added", lang,
+               name=html.escape(chat.title or str(chat.id))) + warn,
+        parse_mode=ParseMode.HTML, reply_markup=admin_back_kb(lang))
 
 
 async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4500,23 +4487,20 @@ async def cmd_ref_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if not is_admin(uid):
         return
+    lang = await user_lang(update.effective_user.id)
     if not ctx.args:
         cur = await db.get_setting("mexc_ref_url")
-        await update.message.reply_text(
-            f"Joriy MEXC referal havola: {html.escape(cur) if cur else '(belgilanmagan)'}\n\n"
-            "Belgilash: <code>/refhavola https://www.mexc.com/register?inviteCode=XXX</code>\n"
-            "Agar havolada <code>{symbol}</code> bo'lsa, u postdagi juftlik bilan "
-            "(masalan BTC_USDT) almashtiriladi.\n"
-            "O'chirish: <code>/refhavola off</code>",
-            parse_mode=ParseMode.HTML)
+        shown = html.escape(cur) if cur else i18n.t("adm.rl_unset", lang)
+        await update.message.reply_text(i18n.t("adm.rl_current", lang, cur=shown),
+                                         parse_mode=ParseMode.HTML)
         return
     arg = ctx.args[0]
     if arg.lower() == "off":
         await db.set_setting("mexc_ref_url", None)
-        await update.message.reply_text("🔒 Referal havola o'chirildi.")
+        await update.message.reply_text(i18n.t("adm.rl_off", lang))
         return
     await db.set_setting("mexc_ref_url", arg)
-    await update.message.reply_text(f"✅ Saqlandi:\n{html.escape(arg)}",
+    await update.message.reply_text(i18n.t("adm.rl_saved", lang, url=html.escape(arg)),
                                     parse_mode=ParseMode.HTML)
 
 
@@ -5969,27 +5953,27 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     Karta signal yopilganda o'zi keladi; bu buyruq eski savdolarni ham
     ulashish uchun (va yangi ko'rinishni sinab ko'rish uchun) kerak."""
     msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
     if not ctx.args or not ctx.args[0].lstrip("#").isdigit():
-        await msg.reply_text("Foydalanish: <code>/karta 142</code> — signal raqami.",
-                             parse_mode=ParseMode.HTML)
+        await msg.reply_text(i18n.t("adm.card_usage", lang), parse_mode=ParseMode.HTML)
         return
     sid = int(ctx.args[0].lstrip("#"))
     sig = await db.get_signal(sid)
     if not sig:
-        await msg.reply_text(f"#{sid} topilmadi.")
+        await msg.reply_text(i18n.t("adm.card_no_sig", lang, sid=sid))
         return
 
     ws = await db.get_workspace(sig["workspace_id"])
     # Karta savdo tafsilotlarini (kirish/chiqish narxi) ko'rsatadi — shuning
     # uchun uni FAQAT o'sha joyni boshqara oladigan odam yasay oladi.
     if not ws or not can_manage(update.effective_user.id, ws):
-        await msg.reply_text("Bu signal sizniki emas.")
+        await msg.reply_text(i18n.t("adm.card_not_yours", lang))
         return
     if sig["exit_price"] is None or sig["pnl_pct"] is None:
-        await msg.reply_text(f"#{sid} hali yopilmagan — karta yopilgandan keyin tayyor bo'ladi.")
+        await msg.reply_text(i18n.t("adm.card_open", lang, sid=sid))
         return
 
-    async with busy(ctx.bot, msg.chat_id, "🎨 Karta chizilyapti…"):
+    async with busy(ctx.bot, msg.chat_id, i18n.t("adm.card_drawing", lang)):
         try:
             # QR — buyruqni bergan odamning O'Z taklif havolasi: kartani
             # aynan u ulashadi, demak taklif ham unga yozilishi kerak.
@@ -5999,10 +5983,12 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Karta yasalmadi (#%s)", sid)
             img = None
     if not img:
-        await msg.reply_text("Kartani yasab bo'lmadi.")
+        await msg.reply_text(i18n.t("adm.card_failed", lang))
         return
-    await msg.reply_photo(InputFile(img, "natija.png"),
-                          caption=f"#{sid} {html.escape(sig['symbol'])} — ulashish uchun")
+    await msg.reply_photo(
+        InputFile(img, "natija.png"),
+        caption=i18n.t("adm.card_caption", lang, sid=sid,
+                       sym=html.escape(sig["symbol"])))
 
 
 async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6017,18 +6003,19 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if not is_admin(uid):
         return
+    lang = await user_lang(uid)
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /charttest TLM")
+        await update.message.reply_text(i18n.t("adm.ct_usage", lang))
         return
     if not config.NEWS_CHANNEL_ID:
-        await update.message.reply_text("NEWS_CHANNEL_ID sozlanmagan.")
+        await update.message.reply_text(i18n.t("adm.ct_no_channel", lang))
         return
 
     raw = ctx.args[0]
     symbol, market = await _resolve_news_symbol(raw)
     if not symbol:
         await update.message.reply_text(
-            f"Tiker topilmadi (kripto/aksiya/forex — hech birida): {html.escape(raw)}")
+            i18n.t("adm.ct_no_symbol", lang, sym=html.escape(raw)))
         return
 
     # Kripto 24/7 savdo qiladi — oxirgi 60 daqiqa yetarli. Aksiya/forex
@@ -6039,7 +6026,8 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     tf, before_ms = ("1m", 60 * 60_000) if market == "crypto" else ("1h", 4 * 86_400_000)
 
     now = datetime.now(timezone.utc)
-    await update.message.reply_text(f"⏳ {symbol} ({market}) — grafik chizilyapti...")
+    await update.message.reply_text(
+        i18n.t("adm.ct_drawing", lang, sym=symbol, market=market))
     try:
         rendered = await _news_render(symbol, market, now, tf=tf,
                                       before_ms=before_ms, label="Sinov")
@@ -6047,9 +6035,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("charttest render xato (%s)", symbol)
         rendered = None
     if rendered is None:
-        await update.message.reply_text(
-            "Grafik chizib bo'lmadi — bu tikerda so'nggi shamlar topilmadi "
-            "(bozor yopiq bo'lishi ham mumkin).")
+        await update.message.reply_text(i18n.t("adm.ct_failed", lang))
         return
     photo, live_pct = rendered
 
@@ -6067,13 +6053,11 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
     except (TimedOut, NetworkError):
         log.exception("charttest post qilinmadi — tarmoq (%s)", symbol)
-        await update.message.reply_text(
-            "⏱ Tarmoq vaqtincha javob bermadi (Telegram/Railway orasida uzilish). "
-            "Qayta urinib ko'ring: /charttest " + raw)
+        await update.message.reply_text(i18n.t("adm.ct_network", lang, sym=raw))
         return
     except Exception:
         log.exception("charttest post qilinmadi (%s)", symbol)
-        await update.message.reply_text("Kanalga postlab bo'lmadi (bot admin emasmi?).")
+        await update.message.reply_text(i18n.t("adm.ct_post_failed", lang))
         return
     if eid is not None:
         await db.set_news_message(
@@ -6092,60 +6076,59 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_tg_login(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(update.effective_user.id):
         return
+    lang = await user_lang(update.effective_user.id)
     if not tgsource.enabled():
-        await update.message.reply_text(
-            "TELETHON_API_ID/TELETHON_API_HASH sozlanmagan (Railway o'zgaruvchisi).")
+        await update.message.reply_text(i18n.t("adm.tg_no_keys", lang))
         return
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /tg_login +998901234567")
+        await update.message.reply_text(i18n.t("adm.tg_login_usage", lang))
         return
     phone = ctx.args[0]
     try:
         await tgsource.login_send_code(phone)
     except Exception:
         log.exception("Telethon kod so'ralmadi")
-        await update.message.reply_text("Kod so'rashda xato — loglarni tekshiring.")
+        await update.message.reply_text(i18n.t("adm.tg_code_err", lang))
         return
-    await update.message.reply_text(
-        "Kod yuborildi, Telegram ilovangizni tekshiring. Keyin: /tg_code 12345")
+    await update.message.reply_text(i18n.t("adm.tg_code_sent", lang))
 
 
 async def cmd_tg_code(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(update.effective_user.id):
         return
+    lang = await user_lang(update.effective_user.id)
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /tg_code 12345")
+        await update.message.reply_text(i18n.t("adm.tg_code_usage", lang))
         return
     try:
         result = await tgsource.login_submit_code(ctx.args[0])
     except Exception:
         log.exception("Telethon kod tasdiqlanmadi")
-        await update.message.reply_text(
-            "Kod xato yoki muddati tugagan — /tg_login bilan qayta boshlang.")
+        await update.message.reply_text(i18n.t("adm.tg_code_bad", lang))
         return
     if result == "need_password":
-        await update.message.reply_text(
-            "Akkauntda 2FA parol bor. Yuboring: /tg_password <parol>")
+        await update.message.reply_text(i18n.t("adm.tg_need_pw", lang))
         return
     await _start_markettwits_listener(ctx.bot)
-    await update.message.reply_text("✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.")
+    await update.message.reply_text(i18n.t("adm.tg_ok", lang))
 
 
 async def cmd_tg_password(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_admin(update.effective_user.id):
         return
+    lang = await user_lang(update.effective_user.id)
     if not ctx.args:
-        await update.message.reply_text("Foydalanish: /tg_password <parol>")
+        await update.message.reply_text(i18n.t("adm.tg_pw_usage", lang))
         return
     password = " ".join(ctx.args)
     try:
         await tgsource.login_submit_password(password)
     except Exception:
         log.exception("Telethon parol tasdiqlanmadi")
-        await update.message.reply_text("Parol xato — qayta urinib ko'ring.")
+        await update.message.reply_text(i18n.t("adm.tg_pw_bad", lang))
         return
     await _start_markettwits_listener(ctx.bot)
-    await update.message.reply_text("✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.")
+    await update.message.reply_text(i18n.t("adm.tg_ok", lang))
 
 
 async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6156,21 +6139,16 @@ async def cmd_tg_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     bo'ladigan #hashtag bo'lishi shart (masalan #BTC, #SUI, #AAPL)."""
     if not is_admin(update.effective_user.id):
         return
+    lang = await user_lang(update.effective_user.id)
     text = " ".join(ctx.args) if ctx.args else ""
     if not text:
-        await update.message.reply_text(
-            "Foydalanish: /tg_test <matn>\n"
-            "Matnda tanish #hashtag bo'lsin, masalan:\n"
-            "/tg_test #BTC ETF arizasi tasdiqlandi")
+        await update.message.reply_text(i18n.t("adm.tgt_usage", lang))
         return
-    await update.message.reply_text("Tekshirilmoqda…")
+    await update.message.reply_text(i18n.t("adm.tgt_running", lang))
     fake_msg_id = int(datetime.now(timezone.utc).timestamp())
     await _process_markettwits_message(
         ctx.bot, "sinov", fake_msg_id, text, datetime.now(timezone.utc))
-    await update.message.reply_text(
-        "Tayyor. Matndagi #hashtaglardan biri tanish tikerga to'g'ri kelsa — "
-        "kanalga postlangan bo'lishi kerak; hech biri topilmasa — hech narsa "
-        "chiqmaydi (bu normal, filtr shunday ishlaydi).")
+    await update.message.reply_text(i18n.t("adm.tgt_done", lang))
 
 
 # ─────────────────────────── Ishga tushirish ───────────────────────────

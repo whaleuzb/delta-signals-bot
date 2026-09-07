@@ -1851,6 +1851,696 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "The data is read live from the database",
     },
 
+    # --- Admin panel (faqat super-adminlar ko'radi) ---
+    "adm.home": {
+        "uz": "🛠 <b>Admin panel</b>", "ru": "🛠 <b>Админ-панель</b>",
+        "en": "🛠 <b>Admin panel</b>",
+    },
+    "adm.back": {
+        "uz": "◀️ Admin panel", "ru": "◀️ Админ-панель", "en": "◀️ Admin panel",
+    },
+    "adm.btn_stats": {"uz": "📊 Statistika", "ru": "📊 Статистика", "en": "📊 Stats"},
+    "adm.btn_refs": {"uz": "🎁 Referrallar", "ru": "🎁 Рефералы", "en": "🎁 Referrals"},
+    "adm.btn_groups": {"uz": "👥 Guruhlar", "ru": "👥 Группы", "en": "👥 Groups"},
+    "adm.btn_users": {
+        "uz": "🙍 Foydalanuvchilar", "ru": "🙍 Пользователи", "en": "🙍 Users",
+    },
+    "adm.btn_channels": {
+        "uz": "📢 Majburiy obuna", "ru": "📢 Обязательная подписка",
+        "en": "📢 Required subscription",
+    },
+    "adm.btn_pending": {
+        "uz": "🛡 Tasdiqlar", "ru": "🛡 Заявки", "en": "🛡 Approvals",
+    },
+    "adm.btn_hashtags": {
+        "uz": "📰 MarketTwits hashtaglar", "ru": "📰 Хэштеги MarketTwits",
+        "en": "📰 MarketTwits hashtags",
+    },
+    "adm.btn_broadcast": {
+        "uz": "📣 Broadcast", "ru": "📣 Рассылка", "en": "📣 Broadcast",
+    },
+    "adm.btn_pdf_groups": {
+        "uz": "📄 Guruhlar PDF", "ru": "📄 PDF по группам", "en": "📄 Groups PDF",
+    },
+    "adm.btn_pdf_users": {
+        "uz": "📄 Userlar PDF", "ru": "📄 PDF по юзерам", "en": "📄 Users PDF",
+    },
+    "adm.not_found": {"uz": "Topilmadi.", "ru": "Не найдено.", "en": "Not found."},
+
+    # guruh holati
+    "adm.h_no_group": {
+        "uz": "guruh biriktirilmagan", "ru": "группа не привязана",
+        "en": "no group attached",
+    },
+    "adm.h_unreachable": {
+        "uz": "bog'lanib bo'lmadi ({err})", "ru": "не удалось связаться ({err})",
+        "en": "could not reach it ({err})",
+    },
+    "adm.h_kicked": {
+        "uz": "bot guruhdan chiqarilgan", "ru": "бот удалён из группы",
+        "en": "the bot was removed from the group",
+    },
+    "adm.h_not_admin": {
+        "uz": "bot admin emas — post/reply ishlamaydi",
+        "ru": "бот не админ — посты и ответы не работают",
+        "en": "the bot is not an admin — posting and replies do not work",
+    },
+    "adm.h_ok_n": {
+        "uz": "admin • {n} a'zo", "ru": "админ • {n} участн.", "en": "admin • {n} members",
+    },
+    "adm.h_ok": {"uz": "admin", "ru": "админ", "en": "admin"},
+
+    # guruhlar ro'yxati / kartasi
+    "adm.groups_none": {
+        "uz": "👥 Hali birorta guruh ulanmagan.", "ru": "👥 Пока не подключена ни одна группа.",
+        "en": "👥 No group is connected yet.",
+    },
+    "adm.groups_head": {
+        "uz": "👥 <b>Ulangan guruhlar</b>", "ru": "👥 <b>Подключённые группы</b>",
+        "en": "👥 <b>Connected groups</b>",
+    },
+    "adm.groups_row": {
+        "uz": "{n_sig} signal, {n_view} kuzatuvchi",
+        "ru": "{n_sig} сигналов, {n_view} наблюдателей",
+        "en": "{n_sig} signals, {n_view} watchers",
+    },
+    "adm.groups_legend": {
+        "uz": "✅ ishlayapti · ⚠️ admin emas · 🚫 chiqarilgan · 📦 arxivlangan",
+        "ru": "✅ работает · ⚠️ не админ · 🚫 удалён · 📦 в архиве",
+        "en": "✅ working · ⚠️ not admin · 🚫 removed · 📦 archived",
+    },
+    "adm.pub_ranked": {
+        "uz": "✅ reytingda", "ru": "✅ в рейтинге", "en": "✅ in the ranking",
+    },
+    "adm.pub_waiting": {
+        "uz": "⏳ tasdiq kutmoqda", "ru": "⏳ ждёт одобрения", "en": "⏳ awaiting approval",
+    },
+    "adm.pub_hidden": {"uz": "🔒 yashirin", "ru": "🔒 скрыта", "en": "🔒 hidden"},
+    "adm.card_state": {"uz": "Holat", "ru": "Состояние", "en": "State"},
+    "adm.card_owner": {"uz": "Egasi", "ru": "Владелец", "en": "Owner"},
+    "adm.card_signals": {"uz": "Signallar", "ru": "Сигналов", "en": "Signals"},
+    "adm.card_closed_n": {"uz": "yopilgan {n}", "ru": "закрыто {n}", "en": "{n} closed"},
+    "adm.card_viewers": {"uz": "Kuzatuvchilar", "ru": "Наблюдатели", "en": "Watchers"},
+    "adm.card_deposit": {"uz": "Depozit", "ru": "Депозит", "en": "Deposit"},
+    "adm.card_ranking": {"uz": "Reyting", "ru": "Рейтинг", "en": "Ranking"},
+    "adm.card_created": {"uz": "Ochilgan", "ru": "Создана", "en": "Created"},
+    "adm.card_archived": {
+        "uz": "📦 <b>Arxivlangan</b> — reytingda va tanlovda ko'rinmaydi.",
+        "ru": "📦 <b>В архиве</b> — не видна в рейтинге и в выборе.",
+        "en": "📦 <b>Archived</b> — hidden from the ranking and the switcher.",
+    },
+    "adm.btn_unarchive": {
+        "uz": "♻️ Arxivdan chiqarish", "ru": "♻️ Вернуть из архива",
+        "en": "♻️ Unarchive",
+    },
+    "adm.btn_archive": {
+        "uz": "📦 Arxivlash", "ru": "📦 В архив", "en": "📦 Archive",
+    },
+    "adm.btn_recheck": {
+        "uz": "🔄 Holatni tekshirish", "ru": "🔄 Проверить состояние",
+        "en": "🔄 Re-check the state",
+    },
+    "adm.back_groups": {
+        "uz": "◀️ Guruhlar", "ru": "◀️ Группы", "en": "◀️ Groups",
+    },
+    "adm.checking_groups": {
+        "uz": "👥 Guruhlar holati tekshirilmoqda…", "ru": "👥 Проверяю состояние групп…",
+        "en": "👥 Checking the groups…",
+    },
+
+    # foydalanuvchilar
+    "adm.users_head": {
+        "uz": "🙍 <b>Foydalanuvchilar</b> — jami {n} ta",
+        "ru": "🙍 <b>Пользователи</b> — всего {n}",
+        "en": "🙍 <b>Users</b> — {n} in total",
+    },
+    "adm.users_legend": {
+        "uz": ("🧑 shaxsiy jurnal · 👑 guruh egasi · 👥 guruhga ulangan · "
+               "🎁 taklif qilgan · 🚫 botni bloklagan"),
+        "ru": ("🧑 личный журнал · 👑 владелец группы · 👥 подключён к группе · "
+               "🎁 приглашал · 🚫 заблокировал бота"),
+        "en": ("🧑 personal journal · 👑 group owner · 👥 joined a group · "
+               "🎁 invited others · 🚫 blocked the bot"),
+    },
+    "adm.back_users": {
+        "uz": "◀️ Foydalanuvchilar", "ru": "◀️ Пользователи", "en": "◀️ Users",
+    },
+    "adm.u_personal": {
+        "uz": "Shaxsiy jurnal", "ru": "Личный журнал", "en": "Personal journal",
+    },
+    "adm.u_yes": {"uz": "bor 🧑", "ru": "есть 🧑", "en": "yes 🧑"},
+    "adm.u_no": {"uz": "yo'q", "ru": "нет", "en": "no"},
+    "adm.u_owns": {
+        "uz": "Egalik qiladigan guruhlar 👑:", "ru": "Группы во владении 👑:",
+        "en": "Groups they own 👑:",
+    },
+    "adm.u_owns_no": {
+        "uz": "Guruh egasi: yo'q", "ru": "Владелец группы: нет", "en": "Group owner: no",
+    },
+    "adm.u_joined": {
+        "uz": "Ulangan yopiq guruhlar 👥:", "ru": "Подключённые закрытые группы 👥:",
+        "en": "Private groups joined 👥:",
+    },
+    "adm.u_joined_no": {
+        "uz": "Ulangan yopiq guruhlar: yo'q",
+        "ru": "Подключённые закрытые группы: нет",
+        "en": "Private groups joined: none",
+    },
+    "adm.u_not_member": {
+        "uz": " 🚫 a'zo emas", "ru": " 🚫 не участник", "en": " 🚫 not a member",
+    },
+    "adm.u_uncheckable": {
+        "uz": " ❔ tekshirib bo'lmadi", "ru": " ❔ проверить не удалось",
+        "en": " ❔ could not check",
+    },
+    "adm.u_invited": {
+        "uz": "Taklif qilgan: <b>{n}</b> ta", "ru": "Пригласил: <b>{n}</b>",
+        "en": "Invited: <b>{n}</b>",
+    },
+    "adm.u_invited_by": {
+        "uz": "Kim taklif qilgan: <code>{id}</code>",
+        "ru": "Кто пригласил: <code>{id}</code>",
+        "en": "Invited by: <code>{id}</code>",
+    },
+    "adm.u_first": {"uz": "Birinchi", "ru": "Первый раз", "en": "First seen"},
+    "adm.u_last": {"uz": "Oxirgi faollik", "ru": "Последняя активность", "en": "Last seen"},
+    "adm.btn_live_check": {
+        "uz": "🔍 A'zolikni jonli tekshirish", "ru": "🔍 Проверить членство вживую",
+        "en": "🔍 Check membership live",
+    },
+    "adm.checking_member": {
+        "uz": "🔍 A'zolik tekshirilmoqda…", "ru": "🔍 Проверяю членство…",
+        "en": "🔍 Checking membership…",
+    },
+
+    # statistika
+    "adm.stats": {
+        "uz": ("📊 <b>Statistika</b>\n\n<b>Foydalanuvchilar</b>\n"
+               "Jami: <b>{u_total}</b>\n"
+               "Yangi: {new1} (24s)  •  {new7} (7 kun)\n"
+               "Faol: {act1} (24s)  •  {act7} (7 kun)\n\n"
+               "<b>Workspace'lar</b>\n"
+               "Guruhlar: <b>{groups}</b>  •  Shaxsiy: <b>{personals}</b>\n"
+               "Guruh kuzatuvchilari: {viewers}\n"
+               "Reytingda: {pub_ok} ta (so'rov: {pub_req})\n\n"
+               "<b>Signallar</b>\nJami: <b>{s_all}</b>\n"
+               "Ochiq: {s_open}  •  Yopilgan: {s_closed}"),
+        "ru": ("📊 <b>Статистика</b>\n\n<b>Пользователи</b>\n"
+               "Всего: <b>{u_total}</b>\n"
+               "Новых: {new1} (24ч)  •  {new7} (7 дней)\n"
+               "Активных: {act1} (24ч)  •  {act7} (7 дней)\n\n"
+               "<b>Рабочие пространства</b>\n"
+               "Групп: <b>{groups}</b>  •  Личных: <b>{personals}</b>\n"
+               "Наблюдателей групп: {viewers}\n"
+               "В рейтинге: {pub_ok} (заявок: {pub_req})\n\n"
+               "<b>Сигналы</b>\nВсего: <b>{s_all}</b>\n"
+               "Открытых: {s_open}  •  Закрытых: {s_closed}"),
+        "en": ("📊 <b>Stats</b>\n\n<b>Users</b>\n"
+               "Total: <b>{u_total}</b>\n"
+               "New: {new1} (24h)  •  {new7} (7 days)\n"
+               "Active: {act1} (24h)  •  {act7} (7 days)\n\n"
+               "<b>Workspaces</b>\n"
+               "Groups: <b>{groups}</b>  •  Personal: <b>{personals}</b>\n"
+               "Group watchers: {viewers}\n"
+               "In the ranking: {pub_ok} (requests: {pub_req})\n\n"
+               "<b>Signals</b>\nTotal: <b>{s_all}</b>\n"
+               "Open: {s_open}  •  Closed: {s_closed}"),
+    },
+    "adm.refs_head": {
+        "uz": "🎁 <b>Referrallar</b>", "ru": "🎁 <b>Рефералы</b>", "en": "🎁 <b>Referrals</b>",
+    },
+    "adm.refs_total": {
+        "uz": "Jami taklif qilinganlar: <b>{n}</b>", "ru": "Всего приглашено: <b>{n}</b>",
+        "en": "Invited in total: <b>{n}</b>",
+    },
+    "adm.refs_none": {
+        "uz": "Hali hech kim taklif qilmagan.", "ru": "Пока никто никого не пригласил.",
+        "en": "Nobody has invited anyone yet.",
+    },
+    "adm.refs_top": {
+        "uz": "<b>Eng faol takliflovchilar:</b>", "ru": "<b>Самые активные пригласившие:</b>",
+        "en": "<b>Most active inviters:</b>",
+    },
+    "adm.refs_n": {"uz": "{n} ta", "ru": "{n}", "en": "{n}"},
+
+    # majburiy obuna
+    "adm.ch_head": {
+        "uz": "📢 <b>Majburiy obuna kanallari</b>",
+        "ru": "📢 <b>Каналы обязательной подписки</b>",
+        "en": "📢 <b>Required subscription channels</b>",
+    },
+    "adm.ch_note": {
+        "uz": ("Botga /start bosgan har bir foydalanuvchi shu kanallarga obuna "
+               "bo'lishi shart (adminlar bundan mustasno)."),
+        "ru": ("Каждый, кто нажал /start, должен быть подписан на эти каналы "
+               "(кроме админов)."),
+        "en": ("Everyone who presses /start must be subscribed to these channels "
+               "(admins excepted)."),
+    },
+    "adm.ch_none": {
+        "uz": "Hozircha kanal yo'q — majburiy obuna <b>o'chirilgan</b>.",
+        "ru": "Каналов пока нет — обязательная подписка <b>выключена</b>.",
+        "en": "No channels yet — the required subscription is <b>off</b>.",
+    },
+    "adm.ch_add_btn": {
+        "uz": "➕ Kanal qo'shish", "ru": "➕ Добавить канал", "en": "➕ Add a channel",
+    },
+    "adm.ch_add": {
+        "uz": ("➕ <b>Kanal qo'shish</b>\n\n"
+               "Kanal <code>@usernameni</code> yuboring, yoki o'sha kanaldan "
+               "istalgan postni shu yerga <b>forward</b> qiling.\n\n"
+               "⚠️ Bot o'sha kanalda <b>admin</b> bo'lishi shart — aks holda "
+               "obunani tekshirib bo'lmaydi."),
+        "ru": ("➕ <b>Добавление канала</b>\n\n"
+               "Пришлите <code>@username</code> канала или <b>перешлите</b> сюда "
+               "любой пост из него.\n\n"
+               "⚠️ Бот должен быть <b>админом</b> в этом канале — иначе подписку "
+               "не проверить."),
+        "en": ("➕ <b>Add a channel</b>\n\n"
+               "Send the channel's <code>@username</code>, or <b>forward</b> any "
+               "post from it here.\n\n"
+               "⚠️ The bot must be an <b>admin</b> in that channel — otherwise the "
+               "subscription cannot be checked."),
+    },
+
+    # hashtaglar
+    "adm.mth_head": {
+        "uz": "📰 <b>MarketTwits — qo'shimcha #hashtaglar</b>",
+        "ru": "📰 <b>MarketTwits — дополнительные #хэштеги</b>",
+        "en": "📰 <b>MarketTwits — extra #hashtags</b>",
+    },
+    "adm.mth_note": {
+        "uz": ("Bu hashtaglardan biri postda bo'lsa — tiker topilmasa ham "
+               "(matn-only) kanalga postlanadi."),
+        "ru": ("Если в посте есть один из этих хэштегов — он уйдёт в канал даже "
+               "без тикера (только текстом)."),
+        "en": ("If a post carries one of these hashtags, it goes to the channel "
+               "even with no ticker (text only)."),
+    },
+    "adm.mth_none": {
+        "uz": ("Hozircha yo'q — faqat RESOLVE bo'ladigan tikerli postlar "
+               "(masalan #BTC, #AAPL) o'tadi."),
+        "ru": ("Пока пусто — проходят только посты с распознаваемым тикером "
+               "(например #BTC, #AAPL)."),
+        "en": ("Empty for now — only posts with a resolvable ticker (for example "
+               "#BTC, #AAPL) pass."),
+    },
+    "adm.mth_add_btn": {
+        "uz": "➕ Hashtag qo'shish", "ru": "➕ Добавить хэштег", "en": "➕ Add a hashtag",
+    },
+    "adm.mth_add": {
+        "uz": ("➕ <b>Hashtag qo'shish</b>\n\n"
+               "Bitta yoki bir nechta so'z yuboring (# bilan yoki #siz, "
+               "bo'shliq/vergul bilan ajratib) — masalan:\n"
+               "<code>geopolitika, hisobot, ETF</code>"),
+        "ru": ("➕ <b>Добавление хэштега</b>\n\n"
+               "Пришлите одно или несколько слов (с # или без, через пробел или "
+               "запятую) — например:\n<code>геополитика, отчёт, ETF</code>"),
+        "en": ("➕ <b>Add a hashtag</b>\n\n"
+               "Send one or several words (with or without #, separated by spaces "
+               "or commas) — for example:\n<code>geopolitics, earnings, ETF</code>"),
+    },
+    "adm.mth_empty": {
+        "uz": "Hashtag topilmadi. Masalan: geopolitika, hisobot",
+        "ru": "Хэштег не найден. Например: геополитика, отчёт",
+        "en": "No hashtag found. For example: geopolitics, earnings",
+    },
+    "adm.mth_added": {
+        "uz": "✅ Qo'shildi: {tags}", "ru": "✅ Добавлено: {tags}", "en": "✅ Added: {tags}",
+    },
+
+    # tasdiqlar
+    "adm.pend_none": {
+        "uz": "🛡 Tasdiq kutayotgan guruh yo'q. ✅",
+        "ru": "🛡 Групп, ждущих одобрения, нет. ✅",
+        "en": "🛡 No group is waiting for approval. ✅",
+    },
+    "adm.pend_n": {
+        "uz": "🛡 Tasdiq kutmoqda: <b>{n}</b> ta",
+        "ru": "🛡 Ждут одобрения: <b>{n}</b>",
+        "en": "🛡 Waiting for approval: <b>{n}</b>",
+    },
+
+    # --- Broadcast, PDF, kanal qo'shish ---
+    "adm.bc_prompt": {
+        "uz": ("📣 <b>Broadcast</b>\n\nXabar <b>{n}</b> ta foydalanuvchiga "
+               "yuboriladi.\n\nYubormoqchi bo'lgan xabaringizni shu yerga yuboring "
+               "— matn, rasm, video, nima bo'lsa ham. Qanday yuborsangiz, xuddi "
+               "shundayligicha yetkaziladi.\n\nBekor qilish uchun /bekor yozing."),
+        "ru": ("📣 <b>Рассылка</b>\n\nСообщение уйдёт <b>{n}</b> "
+               "пользователям.\n\nПришлите сюда то, что хотите разослать — текст, "
+               "картинку, видео, что угодно. Доставится ровно в том же виде.\n\n"
+               "Для отмены напишите /bekor."),
+        "en": ("📣 <b>Broadcast</b>\n\nThe message goes to <b>{n}</b> users.\n\n"
+               "Send here whatever you want to broadcast — text, an image, a video, "
+               "anything. It is delivered exactly as you sent it.\n\n"
+               "Send /bekor to cancel."),
+    },
+    "adm.bc_confirm": {
+        "uz": ("⬆️ Shu xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n"
+               "Taxminiy vaqt: ~{sec} soniya.\n\nTasdiqlaysizmi?"),
+        "ru": ("⬆️ Это сообщение уйдёт <b>{n}</b> пользователям.\n"
+               "Примерное время: ~{sec} секунд.\n\nПодтверждаете?"),
+        "en": ("⬆️ This message goes to <b>{n}</b> users.\n"
+               "Estimated time: ~{sec} seconds.\n\nConfirm?"),
+    },
+    "adm.bc_yes": {
+        "uz": "✅ Ha, yuborilsin", "ru": "✅ Да, отправить", "en": "✅ Yes, send it",
+    },
+    "adm.bc_no": {
+        "uz": "❌ Bekor qilish", "ru": "❌ Отменить", "en": "❌ Cancel",
+    },
+    "adm.bc_lost": {
+        "uz": "Yuboriladigan xabar topilmadi — qaytadan boshlang.",
+        "ru": "Сообщение для рассылки не найдено — начните заново.",
+        "en": "The message to broadcast was not found — start again.",
+    },
+    "adm.bc_started": {
+        "uz": "📣 Yuborish boshlandi — tugagach hisobot keladi.",
+        "ru": "📣 Рассылка началась — по завершении придёт отчёт.",
+        "en": "📣 The broadcast started — a report arrives when it finishes.",
+    },
+    "adm.bc_done": {
+        "uz": ("📣 <b>Broadcast tugadi</b>\n\n✅ Yuborildi: <b>{sent}</b>\n"
+               "🚫 Bloklaganlar: {blocked}\n⚠️ Xato: {failed}\n\nJami: {total}"),
+        "ru": ("📣 <b>Рассылка завершена</b>\n\n✅ Отправлено: <b>{sent}</b>\n"
+               "🚫 Заблокировали: {blocked}\n⚠️ Ошибок: {failed}\n\nВсего: {total}"),
+        "en": ("📣 <b>Broadcast finished</b>\n\n✅ Sent: <b>{sent}</b>\n"
+               "🚫 Blocked the bot: {blocked}\n⚠️ Errors: {failed}\n\nTotal: {total}"),
+    },
+    "adm.pdf_making": {
+        "uz": "📄 Tayyorlanmoqda…", "ru": "📄 Готовлю…", "en": "📄 Preparing…",
+    },
+
+    # --- Kanal qo'shish, /tuzat, /qaytar, /pending ---
+    "adm.ch_unknown": {
+        "uz": "Kanalni aniqlab bo'lmadi. @username yuboring yoki kanaldan post forward qiling.",
+        "ru": "Не удалось определить канал. Пришлите @username или перешлите пост из канала.",
+        "en": "Could not identify the channel. Send its @username or forward a post from it.",
+    },
+    "adm.ch_notfound": {
+        "uz": ("❌ Kanal topilmadi. @username to'g'riligini va botning o'sha kanalda "
+               "admin ekanini tekshiring."),
+        "ru": ("❌ Канал не найден. Проверьте @username и то, что бот админ в этом "
+               "канале."),
+        "en": ("❌ Channel not found. Check the @username and that the bot is an admin "
+               "there."),
+    },
+    "adm.ch_warn_notadmin": {
+        "uz": ("\n\n⚠️ <b>Diqqat:</b> bot bu kanalda admin emas — obuna tekshiruvi "
+               "ishlamaydi. Botni kanalga admin qilib qo'shing."),
+        "ru": ("\n\n⚠️ <b>Внимание:</b> бот не админ в этом канале — проверка "
+               "подписки работать не будет. Сделайте бота админом."),
+        "en": ("\n\n⚠️ <b>Note:</b> the bot is not an admin in this channel — the "
+               "subscription check will not work. Make the bot an admin there."),
+    },
+    "adm.ch_warn_unknown": {
+        "uz": ("\n\n⚠️ <b>Diqqat:</b> botning kanaldagi holatini tekshirib bo'lmadi. "
+               "Bot kanalda admin ekaniga ishonch hosil qiling."),
+        "ru": ("\n\n⚠️ <b>Внимание:</b> не удалось проверить статус бота в канале. "
+               "Убедитесь, что бот там админ."),
+        "en": ("\n\n⚠️ <b>Note:</b> the bot's status in the channel could not be "
+               "checked. Make sure it is an admin there."),
+    },
+    "adm.ch_added": {
+        "uz": "✅ Qo'shildi: <b>{name}</b>", "ru": "✅ Добавлен: <b>{name}</b>",
+        "en": "✅ Added: <b>{name}</b>",
+    },
+    "adm.fix_head": {
+        "uz": "🛠 <b>Signallarni tuzatish</b> — {name}",
+        "ru": "🛠 <b>Правка сигналов</b> — {name}",
+        "en": "🛠 <b>Fixing signals</b> — {name}",
+    },
+    "adm.fix_last_n": {
+        "uz": "Oxirgi {n} ta", "ru": "Последние {n}", "en": "Last {n}",
+    },
+    "adm.fix_off_n": {
+        "uz": " · {n} tasi hisobdan chiqarilgan", "ru": " · {n} исключено из статистики",
+        "en": " · {n} excluded from the stats",
+    },
+    "adm.fix_note": {
+        "uz": ("Tugmani bosing — signal statistikadan olib tashlanadi. Qayta bossangiz "
+               "qaytariladi. Hech narsa o'chirilmaydi."),
+        "ru": ("Нажмите кнопку — сигнал уйдёт из статистики. Нажмёте ещё раз — "
+               "вернётся. Ничего не удаляется."),
+        "en": ("Press a button — the signal leaves the stats. Press again and it comes "
+               "back. Nothing is deleted."),
+    },
+    "adm.fix_none": {
+        "uz": "Signal topilmadi{what}.", "ru": "Сигналы не найдены{what}.",
+        "en": "No signal found{what}.",
+    },
+    "adm.fix_by": {
+        "uz": " <code>{sym}</code> bo'yicha", "ru": " по <code>{sym}</code>",
+        "en": " for <code>{sym}</code>",
+    },
+    "adm.fix_btn_off": {
+        "uz": "🚫 chiqarish", "ru": "🚫 исключить", "en": "🚫 exclude",
+    },
+    "adm.fix_btn_on": {
+        "uz": "↩️ qaytarish", "ru": "↩️ вернуть", "en": "↩️ restore",
+    },
+    "adm.fix_done_off": {
+        "uz": "Hisobdan chiqarildi.", "ru": "Исключено из статистики.",
+        "en": "Excluded from the stats.",
+    },
+    "adm.fix_done_on": {
+        "uz": "Qaytarildi.", "ru": "Возвращено.", "en": "Restored.",
+    },
+    "adm.ws_not_found": {
+        "uz": "Workspace topilmadi.", "ru": "Рабочее пространство не найдено.",
+        "en": "Workspace not found.",
+    },
+    "adm.reopen_usage": {
+        "uz": "Foydalanish: /qaytar <signal ID>", "ru": "Использование: /qaytar <ID сигнала>",
+        "en": "Usage: /qaytar <signal ID>",
+    },
+    "adm.reopen_nan": {
+        "uz": "Signal ID raqam bo'lishi kerak.", "ru": "ID сигнала должен быть числом.",
+        "en": "The signal ID must be a number.",
+    },
+    "adm.reopen_gone": {
+        "uz": ("#{sid} topilmadi yoki allaqachon ochiq (faqat YOPILGAN signalni "
+               "qaytarish mumkin)."),
+        "ru": ("#{sid} не найден или уже открыт (вернуть можно только ЗАКРЫТЫЙ "
+               "сигнал)."),
+        "en": ("#{sid} was not found, or it is already open (only a CLOSED signal can "
+               "be reopened)."),
+    },
+    "adm.reopen_done": {
+        "uz": ("↩️ <b>#{sid} {sym}</b> — ACTIVE holatiga qaytarildi.\nStop xavfsiz "
+               "boshlang'ich qiymatga tushirildi, TP/SL kuzatuvi hozirdan davom etadi."),
+        "ru": ("↩️ <b>#{sid} {sym}</b> — возвращён в ACTIVE.\nСтоп сброшен к "
+               "безопасному начальному значению, отслеживание TP/SL продолжается."),
+        "en": ("↩️ <b>#{sid} {sym}</b> — reopened as ACTIVE.\nThe stop was reset to its "
+               "safe initial value; TP/SL tracking continues from now."),
+    },
+
+    # --- /karta, /charttest, /refhavola, Telethon login (hammasi admin) ---
+    "adm.card_usage": {
+        "uz": "Foydalanish: <code>/karta 142</code> — signal raqami.",
+        "ru": "Использование: <code>/karta 142</code> — номер сигнала.",
+        "en": "Usage: <code>/karta 142</code> — the signal number.",
+    },
+    "adm.card_no_sig": {
+        "uz": "#{sid} topilmadi.", "ru": "#{sid} не найден.", "en": "#{sid} not found.",
+    },
+    "adm.card_not_yours": {
+        "uz": "Bu signal sizniki emas.", "ru": "Этот сигнал не ваш.",
+        "en": "This signal is not yours.",
+    },
+    "adm.card_open": {
+        "uz": "#{sid} hali yopilmagan — karta yopilgandan keyin tayyor bo'ladi.",
+        "ru": "#{sid} ещё не закрыт — карточка появится после закрытия.",
+        "en": "#{sid} is not closed yet — the card is ready once it closes.",
+    },
+    "adm.card_drawing": {
+        "uz": "🎨 Karta chizilyapti…", "ru": "🎨 Рисую карточку…",
+        "en": "🎨 Drawing the card…",
+    },
+    "adm.card_failed": {
+        "uz": "Kartani yasab bo'lmadi.", "ru": "Не удалось собрать карточку.",
+        "en": "The card could not be built.",
+    },
+    "adm.card_caption": {
+        "uz": "#{sid} {sym} — ulashish uchun", "ru": "#{sid} {sym} — чтобы поделиться",
+        "en": "#{sid} {sym} — for sharing",
+    },
+    "adm.ct_no_channel": {
+        "uz": "NEWS_CHANNEL_ID sozlanmagan.", "ru": "NEWS_CHANNEL_ID не задан.",
+        "en": "NEWS_CHANNEL_ID is not set.",
+    },
+    "adm.ct_usage": {
+        "uz": "Foydalanish: /charttest TLM", "ru": "Использование: /charttest TLM",
+        "en": "Usage: /charttest TLM",
+    },
+    "adm.ct_no_symbol": {
+        "uz": "Tiker topilmadi (kripto/aksiya/forex — hech birida): {sym}",
+        "ru": "Тикер не найден (ни в крипто, ни в акциях, ни в форекс): {sym}",
+        "en": "Ticker not found (neither crypto, stocks nor forex): {sym}",
+    },
+    "adm.ct_drawing": {
+        "uz": "⏳ {sym} ({market}) — grafik chizilyapti...",
+        "ru": "⏳ {sym} ({market}) — рисую график...",
+        "en": "⏳ {sym} ({market}) — drawing the chart...",
+    },
+    "adm.ct_failed": {
+        "uz": ("Grafik chizib bo'lmadi — bu tikerda so'nggi shamlar topilmadi "
+               "(bozor yopiq bo'lishi ham mumkin)."),
+        "ru": ("Не удалось построить график — свежих свечей по тикеру нет "
+               "(рынок может быть закрыт)."),
+        "en": ("The chart could not be drawn — no recent candles for this ticker "
+               "(the market may be closed)."),
+    },
+    "adm.rl_current": {
+        "uz": ("Joriy MEXC referal havola: {cur}\n\n"
+               "Belgilash: <code>/refhavola https://www.mexc.com/register?inviteCode=XXX</code>\n"
+               "Agar havolada <code>{{symbol}}</code> bo'lsa, u postdagi juftlik bilan "
+               "(masalan BTC_USDT) almashtiriladi.\nO'chirish: <code>/refhavola off</code>"),
+        "ru": ("Текущая реферальная ссылка MEXC: {cur}\n\n"
+               "Задать: <code>/refhavola https://www.mexc.com/register?inviteCode=XXX</code>\n"
+               "Если в ссылке есть <code>{{symbol}}</code>, он заменяется парой из поста "
+               "(например BTC_USDT).\nУбрать: <code>/refhavola off</code>"),
+        "en": ("Current MEXC referral link: {cur}\n\n"
+               "Set it: <code>/refhavola https://www.mexc.com/register?inviteCode=XXX</code>\n"
+               "If the link contains <code>{{symbol}}</code>, it is replaced with the pair "
+               "from the post (for example BTC_USDT).\nRemove it: <code>/refhavola off</code>"),
+    },
+    "adm.rl_unset": {
+        "uz": "(belgilanmagan)", "ru": "(не задана)", "en": "(not set)",
+    },
+    "adm.rl_off": {
+        "uz": "🔒 Referal havola o'chirildi.", "ru": "🔒 Реферальная ссылка убрана.",
+        "en": "🔒 The referral link was removed.",
+    },
+    "adm.rl_saved": {
+        "uz": "✅ Saqlandi:\n{url}", "ru": "✅ Сохранено:\n{url}", "en": "✅ Saved:\n{url}",
+    },
+    "adm.tg_no_keys": {
+        "uz": "TELETHON_API_ID/TELETHON_API_HASH sozlanmagan (Railway o'zgaruvchisi).",
+        "ru": "TELETHON_API_ID/TELETHON_API_HASH не заданы (переменные Railway).",
+        "en": "TELETHON_API_ID/TELETHON_API_HASH are not set (Railway variables).",
+    },
+    "adm.tg_login_usage": {
+        "uz": "Foydalanish: /tg_login +998901234567",
+        "ru": "Использование: /tg_login +998901234567",
+        "en": "Usage: /tg_login +998901234567",
+    },
+    "adm.tg_code_err": {
+        "uz": "Kod so'rashda xato — loglarni tekshiring.",
+        "ru": "Ошибка при запросе кода — проверьте логи.",
+        "en": "Error requesting the code — check the logs.",
+    },
+    "adm.tg_code_sent": {
+        "uz": "Kod yuborildi, Telegram ilovangizni tekshiring. Keyin: /tg_code 12345",
+        "ru": "Код отправлен, проверьте приложение Telegram. Затем: /tg_code 12345",
+        "en": "The code was sent, check your Telegram app. Then: /tg_code 12345",
+    },
+    "adm.tg_code_usage": {
+        "uz": "Foydalanish: /tg_code 12345", "ru": "Использование: /tg_code 12345",
+        "en": "Usage: /tg_code 12345",
+    },
+    "adm.tg_code_bad": {
+        "uz": "Kod xato yoki muddati tugagan — /tg_login bilan qayta boshlang.",
+        "ru": "Код неверный или истёк — начните заново с /tg_login.",
+        "en": "The code is wrong or expired — start again with /tg_login.",
+    },
+    "adm.tg_need_pw": {
+        "uz": "Akkauntda 2FA parol bor. Yuboring: /tg_password <parol>",
+        "ru": "На аккаунте включён 2FA. Пришлите: /tg_password <пароль>",
+        "en": "The account has 2FA. Send: /tg_password <password>",
+    },
+    "adm.tg_pw_usage": {
+        "uz": "Foydalanish: /tg_password <parol>", "ru": "Использование: /tg_password <пароль>",
+        "en": "Usage: /tg_password <password>",
+    },
+    "adm.tg_pw_bad": {
+        "uz": "Parol xato — qayta urinib ko'ring.", "ru": "Неверный пароль — попробуйте снова.",
+        "en": "Wrong password — try again.",
+    },
+    "adm.tg_ok": {
+        "uz": "✅ Login muvaffaqiyatli! MarketTwits endi tinglanmoqda.",
+        "ru": "✅ Вход выполнен! MarketTwits теперь прослушивается.",
+        "en": "✅ Logged in! MarketTwits is now being listened to.",
+    },
+
+    "adm.pub_approved": {
+        "uz": "✅ <b>{name}</b> tasdiqlandi — reytingda ko'rinadi.",
+        "ru": "✅ <b>{name}</b> одобрена — попадёт в рейтинг.",
+        "en": "✅ <b>{name}</b> approved — it shows in the ranking.",
+    },
+    "adm.pub_rejected": {
+        "uz": "🚫 <b>{name}</b> rad etildi — reytingga chiqmaydi.",
+        "ru": "🚫 <b>{name}</b> отклонена — в рейтинг не попадёт.",
+        "en": "🚫 <b>{name}</b> rejected — it stays out of the ranking.",
+    },
+    "adm.ct_network": {
+        "uz": ("⏱ Tarmoq vaqtincha javob bermadi (Telegram/Railway orasida uzilish). "
+               "Qayta urinib ko'ring: /charttest {sym}"),
+        "ru": ("⏱ Сеть временно не ответила (обрыв между Telegram и Railway). "
+               "Попробуйте снова: /charttest {sym}"),
+        "en": ("⏱ The network did not answer (a hiccup between Telegram and Railway). "
+               "Try again: /charttest {sym}"),
+    },
+    "adm.ct_post_failed": {
+        "uz": "Kanalga postlab bo'lmadi (bot admin emasmi?).",
+        "ru": "Не удалось опубликовать в канал (бот не админ?).",
+        "en": "Could not post to the channel (is the bot an admin?).",
+    },
+    "adm.tgt_usage": {
+        "uz": ("Foydalanish: /tg_test <matn>\nMatnda tanish #hashtag bo'lsin, masalan:\n"
+               "/tg_test #BTC ETF arizasi tasdiqlandi"),
+        "ru": ("Использование: /tg_test <текст>\nВ тексте должен быть знакомый "
+               "#хэштег, например:\n/tg_test #BTC заявка на ETF одобрена"),
+        "en": ("Usage: /tg_test <text>\nThe text must contain a known #hashtag, for "
+               "example:\n/tg_test #BTC the ETF filing was approved"),
+    },
+    "adm.tgt_running": {
+        "uz": "Tekshirilmoqda…", "ru": "Проверяю…", "en": "Checking…",
+    },
+    "adm.tgt_done": {
+        "uz": ("Tayyor. Matndagi #hashtaglardan biri tanish tikerga to'g'ri kelsa — "
+               "kanalga postlangan bo'lishi kerak; hech biri topilmasa — hech narsa "
+               "chiqmaydi (bu normal, filtr shunday ishlaydi)."),
+        "ru": ("Готово. Если один из #хэштегов совпал с известным тикером — пост "
+               "должен уйти в канал; если ни один не совпал — ничего не выйдет "
+               "(это нормально, так работает фильтр)."),
+        "en": ("Done. If one of the #hashtags matched a known ticker, a post should "
+               "have gone to the channel; if none matched, nothing is posted (that is "
+               "normal — this is how the filter works)."),
+    },
+
+    # --- Admin PDF hisobotlari ---
+    "adm.pdfg_title": {
+        "uz": "Ulangan guruhlar", "ru": "Подключённые группы", "en": "Connected groups",
+    },
+    "adm.pdfg_sub": {
+        "uz": "Jami {n} ta guruh · {bad} tasida muammo",
+        "ru": "Всего групп: {n} · с проблемами: {bad}",
+        "en": "{n} groups in total · {bad} with problems",
+    },
+    "adm.pdfg_col_group": {"uz": "Guruh", "ru": "Группа", "en": "Group"},
+    "adm.pdfg_col_sig": {"uz": "Signal", "ru": "Сигн.", "en": "Signals"},
+    "adm.pdfg_col_closed": {"uz": "Yopilgan", "ru": "Закрыто", "en": "Closed"},
+    "adm.pdfg_col_view": {"uz": "Kuzatuv", "ru": "Набл.", "en": "Watch"},
+    "adm.pdfg_col_state": {"uz": "Holat", "ru": "Состояние", "en": "State"},
+    "adm.st_ok": {"uz": "ishlayapti", "ru": "работает", "en": "working"},
+    "adm.st_notadmin": {"uz": "admin emas", "ru": "не админ", "en": "not admin"},
+    "adm.st_kicked": {"uz": "chiqarilgan", "ru": "удалён", "en": "removed"},
+    "adm.st_none": {"uz": "biriktirilmagan", "ru": "не привязана", "en": "not attached"},
+    "adm.st_archived": {"uz": " (arxiv)", "ru": " (архив)", "en": " (archived)"},
+    "adm.pdfu_title": {
+        "uz": "Foydalanuvchilar", "ru": "Пользователи", "en": "Users",
+    },
+    "adm.pdfu_sub": {"uz": "Jami {n} ta", "ru": "Всего: {n}", "en": "{n} in total"},
+    "adm.pdfu_col_user": {"uz": "Foydalanuvchi", "ru": "Пользователь", "en": "User"},
+    "adm.pdfu_col_role": {"uz": "Rol", "ru": "Роль", "en": "Role"},
+    "adm.pdfu_col_inv": {"uz": "Taklif", "ru": "Пригл.", "en": "Invited"},
+    "adm.pdfu_col_last": {"uz": "Oxirgi", "ru": "Последний", "en": "Last"},
+    "adm.role_personal": {"uz": "shaxsiy", "ru": "личный", "en": "personal"},
+    "adm.role_owner": {"uz": "egasi×{n}", "ru": "владелец×{n}", "en": "owner×{n}"},
+    "adm.role_member": {"uz": "a'zo×{n}", "ru": "участник×{n}", "en": "member×{n}"},
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",
