@@ -192,7 +192,10 @@ def validate(d: dict) -> str | None:
             return f"SHORT uchun SL ({sl}) entry ({e}) dan yuqori bo'lishi kerak."
         if any(t >= e for t in tps):
             return f"SHORT uchun barcha TP entry ({e}) dan past bo'lishi kerak."
-    risk = abs(e - sl) / e * 100
-    if risk > 25:
-        return f"Risk juda katta ({risk:.1f}%) — darajalar to'g'ri o'qildimi?"
+    # Risk CHEGARASI ATAYLAB YO'Q. Avval "25% dan katta" risk rad etilardi
+    # (verguldan adashishga qarshi himoya sifatida), lekin foydalanuvchi
+    # to'g'ri e'tiroz bildirdi: "har bir odamni riski o'ziga bog'liq".
+    # Chalkash yozuvga qarshi haqiqiy himoya baribir yuqorida turibdi —
+    # LONG'da stop entrydan PAST, SHORT'da BALAND bo'lishi sharti eng ko'p
+    # uchraydigan xatoni (yo'nalish adashtirilishini) tutadi.
     return None

@@ -203,10 +203,6 @@ def content(img: dict | None = None) -> list:
         _p("LONG uchun: stop ", _b("past"), ", TP ", _b("yuqori"), ". SHORT uchun teskarisi. "
            "Odatda bu LONG/SHORT adashtirilganini bildiradi."),
 
-        _h("«Risk juda katta»", 4),
-        _p("Kirish bilan stop orasi 25% dan ko'p. Raqamlarni tekshiring — ko'pincha "
-           "verguldan yoki nuqtadan adashish."),
-
         _h("Bot guruhga yozmayapti", 4),
         _p("Botda admin huquqi yo'qligidan. ", _code("/setup"), " ishlagan bo'lsa ham, "
            "admin huquqisiz bot post yubora olmaydi. Guruh sozlamalaridan bering."),

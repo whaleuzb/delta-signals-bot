@@ -752,9 +752,6 @@ HELP_TOPICS = {
         "<b>\"SL entry dan past bo'lishi kerak\"?</b>\n"
         "LONG uchun: stop <b>past</b>, TP <b>yuqori</b>. SHORT uchun teskarisi. "
         "Odatda bu LONG/SHORT adashtirilganini bildiradi.\n\n"
-        "<b>\"Risk juda katta\"?</b>\n"
-        "Kirish bilan stop orasi 25% dan ko'p. Raqamlarni tekshiring — "
-        "ko'pincha verguldan adashish.\n\n"
         "<b>Bot guruhga yozmayapti?</b>\n"
         "Botda admin huquqi yo'qligidan. Guruh sozlamalaridan bering."
     ),
@@ -1153,13 +1150,13 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             await msg.reply_text("Noto'g'ri raqam. Qayta kiriting yoki /bekor.")
             return True
         entry = float(sig["entry"])
-        # Kirish narxidan juda uzoq qiymat deyarli doim xato yozuv (masalan
-        # nol tushib qolgan) — signalni bejiz yopib yubormaslik uchun to'xtatamiz.
-        if not (entry * 0.5 <= price <= entry * 1.5):
-            AWAITING_SL[uid] = sig_id
-            await msg.reply_text("Bu narx kirish narxidan juda uzoq. "
-                                  "Tekshiring yoki /bekor.")
-            return True
+        # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
+        # tashqarisi rad etilardi). Foydalanuvchi: "har bir odamni riski
+        # o'ziga bog'liq". Xavfli holat — stopni narxning NARIGI tomoniga
+        # qo'yib signalni bexosdan darhol yopish — pastdagi "breached"
+        # ogohlantirishi bilan baribir tutiladi; uzoqdagi, lekin TO'G'RI
+        # tomondagi stop esa hech kimga zarar qilmaydi (u shunchaki
+        # tegmaydi).
         # Foydalanuvchi: "stopni ko'tarsam, narx hali yetmagan bo'lsa ham
         # erta yopib yuboryapti". Sabab — agar yangi stop JORIY narxning
         # NARIGI tomonida bo'lsa (LONG: narx allaqachon stopdan PAST;

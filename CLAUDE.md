@@ -4776,3 +4776,34 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        ishlashi, `sl IS NULL` holatida yangi kiritilgan -15% stopning
        o'chirilmasligi. `test_tracker.py` 15/15 va qolgan barcha to'plamlar
        (127 ta holat) o'zgarishsiz.
+
+150. **Stop qo'yishdagi MASOFA cheklovlari olib tashlandi.** Foydalanuvchi:
+     "stop loss qo'yishdagi cheklovni ham olib tashlash kerak. Har bir
+     odamni riski o'ziga bog'liq."
+     - Ikki joyda chegara bor edi: (a) `parsing.validate()` — "Risk juda
+       katta" (entry bilan stop orasi 25% dan ko'p bo'lsa signal
+       YARATILMASDI); (b) `handle_manage_input()` — mavjud signalning
+       stopini tahrirlashda entrydan ±50% tashqarisi rad etilardi.
+       Ikkalasi ham verguldan/nolddan adashishga qarshi himoya sifatida
+       qo'yilgan edi, lekin amalda haqiqiy savdo qarorini bloklardi.
+     - **NIMA QOLDI (bu himoyalar yetarli)**:
+       • LONG'da stop entrydan PAST, SHORT'da BALAND bo'lishi sharti —
+         eng ko'p uchraydigan xatoni (yo'nalish adashtirilishini) tutadi
+         va aynan shu chalkash yozuvning asosiy alomati;
+       • stop JORIY NARXNING NARIGI TOMONIGA qo'yilsa — "signal DARHOL
+         yopiladi" ogohlantirishi (bu YAGONA haqiqatan xavfli holat:
+         uzoqdagi, lekin to'g'ri tomondagi stop hech kimga zarar qilmaydi,
+         u shunchaki tegmaydi);
+       • musbat son va format tekshiruvlari.
+     - **ENTRY tahriridagi ±50% chegara ATAYLAB QOLDIRILDI** — u risk
+       emas, PENDING signalning limit narxi haqida: u yerdagi xato signal
+       umuman to'lmasligiga yoki mutlaqo boshqa narxda "aktivlashishiga"
+       olib keladi. Foydalanuvchi so'rovi stopga tegishli edi.
+     - Yordam matni (`bot.py`) va qo'llanmadagi (`guide.py`) "«Risk juda
+       katta»" bo'limi olib tashlandi — mavjud bo'lmagan xatoni
+       tushuntirib turish chalg'itardi.
+     - Tekshirildi: 18 ta holat — -15%, -40%, -70%, -90% stoplar qabul
+       qilinishi; narxning narigi tomonidagi stop HAMON ogohlantirilishi;
+       yaroqsiz raqam va yo'nalish adashuvi hamon rad etilishi; yordam
+       matni va qo'llanmada eski izohning qolmagani. `test_tracker.py`
+       15/15 va qolgan barcha to'plamlar (136 holat) o'zgarishsiz.
