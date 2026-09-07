@@ -4731,3 +4731,48 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        so'rash, `/bekor` tozalashi) va yangi kod bilan kelgan odam taklif
        bo'lib yozilishi. `test_tracker` 15/15, `card` 22/22,
        `build_pnl_card` 20/20, `ref_code` 16/16, veb 30/30.
+
+149. **⭐ Kuzatuv QO'LDA qo'yilgan stopni eskisiga qaytarib yuborardi
+     (`save_progress` poygasi).** Foydalanuvchi: "Stop breakeven ga
+     kochirgan narx kelganida ishlamayabti. Keyin -15% katta stop loss
+     qo'yib bo'lmayabti."
+     - **Ikki shikoyat — BITTA sabab.** `run_once()` barcha ochiq
+       signallarni BITTA snapshot bilan o'qib, keyin har birini
+       navbatma-navbat, birjaga chiqib ishlaydi. Sikl oxiridagi signalning
+       qatori o'nlab soniya eskirgan bo'ladi. `process()` esa oxirida
+       `save_progress()` bilan `sl`ni SHARTSIZ yozardi — ya'ni odam shu
+       oraliqda stopni ko'chirgan bo'lsa, ESKI qiymat qaytarib yozilib,
+       odamning amali JIMGINA bekor bo'lardi. Shundan:
+       • "breakeven'ga ko'chirdim, narx keldi — ishlamadi" (stop aslida
+         eski joyida turgan, breakeven'da emas);
+       • "-15% katta stop qo'yib bo'lmayapti" (qo'yiladi, keyin qaytariladi).
+     - **Isbot**: haqiqiy Postgres'da qayta ishlab chiqarildi — snapshot
+       o'qildi → `set_stop(100)` → `save_progress(sl=90)` → bazada **90**
+       qoldi. Tuzatishdan keyin **100** qoladi.
+     - **Tuzatish 1 — `sl` SHARTLI yoziladi** (optimistik qulf):
+       `sl = CASE WHEN sl IS NOT DISTINCT FROM $sl_prev THEN $new ELSE sl END`.
+       `sl_prev` — kuzatuv ishni boshlagan paytdagi XOM (Decimal/None)
+       qiymat; ataylab float'ga o'tkazilmaydi, aks holda juda kichik
+       kasrli narxlarda taqqoslash hech qachon mos kelmay, kuzatuvning
+       O'Z breakeven ko'chirishi ham yozilmay qolardi. `IS NOT DISTINCT
+       FROM` NULL holatini ham qamraydi (limit to'lgach TP/SL kiritilishi).
+       **To'qnashuvda ODAM yutadi** — u aniq va ataylab bosgan, kuzatuv esa
+       eskirgan ma'lumot bilan ishlayotgan bo'ladi.
+     - **Tuzatish 2 — `run_once()` har bir signalni ishlashdan OLDIN
+       QAYTA o'qiydi.** Bu oynani "butun sikl"dan "bitta `process()`
+       chaqiruvi"gacha qisqartiradi va oraliqda qo'lda yopilgan signal
+       ustida behuda ishlanmaydi. Snapshot endi faqat "qaysi id'larni
+       ko'rish kerak" uchun.
+     - **Diagnostika**: to'qnashuv sodir bo'lganda `save_progress`
+       `RETURNING sl` bilan buni aniqlab, logga yozadi. Aks holda bu
+       holat jimgina o'tib ketib, kelajakda yana "stop ishlamadi" degan
+       shikoyat kelsa sababini topib bo'lmasdi.
+     - **Saboq**: bitta ustunni IKKI manba (kuzatuv va odam) yozsa,
+       yozuvchining eskirgan nusxasi ustidan yozishi vaqt masalasi.
+       `tps`/`entry` xavfsiz edi — ularni `save_progress` umuman yozmaydi.
+     - Tekshirildi: haqiqiy Postgres'da 9 ta holat — qo'lda qo'yilgan
+       stop saqlanishi, breakeven saqlanishi, **kuzatuvning O'Z BE
+       ko'chirishi baribir yozilishi**, juda kichik kasrli narxda ham
+       ishlashi, `sl IS NULL` holatida yangi kiritilgan -15% stopning
+       o'chirilmasligi. `test_tracker.py` 15/15 va qolgan barcha to'plamlar
+       (127 ta holat) o'zgarishsiz.

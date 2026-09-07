@@ -8,12 +8,15 @@ Multi-tenant: har bir signal bitta workspace'ga tegishli.
                        faqat owner_id o'zi ko'ra oladi.
 """
 import json
+import logging
 import secrets
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import asyncpg
 import config
+
+log = logging.getLogger("db")
 
 
 def _d(x):
@@ -1030,19 +1033,50 @@ async def reset_workspace_stats(workspace_id: int) -> dict:
 
 
 async def save_progress(sig_id: int, f: dict) -> None:
+    """Kuzatuv natijasini yozadi.
+
+    `sl` — YAGONA ustun bo'lib, uni kuzatuv ham, ODAM ham o'zgartiradi
+    ("✏️ Stop", "🛡 Stop → breakeven", limit to'lgach TP/SL kiritish).
+    Shu sabab u SHARTLI yoziladi: bazadagi qiymat kuzatuv ISHNI BOSHLAGAN
+    paytdagi qiymat bo'lsagina yangilanadi (`sl_prev`).
+
+    Nega kerak: `run_once()` barcha ochiq signallarni bitta snapshot bilan
+    o'qiydi va har birini navbatma-navbat, tarmoqqa chiqib ishlaydi.
+    Shu oraliqda odam stopni ko'chirsa, eski kod snapshotdagi ESKI qiymatni
+    qaytarib yozib, odamning amalini JIMGINA bekor qilardi — foydalanuvchi
+    buni "stop breakeven'ga ko'chgani ishlamayapti" va "katta stop qo'yib
+    bo'lmayapti" deb ko'rgan. `sl IS NULL` holati ham shunga kiradi
+    (limit to'lgach TP/SL kiritilishi) — shuning uchun `IS NOT DISTINCT FROM`.
+
+    To'qnashuvda ODAM yutadi: u aniq va ataylab bosgan, kuzatuv esa eskirgan
+    ma'lumot bilan ishlayotgan bo'ladi."""
     q = """
     UPDATE signals SET
-        sl=$2, tp_hit=$3, filled_pct=$4, realized_pct=$5, status=$6,
+        sl = CASE WHEN sl IS NOT DISTINCT FROM $14 THEN $2 ELSE sl END,
+        tp_hit=$3, filled_pct=$4, realized_pct=$5, status=$6,
         opened_at=COALESCE(opened_at,$7), closed_at=$8, exit_price=$9,
         pnl_pct=$10, r_multiple=$11, last_checked_ms=$12, ambiguous=$13
     WHERE id=$1
     """
     async with pool().acquire() as c:
-        await c.execute(
-            q, sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
+        kept = await c.fetchval(
+            q + " RETURNING sl",
+            sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
             f["status"], f.get("opened_at"), f.get("closed_at"), _d(f.get("exit_price")),
-            _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"], f["ambiguous"],
+            _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"],
+            f["ambiguous"],
+            # ATAYLAB xom (Decimal/None) qiymat: float'ga o'tkazib qaytarish
+            # ba'zi narxlarda oxirgi raqamni o'zgartirib, taqqoslash HECH
+            # QACHON mos kelmasligiga olib kelardi.
+            f.get("sl_prev"),
         )
+    # To'qnashuv HAQIQATAN bo'lganini ko'rsatadigan yagona iz — bu holat
+    # jimgina o'tib ketmasligi kerak, aks holda kelajakda yana "stop
+    # ishlamadi" degan shikoyat kelsa sababini topib bo'lmaydi.
+    want = _d(f["sl"])
+    if kept != want:
+        log.info("Signal #%s: stop kuzatuv ishlayotganda QO'LDA o'zgartirilgan — "
+                 "odamniki saqlandi (bazada=%s, kuzatuvda=%s)", sig_id, kept, want)
 
 
 async def set_milestone(sig_id: int, milestone: int) -> None:

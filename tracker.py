@@ -53,6 +53,10 @@ async def process(sig) -> list[dict]:
     # bu signal #126/#127'dagi "hali limitga kelmagandi ham TP bilan yopildi"
     # muammosining eng ISHONCHLI, tub yechimi.
     awaiting_tpsl = sig["sl"] is None
+    # Kuzatuv ISHNI BOSHLAGAN paytdagi xom qiymat — oxirida `save_progress()`
+    # shu bilan taqqoslab, odam orada stopni ko'chirgan bo'lsa uni bekor
+    # qilib yubormaydi (`db.save_progress` izohiga qarang).
+    sl_prev = sig["sl"]
     sl = float(sig["sl"]) if sig["sl"] is not None else None
     sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
     tps = [float(x) for x in sig["tps"]] if sig["tps"] else []
@@ -290,7 +294,7 @@ async def process(sig) -> list[dict]:
         r = round(pnl / risk, 3) if risk > 0 else None
 
     await db.save_progress(sig["id"], {
-        "sl": sl, "tp_hit": tp_hit, "filled_pct": round(filled, 6),
+        "sl": sl, "sl_prev": sl_prev, "tp_hit": tp_hit, "filled_pct": round(filled, 6),
         "realized_pct": round(realized, 4), "status": status,
         "opened_at": opened_at, "closed_at": closed_at, "exit_price": exit_price,
         "pnl_pct": pnl, "r_multiple": r, "last_checked_ms": last_ms,
@@ -469,9 +473,18 @@ async def reopen_signal(sig_id: int) -> dict | None:
 
 async def run_once() -> list[dict]:
     out = []
-    for sig in await db.live_signals():  # barcha workspace'lar
+    # Ro'yxat bir marta olinadi, LEKIN har bir signal ishlashdan oldin
+    # QAYTA o'qiladi. Sabab: bitta siklda o'nlab signal bo'lishi va har biri
+    # birjaga chiqishi mumkin — oxirgisiga navbat kelganda snapshotdagi
+    # ma'lumot o'nlab soniya eskirgan bo'ladi. Shu orada odam stop
+    # ko'chirgan yoki TP/SL kiritgan bo'lsa, kuzatuv eski holat bilan
+    # ishlab, xulosani ham eski stop bo'yicha chiqarardi.
+    for row in await db.live_signals():  # barcha workspace'lar
         try:
+            sig = await db.get_signal(row["id"])
+            if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+                continue          # oraliqda qo'lda yopilgan/bekor qilingan
             out += await process(sig)
         except Exception:
-            log.exception("Signal #%s kuzatuvida xato", sig["id"])
+            log.exception("Signal #%s kuzatuvida xato", row["id"])
     return out
