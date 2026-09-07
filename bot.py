@@ -94,12 +94,9 @@ def can_manage(uid: int, ws) -> bool:
     return is_admin(uid) or ws["owner_id"] == uid
 
 
-NOT_SUBSCRIBER_TEXT = (
-    "🔒 Bu ma'lumotlar faqat shu guruh obunachilariga ochiq.\n"
-    "Obunani faollashtirgach, bot avtomatik ishlay boshlaydi."
-)
-NOT_SUBSCRIBER_KB = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("💳 Obuna bo'lish", url="https://t.me/mamurjonpaybot")]])
+def not_subscriber_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        i18n.t("acc.btn_subscribe", lang), url="https://t.me/mamurjonpaybot")]])
 
 
 async def can_view(bot, uid: int, ws) -> bool:
@@ -167,16 +164,16 @@ def _channel_url(ch) -> str | None:
 
 
 async def send_subscribe_prompt(update: Update, missing: list) -> None:
+    lang = await user_lang(update.effective_user.id)
     rows = []
     for ch in missing:
         url = _channel_url(ch)
         label = f"📢 {ch['title'] or ch['username'] or ch['chat_id']}"
         if url:
             rows.append([InlineKeyboardButton(label, url=url)])
-    rows.append([InlineKeyboardButton("✅ Obuna bo'ldim, tekshirish",
+    rows.append([InlineKeyboardButton(i18n.t("sub.btn_check", lang),
                                        callback_data="subcheck")])
-    txt = ("👋 Botdan foydalanish uchun quyidagi kanal(lar)ga obuna bo'ling, "
-           "so'ng <b>“✅ Obuna bo'ldim”</b> tugmasini bosing.")
+    txt = i18n.t("sub.prompt", lang)
     msg = update.effective_message
     if msg:
         await msg.reply_text(txt, parse_mode=ParseMode.HTML,
@@ -205,26 +202,27 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     missing = await missing_subscriptions(ctx.bot, user.id)
     if missing:
         if q:
-            await q.answer("Avval kanalga obuna bo'ling", show_alert=True)
+            await q.answer(i18n.t("sub.first", await user_lang(user.id)), show_alert=True)
         await send_subscribe_prompt(update, missing)
         raise ApplicationHandlerStop
 
 
 async def on_subcheck(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
+    lang = await user_lang(q.from_user.id)
     missing = await missing_subscriptions(ctx.bot, q.from_user.id)
     if missing:
-        await q.answer("Hali obuna bo'lmagansiz.", show_alert=True)
+        await q.answer(i18n.t("sub.not_yet", lang), show_alert=True)
         return
-    await q.answer("Rahmat! ✅")
-    await q.edit_message_text("✅ Obuna tasdiqlandi. Botdan foydalanishingiz mumkin.")
+    await q.answer(i18n.t("sub.thanks", lang))
+    await q.edit_message_text(i18n.t("sub.ok", lang))
     await show_menu(update, ctx)
 
 
-def access_denied(ws) -> tuple[str, InlineKeyboardMarkup | None]:
+def access_denied(ws, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup | None]:
     if ws["type"] == "personal":
-        return "🔒 Bu boshqa foydalanuvchining shaxsiy jurnali.", None
-    return NOT_SUBSCRIBER_TEXT, NOT_SUBSCRIBER_KB
+        return i18n.t("acc.personal_other", lang), None
+    return i18n.t("acc.not_subscriber", lang), not_subscriber_kb(lang)
 
 
 # ─────────────────────────── Workspace aniqlash ───────────────────────────
@@ -263,8 +261,10 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     owned_group = await db.get_group_workspace_by_owner(uid)
-    personal = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+    personal = await db.get_or_create_personal_workspace(
+        uid, i18n.t("ws.personal_name", lang))
     viewer_links = await db.get_group_viewer_workspaces(uid)
     rows = []
     if owned_group:
@@ -273,41 +273,50 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
     for vws in viewer_links:
         rows.append([InlineKeyboardButton(
             f"👥 {vws['name']}", callback_data=f"ws:{vws['id']}")])
-    rows.append([InlineKeyboardButton("🧑 Shaxsiy jurnal", callback_data=f"ws:{personal['id']}")])
-    rows.append([InlineKeyboardButton("➕ Boshqa guruhga a'zo bo'lish", callback_data="joingroup")])
-    await update.effective_message.reply_text("Qaysi joy uchun?", reply_markup=InlineKeyboardMarkup(rows))
+    rows.append([InlineKeyboardButton(i18n.t("ws.btn_personal", lang),
+                                       callback_data=f"ws:{personal['id']}")])
+    rows.append([InlineKeyboardButton(i18n.t("ws.btn_join", lang),
+                                       callback_data="joingroup")])
+    await update.effective_message.reply_text(i18n.t("ws.pick", lang),
+                                               reply_markup=InlineKeyboardMarkup(rows))
 
 
-ONBOARD_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🧑 Shaxsiy jurnal ochish", callback_data="onboard:personal")],
-    [InlineKeyboardButton("🏘 Menda yopiq guruh bor", callback_data="onboard:group")],
-])
-GROUP_ROLE_KB = InlineKeyboardMarkup([
-    [InlineKeyboardButton("👥 Men guruh a'zosiman", callback_data="onboard:group_member")],
-    [InlineKeyboardButton("👑 Men guruh egasiman", callback_data="onboard:group_owner")],
-])
+def onboard_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("onb.btn_personal", lang),
+                              callback_data="onboard:personal")],
+        [InlineKeyboardButton(i18n.t("onb.btn_group", lang),
+                              callback_data="onboard:group")],
+    ])
+
+
+def group_role_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("onb.btn_member", lang),
+                              callback_data="onboard:group_member")],
+        [InlineKeyboardButton(i18n.t("onb.btn_owner", lang),
+                              callback_data="onboard:group_owner")],
+    ])
 
 
 async def send_onboarding(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = await user_lang(update.effective_user.id)
     await update.effective_message.reply_text(
-        "👋 Xush kelibsiz! Botni qanday ishlatmoqchisiz?\n\n"
-        "🧑 <b>Shaxsiy jurnal</b> — o'z savdo signallaringizni yozib, statistikangizni "
-        "kuzatib borasiz. Faqat sizga ko'rinadi, hech kimga post bo'lmaydi.\n\n"
-        "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa (yoki allaqachon "
-        "biror guruhga a'zo bo'lsangiz), shu bot orqali statistikani ko'rishingiz mumkin.",
-        parse_mode=ParseMode.HTML, reply_markup=ONBOARD_KB)
+        i18n.t("onb.welcome", lang), parse_mode=ParseMode.HTML,
+        reply_markup=onboard_kb(lang))
 
 
 async def send_group_picker(q) -> None:
     """q — CallbackQuery; joriy xabarni tahrirlab guruhlar ro'yxatini ko'rsatadi."""
+    lang = await user_lang(q.from_user.id)
     groups = await db.list_group_workspaces()
     if not groups:
-        await q.edit_message_text("Hozircha hech qanday guruh ro'yxatdan o'tmagan.",
-                                   reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("ws.no_groups", lang),
+                                   reply_markup=menu_back_kb(lang))
         return
     rows = [[InlineKeyboardButton(f"👥 {g['name']}", callback_data=f"viewjoin:{g['id']}")]
             for g in groups]
-    await q.edit_message_text("Qaysi guruh a'zosisiz? Tanlang:",
+    await q.edit_message_text(i18n.t("ws.which_group", lang),
                                reply_markup=InlineKeyboardMarkup(rows))
 
 
@@ -316,19 +325,21 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.answer()
     choice = q.data.split(":", 1)[1]
     uid = q.from_user.id
+    lang = await user_lang(uid)
 
     if choice == "personal":
-        ws = await db.get_or_create_personal_workspace(uid, "Shaxsiy jurnal")
+        ws = await db.get_or_create_personal_workspace(
+            uid, i18n.t("ws.personal_name", lang))
         ctx.user_data["workspace_id"] = ws["id"]
-        await q.edit_message_text("✅ Shaxsiy jurnal ochildi.")
+        await q.edit_message_text(i18n.t("onb.personal_ok", lang))
         await q.message.reply_text(
-            "Bosh menyu:",
+            i18n.t("menu.open_title", lang),
             reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
         return
 
     if choice == "group":
-        await q.edit_message_text(
-            "🏘 Shu guruh bilan bog'liq siz kimsiz?", reply_markup=GROUP_ROLE_KB)
+        await q.edit_message_text(i18n.t("onb.who", lang),
+                                   reply_markup=group_role_kb(lang))
         return
 
     if choice == "group_member":
@@ -337,15 +348,9 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     # choice == "group_owner"
     bot_username = ctx.bot.username
-    mention = f"@{bot_username}" if bot_username else "botni"
-    await q.edit_message_text(
-        f"👑 Guruhingizni ulash uchun:\n\n"
-        f"1. {mention} o'z guruhingizga qo'shing.\n"
-        "2. Botga guruhda <b>admin</b> huquqini bering (xabar yuborish uchun kerak).\n"
-        "3. Guruh ichida <code>/setup</code> buyrug'ini yozing.\n\n"
-        "Shundan so'ng guruhingiz mustaqil workspace sifatida ishlay boshlaydi va "
-        "botga shaxsiy yozganingizda avtomatik o'shani boshqarasiz.",
-        parse_mode=ParseMode.HTML)
+    mention = f"@{bot_username}" if bot_username else "@bot"
+    await q.edit_message_text(i18n.t("onb.owner_steps", lang, mention=mention),
+                               parse_mode=ParseMode.HTML)
 
 
 async def on_join_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -359,9 +364,11 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.answer()
     wid = int(q.data.split(":", 1)[1])
     uid = q.from_user.id
+    lang = await user_lang(uid)
     ws = await db.get_workspace(wid)
     if not ws or ws["type"] != "group" or not ws["group_chat_id"]:
-        await q.edit_message_text("Bu guruh topilmadi.", reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("ws.group_not_found", lang),
+                                   reply_markup=menu_back_kb(lang))
         return
     try:
         member = await ctx.bot.get_chat_member(ws["group_chat_id"], uid)
@@ -369,15 +376,14 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         is_member = False
     if not is_member:
-        await q.edit_message_text(
-            f"🔒 Siz \"{ws['name']}\" guruhi a'zosi emassiz (yoki bot tekshira olmadi).",
-            reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("ws.not_member", lang, name=ws["name"]),
+                                   reply_markup=menu_back_kb(lang))
         return
     await db.add_group_viewer(uid, wid)
     ctx.user_data["workspace_id"] = wid
-    await q.edit_message_text(f"✅ \"{ws['name']}\" ulandi — endi statistikasini ko'ra olasiz.")
+    await q.edit_message_text(i18n.t("ws.joined", lang, name=ws["name"]))
     await q.message.reply_text(
-        "Bosh menyu:",
+        i18n.t("menu.open_title", lang),
         reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
 
 
@@ -390,7 +396,7 @@ async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if chat.type in ("group", "supergroup"):
         await update.effective_message.reply_text(
-            "Bu guruh hali ro'yxatdan o'tmagan. Guruh admini /setup buyrug'ini yozsin.")
+            i18n.t("ws.not_registered", await user_lang(update.effective_user.id)))
         return None
 
     uid = update.effective_user.id
@@ -410,14 +416,15 @@ async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     wid = int(q.data.split(":", 1)[1])
     uid = q.from_user.id
     ws = await db.get_workspace(wid)
+    lang = await user_lang(uid)
     allowed = ws and (is_admin(uid) or ws["owner_id"] == uid or await db.is_group_viewer(uid, wid))
     if not allowed:
-        await q.edit_message_text("Ruxsat yo'q.")
+        await q.edit_message_text(i18n.t("man.no_right", lang))
         return
     ctx.user_data["workspace_id"] = wid
-    await q.edit_message_text(f"✅ Tanlandi: {ws['name']}")
+    await q.edit_message_text(i18n.t("ws.picked", lang, name=ws["name"]))
     await q.message.reply_text(
-        "Bosh menyu:",
+        i18n.t("menu.open_title", lang),
         reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
 
 
@@ -767,7 +774,7 @@ async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await q.message.reply_text(text, reply_markup=kb)
         return
     await q.message.reply_text(
@@ -816,63 +823,8 @@ async def on_lang_ws_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 # ham javobini topishi kerak (ko'pchilik aynan qotib qolgan payt yordam
 # qidiradi va tashqi sahifaga o'tishga xohishi bo'lmaydi).
 
-HELP_TOPICS = {
-    "setup": (
-        "👥 <b>Guruhni ulash</b>\n\n"
-        "<b>1.</b> Botni guruhingizga qo'shing.\n"
-        "<b>2.</b> Botga guruhda <b>admin</b> huquqini bering.\n"
-        "<b>3.</b> Guruh ichida <code>/setup</code> yozing.\n\n"
-        "Bot javob bersa — ulanish tugadi.\n\n"
-        "⚠️ Diqqat qiling:\n"
-        "• <code>/setup</code> ni <b>guruh ichida</b> yozing, shaxsiy chatda emas.\n"
-        "• Faqat <b>guruh admini</b> qila oladi.\n"
-        "• Bir admin — bitta guruh.\n"
-        "• Admin huquqisiz bot guruhga post yubora olmaydi."
-    ),
-    "signal": (
-        "📈 <b>Signal kiritish</b>\n\n"
-        "Signal <b>botning shaxsiy chatiga</b> yoziladi — guruhga emas! "
-        "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.\n\n"
-        "<b>Yo'l 1 — sehrgar:</b> <code>/new</code> yozing, bot har bir darajani "
-        "navbat bilan so'raydi.\n\n"
-        "<b>Yo'l 2 — bitta xabar:</b>\n"
-        "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
-        "Bular ham ishlaydi:\n"
-        "<code>ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80</code>\n"
-        "<code>eth long 3200 3400 3550 3100</code>\n"
-        "  ↳ kalit so'zsiz: birinchi raqam — kirish, oxirgisi — stop, "
-        "o'rtadagilari TP.\n\n"
-        "<b>Rasm bilan:</b> izoh (caption) bo'lsa undan o'qiydi, bo'lmasa "
-        "sun'iy intellekt grafikdan topishga urinadi.\n\n"
-        "✅ Hech narsa tasdiqsiz saqlanmaydi — bot avval o'qiganini ko'rsatadi."
-    ),
-    "mode": (
-        "⏳ <b>Limit va Market farqi</b>\n\n"
-        "<b>Standart holat — kutish (limit).</b> Signal darhol ochilmaydi: "
-        "narx kirish darajasiga <b>tegguncha kutadi</b>. Bu vaqtda "
-        "🕐 belgisi bilan turadi.\n\n"
-        "<b>Darhol ochish uchun</b> matnga <code>market</code> yoki "
-        "<code>bozor</code> so'zini qo'shing:\n"
-        "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
-        "Sehrgarda esa <b>🎯 Oddiy (darhol)</b> tugmasini tanlaysiz.\n\n"
-        "💡 Pozitsiyaga allaqachon kirgan bo'lsangiz — <code>market</code> "
-        "yozishni unutmang, aks holda bot narxni kutib turaveradi."
-    ),
-    "errors": (
-        "🔧 <b>Ko'p uchraydigan xatolar</b>\n\n"
-        "<b>Bot javob bermayapti?</b>\n"
-        "Signalni guruhga yozgan bo'lishingiz mumkin. Signal faqat "
-        "<b>shaxsiy chatda</b> qabul qilinadi.\n\n"
-        "<b>TP noto'g'ri o'qildi?</b>\n"
-        "<code>tp 172 168</code> — bu <b>ikkita</b> TP (172 va 168) deb o'qiladi. "
-        "Minglik uchun <code>tp 172168</code> yoki <code>TP1 172 168</code> yozing.\n\n"
-        "<b>\"SL entry dan past bo'lishi kerak\"?</b>\n"
-        "LONG uchun: stop <b>past</b>, TP <b>yuqori</b>. SHORT uchun teskarisi. "
-        "Odatda bu LONG/SHORT adashtirilganini bildiradi.\n\n"
-        "<b>Bot guruhga yozmayapti?</b>\n"
-        "Botda admin huquqi yo'qligidan. Guruh sozlamalaridan bering."
-    ),
-}
+# Yordam mavzulari — matnlar i18n.STRINGS da ("help.setup" va h.k.).
+HELP_KEYS = ("setup", "signal", "mode", "errors")
 
 
 # Mavzuga mos rasm. Telegraph rasm yuklashni qabul qilmagani uchun (upload
@@ -915,28 +867,26 @@ async def send_help_photo(bot, chat_id: int, key: str, caption: str | None = Non
         return False
 
 
-def help_menu_kb() -> InlineKeyboardMarkup:
+def help_menu_kb(lang: str | None = None) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("👥 Guruhni ulash", callback_data="help:setup"),
-         InlineKeyboardButton("📈 Signal kiritish", callback_data="help:signal")],
-        [InlineKeyboardButton("⏳ Limit / Market", callback_data="help:mode"),
-         InlineKeyboardButton("🔧 Xatolar", callback_data="help:errors")],
-        [InlineKeyboardButton("🖼 Rasmli yo'riqnoma", callback_data="help:rasm")],
+        [InlineKeyboardButton(i18n.t("help.btn_setup", lang), callback_data="help:setup"),
+         InlineKeyboardButton(i18n.t("help.btn_signal", lang), callback_data="help:signal")],
+        [InlineKeyboardButton(i18n.t("help.btn_mode", lang), callback_data="help:mode"),
+         InlineKeyboardButton(i18n.t("help.btn_errors", lang), callback_data="help:errors")],
+        [InlineKeyboardButton(i18n.t("help.btn_images", lang), callback_data="help:rasm")],
     ]
     if config.GUIDE_URL:
-        rows.append([InlineKeyboardButton("📘 To'liq qo'llanma (maqola)",
+        rows.append([InlineKeyboardButton(i18n.t("help.btn_guide", lang),
                                            url=config.GUIDE_URL)])
-    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return InlineKeyboardMarkup(rows)
 
 
-HELP_INTRO = ("❓ <b>Yordam</b>\n\n"
-              "Qaysi bo'lim bo'yicha yordam kerak?")
-
-
 async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = await user_lang(update.effective_user.id)
     await update.effective_message.reply_text(
-        HELP_INTRO, parse_mode=ParseMode.HTML, reply_markup=help_menu_kb())
+        i18n.t("help.intro", lang), parse_mode=ParseMode.HTML,
+        reply_markup=help_menu_kb(lang))
 
 
 async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -944,27 +894,27 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.answer()
     topic = q.data.split(":", 1)[1]
     chat_id = q.message.chat_id
+    lang = await user_lang(q.from_user.id)
 
     if topic == "home":
-        await q.edit_message_text(HELP_INTRO, parse_mode=ParseMode.HTML,
-                                   reply_markup=help_menu_kb())
+        await q.edit_message_text(i18n.t("help.intro", lang), parse_mode=ParseMode.HTML,
+                                   reply_markup=help_menu_kb(lang))
         return
 
     if topic == "rasm":
         # Hamma rasm ketma-ket — yangi boshlovchi bittada ko'rib chiqadi.
         for key in ("setup", "signal", "errors", "after"):
             await send_help_photo(ctx.bot, chat_id, key)
-        await ctx.bot.send_message(
-            chat_id, "🖼 Yo'riqnoma rasmlari. Batafsil matn uchun bo'limni tanlang.",
-            reply_markup=help_menu_kb())
+        await ctx.bot.send_message(chat_id, i18n.t("help.images_note", lang),
+                                    reply_markup=help_menu_kb(lang))
         return
 
-    txt = HELP_TOPICS.get(topic)
-    if not txt:
+    if topic not in HELP_KEYS:
         return
-    kb = [[InlineKeyboardButton("◀️ Yordam", callback_data="help:home")]]
+    txt = i18n.t(f"help.{topic}", lang)
+    kb = [[InlineKeyboardButton(i18n.t("help.btn_back", lang), callback_data="help:home")]]
     if config.GUIDE_URL:
-        kb.insert(0, [InlineKeyboardButton("📘 To'liq qo'llanma (maqola)",
+        kb.insert(0, [InlineKeyboardButton(i18n.t("help.btn_guide", lang),
                                             url=config.GUIDE_URL)])
     # Rasm bo'lsa — avval rasm, keyin matn: rasm ko'zga birinchi tashlanadi.
     await send_help_photo(ctx.bot, chat_id, topic)
@@ -1607,7 +1557,7 @@ async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         return
     uid = update.effective_user.id
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await msg.reply_text(text, reply_markup=kb)
         return
 
@@ -1661,7 +1611,7 @@ async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, q.from_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await q.edit_message_text(text, reply_markup=kb)
         return
     lang = await user_lang(q.from_user.id)
@@ -1710,7 +1660,7 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     if not ws:
         return
     if not await can_view(ctx.bot, q.from_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await q.edit_message_text(text, reply_markup=kb)
         return
     parts = q.data.split(":")
@@ -1757,7 +1707,7 @@ async def cmd_page(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, update.effective_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     await send_web_link(update.message, ws)
@@ -1770,7 +1720,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, q.from_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await q.message.reply_text(text, reply_markup=kb)
         return
     action = q.data.split(":", 1)[1]
@@ -1823,7 +1773,7 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     uid = update.effective_user.id
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.effective_message.reply_text(text, reply_markup=kb)
         return
     await update.effective_message.reply_text(
@@ -3297,7 +3247,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(uid)
@@ -3319,7 +3269,9 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
     AWAITING_REF_CODE.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
-    await update.message.reply_text("❌ Bekor qilindi.", reply_markup=MENU_BACK_KB)
+    lang = await user_lang(update.effective_user.id)
+    await update.message.reply_text(i18n.t("cmd.cancelled", lang),
+                                     reply_markup=menu_back_kb(lang))
 
 
 FIX_LIMIT = 30
@@ -3455,7 +3407,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, update.effective_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(update.effective_user.id)
@@ -3471,7 +3423,7 @@ async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     uid = update.effective_user.id
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(uid)
@@ -3493,7 +3445,7 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     uid = update.effective_user.id
     if not await can_view(ctx.bot, uid, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(uid)
@@ -3512,7 +3464,7 @@ async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, update.effective_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(update.effective_user.id)
@@ -3526,7 +3478,7 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, update.effective_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
@@ -3546,7 +3498,7 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not ws:
         return
     if not await can_view(ctx.bot, update.effective_user.id, ws):
-        text, kb = access_denied(ws)
+        text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
     async with busy(ctx.bot, update.effective_chat.id):
@@ -4389,31 +4341,30 @@ async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
+    lang = await user_lang(uid)
     bot_username = ctx.bot.username
     count = await db.count_referrals(uid)
     code, link = await referral_token(uid, bot_username)
-    link_txt = f"<code>{link}</code>" if link else "(havola olinmadi, birozdan so'ng qayta urining)"
-    code_txt = f"Taklif kodingiz: <code>{code}</code>\n\n" if code else ""
+    link_txt = f"<code>{link}</code>" if link else i18n.t("ref.no_link", lang)
+    code_txt = (i18n.t("ref.code_line", lang, code=code) + "\n\n") if code else ""
 
     rows = []
     if can_pick_ref_code(uid, count):
-        rows.append([InlineKeyboardButton("✏️ O'z kodimni tanlash",
+        rows.append([InlineKeyboardButton(i18n.t("ref.btn_pick", lang),
                                           callback_data="refcode")])
         extra = ""
     else:
         # Chegara ochiq aytiladi: bu maqsad, ya'ni odamni taklif qilishga
         # undaydigan narsa. Yashirin bo'lsa hech kim unga intilmaydi.
         left = config.REF_CUSTOM_MIN - count
-        extra = (f"\n\n✨ Yana <b>{left}</b> ta odam taklif qilsangiz, "
-                 f"o'zingizga chiroyli kod tanlay olasiz "
-                 f"(masalan <code>WHALES</code>).")
-    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+        extra = "\n\n" + i18n.t("ref.unlock_hint", lang, left=left)
+    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
 
     await update.message.reply_text(
-        f"🎁 Do'stlaringizni taklif qiling!\n\n"
-        f"{code_txt}"
-        f"Sizning shaxsiy havolangiz:\n{link_txt}\n\n"
-        f"Siz orqali botga kelganlar: <b>{count}</b>{extra}",
+        i18n.t("ref.head", lang) + "\n\n"
+        + code_txt
+        + i18n.t("ref.link_line", lang, link=link_txt) + "\n\n"
+        + i18n.t("ref.count", lang, n=count) + extra,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(rows))
 
@@ -4433,38 +4384,34 @@ def can_pick_ref_code(uid: int, referrals: int) -> bool:
     return is_admin(uid) or referrals >= config.REF_CUSTOM_MIN
 
 
-def validate_ref_code(code: str) -> str | None:
+def validate_ref_code(code: str, lang: str | None = None) -> str | None:
     """Xato matni yoki None (hammasi joyida)."""
     if not REF_CODE_RE.match(code):
-        return "Faqat lotin harflari va raqamlar bo'lishi mumkin (bo'sh joysiz)."
+        return i18n.t("ref.err_charset", lang)
     if not (REF_CODE_MIN <= len(code) <= REF_CODE_MAX):
-        return f"Uzunligi {REF_CODE_MIN} dan {REF_CODE_MAX} tagacha bo'lsin."
+        return i18n.t("ref.err_len", lang, mn=REF_CODE_MIN, mx=REF_CODE_MAX)
     # FAQAT RAQAMDAN iborat kod MUMKIN EMAS: `cmd_start` `ref_<raqam>`ni
     # ESKI shakl (Telegram id) deb o'qiydi, ya'ni bunday kod hech qachon
     # egasiga bog'lanmasdi va taklif boshqa odamga yozilib ketishi mumkin edi.
     if code.isdigit():
-        return "Faqat raqamdan iborat bo'lmasin — kamida bitta harf qo'shing."
+        return i18n.t("ref.err_digits", lang)
     if code.upper() in REF_CODE_BANNED:
-        return "Bu so'z band. Boshqasini tanlang."
+        return i18n.t("ref.err_banned", lang)
     return None
 
 
 async def on_ref_code_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     uid = q.from_user.id
+    lang = await user_lang(uid)
     count = await db.count_referrals(uid)
     if not can_pick_ref_code(uid, count):
-        await q.answer("Bu imkoniyat hali ochilmagan.", show_alert=True)
+        await q.answer(i18n.t("ref.locked", lang), show_alert=True)
         return
     await q.answer()
     AWAITING_REF_CODE[uid] = True
     await q.message.reply_text(
-        "✏️ Yangi kodingizni yozing.\n\n"
-        f"• {REF_CODE_MIN}–{REF_CODE_MAX} ta belgi\n"
-        "• Lotin harflari va raqamlar (masalan <code>WHALES</code>)\n"
-        "• Faqat raqamdan iborat bo'lmasin\n\n"
-        "⚠️ Kodni o'zgartirsangiz, ESKI kod bilan tarqatilgan havolalar "
-        "ishlamay qoladi.\n\nBekor qilish: /bekor",
+        i18n.t("ref.ask_code", lang, mn=REF_CODE_MIN, mx=REF_CODE_MAX),
         parse_mode=ParseMode.HTML)
 
 
@@ -4475,36 +4422,36 @@ async def handle_ref_code_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) 
         return False
     msg = update.effective_message
     code = (msg.text or "").strip().lstrip("@")
+    lang = await user_lang(uid)
 
     count = await db.count_referrals(uid)
     if not can_pick_ref_code(uid, count):
-        await msg.reply_text("Bu imkoniyat hali ochilmagan.", reply_markup=MENU_BACK_KB)
+        await msg.reply_text(i18n.t("ref.locked", lang), reply_markup=menu_back_kb(lang))
         return True
 
-    err = validate_ref_code(code)
+    err = validate_ref_code(code, lang)
     if err:
         AWAITING_REF_CODE[uid] = True
-        await msg.reply_text(f"❌ {err}\n\nQayta yozing yoki /bekor.")
+        await msg.reply_text(i18n.t("ref.retry", lang, err=err))
         return True
 
     try:
         ok = await db.set_custom_ref_code(uid, code)
     except Exception:
         log.exception("Taklif kodi saqlanmadi (%s)", uid)
-        await msg.reply_text("Saqlab bo'lmadi, birozdan so'ng qayta urining.",
-                             reply_markup=MENU_BACK_KB)
+        await msg.reply_text(i18n.t("ref.save_failed", lang),
+                             reply_markup=menu_back_kb(lang))
         return True
 
     if not ok:
         AWAITING_REF_CODE[uid] = True
-        await msg.reply_text("❌ Bu kod band. Boshqasini yozing yoki /bekor.")
+        await msg.reply_text(i18n.t("ref.taken", lang))
         return True
 
     link = referral_link(code, ctx.bot.username)
     await msg.reply_text(
-        f"✅ Kodingiz o'zgartirildi: <code>{html.escape(code)}</code>\n\n"
-        f"Yangi havolangiz:\n<code>{link}</code>",
-        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+        i18n.t("ref.changed", lang, code=html.escape(code), link=link),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     return True
 
 

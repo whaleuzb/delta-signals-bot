@@ -889,6 +889,460 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "{n} ta kutilmoqda", "ru": "{n} ожидают", "en": "{n} waiting",
     },
 
+    # --- Yordam ---
+    "help.intro": {
+        "uz": "❓ <b>Yordam</b>\n\nQaysi bo'lim bo'yicha yordam kerak?",
+        "ru": "❓ <b>Помощь</b>\n\nПо какому разделу нужна помощь?",
+        "en": "❓ <b>Help</b>\n\nWhich section do you need help with?",
+    },
+    "help.btn_setup": {
+        "uz": "👥 Guruhni ulash", "ru": "👥 Подключить группу",
+        "en": "👥 Connect a group",
+    },
+    "help.btn_signal": {
+        "uz": "📈 Signal kiritish", "ru": "📈 Как отправить сигнал",
+        "en": "📈 Sending a signal",
+    },
+    "help.btn_mode": {
+        "uz": "⏳ Limit / Market", "ru": "⏳ Лимит / Маркет",
+        "en": "⏳ Limit / Market",
+    },
+    "help.btn_errors": {
+        "uz": "🔧 Xatolar", "ru": "🔧 Ошибки", "en": "🔧 Common errors",
+    },
+    "help.btn_images": {
+        "uz": "🖼 Rasmli yo'riqnoma", "ru": "🖼 Инструкция в картинках",
+        "en": "🖼 Illustrated guide",
+    },
+    "help.btn_guide": {
+        "uz": "📘 To'liq qo'llanma (maqola)", "ru": "📘 Полное руководство (статья)",
+        "en": "📘 Full guide (article)",
+    },
+    "help.btn_back": {
+        "uz": "◀️ Yordam", "ru": "◀️ Помощь", "en": "◀️ Help",
+    },
+    "help.images_note": {
+        "uz": "🖼 Yo'riqnoma rasmlari. Batafsil matn uchun bo'limni tanlang.",
+        "ru": "🖼 Картинки инструкции. Для подробного текста выберите раздел.",
+        "en": "🖼 Guide images. Pick a section for the full text.",
+    },
+    "help.setup": {
+        "uz": ("👥 <b>Guruhni ulash</b>\n\n"
+               "<b>1.</b> Botni guruhingizga qo'shing.\n"
+               "<b>2.</b> Botga guruhda <b>admin</b> huquqini bering.\n"
+               "<b>3.</b> Guruh ichida <code>/setup</code> yozing.\n\n"
+               "Bot javob bersa — ulanish tugadi.\n\n"
+               "⚠️ Diqqat qiling:\n"
+               "• <code>/setup</code> ni <b>guruh ichida</b> yozing, shaxsiy chatda emas.\n"
+               "• Faqat <b>guruh admini</b> qila oladi.\n"
+               "• Bir admin — bitta guruh.\n"
+               "• Admin huquqisiz bot guruhga post yubora olmaydi."),
+        "ru": ("👥 <b>Подключение группы</b>\n\n"
+               "<b>1.</b> Добавьте бота в свою группу.\n"
+               "<b>2.</b> Дайте боту права <b>администратора</b>.\n"
+               "<b>3.</b> Напишите <code>/setup</code> внутри группы.\n\n"
+               "Бот ответил — подключение завершено.\n\n"
+               "⚠️ Обратите внимание:\n"
+               "• <code>/setup</code> пишите <b>в группе</b>, не в личном чате.\n"
+               "• Это может сделать только <b>админ группы</b>.\n"
+               "• Один админ — одна группа.\n"
+               "• Без прав администратора бот не сможет писать в группу."),
+        "en": ("👥 <b>Connecting a group</b>\n\n"
+               "<b>1.</b> Add the bot to your group.\n"
+               "<b>2.</b> Give the bot <b>admin</b> rights there.\n"
+               "<b>3.</b> Type <code>/setup</code> inside the group.\n\n"
+               "Once the bot replies, the group is connected.\n\n"
+               "⚠️ Note:\n"
+               "• Type <code>/setup</code> <b>in the group</b>, not in the private chat.\n"
+               "• Only a <b>group admin</b> can do it.\n"
+               "• One admin — one group.\n"
+               "• Without admin rights the bot cannot post to the group."),
+    },
+    "help.signal": {
+        "uz": ("📈 <b>Signal kiritish</b>\n\n"
+               "Signal <b>botning shaxsiy chatiga</b> yoziladi — guruhga emas! "
+               "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.\n\n"
+               "<b>Yo'l 1 — sehrgar:</b> <code>/new</code> yozing, bot har bir darajani "
+               "navbat bilan so'raydi.\n\n"
+               "<b>Yo'l 2 — bitta xabar:</b>\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "Bular ham ishlaydi:\n"
+               "<code>ADAUSDT long kirish 0.85 maqsad 0.92 0.98 stop 0.80</code>\n"
+               "<code>eth long 3200 3400 3550 3100</code>\n"
+               "  ↳ kalit so'zsiz: birinchi raqam — kirish, oxirgisi — stop, "
+               "o'rtadagilari TP.\n\n"
+               "<b>Rasm bilan:</b> darajalar rasm ostidagi <b>izohdan</b> (caption) "
+               "o'qiladi — rasmning o'zi guruhga signal bilan birga ketadi.\n\n"
+               "✅ Hech narsa tasdiqsiz saqlanmaydi — bot avval o'qiganini ko'rsatadi."),
+        "ru": ("📈 <b>Как отправить сигнал</b>\n\n"
+               "Сигнал пишется <b>в личный чат бота</b>, а не в группу! "
+               "После вашего подтверждения бот сам опубликует его в группе.\n\n"
+               "<b>Способ 1 — мастер:</b> напишите <code>/new</code>, бот спросит "
+               "каждый уровень по очереди.\n\n"
+               "<b>Способ 2 — одним сообщением:</b>\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "Это тоже работает:\n"
+               "<code>ADAUSDT long вход 0.85 цель 0.92 0.98 стоп 0.80</code>\n"
+               "<code>eth long 3200 3400 3550 3100</code>\n"
+               "  ↳ без ключевых слов: первое число — вход, последнее — стоп, "
+               "остальные — TP.\n\n"
+               "<b>С картинкой:</b> уровни читаются из <b>подписи</b> под картинкой, "
+               "а сама картинка уходит в группу вместе с сигналом.\n\n"
+               "✅ Ничего не сохраняется без подтверждения — бот сначала покажет, "
+               "что он понял."),
+        "en": ("📈 <b>Sending a signal</b>\n\n"
+               "A signal goes into the <b>bot's private chat</b>, not the group. "
+               "After you confirm it, the bot posts it to the group itself.\n\n"
+               "<b>Way 1 — the wizard:</b> type <code>/new</code> and the bot asks "
+               "for each level in turn.\n\n"
+               "<b>Way 2 — one message:</b>\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>\n\n"
+               "These work too:\n"
+               "<code>ADAUSDT long entry 0.85 target 0.92 0.98 stop 0.80</code>\n"
+               "<code>eth long 3200 3400 3550 3100</code>\n"
+               "  ↳ with no keywords: the first number is the entry, the last one "
+               "the stop, the rest are TPs.\n\n"
+               "<b>With an image:</b> the levels are read from the <b>caption</b> "
+               "under it — the image itself goes to the group with the signal.\n\n"
+               "✅ Nothing is saved without confirmation — the bot shows what it "
+               "understood first."),
+    },
+    "help.mode": {
+        "uz": ("⏳ <b>Limit va Market farqi</b>\n\n"
+               "<b>Standart holat — kutish (limit).</b> Signal darhol ochilmaydi: "
+               "narx kirish darajasiga <b>tegguncha kutadi</b>. Bu vaqtda "
+               "🕐 belgisi bilan turadi.\n\n"
+               "<b>Darhol ochish uchun</b> matnga <code>market</code> yoki "
+               "<code>bozor</code> so'zini qo'shing:\n"
+               "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
+               "Sehrgarda esa <b>🎯 Oddiy (darhol)</b> tugmasini tanlaysiz.\n\n"
+               "💡 Pozitsiyaga allaqachon kirgan bo'lsangiz — <code>market</code> "
+               "yozishni unutmang, aks holda bot narxni kutib turaveradi."),
+        "ru": ("⏳ <b>Разница между лимитом и маркетом</b>\n\n"
+               "<b>По умолчанию — ожидание (лимит).</b> Сигнал не открывается сразу: "
+               "он <b>ждёт</b>, пока цена дойдёт до уровня входа. В это время он "
+               "помечен значком 🕐.\n\n"
+               "<b>Чтобы открыть сразу</b>, добавьте в текст слово <code>market</code> "
+               "или <code>рынок</code>:\n"
+               "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
+               "В мастере для этого есть кнопка <b>🎯 Обычный (сразу)</b>.\n\n"
+               "💡 Если вы уже в позиции — не забудьте про <code>market</code>, иначе "
+               "бот так и будет ждать цену."),
+        "en": ("⏳ <b>Limit vs Market</b>\n\n"
+               "<b>The default is waiting (limit).</b> The signal does not open right "
+               "away: it <b>waits</b> until the price reaches the entry level. Until "
+               "then it is marked 🕐.\n\n"
+               "<b>To open immediately</b>, add the word <code>market</code> to the "
+               "text:\n"
+               "<code>BTCUSDT LONG market entry 65000 tp 67000 sl 64000</code>\n\n"
+               "In the wizard, pick <b>🎯 Market (now)</b>.\n\n"
+               "💡 If you are already in the position, don't forget "
+               "<code>market</code> — otherwise the bot keeps waiting for the price."),
+    },
+    "help.errors": {
+        "uz": ("🔧 <b>Ko'p uchraydigan xatolar</b>\n\n"
+               "<b>Bot javob bermayapti?</b>\n"
+               "Signalni guruhga yozgan bo'lishingiz mumkin. Signal faqat "
+               "<b>shaxsiy chatda</b> qabul qilinadi.\n\n"
+               "<b>TP noto'g'ri o'qildi?</b>\n"
+               "<code>tp 172 168</code> — bu <b>ikkita</b> TP (172 va 168) deb o'qiladi. "
+               "Minglik uchun <code>tp 172168</code> yoki <code>TP1 172 168</code> yozing.\n\n"
+               "<b>\"SL entry dan past bo'lishi kerak\"?</b>\n"
+               "LONG uchun: stop <b>past</b>, TP <b>yuqori</b>. SHORT uchun teskarisi. "
+               "Odatda bu LONG/SHORT adashtirilganini bildiradi.\n\n"
+               "<b>Bot guruhga yozmayapti?</b>\n"
+               "Botda admin huquqi yo'qligidan. Guruh sozlamalaridan bering."),
+        "ru": ("🔧 <b>Частые ошибки</b>\n\n"
+               "<b>Бот не отвечает?</b>\n"
+               "Возможно, вы написали сигнал в группу. Сигнал принимается только "
+               "<b>в личном чате</b>.\n\n"
+               "<b>TP прочитан неправильно?</b>\n"
+               "<code>tp 172 168</code> читается как <b>два</b> TP (172 и 168). Для "
+               "тысяч пишите <code>tp 172168</code> или <code>TP1 172 168</code>.\n\n"
+               "<b>«Стоп должен быть ниже входа»?</b>\n"
+               "Для LONG: стоп <b>ниже</b>, TP <b>выше</b>. Для SHORT — наоборот. "
+               "Обычно это значит, что перепутаны LONG и SHORT.\n\n"
+               "<b>Бот не пишет в группу?</b>\n"
+               "У него нет прав администратора. Выдайте их в настройках группы."),
+        "en": ("🔧 <b>Common errors</b>\n\n"
+               "<b>The bot is not answering?</b>\n"
+               "You may have written the signal in the group. Signals are only "
+               "accepted <b>in the private chat</b>.\n\n"
+               "<b>A TP was read wrong?</b>\n"
+               "<code>tp 172 168</code> reads as <b>two</b> TPs (172 and 168). For "
+               "thousands write <code>tp 172168</code> or <code>TP1 172 168</code>.\n\n"
+               "<b>\"The SL must be below the entry\"?</b>\n"
+               "For LONG: the stop is <b>below</b> and the TPs <b>above</b>. For SHORT "
+               "it is the other way round. Usually this means LONG and SHORT got "
+               "mixed up.\n\n"
+               "<b>The bot is not posting to the group?</b>\n"
+               "It has no admin rights. Grant them in the group settings."),
+    },
+
+    # --- Kirish, obuna va workspace tanlash ---
+    "acc.personal_other": {
+        "uz": "🔒 Bu boshqa foydalanuvchining shaxsiy jurnali.",
+        "ru": "🔒 Это личный журнал другого пользователя.",
+        "en": "🔒 This is another user's personal journal.",
+    },
+    "acc.not_subscriber": {
+        "uz": ("🔒 Bu ma'lumotlar faqat shu guruh obunachilariga ochiq.\n"
+               "Obunani faollashtirgach, bot avtomatik ishlay boshlaydi."),
+        "ru": ("🔒 Эти данные доступны только подписчикам этой группы.\n"
+               "После активации подписки бот заработает автоматически."),
+        "en": ("🔒 This data is only open to subscribers of this group.\n"
+               "Once the subscription is active, the bot starts working automatically."),
+    },
+    "acc.btn_subscribe": {
+        "uz": "💳 Obuna bo'lish", "ru": "💳 Оформить подписку", "en": "💳 Subscribe",
+    },
+    "sub.prompt": {
+        "uz": ("👋 Botdan foydalanish uchun quyidagi kanal(lar)ga obuna bo'ling, "
+               "so'ng <b>“✅ Obuna bo'ldim”</b> tugmasini bosing."),
+        "ru": ("👋 Чтобы пользоваться ботом, подпишитесь на канал(ы) ниже, "
+               "затем нажмите <b>«✅ Я подписался»</b>."),
+        "en": ("👋 To use the bot, subscribe to the channel(s) below, then press "
+               "<b>\"✅ I subscribed\"</b>."),
+    },
+    "sub.btn_check": {
+        "uz": "✅ Obuna bo'ldim, tekshirish", "ru": "✅ Я подписался, проверить",
+        "en": "✅ I subscribed, check",
+    },
+    "sub.first": {
+        "uz": "Avval kanalga obuna bo'ling", "ru": "Сначала подпишитесь на канал",
+        "en": "Subscribe to the channel first",
+    },
+    "sub.not_yet": {
+        "uz": "Hali obuna bo'lmagansiz.", "ru": "Вы ещё не подписались.",
+        "en": "You have not subscribed yet.",
+    },
+    "sub.thanks": {"uz": "Rahmat! ✅", "ru": "Спасибо! ✅", "en": "Thank you! ✅"},
+    "sub.ok": {
+        "uz": "✅ Obuna tasdiqlandi. Botdan foydalanishingiz mumkin.",
+        "ru": "✅ Подписка подтверждена. Можете пользоваться ботом.",
+        "en": "✅ Subscription confirmed. You can use the bot now.",
+    },
+    "ws.personal_name": {
+        "uz": "Shaxsiy jurnal", "ru": "Личный журнал", "en": "Personal journal",
+    },
+    "ws.btn_personal": {
+        "uz": "🧑 Shaxsiy jurnal", "ru": "🧑 Личный журнал", "en": "🧑 Personal journal",
+    },
+    "ws.btn_join": {
+        "uz": "➕ Boshqa guruhga a'zo bo'lish", "ru": "➕ Присоединиться к другой группе",
+        "en": "➕ Join another group",
+    },
+    "ws.pick": {
+        "uz": "Qaysi joy uchun?", "ru": "Для какого места?", "en": "Which workspace?",
+    },
+    "ws.picked": {
+        "uz": "✅ Tanlandi: {name}", "ru": "✅ Выбрано: {name}", "en": "✅ Selected: {name}",
+    },
+    "ws.no_groups": {
+        "uz": "Hozircha hech qanday guruh ro'yxatdan o'tmagan.",
+        "ru": "Пока ни одна группа не зарегистрирована.",
+        "en": "No group has been registered yet.",
+    },
+    "ws.which_group": {
+        "uz": "Qaysi guruh a'zosisiz? Tanlang:",
+        "ru": "В какой группе вы состоите? Выберите:",
+        "en": "Which group are you in? Pick one:",
+    },
+    "ws.group_not_found": {
+        "uz": "Bu guruh topilmadi.", "ru": "Эта группа не найдена.",
+        "en": "This group was not found.",
+    },
+    "ws.not_member": {
+        "uz": "🔒 Siz \"{name}\" guruhi a'zosi emassiz (yoki bot tekshira olmadi).",
+        "ru": "🔒 Вы не состоите в группе «{name}» (или бот не смог проверить).",
+        "en": "🔒 You are not a member of \"{name}\" (or the bot could not check).",
+    },
+    "ws.joined": {
+        "uz": "✅ \"{name}\" ulandi — endi statistikasini ko'ra olasiz.",
+        "ru": "✅ «{name}» подключена — теперь вам видна её статистика.",
+        "en": "✅ \"{name}\" connected — you can see its stats now.",
+    },
+    "ws.not_registered": {
+        "uz": "Bu guruh hali ro'yxatdan o'tmagan. Guruh admini /setup buyrug'ini yozsin.",
+        "ru": "Эта группа ещё не зарегистрирована. Пусть админ группы напишет /setup.",
+        "en": "This group is not registered yet. A group admin should type /setup.",
+    },
+
+    # --- Onboarding ---
+    "onb.welcome": {
+        "uz": ("👋 Xush kelibsiz! Botni qanday ishlatmoqchisiz?\n\n"
+               "🧑 <b>Shaxsiy jurnal</b> — o'z savdo signallaringizni yozib, "
+               "statistikangizni kuzatib borasiz. Faqat sizga ko'rinadi, hech kimga "
+               "post bo'lmaydi.\n\n"
+               "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa (yoki "
+               "allaqachon biror guruhga a'zo bo'lsangiz), shu bot orqali "
+               "statistikani ko'rishingiz mumkin."),
+        "ru": ("👋 Добро пожаловать! Как вы хотите пользоваться ботом?\n\n"
+               "🧑 <b>Личный журнал</b> — записываете свои сигналы и следите за своей "
+               "статистикой. Виден только вам, никуда не публикуется.\n\n"
+               "🏘 <b>Группа</b> — если у вас есть своя закрытая группа в Telegram "
+               "(или вы уже состоите в какой-то), через этого бота можно смотреть "
+               "её статистику."),
+        "en": ("👋 Welcome! How do you want to use the bot?\n\n"
+               "🧑 <b>Personal journal</b> — record your own trade signals and follow "
+               "your stats. Visible only to you, nothing is posted anywhere.\n\n"
+               "🏘 <b>Group</b> — if you have your own private Telegram group (or are "
+               "already a member of one), you can follow its stats through this bot."),
+    },
+    "onb.btn_personal": {
+        "uz": "🧑 Shaxsiy jurnal ochish", "ru": "🧑 Завести личный журнал",
+        "en": "🧑 Start a personal journal",
+    },
+    "onb.btn_group": {
+        "uz": "🏘 Menda yopiq guruh bor", "ru": "🏘 У меня есть закрытая группа",
+        "en": "🏘 I have a private group",
+    },
+    "onb.btn_member": {
+        "uz": "👥 Men guruh a'zosiman", "ru": "👥 Я участник группы",
+        "en": "👥 I am a group member",
+    },
+    "onb.btn_owner": {
+        "uz": "👑 Men guruh egasiman", "ru": "👑 Я владелец группы",
+        "en": "👑 I own the group",
+    },
+    "onb.personal_ok": {
+        "uz": "✅ Shaxsiy jurnal ochildi.", "ru": "✅ Личный журнал создан.",
+        "en": "✅ Personal journal created.",
+    },
+    "onb.who": {
+        "uz": "🏘 Shu guruh bilan bog'liq siz kimsiz?",
+        "ru": "🏘 Кто вы в этой группе?",
+        "en": "🏘 Who are you in that group?",
+    },
+    "onb.owner_steps": {
+        "uz": ("👑 Guruhingizni ulash uchun:\n\n"
+               "1. {mention} o'z guruhingizga qo'shing.\n"
+               "2. Botga guruhda <b>admin</b> huquqini bering (xabar yuborish uchun "
+               "kerak).\n"
+               "3. Guruh ichida <code>/setup</code> buyrug'ini yozing.\n\n"
+               "Shundan so'ng guruhingiz mustaqil workspace sifatida ishlay boshlaydi "
+               "va botga shaxsiy yozganingizda avtomatik o'shani boshqarasiz."),
+        "ru": ("👑 Чтобы подключить свою группу:\n\n"
+               "1. Добавьте {mention} в свою группу.\n"
+               "2. Дайте боту права <b>администратора</b> (нужны для отправки "
+               "сообщений).\n"
+               "3. Напишите в группе команду <code>/setup</code>.\n\n"
+               "После этого ваша группа станет отдельным рабочим пространством, и в "
+               "личном чате с ботом вы будете управлять именно ею."),
+        "en": ("👑 To connect your group:\n\n"
+               "1. Add {mention} to your group.\n"
+               "2. Give the bot <b>admin</b> rights there (needed to post).\n"
+               "3. Type <code>/setup</code> inside the group.\n\n"
+               "After that your group becomes its own workspace, and writing to the "
+               "bot privately manages exactly that group."),
+    },
+
+    # --- Taklif (referal) ---
+    "ref.head": {
+        "uz": "🎁 Do'stlaringizni taklif qiling!",
+        "ru": "🎁 Приглашайте друзей!",
+        "en": "🎁 Invite your friends!",
+    },
+    "ref.code_line": {
+        "uz": "Taklif kodingiz: <code>{code}</code>",
+        "ru": "Ваш код приглашения: <code>{code}</code>",
+        "en": "Your invite code: <code>{code}</code>",
+    },
+    "ref.link_line": {
+        "uz": "Sizning shaxsiy havolangiz:\n{link}",
+        "ru": "Ваша личная ссылка:\n{link}",
+        "en": "Your personal link:\n{link}",
+    },
+    "ref.no_link": {
+        "uz": "(havola olinmadi, birozdan so'ng qayta urining)",
+        "ru": "(ссылку получить не удалось, попробуйте позже)",
+        "en": "(the link could not be built, try again shortly)",
+    },
+    "ref.count": {
+        "uz": "Siz orqali botga kelganlar: <b>{n}</b>",
+        "ru": "Пришли по вашей ссылке: <b>{n}</b>",
+        "en": "Joined through you: <b>{n}</b>",
+    },
+    "ref.unlock_hint": {
+        "uz": ("✨ Yana <b>{left}</b> ta odam taklif qilsangiz, o'zingizga chiroyli "
+               "kod tanlay olasiz (masalan <code>WHALES</code>)."),
+        "ru": ("✨ Пригласите ещё <b>{left}</b> человек — и сможете выбрать себе "
+               "красивый код (например <code>WHALES</code>)."),
+        "en": ("✨ Invite <b>{left}</b> more people and you can pick your own "
+               "nice code (for example <code>WHALES</code>)."),
+    },
+    "ref.btn_pick": {
+        "uz": "✏️ O'z kodimni tanlash", "ru": "✏️ Выбрать свой код",
+        "en": "✏️ Pick my own code",
+    },
+    "ref.locked": {
+        "uz": "Bu imkoniyat hali ochilmagan.", "ru": "Эта возможность пока закрыта.",
+        "en": "This is not unlocked yet.",
+    },
+    "ref.ask_code": {
+        "uz": ("✏️ Yangi kodingizni yozing.\n\n"
+               "• {mn}–{mx} ta belgi\n"
+               "• Lotin harflari va raqamlar (masalan <code>WHALES</code>)\n"
+               "• Faqat raqamdan iborat bo'lmasin\n\n"
+               "⚠️ Kodni o'zgartirsangiz, ESKI kod bilan tarqatilgan havolalar "
+               "ishlamay qoladi.\n\nBekor qilish: /bekor"),
+        "ru": ("✏️ Напишите свой новый код.\n\n"
+               "• от {mn} до {mx} символов\n"
+               "• латинские буквы и цифры (например <code>WHALES</code>)\n"
+               "• не только из цифр\n\n"
+               "⚠️ Если сменить код, СТАРЫЕ разосланные ссылки перестанут "
+               "работать.\n\nОтмена: /bekor"),
+        "en": ("✏️ Send your new code.\n\n"
+               "• {mn}–{mx} characters\n"
+               "• Latin letters and digits (for example <code>WHALES</code>)\n"
+               "• not digits only\n\n"
+               "⚠️ If you change the code, links already shared with the OLD one "
+               "stop working.\n\nCancel: /bekor"),
+    },
+    "ref.err_charset": {
+        "uz": "Faqat lotin harflari va raqamlar bo'lishi mumkin (bo'sh joysiz).",
+        "ru": "Только латинские буквы и цифры (без пробелов).",
+        "en": "Latin letters and digits only (no spaces).",
+    },
+    "ref.err_len": {
+        "uz": "Uzunligi {mn} dan {mx} tagacha bo'lsin.",
+        "ru": "Длина должна быть от {mn} до {mx} символов.",
+        "en": "The length must be between {mn} and {mx}.",
+    },
+    "ref.err_digits": {
+        "uz": "Faqat raqamdan iborat bo'lmasin — kamida bitta harf qo'shing.",
+        "ru": "Код не может состоять только из цифр — добавьте хотя бы одну букву.",
+        "en": "It cannot be digits only — add at least one letter.",
+    },
+    "ref.err_banned": {
+        "uz": "Bu so'z band. Boshqasini tanlang.",
+        "ru": "Это слово занято. Выберите другое.",
+        "en": "That word is reserved. Pick another one.",
+    },
+    "ref.retry": {
+        "uz": "❌ {err}\n\nQayta yozing yoki /bekor.",
+        "ru": "❌ {err}\n\nНапишите ещё раз или /bekor.",
+        "en": "❌ {err}\n\nSend it again or /bekor.",
+    },
+    "ref.save_failed": {
+        "uz": "Saqlab bo'lmadi, birozdan so'ng qayta urining.",
+        "ru": "Не удалось сохранить, попробуйте чуть позже.",
+        "en": "Could not save it, try again shortly.",
+    },
+    "ref.taken": {
+        "uz": "❌ Bu kod band. Boshqasini yozing yoki /bekor.",
+        "ru": "❌ Этот код занят. Напишите другой или /bekor.",
+        "en": "❌ That code is taken. Send another one or /bekor.",
+    },
+    "ref.changed": {
+        "uz": "✅ Kodingiz o'zgartirildi: <code>{code}</code>\n\nYangi havolangiz:\n<code>{link}</code>",
+        "ru": "✅ Код изменён: <code>{code}</code>\n\nВаша новая ссылка:\n<code>{link}</code>",
+        "en": "✅ Your code is now: <code>{code}</code>\n\nYour new link:\n<code>{link}</code>",
+    },
+    "cmd.cancelled": {
+        "uz": "❌ Bekor qilindi.", "ru": "❌ Отменено.", "en": "❌ Cancelled.",
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",
