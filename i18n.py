@@ -241,6 +241,434 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "✏️ <b>#{sid} {sym}</b> — entry price changed to <b>{p}</b>",
     },
 
+    # --- Signal kartasi (guruhga ham, shaxsiy ko'rikka ham shu matn ketadi) ---
+    "sig.entry": {
+        "uz": "Kirish", "ru": "Вход", "en": "Entry",
+    },
+    "sig.entry_now": {
+        "uz": " <i>(🎯 darhol kirilgan)</i>",
+        "ru": " <i>(🎯 вход сразу)</i>",
+        "en": " <i>(🎯 entered at market)</i>",
+    },
+    "sig.tpsl_later": {
+        "uz": "<i>TP/SL — limit to'lgandan keyin so'raladi.</i>",
+        "ru": "<i>TP/SL — спросим после исполнения лимита.</i>",
+        "en": "<i>TP/SL will be asked once the limit fills.</i>",
+    },
+    "sig.stop": {
+        "uz": "Stop", "ru": "Стоп", "en": "Stop",
+    },
+    "sig.rr": {
+        "uz": "Risk/Reward", "ru": "Риск/Прибыль", "en": "Risk/Reward",
+    },
+    "sig.accepted": {
+        "uz": "✅ Signal <code>#{sid}</code> qabul qilindi.",
+        "ru": "✅ Сигнал <code>#{sid}</code> принят.",
+        "en": "✅ Signal <code>#{sid}</code> accepted.",
+    },
+
+    # --- Ko'rik (preview) ---
+    "prev.checking": {
+        "uz": "🔎 Juftlikni tekshiryapman…",
+        "ru": "🔎 Проверяю пару…",
+        "en": "🔎 Checking the pair…",
+    },
+    "prev.not_found": {
+        "uz": ("❌ <code>{sym}</code> topilmadi (kripto, forex yoki aksiya).\n"
+               "Nomni tekshiring — masalan <code>BTCUSDT</code>, <code>btc</code>, "
+               "<code>EURUSD</code>, <code>TSLA</code>."),
+        "ru": ("❌ <code>{sym}</code> не найден (крипто, форекс или акции).\n"
+               "Проверьте название — например <code>BTCUSDT</code>, <code>btc</code>, "
+               "<code>EURUSD</code>, <code>TSLA</code>."),
+        "en": ("❌ <code>{sym}</code> not found (crypto, forex or stocks).\n"
+               "Check the name — e.g. <code>BTCUSDT</code>, <code>btc</code>, "
+               "<code>EURUSD</code>, <code>TSLA</code>."),
+    },
+    "prev.warn_short_spot": {
+        "uz": "⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.",
+        "ru": "⚠️ В режиме SPOT шорт не торгуется — в статистику не войдёт.",
+        "en": "⚠️ SHORT is not traded in SPOT mode — it will not count in the stats.",
+    },
+    "prev.warn_market": {
+        "uz": "🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.",
+        "ru": "🎯 Обычный режим — после подтверждения сигнал сразу станет «открытым».",
+        "en": "🎯 Market mode — once confirmed the signal is marked \"open\" right away.",
+    },
+    "prev.warn_limit_tpsl": {
+        "uz": "📐 Limit to'lganda TP/SL kiritishingiz so'raladi.",
+        "ru": "📐 После исполнения лимита попросим ввести TP/SL.",
+        "en": "📐 You will be asked for TP/SL once the limit fills.",
+    },
+    "prev.cur_price": {
+        "uz": "Joriy narx: <b>{p}</b> (entrydan {d:+.2f}%)",
+        "ru": "Текущая цена: <b>{p}</b> ({d:+.2f}% от входа)",
+        "en": "Current price: <b>{p}</b> ({d:+.2f}% from entry)",
+    },
+    "prev.pic_q": {
+        "uz": "<b>Rasm qanday bo'lsin?</b>",
+        "ru": "<b>Какую картинку поставить?</b>",
+        "en": "<b>Which image should be used?</b>",
+    },
+    "prev.btn_own_pic": {
+        "uz": "🖼 Yuborgan rasmim bilan",
+        "ru": "🖼 С моей картинкой",
+        "en": "🖼 Use my image",
+    },
+    "prev.btn_upload_pic": {
+        "uz": "🖼 Rasm yuklash", "ru": "🖼 Загрузить картинку", "en": "🖼 Upload an image",
+    },
+    "prev.btn_bot_chart": {
+        "uz": "📈 Bot grafikni aniqlasin",
+        "ru": "📈 Пусть бот построит график",
+        "en": "📈 Let the bot draw the chart",
+    },
+    "prev.btn_no_pic": {
+        "uz": "📝 Rasmsiz davom etish",
+        "ru": "📝 Продолжить без картинки",
+        "en": "📝 Continue without an image",
+    },
+    "prev.btn_edit": {
+        "uz": "✏️ Tahrirlash", "ru": "✏️ Изменить", "en": "✏️ Edit",
+    },
+    "prev.btn_cancel": {
+        "uz": "🗑 Bekor", "ru": "🗑 Отмена", "en": "🗑 Cancel",
+    },
+    "prev.confirm_note": {
+        "uz": "✅ Tasdiqlasangiz guruhga shu ko'rinishda yuboriladi.",
+        "ru": "✅ После подтверждения в группу уйдёт именно в таком виде.",
+        "en": "✅ Once confirmed, it goes to the group exactly like this.",
+    },
+    "prev.btn_confirm": {
+        "uz": "✅ Tasdiqlash va yuborish",
+        "ru": "✅ Подтвердить и отправить",
+        "en": "✅ Confirm and send",
+    },
+
+    # --- Darajalarni tekshirish xatolari (parsing.validate) ---
+    "err.positive": {
+        "uz": "Narxlar musbat bo'lishi kerak.",
+        "ru": "Цены должны быть положительными.",
+        "en": "Prices must be positive.",
+    },
+    "err.sl_long": {
+        "uz": "LONG uchun SL ({sl}) entry ({e}) dan past bo'lishi kerak.",
+        "ru": "Для LONG стоп ({sl}) должен быть ниже входа ({e}).",
+        "en": "For LONG the SL ({sl}) must be below the entry ({e}).",
+    },
+    "err.tp_long": {
+        "uz": "LONG uchun barcha TP entry ({e}) dan yuqori bo'lishi kerak.",
+        "ru": "Для LONG все TP должны быть выше входа ({e}).",
+        "en": "For LONG every TP must be above the entry ({e}).",
+    },
+    "err.sl_short": {
+        "uz": "SHORT uchun SL ({sl}) entry ({e}) dan yuqori bo'lishi kerak.",
+        "ru": "Для SHORT стоп ({sl}) должен быть выше входа ({e}).",
+        "en": "For SHORT the SL ({sl}) must be above the entry ({e}).",
+    },
+    "err.tp_short": {
+        "uz": "SHORT uchun barcha TP entry ({e}) dan past bo'lishi kerak.",
+        "ru": "Для SHORT все TP должны быть ниже входа ({e}).",
+        "en": "For SHORT every TP must be below the entry ({e}).",
+    },
+
+    # --- Boshqaruv ekrani (ochiq signal) ---
+    "man.entry": {"uz": "Kirish", "ru": "Вход", "en": "Entry"},
+    "man.stop": {"uz": "Stop", "ru": "Стоп", "en": "Stop"},
+    "man.targets": {"uz": "Maqsadlar", "ru": "Цели", "en": "Targets"},
+    "man.closed_share": {
+        "uz": "Yopilgan ulush: <b>{pct:.0f}%</b> (to'plangan {run:+.2f}%)",
+        "ru": "Закрытая доля: <b>{pct:.0f}%</b> (накоплено {run:+.2f}%)",
+        "en": "Closed share: <b>{pct:.0f}%</b> (accrued {run:+.2f}%)",
+    },
+    "man.live": {
+        "uz": "Joriy narx: <b>{p}</b> → <b>{live:+.2f}%</b>",
+        "ru": "Текущая цена: <b>{p}</b> → <b>{live:+.2f}%</b>",
+        "en": "Current price: <b>{p}</b> → <b>{live:+.2f}%</b>",
+    },
+    "man.no_price": {
+        "uz": "<i>Joriy narx olinmadi</i>",
+        "ru": "<i>Текущая цена недоступна</i>",
+        "en": "<i>Current price unavailable</i>",
+    },
+    "man.no_tpsl": {
+        "uz": "<i>TP/SL hali kiritilmagan.</i>",
+        "ru": "<i>TP/SL ещё не заданы.</i>",
+        "en": "<i>TP/SL not set yet.</i>",
+    },
+    "man.btn_tpsl": {
+        "uz": "📐 TP/SL kiriting", "ru": "📐 Задать TP/SL", "en": "📐 Set TP/SL",
+    },
+    "man.btn_entry": {"uz": "✏️ Entry", "ru": "✏️ Вход", "en": "✏️ Entry"},
+    "man.btn_cancel": {
+        "uz": "❌ Bekor qilish", "ru": "❌ Отменить", "en": "❌ Cancel",
+    },
+    "man.btn_close": {
+        "uz": "🔒 To'liq yopish", "ru": "🔒 Закрыть полностью", "en": "🔒 Close fully",
+    },
+    "man.btn_be": {
+        "uz": "🛡 Stop → breakeven{be}", "ru": "🛡 Стоп → безубыток{be}",
+        "en": "🛡 Stop → breakeven{be}",
+    },
+    "man.btn_sl": {"uz": "✏️ Stop", "ru": "✏️ Стоп", "en": "✏️ Stop"},
+    "man.btn_tp": {
+        "uz": "🎯 Maqsadlarni o'zgartirish", "ru": "🎯 Изменить цели",
+        "en": "🎯 Change targets",
+    },
+    "man.gone": {
+        "uz": "Bu signal allaqachon yopilgan yoki topilmadi.",
+        "ru": "Этот сигнал уже закрыт или не найден.",
+        "en": "This signal is already closed or was not found.",
+    },
+    "man.no_right": {
+        "uz": "Ruxsat yo'q.", "ru": "Нет доступа.", "en": "No permission.",
+    },
+    "man.be_already": {
+        "uz": "Stop allaqachon breakeven'da.",
+        "ru": "Стоп уже в безубытке.",
+        "en": "The stop is already at breakeven.",
+    },
+    "man.be_breached": {
+        "uz": ("Joriy narx ({p}) kirish narxidan {dir} — breakeven'ga ko'chirish "
+               "signalni DARHOL yopadi. Shuni xohlasangiz \"To'liq yopish\"ni bosing."),
+        "ru": ("Текущая цена ({p}) {dir} цены входа — перенос в безубыток ЗАКРОЕТ "
+               "сигнал СРАЗУ. Если вы этого хотите, нажмите «Закрыть полностью»."),
+        "en": ("The current price ({p}) is {dir} the entry — moving to breakeven "
+               "will close the signal IMMEDIATELY. If that is what you want, press "
+               "\"Close fully\"."),
+    },
+    "man.dir_below": {"uz": "past", "ru": "ниже", "en": "below"},
+    "man.dir_above": {"uz": "baland", "ru": "выше", "en": "above"},
+    "man.ask_sl": {
+        "uz": ("✏️ #{sid} {sym} uchun <b>yangi stop</b> narxini yozing.\n"
+               "Hozirgi: <code>{cur}</code>\n\nBekor qilish uchun /bekor"),
+        "ru": ("✏️ Введите <b>новый стоп</b> для #{sid} {sym}.\n"
+               "Сейчас: <code>{cur}</code>\n\nДля отмены — /bekor"),
+        "en": ("✏️ Send the <b>new stop</b> price for #{sid} {sym}.\n"
+               "Current: <code>{cur}</code>\n\nSend /bekor to cancel"),
+    },
+    "man.ask_entry": {
+        "uz": ("✏️ #{sid} {sym} uchun <b>yangi entry (limit)</b> narxini yozing.\n"
+               "Hozirgi: <code>{cur}</code>\n\nBekor qilish uchun /bekor"),
+        "ru": ("✏️ Введите <b>новую цену входа (лимит)</b> для #{sid} {sym}.\n"
+               "Сейчас: <code>{cur}</code>\n\nДля отмены — /bekor"),
+        "en": ("✏️ Send the <b>new entry (limit)</b> price for #{sid} {sym}.\n"
+               "Current: <code>{cur}</code>\n\nSend /bekor to cancel"),
+    },
+    "man.ask_tps": {
+        "uz": ("🎯 #{sid} {sym} uchun <b>yangi maqsadlar</b>ni yozing (bo'sh joy "
+               "bilan ajrating).\nHozirgi: <code>{cur}</code>\n\n"
+               "Bekor qilish uchun /bekor"),
+        "ru": ("🎯 Введите <b>новые цели</b> для #{sid} {sym} (через пробел).\n"
+               "Сейчас: <code>{cur}</code>\n\nДля отмены — /bekor"),
+        "en": ("🎯 Send the <b>new targets</b> for #{sid} {sym} (space separated).\n"
+               "Current: <code>{cur}</code>\n\nSend /bekor to cancel"),
+    },
+    "man.entry_pending_only": {
+        "uz": "Entry faqat hali tegmagan (PENDING) signalda o'zgartiriladi.",
+        "ru": "Вход меняется только у сигнала, который ещё не исполнен (PENDING).",
+        "en": "The entry can only be changed while the signal is still PENDING.",
+    },
+    "man.partial_failed": {
+        "uz": "Yopib bo'lmadi (narx olinmadi yoki qism qolmagan).",
+        "ru": "Не удалось закрыть (нет цены или не осталось доли).",
+        "en": "Could not close (no price, or no share left).",
+    },
+    "man.closed_full": {
+        "uz": "{icon} #{sid} {sym} to'liq yopildi: <b>{pnl:+.2f}%</b>{rtxt}",
+        "ru": "{icon} #{sid} {sym} закрыт полностью: <b>{pnl:+.2f}%</b>{rtxt}",
+        "en": "{icon} #{sid} {sym} fully closed: <b>{pnl:+.2f}%</b>{rtxt}",
+    },
+    "man.sig_closed": {
+        "uz": "Signal allaqachon yopilgan.",
+        "ru": "Сигнал уже закрыт.",
+        "en": "The signal is already closed.",
+    },
+    "man.bad_number": {
+        "uz": "Noto'g'ri raqam. Qayta kiriting yoki /bekor.",
+        "ru": "Неверное число. Введите снова или /bekor.",
+        "en": "Invalid number. Try again or /bekor.",
+    },
+    "man.bad_format": {
+        "uz": "Noto'g'ri format. Qayta kiriting yoki /bekor.",
+        "ru": "Неверный формат. Введите снова или /bekor.",
+        "en": "Invalid format. Try again or /bekor.",
+    },
+    "man.sl_breached": {
+        "uz": ("⚠️ Joriy narx (<code>{p}</code>) bu stopdan {dir} — signal KEYINGI "
+               "tekshiruvda DARHOL yopiladi (stop allaqachon tegilgan hisoblanadi). "
+               "Shuni xohlasangiz \"🔒 To'liq yopish\" tugmasidan foydalaning, "
+               "aks holda boshqa narx kiriting yoki /bekor."),
+        "ru": ("⚠️ Текущая цена (<code>{p}</code>) {dir} этого стопа — сигнал будет "
+               "закрыт СРАЗУ на следующей проверке (стоп считается уже задетым). "
+               "Если вы этого хотите, нажмите «🔒 Закрыть полностью», иначе введите "
+               "другую цену или /bekor."),
+        "en": ("⚠️ The current price (<code>{p}</code>) is {dir} this stop — the signal "
+               "will be closed IMMEDIATELY on the next check (the stop counts as already "
+               "hit). If that is what you want, use \"🔒 Close fully\"; otherwise send "
+               "another price or /bekor."),
+    },
+    "man.dir_below_caps": {"uz": "PAST", "ru": "НИЖЕ", "en": "BELOW"},
+    "man.dir_above_caps": {"uz": "BALAND", "ru": "ВЫШЕ", "en": "ABOVE"},
+    "man.stop_set": {
+        "uz": "✅ Stop <b>{p}</b> ga o'rnatildi.",
+        "ru": "✅ Стоп установлен на <b>{p}</b>.",
+        "en": "✅ Stop set to <b>{p}</b>.",
+    },
+    "man.entry_set": {
+        "uz": "✅ Entry <b>{p}</b> ga o'rnatildi.",
+        "ru": "✅ Вход установлен на <b>{p}</b>.",
+        "en": "✅ Entry set to <b>{p}</b>.",
+    },
+    "man.tps_set": {
+        "uz": "✅ Maqsadlar: <b>{tps}</b>",
+        "ru": "✅ Цели: <b>{tps}</b>",
+        "en": "✅ Targets: <b>{tps}</b>",
+    },
+    "man.tps_too_few": {
+        "uz": ("Kamida {n} ta maqsad kerak — {n} tasi allaqachon bajarilgan. "
+               "Qayta kiriting yoki /bekor."),
+        "ru": ("Нужно минимум {n} целей — {n} уже исполнено. Введите снова или /bekor."),
+        "en": ("At least {n} targets are required — {n} are already filled. "
+               "Try again or /bekor."),
+    },
+    "man.entry_locked": {
+        "uz": "Signal allaqachon bajarilgan yoki yopilgan — entry endi o'zgarmaydi.",
+        "ru": "Сигнал уже исполнен или закрыт — вход больше не меняется.",
+        "en": "The signal is already filled or closed — the entry can no longer change.",
+    },
+    "man.entry_far": {
+        "uz": "Bu narx eski entrydan juda uzoq. Tekshiring yoki /bekor.",
+        "ru": "Эта цена слишком далека от прежнего входа. Проверьте или /bekor.",
+        "en": "This price is too far from the previous entry. Check it or /bekor.",
+    },
+    "man.entry_conflict": {
+        "uz": "❌ {err}\nMavjud stop/maqsadlar bilan mos kelmayapti. Boshqa narx kiriting yoki /bekor.",
+        "ru": "❌ {err}\nНе согласуется с текущим стопом/целями. Введите другую цену или /bekor.",
+        "en": "❌ {err}\nDoes not fit the current stop/targets. Send another price or /bekor.",
+    },
+
+    # --- Birinchi TP/SL joylashtirish ---
+    "tpsl.prompt": {
+        "uz": ("📐 <b>#{sid} {sym}</b> — TP va SL kiriting:\n"
+               "<code>tp 67000 68500 sl 64000</code>\n"
+               "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop)."),
+        "ru": ("📐 <b>#{sid} {sym}</b> — введите TP и SL:\n"
+               "<code>tp 67000 68500 sl 64000</code>\n"
+               "или коротко: <code>67000 68500 64000</code> (последнее — стоп)."),
+        "en": ("📐 <b>#{sid} {sym}</b> — send the TP and SL:\n"
+               "<code>tp 67000 68500 sl 64000</code>\n"
+               "or short: <code>67000 68500 64000</code> (the last one is the stop)."),
+    },
+    "tpsl.not_needed": {
+        "uz": "Bu so'rov endi kerak emas.",
+        "ru": "Этот запрос больше не нужен.",
+        "en": "This request is no longer needed.",
+    },
+    "tpsl.unreadable": {
+        "uz": ("O'qiy olmadim. Namuna: <code>tp 67000 68500 sl 64000</code>\n"
+               "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop). "
+               "Yoki /bekor yozing."),
+        "ru": ("Не смог прочитать. Пример: <code>tp 67000 68500 sl 64000</code>\n"
+               "или коротко: <code>67000 68500 64000</code> (последнее — стоп). "
+               "Или напишите /bekor."),
+        "en": ("Could not read that. Example: <code>tp 67000 68500 sl 64000</code>\n"
+               "or short: <code>67000 68500 64000</code> (the last one is the stop). "
+               "Or send /bekor."),
+    },
+    "tpsl.retry": {
+        "uz": "❌ {err}\nQayta kiriting yoki /bekor.",
+        "ru": "❌ {err}\nВведите снова или /bekor.",
+        "en": "❌ {err}\nTry again or /bekor.",
+    },
+    "tpsl.placed": {
+        "uz": "✅ TP/SL joylashtirildi.\n\n{body}",
+        "ru": "✅ TP/SL установлены.\n\n{body}",
+        "en": "✅ TP/SL placed.\n\n{body}",
+    },
+
+    # --- Qo'lda yopish ---
+    "close.ask_pending": {
+        "uz": "#{sid} {sym} hali entryga tegmagan. Bekor qilinsinmi?",
+        "ru": "#{sid} {sym} ещё не дошёл до входа. Отменить?",
+        "en": "#{sid} {sym} has not reached the entry yet. Cancel it?",
+    },
+    "close.ask_active": {
+        "uz": "#{sid} {sym} joriy narxda yopilsinmi?{est}",
+        "ru": "Закрыть #{sid} {sym} по текущей цене?{est}",
+        "en": "Close #{sid} {sym} at the current price?{est}",
+    },
+    "close.btn_yes": {
+        "uz": "✅ Ha, yopish", "ru": "✅ Да, закрыть", "en": "✅ Yes, close",
+    },
+    "close.btn_no": {"uz": "↩️ Yo'q", "ru": "↩️ Нет", "en": "↩️ No"},
+    "close.not_found": {"uz": "Topilmadi.", "ru": "Не найдено.", "en": "Not found."},
+    "close.failed": {
+        "uz": "Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).",
+        "ru": "Не удалось закрыть (нет цены или уже закрыт).",
+        "en": "Could not close (no price, or already closed).",
+    },
+    "close.cancelled_sig": {
+        "uz": "🗑 #{sid} {sym} bekor qilindi (entryga tegmagan edi).",
+        "ru": "🗑 #{sid} {sym} отменён (вход не был достигнут).",
+        "en": "🗑 #{sid} {sym} cancelled (the entry was never reached).",
+    },
+    "close.done": {
+        "uz": "{icon} #{sid} {sym} qo'lda yopildi @ {p}\nYakuniy: {pnl:+.2f}%{rtxt}",
+        "ru": "{icon} #{sid} {sym} закрыт вручную @ {p}\nИтог: {pnl:+.2f}%{rtxt}",
+        "en": "{icon} #{sid} {sym} closed manually @ {p}\nFinal: {pnl:+.2f}%{rtxt}",
+    },
+    "close.kept": {
+        "uz": "↩️ Bekor qilindi, signal ochiq qoldi.",
+        "ru": "↩️ Отменено, сигнал остался открытым.",
+        "en": "↩️ Cancelled — the signal stays open.",
+    },
+    "prev.price_moved": {
+        "uz": ("❌ Narx yangilandi (<b>{p}</b>), lekin endi darajalar mantiqan to'g'ri "
+               "kelmaydi: {err}\n✏️ Tahrirlash orqali qayta kiriting."),
+        "ru": ("❌ Цена обновилась (<b>{p}</b>), и уровни больше не согласуются: {err}\n"
+               "✏️ Измените их через «Изменить»."),
+        "en": ("❌ The price refreshed (<b>{p}</b>) and the levels no longer line up: "
+               "{err}\n✏️ Use Edit to enter them again."),
+    },
+
+    # --- Ko'rik tugmalaridan keyingi qadamlar ---
+    "prev.expired": {
+        "uz": "Bu so'rov eskirgan.", "ru": "Этот запрос устарел.",
+        "en": "This request has expired.",
+    },
+    "prev.cancelled": {
+        "uz": "🗑 Bekor qilindi.", "ru": "🗑 Отменено.", "en": "🗑 Cancelled.",
+    },
+    "prev.ask_tf": {
+        "uz": "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
+        "ru": "📈 В каком таймфрейме рисовать график итогового результата?",
+        "en": "📈 Which timeframe should the closing result chart use?",
+    },
+    "prev.send_photo": {
+        "uz": "🖼 Grafik rasmni yuboring.\nFikringizdan qaytsangiz /bekor yozing.",
+        "ru": "🖼 Пришлите картинку графика.\nПередумали — напишите /bekor.",
+        "en": "🖼 Send the chart image.\nChanged your mind — send /bekor.",
+    },
+    "prev.drawing": {
+        "uz": "📈 {tf} grafigi chizilmoqda…",
+        "ru": "📈 Рисую график {tf}…",
+        "en": "📈 Drawing the {tf} chart…",
+    },
+    "prev.draw_failed": {
+        "uz": "⚠️ Grafik chizilmadi (birja javob bermadi). Signal rasmsiz yuboriladi.",
+        "ru": "⚠️ График не построен (биржа не ответила). Сигнал уйдёт без картинки.",
+        "en": "⚠️ The chart could not be drawn (the exchange did not answer). "
+              "The signal will be sent without an image.",
+    },
+    "prev.ask_edit": {
+        "uz": ("✏️ To'g'ri darajalarni yuboring:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+        "ru": ("✏️ Пришлите правильные уровни:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+        "en": ("✏️ Send the correct levels:\n"
+               "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>"),
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",

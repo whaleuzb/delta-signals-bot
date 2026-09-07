@@ -13,6 +13,8 @@ narx kirish darajasiga tegguncha kutadi).
 """
 import re
 
+import i18n
+
 # Ikkita variant kerak:
 #   NUM  — "65 000" kabi bo'sh joyli minglikni tushunadi (bitta qiymat kutilgan joyda)
 #   NUMS — bo'sh joyni ajratgich deb biladi, ya'ni "172 168" = ikkita raqam
@@ -177,21 +179,22 @@ def parse_tp_sl(text: str) -> dict | None:
     return {"sl": sl, "tps": tps}
 
 
-def validate(d: dict) -> str | None:
-    """Mantiqiy xatolarni tutadi. Xato bo'lsa matn qaytaradi."""
+def validate(d: dict, lang: str | None = None) -> str | None:
+    """Mantiqiy xatolarni tutadi. Xato bo'lsa (foydalanuvchi tilidagi)
+    matn qaytaradi."""
     e, sl, tps = d["entry"], d["sl"], d["tps"]
     if e <= 0 or sl <= 0 or any(t <= 0 for t in tps):
-        return "Narxlar musbat bo'lishi kerak."
+        return i18n.t("err.positive", lang)
     if d["side"] == "LONG":
         if sl >= e:
-            return f"LONG uchun SL ({sl}) entry ({e}) dan past bo'lishi kerak."
+            return i18n.t("err.sl_long", lang, sl=sl, e=e)
         if any(t <= e for t in tps):
-            return f"LONG uchun barcha TP entry ({e}) dan yuqori bo'lishi kerak."
+            return i18n.t("err.tp_long", lang, e=e)
     else:
         if sl <= e:
-            return f"SHORT uchun SL ({sl}) entry ({e}) dan yuqori bo'lishi kerak."
+            return i18n.t("err.sl_short", lang, sl=sl, e=e)
         if any(t >= e for t in tps):
-            return f"SHORT uchun barcha TP entry ({e}) dan past bo'lishi kerak."
+            return i18n.t("err.tp_short", lang, e=e)
     # Risk CHEGARASI ATAYLAB YO'Q. Avval "25% dan katta" risk rad etilardi
     # (verguldan adashishga qarshi himoya sifatida), lekin foydalanuvchi
     # to'g'ri e'tiroz bildirdi: "har bir odamni riski o'ziga bog'liq".

@@ -456,20 +456,24 @@ def fmt_price(x: float) -> str:
     return f"{x:.8f}".rstrip("0").rstrip(".")
 
 
-def draft_text(d: dict, sig_id: int | None = None) -> str:
+def draft_text(d: dict, sig_id: int | None = None, lang: str | None = None) -> str:
+    """Signal kartasi. `lang` — GURUH tili (`ws_lang`), chunki bu matn
+    guruhga ketadi; ko'rikda ham ayni shu matn ko'rsatiladi ("tasdiqlasangiz
+    shu ko'rinishda yuboriladi" va'dasi buzilmasin)."""
     e, sl, tps = d["entry"], d.get("sl"), d.get("tps") or []
-    arrow = "🟢 LONG" if d["side"] == "LONG" else "🔴 SHORT"
+    arrow = i18n.t("side.long" if d["side"] == "LONG" else "side.short", lang)
     tag = {"forex": "💱 ", "stock": "📈 "}.get(d.get("market"), "")
     head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
     if sig_id:
         head += f"  <code>#{sig_id}</code>"
-    entry_note = " <i>(🎯 darhol kirilgan)</i>" if d.get("entry_mode") == "market" else ""
-    lines = [head, "", f"Kirish: <b>{fmt_price(e)}</b>{entry_note}"]
+    entry_note = i18n.t("sig.entry_now", lang) if d.get("entry_mode") == "market" else ""
+    lines = [head, "",
+             f"{i18n.t('sig.entry', lang)}: <b>{fmt_price(e)}</b>{entry_note}"]
     if sl is None:
         # TP/SL hali kiritilmagan — limit to'lgach so'raladi (foydalanuvchi:
         # "boshida faqat limitni kiritamiz, TP/SL limit aktivlashgandan
         # keyin so'ralsin"). R:R hali hisoblab bo'lmaydi.
-        lines.append("<i>TP/SL — limit to'lgandan keyin so'raladi.</i>")
+        lines.append(i18n.t("sig.tpsl_later", lang))
         return "\n".join(lines)
     risk = abs(e - sl) / e * 100
     reward = abs(tps[-1] - e) / e * 100
@@ -478,9 +482,9 @@ def draft_text(d: dict, sig_id: int | None = None) -> str:
         pct = abs(t - e) / e * 100
         lines.append(f"🎯 TP{i}: <b>{fmt_price(t)}</b>  <i>(+{pct:.2f}%)</i>")
     lines += [
-        f"🛑 Stop: <b>{fmt_price(sl)}</b>  <i>(-{risk:.2f}%)</i>",
+        f"🛑 {i18n.t('sig.stop', lang)}: <b>{fmt_price(sl)}</b>  <i>(-{risk:.2f}%)</i>",
         "",
-        f"Risk/Reward: <b>1:{rr:.2f}</b>",
+        f"{i18n.t('sig.rr', lang)}: <b>1:{rr:.2f}</b>",
     ]
     return "\n".join(lines)
 
@@ -1011,7 +1015,7 @@ AWAITING_ENTRY: dict[int, int] = {}
 AWAITING_TPSL: dict[int, int] = {}
 
 
-async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
+async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     entry = float(sig["entry"])
     sid = sig["id"]
     # PENDING — signal hali entryga TEGMAGAN (limit hali bajarilmagan).
@@ -1026,45 +1030,46 @@ async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
         # (stop/maqsad o'zgartirish, qisman yopish) TP/SL borligini
         # kutadi, shuning uchun bu yerda mavjud emas. Foydalanuvchini
         # to'g'ridan-to'g'ri TP/SL kiritishga yo'naltiramiz.
-        rows = [[InlineKeyboardButton("📐 TP/SL kiriting", callback_data=f"tpsl:{sid}")]]
+        rows = [[InlineKeyboardButton(i18n.t("man.btn_tpsl", lang),
+                                       callback_data=f"tpsl:{sid}")]]
         if pending:
             rows.append([
-                InlineKeyboardButton("✏️ Entry", callback_data=f"mentry:{sid}"),
-                InlineKeyboardButton("❌ Bekor qilish", callback_data=f"close:{sid}"),
+                InlineKeyboardButton(i18n.t("man.btn_entry", lang), callback_data=f"mentry:{sid}"),
+                InlineKeyboardButton(i18n.t("man.btn_cancel", lang), callback_data=f"close:{sid}"),
             ])
-        rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+        rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
         return (f"⚙️ <b>#{sid} {sig['symbol']} {sig['side']}</b>\n"
-                f"Kirish: <b>{fmt_price(entry)}</b>\n\n"
-                "<i>TP/SL hali kiritilmagan.</i>"), InlineKeyboardMarkup(rows)
+                f"{i18n.t('man.entry', lang)}: <b>{fmt_price(entry)}</b>\n\n"
+                + i18n.t("man.no_tpsl", lang)), InlineKeyboardMarkup(rows)
     filled = float(sig["filled_pct"])
     realized = float(sig["realized_pct"])
     price = await safe_last_price(sig["market"], sig["symbol"])
 
     lines = [f"⚙️ <b>#{sig['id']} {sig['symbol']} {sig['side']}</b>",
-             f"Kirish: <b>{fmt_price(entry)}</b> · "
-             f"Stop: <b>{fmt_price(float(sig['sl']))}</b>"]
+             f"{i18n.t('man.entry', lang)}: <b>{fmt_price(entry)}</b> · "
+             f"{i18n.t('man.stop', lang)}: <b>{fmt_price(float(sig['sl']))}</b>"]
     tps = [float(t) for t in sig["tps"]]
-    lines.append("Maqsadlar: " + " · ".join(
+    lines.append(i18n.t("man.targets", lang) + ": " + " · ".join(
         f"{'✅' if i < sig['tp_hit'] else '◻️'}{fmt_price(t)}"
         for i, t in enumerate(tps)))
     if filled > 0:
-        lines.append(f"Yopilgan ulush: <b>{filled * 100:.0f}%</b> "
-                     f"(to'plangan {realized:+.2f}%)")
+        lines.append(i18n.t("man.closed_share", lang, pct=filled * 100, run=realized))
     if price:
         live = realized + max(0.0, 1.0 - filled) * tracker.pnl_at(
             sig["side"], entry, price)
-        lines.append(f"Joriy narx: <b>{fmt_price(price)}</b> → <b>{live:+.2f}%</b>")
+        lines.append(i18n.t("man.live", lang, p=fmt_price(price), live=live))
     else:
-        lines.append("<i>Joriy narx olinmadi</i>")
+        lines.append(i18n.t("man.no_price", lang))
 
     be = " ✓" if abs(float(sig["sl"]) - entry) < 1e-12 else ""
     rows = [
-        [InlineKeyboardButton(f"🛡 Stop → breakeven{be}", callback_data=f"mbe:{sid}"),
-         InlineKeyboardButton("✏️ Stop", callback_data=f"msl:{sid}")],
-        [InlineKeyboardButton("🎯 Maqsadlarni o'zgartirish", callback_data=f"mtp:{sid}")],
+        [InlineKeyboardButton(i18n.t("man.btn_be", lang, be=be), callback_data=f"mbe:{sid}"),
+         InlineKeyboardButton(i18n.t("man.btn_sl", lang), callback_data=f"msl:{sid}")],
+        [InlineKeyboardButton(i18n.t("man.btn_tp", lang), callback_data=f"mtp:{sid}")],
     ]
     if pending:
-        rows.append([InlineKeyboardButton("✏️ Entry", callback_data=f"mentry:{sid}")])
+        rows.append([InlineKeyboardButton(i18n.t("man.btn_entry", lang),
+                                          callback_data=f"mentry:{sid}")])
     if sig["status"] == "ACTIVE" and filled < 0.999:
         rows.append([
             InlineKeyboardButton("✂️ 25%", callback_data=f"mpc:{sid}:25"),
@@ -1075,21 +1080,22 @@ async def manage_view(sig) -> tuple[str, InlineKeyboardMarkup]:
     # xuddi shu tugma (close:) close_now()da PENDING uchun ALLAQACHON
     # bekor qilish sifatida ishlaydi, faqat matni aniqroq qilib ko'rsatiladi.
     rows.append([InlineKeyboardButton(
-        "❌ Bekor qilish" if pending else "🔒 To'liq yopish", callback_data=f"close:{sid}")])
-    rows.append([InlineKeyboardButton("🏠 Bosh menyu", callback_data="menu")])
+        i18n.t("man.btn_cancel" if pending else "man.btn_close", lang),
+        callback_data=f"close:{sid}")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 async def _manage_guard(q):
     """Signalni oladi va huquqni tekshiradi. Mos bo'lmasa (None, None)."""
+    lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(int(q.data.split(":")[1]))
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.",
-                                   reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=MENU_BACK_KB)
         return None, None
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
-        await q.answer("Ruxsat yo'q.", show_alert=True)
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return None, None
     return sig, ws
 
@@ -1111,7 +1117,7 @@ async def _show_manage(q, sig_id: int) -> None:
     sig = await db.get_signal(sig_id)
     if not sig:
         return
-    text, kb = await manage_view(sig)
+    text, kb = await manage_view(sig, await user_lang(q.from_user.id))
     try:
         await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception:
@@ -1134,9 +1140,10 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     sig, ws = await _manage_guard(q)
     if not sig:
         return
+    lang = await user_lang(q.from_user.id)
     entry = float(sig["entry"])
     if abs(float(sig["sl"]) - entry) < 1e-12:
-        await q.answer("Stop allaqachon breakeven'da.", show_alert=True)
+        await q.answer(i18n.t("man.be_already", lang), show_alert=True)
         return
     # "✏️ Stop" oqimidagi bilan bir xil ogohlantirish — narx allaqachon
     # kirish narxidan "narigi tomonda" bo'lsa, breakeven'ga ko'chirish
@@ -1150,10 +1157,10 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         breached = (live_price <= entry) if sig["side"] == "LONG" else (live_price >= entry)
         if breached:
             await q.answer(
-                f"Joriy narx ({fmt_price(live_price)}) kirish narxidan "
-                f"{'past' if sig['side'] == 'LONG' else 'baland'} — breakeven'ga "
-                "ko'chirish signalni DARHOL yopadi. Shuni xohlasangiz \"To'liq "
-                "yopish\"ni bosing.", show_alert=True)
+                i18n.t("man.be_breached", lang, p=fmt_price(live_price),
+                       dir=i18n.t("man.dir_below" if sig["side"] == "LONG"
+                                  else "man.dir_above", lang)),
+                show_alert=True)
             return
     await db.set_stop(sig["id"], entry)
     await notify_group(ctx, ws, sig, tw("ev.be_moved", ws, sid=sig["id"],
@@ -1169,9 +1176,9 @@ async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     AWAITING_SL[q.from_user.id] = sig["id"]
     await q.edit_message_text(
-        f"✏️ #{sig['id']} {sig['symbol']} uchun <b>yangi stop</b> narxini yozing.\n"
-        f"Hozirgi: <code>{fmt_price(float(sig['sl']))}</code>\n\n"
-        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+        i18n.t("man.ask_sl", await user_lang(q.from_user.id), sid=sig["id"],
+               sym=sig["symbol"], cur=fmt_price(float(sig["sl"]))),
+        parse_mode=ParseMode.HTML)
 
 
 async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1180,15 +1187,15 @@ async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     sig, _ = await _manage_guard(q)
     if not sig:
         return
+    lang = await user_lang(q.from_user.id)
     if sig["status"] != "PENDING":
-        await q.answer("Entry faqat hali tegmagan (PENDING) signalda o'zgartiriladi.",
-                       show_alert=True)
+        await q.answer(i18n.t("man.entry_pending_only", lang), show_alert=True)
         return
     AWAITING_ENTRY[q.from_user.id] = sig["id"]
     await q.edit_message_text(
-        f"✏️ #{sig['id']} {sig['symbol']} uchun <b>yangi entry (limit)</b> narxini yozing.\n"
-        f"Hozirgi: <code>{fmt_price(float(sig['entry']))}</code>\n\n"
-        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+        i18n.t("man.ask_entry", lang, sid=sig["id"], sym=sig["symbol"],
+               cur=fmt_price(float(sig["entry"]))),
+        parse_mode=ParseMode.HTML)
 
 
 async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1200,9 +1207,9 @@ async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_TPS[q.from_user.id] = sig["id"]
     cur = " ".join(fmt_price(float(t)) for t in sig["tps"])
     await q.edit_message_text(
-        f"🎯 #{sig['id']} {sig['symbol']} uchun <b>yangi maqsadlar</b>ni yozing "
-        f"(bo'sh joy bilan ajrating).\nHozirgi: <code>{cur}</code>\n\n"
-        "Bekor qilish uchun /bekor", parse_mode=ParseMode.HTML)
+        i18n.t("man.ask_tps", await user_lang(q.from_user.id), sid=sig["id"],
+               sym=sig["symbol"], cur=cur),
+        parse_mode=ParseMode.HTML)
 
 
 async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1214,7 +1221,7 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     pct = int(q.data.split(":")[2])
     ev = await tracker.partial_close(sig["id"], pct / 100)
     if not ev:
-        await q.answer("Yopib bo'lmadi (narx olinmadi yoki qism qolmagan).",
+        await q.answer(i18n.t("man.partial_failed", await user_lang(q.from_user.id)),
                        show_alert=True)
         return
 
@@ -1239,8 +1246,8 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
                    pnl=ev["pnl"], rtxt=rtxt),
                 ref_uid=q.from_user.id)
         await q.edit_message_text(
-            f"{icon} #{sig['id']} {sig['symbol']} to'liq yopildi: "
-            f"<b>{ev['pnl']:+.2f}%</b>{rtxt}",
+            i18n.t("man.closed_full", await user_lang(q.from_user.id), icon=icon,
+                   sid=sig["id"], sym=sig["symbol"], pnl=ev["pnl"], rtxt=rtxt),
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return
 
@@ -1255,17 +1262,18 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     uid = update.effective_user.id
     msg = update.effective_message
     text = (msg.text or "").strip()
+    lang = await user_lang(uid)
 
     sig_id = AWAITING_SL.pop(uid, None)
     if sig_id:
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-            await msg.reply_text("Signal allaqachon yopilgan.", reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=MENU_BACK_KB)
             return True
         price = _parse_price(text)
         if price is None or price <= 0:
             AWAITING_SL[uid] = sig_id
-            await msg.reply_text("Noto'g'ri raqam. Qayta kiriting yoki /bekor.")
+            await msg.reply_text(i18n.t("man.bad_number", lang))
             return True
         entry = float(sig["entry"])
         # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
@@ -1295,11 +1303,9 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             if breached:
                 AWAITING_SL[uid] = sig_id
                 await msg.reply_text(
-                    f"⚠️ Joriy narx (<code>{fmt_price(live_price)}</code>) bu stopdan "
-                    f"{'PAST' if side == 'LONG' else 'BALAND'} — signal KEYINGI "
-                    "tekshiruvda DARHOL yopiladi (stop allaqachon tegilgan hisoblanadi). "
-                    "Shuni xohlasangiz \"🔒 To'liq yopish\" tugmasidan foydalaning, "
-                    "aks holda boshqa narx kiriting yoki /bekor.",
+                    i18n.t("man.sl_breached", lang, p=fmt_price(live_price),
+                           dir=i18n.t("man.dir_below_caps" if side == "LONG"
+                                      else "man.dir_above_caps", lang)),
                     parse_mode=ParseMode.HTML)
                 return True
         ws = await db.get_workspace(sig["workspace_id"])
@@ -1308,7 +1314,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         await db.set_stop(sig_id, price)
         await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig_id,
                                             sym=sig["symbol"], p=fmt_price(price)))
-        await msg.reply_text(f"✅ Stop <b>{fmt_price(price)}</b> ga o'rnatildi.",
+        await msg.reply_text(i18n.t("man.stop_set", lang, p=fmt_price(price)),
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
 
@@ -1316,20 +1322,18 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     if sig_id:
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-            await msg.reply_text("Signal allaqachon yopilgan.", reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("man.sig_closed", lang), reply_markup=MENU_BACK_KB)
             return True
         tps = [x for x in (_parse_price(x) for x in text.split()) if x and x > 0]
         if not tps:
             AWAITING_TPS[uid] = sig_id
-            await msg.reply_text("Noto'g'ri format. Qayta kiriting yoki /bekor.")
+            await msg.reply_text(i18n.t("man.bad_format", lang))
             return True
         # Allaqachon bajarilgan maqsadlardan kam qoldirib bo'lmaydi — tp_hit
         # indeksi ro'yxatdan chiqib ketib, kuzatuv chalkashib qolardi.
         if len(tps) < sig["tp_hit"]:
             AWAITING_TPS[uid] = sig_id
-            await msg.reply_text(
-                f"Kamida {sig['tp_hit']} ta maqsad kerak — {sig['tp_hit']} tasi "
-                "allaqachon bajarilgan. Qayta kiriting yoki /bekor.")
+            await msg.reply_text(i18n.t("man.tps_too_few", lang, n=sig["tp_hit"]))
             return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not can_manage(uid, ws):
@@ -1339,7 +1343,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         shown = " · ".join(fmt_price(t) for t in tps)
         await notify_group(ctx, ws, sig, tw("ev.tps_changed", ws, sid=sig_id,
                                             sym=sig["symbol"], tps=f"<b>{shown}</b>"))
-        await msg.reply_text(f"✅ Maqsadlar: <b>{shown}</b>",
+        await msg.reply_text(i18n.t("man.tps_set", lang, tps=shown),
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
 
@@ -1347,33 +1351,29 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     if sig_id:
         sig = await db.get_signal(sig_id)
         if not sig or sig["status"] != "PENDING":
-            await msg.reply_text(
-                "Signal allaqachon bajarilgan yoki yopilgan — entry endi o'zgarmaydi.",
-                reply_markup=MENU_BACK_KB)
+            await msg.reply_text(i18n.t("man.entry_locked", lang),
+                                  reply_markup=MENU_BACK_KB)
             return True
         price = _parse_price(text)
         if price is None or price <= 0:
             AWAITING_ENTRY[uid] = sig_id
-            await msg.reply_text("Noto'g'ri raqam. Qayta kiriting yoki /bekor.")
+            await msg.reply_text(i18n.t("man.bad_number", lang))
             return True
         old_entry = float(sig["entry"])
         # Eski entrydan juda uzoq qiymat deyarli doim xato yozuv — bejiz
         # noto'g'ri narxda signal "aktivlashtirib" yuborilmasligi uchun.
         if not (old_entry * 0.5 <= price <= old_entry * 1.5):
             AWAITING_ENTRY[uid] = sig_id
-            await msg.reply_text("Bu narx eski entrydan juda uzoq. "
-                                  "Tekshiring yoki /bekor.")
+            await msg.reply_text(i18n.t("man.entry_far", lang))
             return True
         if sig["sl"] is not None:
             err = parsing.validate({
                 "entry": price, "sl": float(sig["sl"]),
                 "tps": [float(t) for t in sig["tps"]], "side": sig["side"],
-            })
+            }, lang)
             if err:
                 AWAITING_ENTRY[uid] = sig_id
-                await msg.reply_text(
-                    f"❌ {err}\nMavjud stop/maqsadlar bilan mos kelmayapti. "
-                    "Boshqa narx kiriting yoki /bekor.")
+                await msg.reply_text(i18n.t("man.entry_conflict", lang, err=err))
                 return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not can_manage(uid, ws):
@@ -1381,17 +1381,15 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         await db.set_entry(sig_id, price)
         await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig_id,
                                             sym=sig["symbol"], p=fmt_price(price)))
-        await msg.reply_text(f"✅ Entry <b>{fmt_price(price)}</b> ga o'rnatildi.",
+        await msg.reply_text(i18n.t("man.entry_set", lang, p=fmt_price(price)),
                               parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
         return True
 
     return False
 
 
-def _tpsl_prompt(sig_id: int, symbol: str) -> str:
-    return (f"📐 <b>#{sig_id} {symbol}</b> — TP va SL kiriting:\n"
-            "<code>tp 67000 68500 sl 64000</code>\n"
-            "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop).")
+def _tpsl_prompt(sig_id: int, symbol: str, lang: str | None = None) -> str:
+    return i18n.t("tpsl.prompt", lang, sid=sig_id, sym=symbol)
 
 
 async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -1406,29 +1404,28 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
     if not sig_id:
         return False
 
+    lang = await user_lang(uid)
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] != "ACTIVE" or sig["sl"] is not None:
         # Signal allaqachon yopilgan, yoki (masalan boshqa yo'l bilan)
         # TP/SL allaqachon o'rnatilgan bo'lsa — bu javob endi ma'nosiz.
-        await msg.reply_text("Bu so'rov endi kerak emas.", reply_markup=MENU_BACK_KB)
+        await msg.reply_text(i18n.t("tpsl.not_needed", lang), reply_markup=MENU_BACK_KB)
         return True
 
     parsed = parsing.parse_tp_sl(text)
     if parsed is None:
         AWAITING_TPSL[uid] = sig_id
-        await msg.reply_text(
-            "O'qiy olmadim. Namuna: <code>tp 67000 68500 sl 64000</code>\n"
-            "yoki qisqa: <code>67000 68500 64000</code> (oxirgisi — stop). "
-            "Yoki /bekor yozing.", parse_mode=ParseMode.HTML)
+        await msg.reply_text(i18n.t("tpsl.unreadable", lang), parse_mode=ParseMode.HTML)
         return True
 
     entry = float(sig["entry"])
     side = sig["side"]
     tps = sorted(set(parsed["tps"]), reverse=(side == "SHORT"))
-    err = parsing.validate({"entry": entry, "sl": parsed["sl"], "tps": tps, "side": side})
+    err = parsing.validate({"entry": entry, "sl": parsed["sl"], "tps": tps,
+                            "side": side}, lang)
     if err:
         AWAITING_TPSL[uid] = sig_id
-        await msg.reply_text(f"❌ {err}\nQayta kiriting yoki /bekor.")
+        await msg.reply_text(i18n.t("tpsl.retry", lang, err=err))
         return True
 
     ws = await db.get_workspace(sig["workspace_id"])
@@ -1438,9 +1435,9 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
     await db.set_tp_sl(sig_id, parsed["sl"], tps)
     body = draft_text({"symbol": sig["symbol"], "side": side, "entry": entry,
                         "sl": parsed["sl"], "tps": tps, "market": sig["market"]},
-                       sig_id)
-    await msg.reply_text(f"✅ TP/SL joylashtirildi.\n\n{body}", parse_mode=ParseMode.HTML,
-                          reply_markup=MENU_BACK_KB)
+                       sig_id, ws_lang(ws))
+    await msg.reply_text(i18n.t("tpsl.placed", lang, body=body),
+                          parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
     await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
                                         sym=sig["symbol"], body=body))
     return True
@@ -1452,33 +1449,35 @@ async def on_tpsl_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     q = update.callback_query
     await q.answer()
     sig_id = int(q.data.split(":", 1)[1])
+    lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] != "ACTIVE" or sig["sl"] is not None:
-        await q.answer("Bu so'rov endi kerak emas.", show_alert=True)
+        await q.answer(i18n.t("tpsl.not_needed", lang), show_alert=True)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
-        await q.answer("Ruxsat yo'q.", show_alert=True)
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
     AWAITING_TPSL[q.from_user.id] = sig_id
-    await q.message.reply_text(_tpsl_prompt(sig_id, sig["symbol"]), parse_mode=ParseMode.HTML)
+    await q.message.reply_text(_tpsl_prompt(sig_id, sig["symbol"], lang),
+                                parse_mode=ParseMode.HTML)
 
 
 async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
     sig_id = int(q.data.split(":", 1)[1])
+    lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(sig_id)
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.edit_message_text("Bu signal allaqachon yopilgan yoki topilmadi.",
-                                   reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=MENU_BACK_KB)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
         return
 
     if sig["status"] == "PENDING":
-        text = f"#{sig_id} {sig['symbol']} hali entryga tegmagan. Bekor qilinsinmi?"
+        text = i18n.t("close.ask_pending", lang, sid=sig_id, sym=sig["symbol"])
     else:
         price = await safe_last_price(sig["market"], sig["symbol"])
         est_txt = ""
@@ -1489,11 +1488,12 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             rest = max(0.0, 1.0 - filled)
             est = realized + rest * tracker.pnl_at(sig["side"], entry, price)
             est_txt = f" (~{est:+.2f}%)"
-        text = f"#{sig_id} {sig['symbol']} joriy narxda yopilsinmi?{est_txt}"
+        text = i18n.t("close.ask_active", lang, sid=sig_id, sym=sig["symbol"],
+                      est=est_txt)
 
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Ha, yopish", callback_data=f"closeok:{sig_id}"),
-        InlineKeyboardButton("↩️ Yo'q", callback_data="closeno"),
+        InlineKeyboardButton(i18n.t("close.btn_yes", lang), callback_data=f"closeok:{sig_id}"),
+        InlineKeyboardButton(i18n.t("close.btn_no", lang), callback_data="closeno"),
     ]])
     await q.edit_message_text(text, reply_markup=kb)
 
@@ -1502,9 +1502,10 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     q = update.callback_query
     await q.answer()
     sig_id = int(q.data.split(":", 1)[1])
+    lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(sig_id)
     if not sig:
-        await q.edit_message_text("Topilmadi.", reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("close.not_found", lang), reply_markup=MENU_BACK_KB)
         return
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
@@ -1512,13 +1513,13 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
     ev = await tracker.close_now(sig_id)
     if not ev:
-        await q.edit_message_text("Yopib bo'lmadi (narx olinmadi yoki allaqachon yopilgan).",
-                                   reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(i18n.t("close.failed", lang), reply_markup=MENU_BACK_KB)
         return
 
     if ev["status"] == "CANCELLED":
-        await q.edit_message_text(f"🗑 #{sig_id} {ev['symbol']} bekor qilindi (entryga tegmagan edi).",
-                                   reply_markup=MENU_BACK_KB)
+        await q.edit_message_text(
+            i18n.t("close.cancelled_sig", lang, sid=sig_id, sym=ev["symbol"]),
+            reply_markup=MENU_BACK_KB)
         return
 
     pnl, r = ev["pnl"], ev["r"]
@@ -1531,8 +1532,9 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     icon = "✅" if pnl >= 0 else "❌"
     rtxt = f" ({r:+.2f}R)" if r is not None else ""
     await q.edit_message_text(
-        f"{icon} #{sig_id} {ev['symbol']} qo'lda yopildi @ {fmt_price(ev['price'])}\n"
-        f"Yakuniy: {pnl:+.2f}%{rtxt}", reply_markup=MENU_BACK_KB)
+        i18n.t("close.done", lang, icon=icon, sid=sig_id, sym=ev["symbol"],
+               p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt),
+        reply_markup=MENU_BACK_KB)
 
     txt = tw("ev.manual_close", ws, icon=icon, sid=sig_id, sym=ev["symbol"],
              p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt)
@@ -1548,7 +1550,8 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    await q.edit_message_text("↩️ Bekor qilindi, signal ochiq qoldi.", reply_markup=MENU_BACK_KB)
+    await q.edit_message_text(i18n.t("close.kept", await user_lang(q.from_user.id)),
+                               reply_markup=MENU_BACK_KB)
 
 
 def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
@@ -2338,15 +2341,18 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
 
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
                         token: str | None = None) -> None:
+    # Ikki xil til: `lang` — odamning shaxsiy tili (tugmalar, ogohlantirishlar),
+    # `glang` — guruh tili (signal kartasining o'zi, chunki u guruhga ketadi).
+    lang = await user_lang(msg.from_user.id)
+    ws = await db.get_workspace(workspace_id)
+    glang = ws_lang(ws)
     cands = draft.get("symbols") or [draft["symbol"]]
-    async with busy(ctx.bot, msg.chat_id, "🔎 Juftlikni tekshiryapman…"):
+    async with busy(ctx.bot, msg.chat_id, i18n.t("prev.checking", lang)):
         sym, market = await resolve_symbol(cands)
     if not sym:
         shown = html.escape(", ".join(cands[:3]))
         await msg.reply_text(
-            f"❌ <code>{shown}</code> topilmadi (kripto, forex yoki aksiya).\n"
-            "Nomni tekshiring — masalan <code>BTCUSDT</code>, <code>btc</code>, "
-            "<code>EURUSD</code>, <code>TSLA</code>.",
+            i18n.t("prev.not_found", lang, sym=shown),
             parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB,
         )
         return
@@ -2359,7 +2365,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     # bu yerda hali tekshirishning o'zi ma'nosiz: TP/SL foydalanuvchi
     # limit to'lgach kiritganida (`handle_tpsl_input()`) tekshiriladi.
     if draft.get("sl") is not None:
-        err = parsing.validate(draft)
+        err = parsing.validate(draft, lang)
         if err:
             await msg.reply_text(f"❌ {err}", parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
             return
@@ -2368,15 +2374,15 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     # SPOT cheklovi faqat KRIPTOGA tegishli: forex va aksiyalarda short
     # oddiy hol (CFD/margin), shuning uchun ogohlantirish ko'rsatilmaydi.
     if draft["side"] == "SHORT" and not config.ALLOW_SHORT and market == "crypto":
-        warn.append("⚠️ SPOT rejimida SHORT savdo qilinmaydi — statistikaga kirmaydi.")
+        warn.append(i18n.t("prev.warn_short_spot", lang))
     if draft.get("entry_mode") == "market":
-        warn.append("🎯 Oddiy rejim — tasdiqlansa signal darhol \"ochiq\" deb belgilanadi.")
+        warn.append(i18n.t("prev.warn_market", lang))
     if draft.get("entry_mode") == "limit" and draft.get("sl") is None:
-        warn.append("📐 Limit to'lganda TP/SL kiritishingiz so'raladi.")
+        warn.append(i18n.t("prev.warn_limit_tpsl", lang))
     price = await safe_last_price(market, sym)
     if price:
         d = (price - draft["entry"]) / draft["entry"] * 100
-        warn.append(f"Joriy narx: <b>{fmt_price(price)}</b> (entrydan {d:+.2f}%)")
+        warn.append(i18n.t("prev.cur_price", lang, p=fmt_price(price), d=d))
 
     token = token or secrets.token_urlsafe(8)
     # Tasdiqlanmagan qoralamalar cheksiz to'planmasin: tasdiqlamay tashlab
@@ -2386,31 +2392,32 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
         PENDING.pop(next(iter(PENDING)), None)
     PENDING[token] = {"draft": draft, "file_id": file_id, "user": msg.from_user.id,
                        "workspace_id": workspace_id, "warn": warn,
-                       "chart_tf": None, "ready_file_id": None, "want_bot_chart": False}
+                       "chart_tf": None, "ready_file_id": None, "want_bot_chart": False,
+                       "lang": lang, "glang": glang}
 
-    body = draft_text(draft)
+    body = draft_text(draft, lang=glang)
     if warn:
         body += "\n\n" + "\n".join(warn)
-    body += "\n\n<b>Rasm qanday bo'lsin?</b>"
+    body += "\n\n" + i18n.t("prev.pic_q", lang)
 
     await msg.reply_text(body, parse_mode=ParseMode.HTML,
-                          reply_markup=preview_kb(token, file_id))
+                          reply_markup=preview_kb(token, file_id, lang))
 
 
-def preview_kb(token: str, file_id) -> InlineKeyboardMarkup:
+def preview_kb(token: str, file_id, lang: str | None = None) -> InlineKeyboardMarkup:
     """Uchta tanlov. Rasm HECH QACHON majburiy emas — uchinchi tugma har doim bor.
 
     "📈 Bot grafikni aniqlasin" TP/SL hali kiritilmagan (limit-keyin-
     so'ralsin oqimi) qoralamalarda ham ishlaydi — `chart._render()` endi
     `sl=None`/`tps=[]` bilan xavfsiz (faqat entry chizig'i bilan, stop/
     maqsad chiziqlarisiz chiziladi)."""
-    first = ("🖼 Yuborgan rasmim bilan" if file_id else "🖼 Rasm yuklash")
+    first = i18n.t("prev.btn_own_pic" if file_id else "prev.btn_upload_pic", lang)
     rows = [
         [InlineKeyboardButton(first, callback_data=f"pic:{token}")],
-        [InlineKeyboardButton("📈 Bot grafikni aniqlasin", callback_data=f"okc:{token}")],
-        [InlineKeyboardButton("📝 Rasmsiz davom etish", callback_data=f"nopic:{token}")],
-        [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
-         InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
+        [InlineKeyboardButton(i18n.t("prev.btn_bot_chart", lang), callback_data=f"okc:{token}")],
+        [InlineKeyboardButton(i18n.t("prev.btn_no_pic", lang), callback_data=f"nopic:{token}")],
+        [InlineKeyboardButton(i18n.t("prev.btn_edit", lang), callback_data=f"ed:{token}"),
+         InlineKeyboardButton(i18n.t("prev.btn_cancel", lang), callback_data=f"no:{token}")],
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -2426,10 +2433,11 @@ async def send_final_preview(target, ctx, token: str) -> None:
     if not item:
         return
     d = item["draft"]
-    caption = draft_text(d)
+    lang = item.get("lang")
+    caption = draft_text(d, lang=item.get("glang"))
     if item["warn"]:
         caption += "\n\n" + "\n".join(item["warn"])
-    caption += "\n\n✅ Tasdiqlasangiz guruhga shu ko'rinishda yuboriladi."
+    caption += "\n\n" + i18n.t("prev.confirm_note", lang)
     # Telegram rasm sarlavhasi 1024 belgi bilan cheklangan. Uzun bo'lsa
     # send_photo YIQILADI va rasm butunlay yo'qolardi (bot grafigi ham) —
     # shuning uchun oldindan qisqartiramiz.
@@ -2437,9 +2445,9 @@ async def send_final_preview(target, ctx, token: str) -> None:
         caption = caption[:1000].rsplit("\n", 1)[0] + "\n…"
 
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Tasdiqlash va yuborish", callback_data=f"go:{token}")],
-        [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"ed:{token}"),
-         InlineKeyboardButton("🗑 Bekor", callback_data=f"no:{token}")],
+        [InlineKeyboardButton(i18n.t("prev.btn_confirm", lang), callback_data=f"go:{token}")],
+        [InlineKeyboardButton(i18n.t("prev.btn_edit", lang), callback_data=f"ed:{token}"),
+         InlineKeyboardButton(i18n.t("prev.btn_cancel", lang), callback_data=f"no:{token}")],
     ])
 
     photo = item.get("gen") or item.get("file_id")
@@ -2582,14 +2590,16 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         token = rest
     item = PENDING.get(token)
     if not item:
-        await _edit(q, "Bu so'rov eskirgan.", reply_markup=MENU_BACK_KB)
+        await _edit(q, i18n.t("prev.expired", await user_lang(q.from_user.id)),
+                    reply_markup=MENU_BACK_KB)
         return
     if q.from_user.id != item["user"]:
         return
+    lang = item.get("lang")
 
     if action == "no":
         PENDING.pop(token, None)
-        await _edit(q, "🗑 Bekor qilindi.", reply_markup=MENU_BACK_KB)
+        await _edit(q, i18n.t("prev.cancelled", lang), reply_markup=MENU_BACK_KB)
         return
 
     if action == "okc":
@@ -2603,7 +2613,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if action == "bk":
         await q.edit_message_reply_markup(
-            reply_markup=preview_kb(token, item["file_id"]))
+            reply_markup=preview_kb(token, item["file_id"], lang))
         return
 
     if action == "pic":
@@ -2617,14 +2627,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # misolida ko'rsatdi).
         if item["file_id"]:
             item["want_bot_chart"] = False
-            await _edit(q, "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
-                       reply_markup=tf_kb(token))
+            await _edit(q, i18n.t("prev.ask_tf", lang), reply_markup=tf_kb(token))
         else:
             AWAITING_SIGNAL_PHOTO[q.from_user.id] = token
             await _clear_kb(q)
-            await q.message.reply_text(
-                "🖼 Grafik rasmni yuboring.\n"
-                "Fikringizdan qaytsangiz /bekor yozing.")
+            await q.message.reply_text(i18n.t("prev.send_photo", lang))
         return
 
     if action == "nopic":
@@ -2632,8 +2639,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # avtomatik chiziladi, shuning uchun taym freym baribir kerak.
         item["gen"] = None
         item["want_bot_chart"] = False
-        await _edit(q, "📈 Yopilgandagi natija grafigi qaysi taym freymda chizilsin?",
-                   reply_markup=tf_kb(token))
+        await _edit(q, i18n.t("prev.ask_tf", lang), reply_markup=tf_kb(token))
         return
 
     if action == "tf":
@@ -2647,7 +2653,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # u har doim avtomatik chiziladi), OCHILISH posti uchun qayta
         # bot grafigi CHIZILMAYDI.
         if item.get("want_bot_chart"):
-            note = await q.message.reply_text(f"📈 {chart_tf} grafigi chizilmoqda…")
+            note = await q.message.reply_text(i18n.t("prev.drawing", lang, tf=chart_tf))
             ws_row = await db.get_workspace(item["workspace_id"])
             try:
                 buf = await chart.setup_chart(item["draft"], ws_row["name"] if ws_row else "",
@@ -2661,20 +2667,13 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception:
                 pass
             if not item["gen"]:
-                await q.message.reply_text(
-                    "⚠️ Grafik chizilmadi (birja javob bermadi). "
-                    "Signal rasmsiz yuboriladi.")
+                await q.message.reply_text(i18n.t("prev.draw_failed", lang))
         await send_final_preview(q.message, ctx, token)
         return
 
     if action == "ed":
         AWAITING_EDIT[q.from_user.id] = token
-        await _edit(
-            q,
-            "✏️ To'g'ri darajalarni yuboring:\n"
-            "<code>BTCUSDT LONG entry 65000 tp 67000 68500 sl 64000</code>",
-            parse_mode=ParseMode.HTML,
-        )
+        await _edit(q, i18n.t("prev.ask_edit", lang), parse_mode=ParseMode.HTML)
         # Eski ko'rikning tugmalari olib tashlanadi: tahrirdan keyin YANGI
         # ko'rik yuboriladi, eskisidan "Tasdiqlash" bosilsa foydalanuvchi
         # ekranda ko'rib turgan narsa bilan yuboriladigan signal mos
@@ -2685,7 +2684,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # --- tasdiqlash ---
     ws = await db.get_workspace(item["workspace_id"])
     if not ws or not can_manage(q.from_user.id, ws):
-        await _edit(q, "Ruxsat yo'q.")
+        await _edit(q, i18n.t("man.no_right", lang))
         return
 
     d = item["draft"]
@@ -2704,16 +2703,15 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         fresh_price = await safe_last_price(d.get("market", "crypto"), d["symbol"], fresh=True)
         if fresh_price:
             refreshed = dict(d, entry=fresh_price)
-            err = parsing.validate(refreshed)
+            err = parsing.validate(refreshed, lang)
             if err:
                 # Narx shu qadar siljiganki, avval tanlangan TP/SL endi
                 # mantiqsiz (masalan TP allaqachon o'tib ketgan) — signalni
                 # SHUNDAY yaratish o'rniga (darrov "yopilgan" holatda
                 # tug'iladi) to'xtatib, foydalanuvchiga aniq xabar beramiz.
                 await _edit(
-                    q, f"❌ Narx yangilandi (<b>{fmt_price(fresh_price)}</b>), lekin endi "
-                    f"darajalar mantiqan to'g'ri kelmaydi: {err}\n"
-                    "✏️ Tahrirlash orqali qayta kiriting.",
+                    q, i18n.t("prev.price_moved", lang,
+                              p=fmt_price(fresh_price), err=err),
                     parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
                 return
             d = refreshed
@@ -2733,12 +2731,13 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     })
     PENDING.pop(token, None)
     await _clear_kb(q)
-    await q.message.reply_text(f"✅ Signal <code>#{sig_id}</code> qabul qilindi.",
-                                parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
+    await q.message.reply_text(
+        i18n.t("sig.accepted", lang, sid=sig_id),
+        parse_mode=ParseMode.HTML, reply_markup=MENU_BACK_KB)
 
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
-        body = draft_text(d, sig_id)
+        body = draft_text(d, sig_id, ws_lang(ws))
         try:
             if post_file_id:
                 sent = await ctx.bot.send_photo(
@@ -2759,7 +2758,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # stop, ±5%) javob beradigan asosiy xabar ham bo'lmasdi. Endi karta
         # egasining shaxsiy chatiga yuboriladi va uning id'si saqlanadi —
         # guruhdagi bilan bir xil tartib.
-        body = draft_text(d, sig_id)
+        body = draft_text(d, sig_id, ws_lang(ws))
         try:
             if post_file_id:
                 sent = await ctx.bot.send_photo(ws["owner_id"], post_file_id,
@@ -2777,7 +2776,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await ctx.bot.send_message(
                 chat_id,
-                f"▶️ <b>#{sig_id} {d['symbol']}</b> — pozitsiya ochildi @ <b>{fmt_price(d['entry'])}</b>",
+                tw("ev.open", ws, sid=sig_id, sym=d["symbol"], p=fmt_price(d["entry"])),
                 parse_mode=ParseMode.HTML, reply_to_message_id=group_msg_id,
                 allow_sending_without_reply=True,
                 message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
@@ -2983,10 +2982,11 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if e["type"] == "OPEN" and e.get("needs_tpsl") and sig and sig["author_id"]:
             author_id = sig["author_id"]
             AWAITING_TPSL[author_id] = sid
+            alang = await user_lang(author_id)
             kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-                "📐 TP/SL kiriting", callback_data=f"tpsl:{sid}")]])
+                i18n.t("man.btn_tpsl", alang), callback_data=f"tpsl:{sid}")]])
             try:
-                await ctx.bot.send_message(author_id, _tpsl_prompt(sid, sym),
+                await ctx.bot.send_message(author_id, _tpsl_prompt(sid, sym, alang),
                                             parse_mode=ParseMode.HTML, reply_markup=kb)
             except Exception:
                 log.exception("TP/SL so'rovi yuborilmadi (#%s)", sid)
