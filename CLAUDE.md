@@ -5339,3 +5339,51 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_news_uz_only.py` 32/32 (RetryAfter -> TimedOut ->
      muvaffaqiyat ketma-ketligi, uchala urinish yiqilishi, va yiqilgandan
      keyin bazada qator qolmasligi).
+
+166. **Qo'llanmalar auditi — eskirganlari tuzatildi, rasmlar KODDAN
+     yasaladigan bo'ldi.** Foydalanuvchi: "qo'llanmalarni tekshirib chiq.
+     Keraksizlarini olib tashlab yangi qo'llanmalarni hammasiga joriy
+     qil."
+
+     Loyihada UCHTA qo'llanma bor edi va ular bir-biridan uzilib
+     ketgan: (1) Telegraph maqolasi (`guide.py`), (2) bot ichidagi
+     `/yordam` matnlari (`help.*`), (3) `guide_images/` rasmlari.
+
+     **Topilgan eskirgan joylar (hammasi kanal qo'shilgandan keyin
+     yolg'onga aylangan):**
+     - "Bir admin — bitta guruh" — uchala qo'llanmada ham. Endi qoida
+       "bitta guruh VA bitta kanal" (163-band).
+     - "Bot uni guruhga o'zi chiqaradi" — kanal aytilmagan.
+     - "Bot guruhga yozmayapti" bo'limi — kanal aytilmagan.
+     - `/yordam` da kanal ulash umuman yo'q edi.
+     - Qo'llanmadagi buyruqlar ro'yxatida `/til` va `/sahifa` yo'q edi
+       (uchala til va ochiq sahifa mahsulotning bir qismi bo'lsa ham).
+
+     **Rasmlar — eng jiddiy muammo.** Ular avgustda QO'LDA yasalgan
+     (`_manba.html`) va FAQAT O'ZBEKCHA edi: rus/ingliz foydalanuvchi
+     `/yordam → 🖼 Rasmlar` bosganda o'zbekcha rasm ko'rardi. Bu
+     158-banddagi "til aralashuvi" muammosining rasmdagi ko'rinishi
+     edi va hech qanday sinov uni ushlamasdi. Ustiga rasmdagi matn
+     ("Bir admin — bitta guruh") endi noto'g'ri edi.
+
+     Yechim: `make_help_images.py` — rasmlar **koddan** yasaladi, matn
+     skript ichida uchala tilda, uslub esa bot/veb bilan bir xil
+     (qora-kumush). `guide_images/uz|ru|en/` — 4 tadan 12 ta rasm.
+     `send_help_photo(..., lang=)` foydalanuvchi tiliga qarab tanlaydi,
+     til uchun rasm bo'lmasa o'zbekchaga qaytadi. Eski 4 ta rasm va
+     `_manba.html` o'chirildi.
+
+     **Kichik tuzatish:** rasm yo'li endi MODUL joylashuviga nisbatan
+     (`__file__`), joriy papkaga emas — bot boshqa ish papkasidan ishga
+     tushirilsa rasm topilmay qolardi.
+
+     **Saboq:** qo'llanma eskirsa kod YIQILMAYDI — shuning uchun u
+     jimgina noto'g'ri bo'lib qolaveradi. Endi `test_guides.py` (43/43)
+     buni ushlaydi: eskirgan egalik qoidasi qolmaganini, kanal uchala
+     qo'llanmada ham borligini, rasmlar har tilda mavjudligini va
+     qo'llanmada aytilgan HAR BIR buyruq haqiqatan ro'yxatdan
+     o'tganini tekshiradi.
+
+     ⚠️ **Telegraph maqolasi qo'lda qayta chop etilishi kerak:**
+     Railway'da `python publish_guide.py` (yoki bitta til uchun
+     `python publish_guide.py ru`). Sandbox'dan telegra.ph bloklangan.

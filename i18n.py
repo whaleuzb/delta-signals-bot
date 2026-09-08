@@ -896,8 +896,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "❓ <b>Help</b>\n\nWhich section do you need help with?",
     },
     "help.btn_setup": {
-        "uz": "👥 Guruhni ulash", "ru": "👥 Подключить группу",
-        "en": "👥 Connect a group",
+        "uz": "👥 Guruh / kanal ulash", "ru": "👥 Группа / канал",
+        "en": "👥 Group / channel",
     },
     "help.btn_signal": {
         "uz": "📈 Signal kiritish", "ru": "📈 Как отправить сигнал",
@@ -926,42 +926,60 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🖼 Картинки инструкции. Для подробного текста выберите раздел.",
         "en": "🖼 Guide images. Pick a section for the full text.",
     },
+    # ⚠️ Guruh VA kanal ikkalasi ham shu bo'limda: kanal boshqacha ulanadi
+    # (kanalda buyruq yozib bo'lmaydi) va egalik qoidasi ham o'zgardi —
+    # bitta admin bitta guruh VA bitta kanal boshqaradi.
     "help.setup": {
-        "uz": ("👥 <b>Guruhni ulash</b>\n\n"
+        "uz": ("👥 <b>Guruh yoki kanalni ulash</b>\n\n"
+               "<b>Guruh:</b>\n"
                "<b>1.</b> Botni guruhingizga qo'shing.\n"
-               "<b>2.</b> Botga guruhda <b>admin</b> huquqini bering.\n"
+               "<b>2.</b> Botga <b>admin</b> huquqini bering.\n"
                "<b>3.</b> Guruh ichida <code>/setup</code> yozing.\n\n"
-               "Bot javob bersa — ulanish tugadi.\n\n"
+               "<b>Kanal:</b>\n"
+               "<b>1.</b> Botni kanalga <b>admin</b> qilib qo'shing "
+               "(xabar yuborish huquqi bilan).\n"
+               "<b>2.</b> Bot shaxsiy chatingizga \"Ulash\" tugmasini yuboradi — "
+               "bosing. Kanalda <code>/setup</code> yozish shart emas.\n\n"
                "⚠️ Diqqat qiling:\n"
                "• <code>/setup</code> ni <b>guruh ichida</b> yozing, shaxsiy chatda emas.\n"
-               "• Faqat <b>guruh admini</b> qila oladi.\n"
-               "• Bir admin — bitta guruh.\n"
-               "• Admin huquqisiz bot guruhga post yubora olmaydi."),
-        "ru": ("👥 <b>Подключение группы</b>\n\n"
+               "• Faqat <b>admin</b> ulay oladi.\n"
+               "• Bir admin — bitta guruh <b>va</b> bitta kanal.\n"
+               "• Admin huquqisiz bot post yubora olmaydi."),
+        "ru": ("👥 <b>Подключение группы или канала</b>\n\n"
+               "<b>Группа:</b>\n"
                "<b>1.</b> Добавьте бота в свою группу.\n"
                "<b>2.</b> Дайте боту права <b>администратора</b>.\n"
                "<b>3.</b> Напишите <code>/setup</code> внутри группы.\n\n"
-               "Бот ответил — подключение завершено.\n\n"
+               "<b>Канал:</b>\n"
+               "<b>1.</b> Добавьте бота в канал <b>администратором</b> "
+               "(с правом отправки сообщений).\n"
+               "<b>2.</b> Бот пришлёт вам в личный чат кнопку «Подключить» — "
+               "нажмите её. Писать <code>/setup</code> в канале не нужно.\n\n"
                "⚠️ Обратите внимание:\n"
                "• <code>/setup</code> пишите <b>в группе</b>, не в личном чате.\n"
-               "• Это может сделать только <b>админ группы</b>.\n"
-               "• Один админ — одна группа.\n"
-               "• Без прав администратора бот не сможет писать в группу."),
-        "en": ("👥 <b>Connecting a group</b>\n\n"
+               "• Подключить может только <b>админ</b>.\n"
+               "• Один админ — одна группа <b>и</b> один канал.\n"
+               "• Без прав администратора бот не сможет публиковать посты."),
+        "en": ("👥 <b>Connecting a group or channel</b>\n\n"
+               "<b>Group:</b>\n"
                "<b>1.</b> Add the bot to your group.\n"
                "<b>2.</b> Give the bot <b>admin</b> rights there.\n"
                "<b>3.</b> Type <code>/setup</code> inside the group.\n\n"
-               "Once the bot replies, the group is connected.\n\n"
+               "<b>Channel:</b>\n"
+               "<b>1.</b> Add the bot to the channel as an <b>admin</b> "
+               "(with the post messages right).\n"
+               "<b>2.</b> The bot sends a \"Connect\" button to your private chat — "
+               "tap it. No <code>/setup</code> needed in the channel.\n\n"
                "⚠️ Note:\n"
                "• Type <code>/setup</code> <b>in the group</b>, not in the private chat.\n"
-               "• Only a <b>group admin</b> can do it.\n"
-               "• One admin — one group.\n"
-               "• Without admin rights the bot cannot post to the group."),
+               "• Only an <b>admin</b> can connect it.\n"
+               "• One admin — one group <b>and</b> one channel.\n"
+               "• Without admin rights the bot cannot post."),
     },
     "help.signal": {
         "uz": ("📈 <b>Signal kiritish</b>\n\n"
                "Signal <b>botning shaxsiy chatiga</b> yoziladi — guruhga emas! "
-               "Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.\n\n"
+               "Tasdiqlaganingizdan keyin bot uni guruh yoki kanalga o'zi chiqaradi.\n\n"
                "<b>Yo'l 1 — sehrgar:</b> <code>/new</code> yozing, bot har bir darajani "
                "navbat bilan so'raydi.\n\n"
                "<b>Yo'l 2 — bitta xabar:</b>\n"
@@ -976,7 +994,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "✅ Hech narsa tasdiqsiz saqlanmaydi — bot avval o'qiganini ko'rsatadi."),
         "ru": ("📈 <b>Как отправить сигнал</b>\n\n"
                "Сигнал пишется <b>в личный чат бота</b>, а не в группу! "
-               "После вашего подтверждения бот сам опубликует его в группе.\n\n"
+               "После вашего подтверждения бот сам опубликует его в группе или канале.\n\n"
                "<b>Способ 1 — мастер:</b> напишите <code>/new</code>, бот спросит "
                "каждый уровень по очереди.\n\n"
                "<b>Способ 2 — одним сообщением:</b>\n"
@@ -992,7 +1010,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "что он понял."),
         "en": ("📈 <b>Sending a signal</b>\n\n"
                "A signal goes into the <b>bot's private chat</b>, not the group. "
-               "After you confirm it, the bot posts it to the group itself.\n\n"
+               "After you confirm it, the bot posts it to the group or channel itself.\n\n"
                "<b>Way 1 — the wizard:</b> type <code>/new</code> and the bot asks "
                "for each level in turn.\n\n"
                "<b>Way 2 — one message:</b>\n"
@@ -1050,8 +1068,8 @@ STRINGS: dict[str, dict[str, str]] = {
                "<b>\"SL entry dan past bo'lishi kerak\"?</b>\n"
                "LONG uchun: stop <b>past</b>, TP <b>yuqori</b>. SHORT uchun teskarisi. "
                "Odatda bu LONG/SHORT adashtirilganini bildiradi.\n\n"
-               "<b>Bot guruhga yozmayapti?</b>\n"
-               "Botda admin huquqi yo'qligidan. Guruh sozlamalaridan bering."),
+               "<b>Bot guruh yoki kanalga yozmayapti?</b>\n"
+               "Botda admin huquqi yo'qligidan. Guruh yoki kanal sozlamalaridan bering."),
         "ru": ("🔧 <b>Частые ошибки</b>\n\n"
                "<b>Бот не отвечает?</b>\n"
                "Возможно, вы написали сигнал в группу. Сигнал принимается только "
@@ -1062,8 +1080,8 @@ STRINGS: dict[str, dict[str, str]] = {
                "<b>«Стоп должен быть ниже входа»?</b>\n"
                "Для LONG: стоп <b>ниже</b>, TP <b>выше</b>. Для SHORT — наоборот. "
                "Обычно это значит, что перепутаны LONG и SHORT.\n\n"
-               "<b>Бот не пишет в группу?</b>\n"
-               "У него нет прав администратора. Выдайте их в настройках группы."),
+               "<b>Бот не пишет в группу или канал?</b>\n"
+               "У него нет прав администратора. Выдайте их в настройках группы или канала."),
         "en": ("🔧 <b>Common errors</b>\n\n"
                "<b>The bot is not answering?</b>\n"
                "You may have written the signal in the group. Signals are only "
@@ -1075,8 +1093,8 @@ STRINGS: dict[str, dict[str, str]] = {
                "For LONG: the stop is <b>below</b> and the TPs <b>above</b>. For SHORT "
                "it is the other way round. Usually this means LONG and SHORT got "
                "mixed up.\n\n"
-               "<b>The bot is not posting to the group?</b>\n"
-               "It has no admin rights. Grant them in the group settings."),
+               "<b>The bot is not posting to the group or channel?</b>\n"
+               "It has no admin rights. Grant them in the group or channel settings."),
     },
 
     # --- Kirish, obuna va workspace tanlash ---

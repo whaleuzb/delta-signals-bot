@@ -36,11 +36,12 @@ G = {
  "ru": "Полное руководство по запуску бота. Каждый шаг показан как реальный диалог с ботом.",
  "en": "A complete guide to getting the bot running. Every step is shown as a real conversation with the bot.",
 },
-"a_head": {"uz": "A. Guruhingizni ulash", "ru": "A. Подключение группы", "en": "A. Connecting your group"},
+"a_head": {"uz": "A. Guruh yoki kanalni ulash", "ru": "A. Подключение группы или канала",
+          "en": "A. Connecting a group or channel"},
 "a_sub": {
- "uz": "Bu bir marta bajariladi. Shundan keyin guruhingiz mustaqil ishlay boshlaydi.",
- "ru": "Делается один раз. После этого группа работает самостоятельно.",
- "en": "This is done once. After that your group runs on its own.",
+ "uz": "Bu bir marta bajariladi. Shundan keyin guruh yoki kanalingiz mustaqil ishlay boshlaydi.",
+ "ru": "Делается один раз. После этого группа или канал работает самостоятельно.",
+ "en": "This is done once. After that your group or channel runs on its own.",
 },
 "a_1a": {"uz": "Botni guruhingizga ", "ru": "", "en": ""},
 "a_1b": {"uz": "qo'shing", "ru": "Добавьте", "en": "Add"},
@@ -78,18 +79,18 @@ G = {
 },
 "a_warn_b": {"uz": "Diqqat: ", "ru": "Внимание: ", "en": "Note: "},
 "a_warn": {
- "uz": "Faqat guruh admini /setup qila oladi. Bir admin — bitta guruh: sizda allaqachon ulangan guruh bo'lsa, bot ikkinchisini qabul qilmaydi.",
- "ru": "Команду /setup может выполнить только админ группы. Один админ — одна группа: если у вас уже есть подключённая группа, вторую бот не примет.",
- "en": "Only a group admin can run /setup. One admin — one group: if you already have a connected group, the bot will not accept a second one.",
+ "uz": "Faqat guruh admini /setup qila oladi. Bir admin — bitta guruh VA bitta kanal: guruhingiz bo'lsa kanal ham ulay olasiz, lekin ikkinchi guruhni bot qabul qilmaydi.",
+ "ru": "Команду /setup может выполнить только админ группы. Один админ — одна группа И один канал: при наличии группы канал подключить можно, но вторую группу бот не примет.",
+ "en": "Only a group admin can run /setup. One admin — one group AND one channel: with a group connected you can still add a channel, but the bot will not accept a second group.",
 },
 "b_head": {"uz": "B. Signal kiritish", "ru": "B. Ввод сигнала", "en": "B. Sending a signal"},
 "b_warn_b": {"uz": "Eng ko'p uchraydigan xato. ", "ru": "Самая частая ошибка. ", "en": "The most common mistake. "},
 "b_warn_1": {"uz": "Signal ", "ru": "Сигнал пишется ", "en": "A signal goes into "},
 "b_warn_2": {"uz": "botning shaxsiy chatiga", "ru": "в личный чат бота", "en": "the bot's private chat"},
 "b_warn_3": {
- "uz": " yoziladi — guruhga emas! Tasdiqlaganingizdan keyin bot uni guruhga o'zi chiqaradi.",
- "ru": ", а не в группу! После вашего подтверждения бот сам опубликует его в группе.",
- "en": ", not the group! After you confirm it, the bot posts it to the group itself.",
+ "uz": " yoziladi — guruh yoki kanalga emas! Tasdiqlaganingizdan keyin bot uni o'zi chiqaradi.",
+ "ru": ", а не в группу или канал! После вашего подтверждения бот сам её опубликует.",
+ "en": ", not the group or channel! After you confirm it, the bot posts it itself.",
 },
 "b_w1_head": {
  "uz": "Yo'l 1 — sehrgar (yangi boshlovchilar uchun)",
@@ -238,14 +239,14 @@ G = {
  "en": ". For SHORT it is the other way round. Usually this means LONG and SHORT got mixed up.",
 },
 "d_4_head": {
- "uz": "Bot guruhga yozmayapti", "ru": "Бот не пишет в группу",
- "en": "The bot is not posting to the group",
+ "uz": "Bot guruh yoki kanalga yozmayapti", "ru": "Бот не пишет в группу или канал",
+ "en": "The bot is not posting to the group or channel",
 },
 "d_4_a": {"uz": "Botda admin huquqi yo'qligidan. ", "ru": "У бота нет прав администратора. ", "en": "The bot has no admin rights. "},
 "d_4_b": {
- "uz": " ishlagan bo'lsa ham, admin huquqisiz bot post yubora olmaydi. Guruh sozlamalaridan bering.",
- "ru": " мог сработать, но без прав администратора бот не может отправлять посты. Выдайте их в настройках группы.",
- "en": " may have worked, but without admin rights the bot cannot post. Grant them in the group settings.",
+ "uz": " ishlagan bo'lsa ham, admin huquqisiz bot post yubora olmaydi. Guruh yoki kanal sozlamalaridan bering.",
+ "ru": " мог сработать, но без прав администратора бот не может отправлять посты. Выдайте их в настройках группы или канала.",
+ "en": " may have worked, but without admin rights the bot cannot post. Grant them in the group or channel settings.",
 },
 "e_head": {"uz": "E. Keyin nima bo'ladi", "ru": "E. Что происходит дальше", "en": "E. What happens next"},
 "e_sub": {
@@ -261,9 +262,9 @@ G = {
 "e_1": {"uz": "Natijalar asl signal postiga ", "ru": "Результаты пишутся ", "en": "Results are written as a "},
 "e_2": {"uz": "javob", "ru": "ответом", "en": "reply"},
 "e_3": {
- "uz": " qilib yoziladi, shuning uchun guruhda hamma nima bo'layotganini kuzatib boradi. Barcha yopilgan signallar statistikaga o'zi tushadi.",
- "ru": " на исходный пост сигнала, поэтому в группе всем видно, что происходит. Все закрытые сигналы попадают в статистику сами.",
- "en": " to the original signal post, so everyone in the group can follow what is happening. Every closed signal enters the stats by itself.",
+ "uz": " qilib yoziladi, shuning uchun guruh yoki kanalda hamma nima bo'layotganini kuzatib boradi. Barcha yopilgan signallar statistikaga o'zi tushadi.",
+ "ru": " на исходный пост сигнала, поэтому всем в группе или канале видно, что происходит. Все закрытые сигналы попадают в статистику сами.",
+ "en": " to the original signal post, so everyone in the group or channel can follow what is happening. Every closed signal enters the stats by itself.",
 },
 "cmds": {"uz": "Buyruqlar: ", "ru": "Команды: ", "en": "Commands: "},
 }
@@ -448,7 +449,8 @@ def content(img: dict | None = None, lang: str = "uz") -> list:
         _p(_b(t("cmds")), _code("/stats"), " ", _code("/month"), " ", _code("/year"),
            " ", _code("/symbols"), " ", _code("/equity"), " ", _code("/open"), " ",
            _code("/pdf"), " ", _code("/depozit"), " ", _code("/cancel"), " ",
-           _code("/top"), " ", _code("/taklif"), " ", _code("/yordam")),
+           _code("/top"), " ", _code("/taklif"), " ", _code("/til"), " ",
+           _code("/sahifa"), " ", _code("/yordam")),
     ]
 
 

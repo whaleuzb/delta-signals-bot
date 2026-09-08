@@ -927,40 +927,65 @@ HELP_KEYS = ("setup", "signal", "mode", "errors")
 # Mavzuga mos rasm. Telegraph rasm yuklashni qabul qilmagani uchun (upload
 # xizmati anonim yuklashni cheklagan) rasmlar botning O'ZI orqali yuboriladi —
 # tashqi hosting kerak emas va rasm foydalanuvchi chatida saqlanib qoladi.
+#
+# ⚠️ Rasmlar HAR TILDA alohida (`guide_images/<til>/`). Ilgari ular faqat
+# o'zbekcha edi va rus/ingliz foydalanuvchi ham o'zbekcha rasm ko'rardi —
+# bu 158-banddagi "til aralashuvi" muammosining rasmdagi ko'rinishi edi.
+# Rasmlar `make_help_images.py` bilan KODDAN yasaladi, shuning uchun
+# mahsulot o'zgarganda ular ham qayta yasaladi va eskirib qolmaydi.
 HELP_IMAGES = {
-    "setup": "guide_images/01-guruh-ulash.png",
-    "signal": "guide_images/02-signal-formati.png",
-    "errors": "guide_images/03-xatolar.png",
-    "after": "guide_images/04-keyin-nima-boladi.png",
+    "setup": "01-ulash",
+    "signal": "02-signal",
+    "errors": "03-xatolar",
+    "after": "04-keyin",
 }
 # Telegram bir marta yuklangan faylni file_id bilan qayta ishlatadi — har
-# safar qaytadan yuklamaslik uchun keshlaymiz (rasm ~200 KB).
-_photo_ids: dict[str, str] = {}
+# safar qaytadan yuklamaslik uchun keshlaymiz. Kalit TIL bilan birga:
+# har tilda alohida fayl, ya'ni alohida file_id.
+_photo_ids: dict[tuple[str, str], str] = {}
 
 
-async def send_help_photo(bot, chat_id: int, key: str, caption: str | None = None) -> bool:
+def help_image_path(key: str, lang: str | None = None) -> str | None:
+    """Mavzu + til uchun rasm yo'li. Til uchun rasm bo'lmasa o'zbekchaga
+    qaytadi — yangi til qo'shilib, rasmlar hali yasalmagan bo'lsa bo'sh
+    ekran o'rniga hech bo'lmasa BIR rasm ko'rinsin."""
+    name = HELP_IMAGES.get(key)
+    if not name:
+        return None
+    # Yo'l MODUL joylashuviga nisbatan: joriy papkaga tayanish bot boshqa
+    # ish papkasidan ishga tushirilsa (yoki sinovda) rasmni topa olmasdi.
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "guide_images")
+    for code in (i18n.normalize(lang), "uz"):
+        path = os.path.join(base, code, f"{name}.png")
+        if os.path.exists(path):
+            return path
+    return None
+
+
+async def send_help_photo(bot, chat_id: int, key: str, caption: str | None = None,
+                          lang: str | None = None) -> bool:
     """Mavzuga mos rasmni yuboradi. Rasm topilmasa/yuborilmasa False —
     chaqiruvchi yordam matnini baribir ko'rsatadi."""
-    path = HELP_IMAGES.get(key)
-    if not path:
-        return False
+    code = i18n.normalize(lang)
+    cached = _photo_ids.get((code, key))
     try:
-        if key in _photo_ids:
-            await bot.send_photo(chat_id, _photo_ids[key], caption=caption,
+        if cached:
+            await bot.send_photo(chat_id, cached, caption=caption,
                                   parse_mode=ParseMode.HTML if caption else None)
             return True
-        if not os.path.exists(path):
-            log.warning("Yordam rasmi topilmadi: %s", path)
+        path = help_image_path(key, code)
+        if not path:
+            log.warning("Yordam rasmi topilmadi: %s/%s", code, key)
             return False
         with open(path, "rb") as f:
             msg = await bot.send_photo(
                 chat_id, InputFile(f, os.path.basename(path)), caption=caption,
                 parse_mode=ParseMode.HTML if caption else None)
         if msg.photo:
-            _photo_ids[key] = msg.photo[-1].file_id
+            _photo_ids[(code, key)] = msg.photo[-1].file_id
         return True
     except Exception:
-        log.exception("Yordam rasmi yuborilmadi (%s)", key)
+        log.exception("Yordam rasmi yuborilmadi (%s/%s)", code, key)
         return False
 
 
@@ -1001,7 +1026,7 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if topic == "rasm":
         # Hamma rasm ketma-ket — yangi boshlovchi bittada ko'rib chiqadi.
         for key in ("setup", "signal", "errors", "after"):
-            await send_help_photo(ctx.bot, chat_id, key)
+            await send_help_photo(ctx.bot, chat_id, key, lang=lang)
         await ctx.bot.send_message(chat_id, i18n.t("help.images_note", lang),
                                     reply_markup=help_menu_kb(lang))
         return
@@ -1014,7 +1039,7 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         kb.insert(0, [InlineKeyboardButton(i18n.t("help.btn_guide", lang),
                                             url=config.guide_url(lang))])
     # Rasm bo'lsa — avval rasm, keyin matn: rasm ko'zga birinchi tashlanadi.
-    await send_help_photo(ctx.bot, chat_id, topic)
+    await send_help_photo(ctx.bot, chat_id, topic, lang=lang)
     await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML,
                                 reply_markup=InlineKeyboardMarkup(kb))
 

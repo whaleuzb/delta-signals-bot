@@ -6,5 +6,10 @@ venv/
 *.png
 .DS_Store
 
-# Qo'llanma rasmlari repoda saqlanadi (Telegraph maqolasiga yuklanadi)
+# Qo'llanma rasmlari repoda saqlanadi (bot ularni foydalanuvchiga yuboradi).
+# Endi har til uchun alohida papka: guide_images/uz|ru|en/
 !guide_images/*.png
+!guide_images/*/*.png
+# Shriftlar (make_help_images.py uchun) repoga kirmaydi — skript ular
+# bo'lmasa Google Fonts'dan oladi.
+guide_images/fonts/
