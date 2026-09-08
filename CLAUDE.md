@@ -5427,3 +5427,62 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_report_lang.py` 55/55 — matplotlib chaqiruvlari
      ushlab qolinib, HAR BIR yozuv tanlangan tilda ekani va o'zbekcha
      qoldiq yo'qligi tekshiriladi.
+
+168. **"Depozitga nisbatan" foizi noto'g'ri edi — o'sib ketgan balansga
+     bo'linardi.**
+     Foydalanuvchi: "Men depozitni 100.000 kiritganman va hozir u
+     164.000 bo'ldi. Lekin nega depozitga nisbatan foiz 40.18? 64%
+     bo'lishi kerakku."
+
+     **Sabab.** `deposit` ustuni STATIK sozlama emas — u JORIY balans:
+     har yopilgan savdodan keyin `db.apply_deposit_delta()` unga pul
+     natijasini qo'shib boradi (bot.py:1609). Hisob esa uchala joyda
+     (SQL `public_workspaces()`, `web._group_numbers()`,
+     `stats.summary()`) bir xil edi:
+
+         sum_weighted = 100 · Σ(pnl_pct · alloc / deposit)
+                      = 100 · Σ(foyda) / depozit
+
+     Ya'ni foyda YAKUNIY balansga bo'linardi: 65 915 / 164 036 = 40.18%.
+     To'g'ri javob — boshlang'ich kapitalga bo'lish:
+     65 915 / 98 121 = 67.2%.
+
+     **Yechim — `stats.net_vs_start()`, sof algebra, qo'shimcha
+     ma'lumotsiz.** `w = sum_weighted/100 = foyda/depozit` bo'lsa:
+
+         boshlang'ich = depozit − foyda = depozit·(1 − w)
+         natija       = foyda / boshlang'ich = w / (1 − w)
+
+     Shu bitta funksiya `stats.summary()`, `stats._pdf_metrics()`,
+     `web._group_numbers()` va `web.net_result()` da qo'llanildi.
+     Funksiya monoton o'suvchi — demak ochiq sahifadagi REYTING
+     TARTIBI o'zgarmaydi (SQL'ni qayta yozish shart emas, saralash
+     hamon `sum_weighted` bo'yicha ketaveradi).
+
+     **Equity grafigi ALLAQACHON to'g'ri edi** — u haqiqiy balans
+     egri chizig'ini quradi va 67.2% ko'rsatardi. Ya'ni bitta sahifada
+     grafik bir sonni, plitka boshqa sonni ko'rsatib turgan; xatoni
+     aynan shu ziddiyat ochib berdi. Endi ikkovi bir xil.
+
+     **"Kompaund" qatori olib tashlandi (faqat depozit rejimida).**
+     Depozit rejimida har savdo o'sha paytdagi balansga qo'shiladi,
+     ya'ni natija ALLAQACHON kompaund: Π(1 + d_i/b_{i−1}) qisqarib
+     yakuniy/boshlang'ich ga teng bo'ladi — bu esa yuqoridagi qatorning
+     o'zi. Ikkita bir xil sonni ikki nom bilan ko'rsatish chalkashtirardi.
+     Depozitsiz (sof foizlar) rejimida `_compound()` hamon kerak va
+     o'z joyida qoldi.
+
+     **Cheklov (foydalanuvchiga aytilgan).** "boshlang'ich = depozit −
+     foyda" faqat depozit savdolardan boshqa yo'l bilan o'zgarmagan
+     bo'lsa to'g'ri. Agar savdolar yopilgach `/depozit` bilan summa
+     QO'LDA o'zgartirilsa, bu son ham, grafik ham siljiydi — ikkalasi
+     bir xil taxminga tayanadi. To'liq yechim uchun depozit tarixi
+     jadvali kerak bo'lardi; hozircha bunga ehtiyoj yo'q.
+
+     **Saboq:** bitta sonni ikki joyda ikki xil formula bilan hisoblash —
+     xato uchun eng qulay yashirinish joyi. Grafik va plitka bir xil
+     narsani ko'rsatishi kerak bo'lsa, ular BITTA funksiyadan o'tsin.
+
+     Sinov: `test_net_pct.py` 13/13 — jumladan "grafik 67.18% ==
+     plitka 67.18%", manfiy natija (−20% → −16.67%), nolga bo'linish
+     himoyasi va monotonlik (reyting tartibi buzilmasligi).

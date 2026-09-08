@@ -576,7 +576,7 @@ def net_result(r) -> float:
     """Guruh natijasi — guruh sahifasidagi AYNI usul: pozitsiya hajmi
     belgilangan bo'lsa depozitga tortilgan, aks holda sof foizlar yig'indisi."""
     if r["deposit"] and r["n_alloc"]:
-        return float(r["sum_weighted"])
+        return stats.net_vs_start(float(r["sum_weighted"]))
     return float(r["sum_pct"])
 
 
@@ -702,7 +702,10 @@ async def _group_numbers(ws, lang: str | None = None) -> dict:
         weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
                     for r in rows
                     if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
-    net = sum(weighted) if weighted else sum(pnls)
+    # ⚠️ `sum(weighted)` foydani JORIY (o'sib ketgan) depozitga bo'ladi —
+    # `stats.net_vs_start()` uni boshlang'ich kapitalga qayta hisoblaydi,
+    # shunda plitka va equity grafigi bir xil sonni ko'rsatadi.
+    net = stats.net_vs_start(sum(weighted)) if weighted else sum(pnls)
     net_label = i18n.t("w.tile_net_dep" if weighted else "w.tile_net", lang)
     wr = (s["wins"] / total * 100) if total else 0
     avg_r = float(s["avg_r"] or 0)

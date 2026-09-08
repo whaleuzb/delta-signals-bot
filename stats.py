@@ -87,6 +87,38 @@ def months(lang: str | None = None) -> list[str]:
     return _MONTHS[i18n.normalize(lang)]
 
 
+def net_vs_start(sum_weighted_pct: float) -> float:
+    """Depozitga nisbatan natijani BOSHLANG'ICH kapitalga qayta hisoblaydi.
+
+    ⚠️ Muammo shu yerda edi. `sum_weighted` (bazadagi va Python'dagi
+    ikkala hisob ham) har savdoning pul natijasini JORIY depozitga
+    bo'ladi:
+
+        sum_weighted = 100 · Σ(foyda) / depozit_HOZIRGI
+
+    Depozit esa har yopilgan savdodan keyin o'sib boradi
+    (`apply_deposit_delta`), ya'ni bo'luvchi — YAKUNIY balans. Natijada
+    100 000 dan 164 000 ga chiqqan hisob "+40.18%" ko'rsatardi, chunki
+    65 915 / 164 036 = 40.18%. To'g'ri javob 65 915 / 98 121 = 67.2% —
+    foyda BOSHLANG'ICH kapitalga bo'linishi kerak.
+
+    Qayta hisob qo'shimcha ma'lumotsiz, sof algebra bilan chiqadi.
+    w = sum_weighted/100 = foyda/depozit bo'lsa:
+
+        boshlang'ich = depozit − foyda = depozit·(1 − w)
+        natija       = foyda / boshlang'ich = w / (1 − w)
+
+    Bu grafikdagi (`_equity_curve`) hisob bilan AYNAN bir xil javob
+    beradi — ilgari grafik va plitka ikki xil son ko'rsatardi."""
+    w = sum_weighted_pct / 100.0
+    if w >= 1.0:
+        # Boshlang'ich kapital nol yoki manfiy — bo'lib bo'lmaydi.
+        # Amalda uchramaydi (butun balans bitta savdodan kelgan bo'lishi
+        # kerak), lekin nol bo'linishdan himoya shart.
+        return sum_weighted_pct
+    return w / (1.0 - w) * 100.0
+
+
 def _compound(pcts: list[float]) -> float:
     """Har savdoda bir xil ulush ishlatilsa — kompaund natija."""
     eq = 1.0
@@ -178,9 +210,14 @@ async def summary(workspace_id: int, since=None, until=None, title=None,
         t.append(i18n.t("st.winrate", lang, wr=wr))
 
         if weighted:
-            real_sum_pct = sum(weighted)
+            real_sum_pct = net_vs_start(sum(weighted))
             t.append(i18n.t("st.total_dep", lang, p=real_sum_pct))
-            t.append(i18n.t("st.compound", lang, p=_compound(weighted)))
+            # "Kompaund" ATAYLAB faqat depozitsiz rejimda ko'rsatiladi.
+            # Depozit rejimida har savdo o'sha paytdagi balansga qo'shiladi,
+            # ya'ni natija ALLAQACHON kompaund: Π(1 + d/b) telescopiyalanib
+            # yakuniy/boshlang'ich ga teng bo'ladi — bu esa yuqoridagi
+            # qatorning o'zi. Ikkita bir xil sonni ikki nom bilan
+            # ko'rsatish faqat chalkashtirardi.
             if show_money and s["real_pnl_money"] is not None:
                 t.append(i18n.t("st.real_money", lang, m=float(s["real_pnl_money"])))
         else:
@@ -465,10 +502,10 @@ def _pdf_metrics(s, rows, deposit, show_money, lang: str | None = None):
                     for r in rows
                     if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
     if weighted:
-        tot = sum(weighted)
+        tot = net_vs_start(sum(weighted))
         out.append((L("rep.pdf_total_dep"), f"{tot:+.2f}%", P_GREEN if tot >= 0 else P_RED))
-        comp = _compound(weighted)
-        out.append((L("rep.pdf_compound"), f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
+        # Kompaund yo'q — `summary()` dagi izohga qarang (depozit rejimida
+        # natijaning o'zi kompaund).
         if show_money and s["real_pnl_money"] is not None:
             m = float(s["real_pnl_money"])
             out.append((L("rep.pdf_real"), f"{m:+,.2f}", P_GREEN if m >= 0 else P_RED))
