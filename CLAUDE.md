@@ -5219,3 +5219,52 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_channel_setup.py` 34/34 (161-banddagi 26 tasi ustiga
      onboarding tugmalari, qo'shish havolalarining aniq shakli va
      almashtirish ekranidagi tanlov).
+
+163. **"Qaysi joy uchun?" ekraniga kanal ulash tugmasi + egalik qoidasi
+     o'zgardi.** Foydalanuvchi skrinshot bilan: "shu yerga qo'shimcha
+     kanal ulash tugmasini qo'shaylik". Skrinshotda guruhi bor odamning
+     almashtirish ekrani: Whales Uzb / Shaxsiy jurnal / Boshqa guruhga
+     a'zo bo'lish — kanal ulash yo'li yo'q.
+
+     **Tugmani ko'rsatishning o'zi yetmasdi.** 162-bandda kirish nuqtasi
+     `if not owned_group` sharti bilan edi, ya'ni aynan skrinshotdagi
+     odamga ko'rinmasdi. Lekin shartni olib tashlash ham yetarli emas:
+     bosilganda "Sizda allaqachon boshqa guruh bor" chiqib, tugma
+     BOSHI BERK KO'CHAGA olib borardi. Sabab bazada edi:
+
+     ```sql
+     UNIQUE (owner_id, type)   -- kanal ham type='group'
+     ```
+
+     Kanal ham `type='group'` bo'lgani uchun bu cheklov amalda
+     "guruhi bor odam kanal ULAY OLMAYDI" degani edi. Ya'ni bu
+     161-banddagi qarorning (kanalni alohida tur qilmaslik) kutilmagan
+     yon ta'siri — o'sha qaror hamon to'g'ri, lekin egalik qoidasi
+     `type` ga emas, `is_channel` ga ham bog'liq bo'lishi kerak ekan.
+
+     **Endi:** `workspaces.is_channel` ustuni qo'shildi, eski cheklov
+     `idx_ws_owner_kind (owner_id, type, is_channel)` bilan almashtirildi.
+     Qoida: **bitta odam — bitta shaxsiy jurnal, bitta guruh VA bitta
+     kanal.** `/setup` faqat GURUH borligini, kanal oqimi faqat KANAL
+     borligini tekshiradi.
+
+     - Almashtirish ekranida guruh 👑, kanal 📢 belgisi bilan chiqadi,
+       va yetishmayotgan TURI uchun alohida ulash tugmasi ko'rsatiladi
+       ("➕ O'z guruhimni ulash" / "📢 Kanalimni ulash").
+     - `resolve_workspace` endi guruh VA kanalni birga hisoblaydi
+       (`get_owned_group_workspaces`) — aks holda ikkitasi bo'lgan odam
+       switcher o'rniga bittasiga avtomatik tushib qolardi.
+     - **`is_channel` O'ZINI TUZATADI:** ustun `DEFAULT FALSE` bilan
+       qo'shilgani uchun bu commitdan OLDIN ulangan kanallar "guruh"
+       bo'lib qolgan bo'lishi mumkin. `refresh_logo()` baribir
+       `get_chat` chaqiradi — javobdagi chat turi to'g'ri qiymatni
+       bepul beradi, shuning uchun `logo_job` (sutkada bir marta) uni
+       jimgina to'g'rilab qo'yadi. Qo'lda migratsiya kerak emas.
+
+     **Saboq:** UI shartini o'zgartirishdan oldin "bosilsa nima
+     bo'ladi?" ni oxirigacha kuzatish kerak. Ko'rinmaydigan tugma —
+     yomon, lekin xato beradigan tugma undan ham yomon. Bu yerda haqiqiy
+     to'siq UI'da emas, BAZA CHEKLOVIDA edi va uni faqat sinov ochib
+     berdi (`UniqueViolationError`).
+
+     Sinov: `test_channel_setup.py` 45/45.

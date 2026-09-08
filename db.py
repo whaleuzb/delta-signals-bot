@@ -36,8 +36,10 @@ CREATE TABLE IF NOT EXISTS workspaces (
     group_topic_id  BIGINT,                 -- ixtiyoriy, forum mavzusi
     name            TEXT        NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (group_chat_id),
-    UNIQUE (owner_id, type)  -- bitta odam — bitta shaxsiy, bitta guruh workspace
+    UNIQUE (group_chat_id)
+    -- Egalik cheklovi `is_channel` ustuni bilan birga MIGRATE blokida
+    -- (idx_ws_owner_kind): bitta odam — bitta shaxsiy, bitta guruh VA
+    -- bitta kanal.
 );
 
 CREATE TABLE IF NOT EXISTS signals (
@@ -143,6 +145,20 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS public BOOLEAN NOT NULL DEFAULT 
 -- Guruh admini belgilaydi (/havola) — /top reytingida guruh nomi shu havolaga
 -- link qilib ko'rsatiladi ("qo'shilmoqchi bo'lganlar shu yerga bossin").
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_link TEXT;
+-- Kanal workspace'i. `type` ATAYLAB 'group' bo'lib qoladi: post qilish,
+-- a'zolik tekshiruvi, natijani signal postiga javob qilib yozish — kanalda
+-- ham guruhdek ishlaydi, ya'ni alohida tur ~10 joyda shart tarmoqlashini
+-- talab qilardi va hech narsa bermasdi. Bu ustun FAQAT ikki narsa uchun:
+-- (1) egalik qoidasi (bitta odam bitta guruh VA bitta kanal), (2) ro'yxatda
+-- to'g'ri belgi (👑 / 📢).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS is_channel BOOLEAN NOT NULL DEFAULT FALSE;
+-- Eski cheklov `UNIQUE (owner_id, type)` edi va kanal ham type='group'
+-- bo'lgani uchun u "guruhi bor odam kanal ulay olmaydi" degan ma'noni
+-- berardi (foydalanuvchi aynan shunga urildi). Endi `is_channel` ham
+-- kalitga kiradi: bitta odam bitta guruh VA bitta kanal boshqaradi.
+ALTER TABLE workspaces DROP CONSTRAINT IF EXISTS workspaces_owner_id_type_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_owner_kind
+    ON workspaces(owner_id, type, is_channel);
 
 -- Ochiq pozitsiya +5%/-5% qadamlarda joriy foizni bosib o'tganda bildirishnoma
 -- yuborilishi uchun oxirgi xabar qilingan bosqich (ishorali, 5 ga karrali:
@@ -382,12 +398,13 @@ def pool() -> asyncpg.Pool:
 # ─────────────────────────── Workspace'lar ───────────────────────────
 
 async def create_group_workspace(owner_id: int, chat_id: int, name: str,
-                                  topic_id: int | None = None) -> int:
+                                  topic_id: int | None = None,
+                                  is_channel: bool = False) -> int:
     async with pool().acquire() as c:
         return await c.fetchval(
-            "INSERT INTO workspaces (type, owner_id, group_chat_id, group_topic_id, name) "
-            "VALUES ('group', $1, $2, $3, $4) RETURNING id",
-            owner_id, chat_id, topic_id, name,
+            "INSERT INTO workspaces (type, owner_id, group_chat_id, group_topic_id, "
+            "name, is_channel) VALUES ('group', $1, $2, $3, $4, $5) RETURNING id",
+            owner_id, chat_id, topic_id, name, is_channel,
         )
 
 
@@ -424,10 +441,41 @@ async def get_workspace_by_group(chat_id: int) -> asyncpg.Record | None:
         return await c.fetchrow("SELECT * FROM workspaces WHERE group_chat_id=$1", chat_id)
 
 
-async def get_group_workspace_by_owner(owner_id: int) -> asyncpg.Record | None:
+async def get_group_workspace_by_owner(owner_id: int,
+                                       is_channel: bool | None = None):
+    """Egasi bo'lgan guruh yoki kanal workspace'i.
+
+    `is_channel` berilsa faqat o'sha turi qidiriladi — egalik qoidasi shu
+    bilan tekshiriladi: bitta odam bitta GURUH va bitta KANAL boshqara
+    oladi (ilgari umuman bittasi edi). `None` bo'lsa birinchi topilgani,
+    guruhga ustunlik berib."""
+    q = "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1"
+    args = [owner_id]
+    if is_channel is not None:
+        q += " AND is_channel=$2"
+        args.append(is_channel)
+    q += " ORDER BY is_channel, id"
     async with pool().acquire() as c:
-        return await c.fetchrow(
-            "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1", owner_id)
+        return await c.fetchrow(q, *args)
+
+
+async def set_workspace_is_channel(workspace_id: int, is_channel: bool) -> None:
+    """Faqat qiymat O'ZGARGANDA yozadi — `logo_job` har kuni hamma
+    workspace uchun chaqiriladi, bekorga UPDATE qilish shart emas."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET is_channel=$2 WHERE id=$1 AND is_channel IS DISTINCT FROM $2",
+            workspace_id, is_channel)
+
+
+async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
+    """Egasi bo'lgan HAMMA guruh/kanal workspace'lari — avval guruh,
+    keyin kanal. Bitta odamda ikkalasi ham bo'lishi mumkin bo'lgach
+    kerak bo'ldi (ro'yxat va "nechta workspace bor" hisobi uchun)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1 "
+            "ORDER BY is_channel, id", owner_id)
 
 
 async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:

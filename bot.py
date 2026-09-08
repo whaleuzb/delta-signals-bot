@@ -256,11 +256,11 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if ws:
             return ws
 
-    owned_group = await db.get_group_workspace_by_owner(uid)
+    owned = await db.get_owned_group_workspaces(uid)
     personal = await db.get_personal_workspace(uid)
     viewer_links = await db.get_group_viewer_workspaces(uid)
 
-    candidates = ([owned_group] if owned_group else []) + ([personal] if personal else []) + list(viewer_links)
+    candidates = list(owned) + ([personal] if personal else []) + list(viewer_links)
     if len(candidates) == 1:
         ws = candidates[0]
         ctx.user_data["workspace_id"] = ws["id"]
@@ -272,14 +272,15 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     lang = await user_lang(uid)
-    owned_group = await db.get_group_workspace_by_owner(uid)
+    owned = await db.get_owned_group_workspaces(uid)
     personal = await db.get_or_create_personal_workspace(
         uid, i18n.t("ws.personal_name", lang))
     viewer_links = await db.get_group_viewer_workspaces(uid)
     rows = []
-    if owned_group:
+    for ows in owned:
+        icon = "📢" if ows["is_channel"] else "👑"
         rows.append([InlineKeyboardButton(
-            f"👑 {owned_group['name']}", callback_data=f"ws:{owned_group['id']}")])
+            f"{icon} {ows['name']}", callback_data=f"ws:{ows['id']}")])
     for vws in viewer_links:
         rows.append([InlineKeyboardButton(
             f"👥 {vws['name']}", callback_data=f"ws:{vws['id']}")])
@@ -287,14 +288,18 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
                                        callback_data=f"ws:{personal['id']}")])
     rows.append([InlineKeyboardButton(i18n.t("ws.btn_join", lang),
                                        callback_data="joingroup")])
-    # O'Z guruhi/kanalini ulash yo'li shu yerda ham kerak: onboarding faqat
-    # hech qanday workspace'i YO'Q odamga ko'rsatiladi, ya'ni shaxsiy
-    # jurnal ochgan odam keyin kanal ulamoqchi bo'lsa bu ekrandan boshqa
-    # kirish nuqtasi qolmasdi. Egasi bo'lgan guruh/kanal bo'lsa ko'rsatilmaydi
-    # — bitta admin bitta workspace qoidasi (`su.have_other`).
-    if not owned_group:
-        rows.append([InlineKeyboardButton(i18n.t("ws.btn_connect", lang),
-                                           callback_data="onboard:connect")])
+    # O'Z guruhi/kanalini ulash yo'li shu yerda ham kerak: onboarding FAQAT
+    # hech qanday workspace'i yo'q odamga ko'rsatiladi, ya'ni guruhi bor
+    # odam keyin kanal ham ulamoqchi bo'lsa boshqa kirish nuqtasi qolmasdi
+    # (foydalanuvchi skrinshot bilan aynan shuni so'radi).
+    # Har turi uchun ALOHIDA tugma va faqat o'sha turi hali yo'q bo'lsa —
+    # egalik qoidasi: bitta odam bitta guruh VA bitta kanal boshqaradi.
+    if not any(not w["is_channel"] for w in owned):
+        rows.append([InlineKeyboardButton(i18n.t("ws.btn_add_group", lang),
+                                           callback_data="onboard:group_owner")])
+    if not any(w["is_channel"] for w in owned):
+        rows.append([InlineKeyboardButton(i18n.t("ws.btn_add_channel", lang),
+                                           callback_data="onboard:channel")])
     await update.effective_message.reply_text(i18n.t("ws.pick", lang),
                                                reply_markup=InlineKeyboardMarkup(rows))
 
@@ -384,18 +389,6 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await send_group_picker(q)
         return
 
-    if choice == "connect":
-        await q.edit_message_text(i18n.t("onb.connect_pick", lang),
-                                   reply_markup=InlineKeyboardMarkup([
-                                       [InlineKeyboardButton(
-                                           i18n.t("onb.btn_pick_group", lang),
-                                           callback_data="onboard:group_owner")],
-                                       [InlineKeyboardButton(
-                                           i18n.t("onb.btn_pick_channel", lang),
-                                           callback_data="onboard:channel")],
-                                   ]))
-        return
-
     bot_username = ctx.bot.username
     mention = f"@{bot_username}" if bot_username else "@bot"
 
@@ -467,10 +460,10 @@ async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return None
 
     uid = update.effective_user.id
-    owned_group = await db.get_group_workspace_by_owner(uid)
+    owned = await db.get_owned_group_workspaces(uid)
     personal = await db.get_personal_workspace(uid)
     viewer_links = await db.get_group_viewer_workspaces(uid)
-    if owned_group or personal or viewer_links:
+    if owned or personal or viewer_links:
         await send_workspace_switcher(update, ctx)
     else:
         await send_onboarding(update, ctx)
@@ -1904,6 +1897,13 @@ async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
         log.warning("Logotip: #%s guruh ma'lumoti olinmadi", ws_id, exc_info=True)
         return False
 
+    # `is_channel` shu yerda O'ZINI TUZATADI. Ustun bu funksiya paydo
+    # bo'lishidan oldin ulangan workspace'lar uchun DEFAULT FALSE bilan
+    # qo'shilgan, ya'ni eski kanallar "guruh" bo'lib qolgan bo'lishi
+    # mumkin. `get_chat` baribir chaqirilyapti — javobdagi chat turi
+    # to'g'ri qiymatni bepul beradi (sutkada bir marta, `logo_job`).
+    await db.set_workspace_is_channel(ws_id, getattr(chat, "type", "") == "channel")
+
     photo = getattr(chat, "photo", None)
     if not photo:
         await db.set_workspace_logo(ws_id, None)
@@ -1961,7 +1961,10 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if not is_admin(uid):
-        owned = await db.get_group_workspace_by_owner(uid)
+        # Faqat GURUH tekshiriladi: bitta odam bitta guruh VA bitta kanal
+        # boshqara oladi, ya'ni kanali borligi guruh ulashga to'sqinlik
+        # qilmaydi (va aksincha).
+        owned = await db.get_group_workspace_by_owner(uid, is_channel=False)
         if owned:
             await update.message.reply_text(i18n.t("su.have_other", lang,
                                                     name=owned["name"]))
@@ -2025,11 +2028,11 @@ async def on_my_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     lang = await user_lang(user.id)
     name = cm.chat.title or "Kanal"
     if not is_admin(user.id):
-        owned = await db.get_group_workspace_by_owner(user.id)
+        owned = await db.get_group_workspace_by_owner(user.id, is_channel=True)
         if owned:
             try:
                 await ctx.bot.send_message(
-                    user.id, i18n.t("su.have_other", lang, name=owned["name"]))
+                    user.id, i18n.t("ch.have_other", lang, name=owned["name"]))
             except Exception:
                 log.info("Kanal taklifi yuborilmadi (uid=%s)", user.id)
             return
@@ -2068,9 +2071,9 @@ async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         await q.edit_message_text(i18n.t("su.already", lang, name=existing["name"]))
         return
     if not is_admin(uid):
-        owned = await db.get_group_workspace_by_owner(uid)
+        owned = await db.get_group_workspace_by_owner(uid, is_channel=True)
         if owned:
-            await q.edit_message_text(i18n.t("su.have_other", lang, name=owned["name"]))
+            await q.edit_message_text(i18n.t("ch.have_other", lang, name=owned["name"]))
             return
     try:
         chat = await ctx.bot.get_chat(chat_id)
@@ -2084,7 +2087,7 @@ async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     name = chat.title or "Kanal"
-    wid = await db.create_group_workspace(uid, chat_id, name)
+    wid = await db.create_group_workspace(uid, chat_id, name, is_channel=True)
     log.info("Yangi workspace (kanal): #%s %s (owner=%s chat=%s)",
              wid, name, uid, chat_id)
     await q.edit_message_text(

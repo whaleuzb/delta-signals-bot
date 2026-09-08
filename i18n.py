@@ -1248,16 +1248,6 @@ STRINGS: dict[str, dict[str, str]] = {
                "in the channel: channel posts do not show an author, so the "
                "confirmation is asked here."),
     },
-    "onb.connect_pick": {
-        "uz": "Nimani ulaymiz?", "ru": "Что подключаем?",
-        "en": "What are we connecting?",
-    },
-    "onb.btn_pick_group": {
-        "uz": "🏘 Guruh", "ru": "🏘 Группу", "en": "🏘 A group",
-    },
-    "onb.btn_pick_channel": {
-        "uz": "📢 Kanal", "ru": "📢 Канал", "en": "📢 A channel",
-    },
     "onb.btn_member": {
         "uz": "👥 Men guruh a'zosiman", "ru": "👥 Я участник группы",
         "en": "👥 I am a group member",
@@ -1484,6 +1474,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": ("Cancelled. If you change your mind, make the bot a channel "
                "admin again — the offer will come back."),
     },
+    "ch.have_other": {
+        "uz": ("Sizda allaqachon ulangan kanal bor: \"{name}\". "
+               "Har bir admin bitta guruh va bitta kanalni boshqara oladi."),
+        "ru": ("У вас уже подключён канал: «{name}». Один админ может вести "
+               "одну группу и один канал."),
+        "en": ("You already have a connected channel: \"{name}\". Each admin "
+               "can run one group and one channel."),
+    },
     "ch.gone": {
         "uz": ("Kanalga kirib bo'lmadi. Bot hali ham kanal admini ekanini "
                "tekshiring."),
@@ -1527,10 +1525,13 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Ochiq sahifa (/sahifa) ---
-    "ws.btn_connect": {
-        "uz": "➕ O'z guruhim yoki kanalimni ulash",
-        "ru": "➕ Подключить свою группу или канал",
-        "en": "➕ Connect my own group or channel",
+    "ws.btn_add_group": {
+        "uz": "➕ O'z guruhimni ulash", "ru": "➕ Подключить свою группу",
+        "en": "➕ Connect my own group",
+    },
+    "ws.btn_add_channel": {
+        "uz": "📢 Kanalimni ulash", "ru": "📢 Подключить свой канал",
+        "en": "📢 Connect my channel",
     },
 
     "web.off": {
