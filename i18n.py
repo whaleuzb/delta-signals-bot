@@ -1390,6 +1390,75 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Эта группа ещё не зарегистрирована — напишите /setup.",
         "en": "This group is not registered yet — type /setup.",
     },
+    # --- Kanal ulash ---
+    # Kanal GURUHDAN farqli ulanadi: kanal postlari ANONIM (`from_user`
+    # yo'q), ya'ni kanal ichida `/setup` yozilsa buni kim yozganini bilib
+    # bo'lmaydi. Shuning uchun bot admin qilingan payt (Telegram bizga kim
+    # qo'shganini aytadi) shaxsiy chatga tasdiqlash tugmasi yuboriladi.
+    "ch.offer": {
+        "uz": ("📢 Siz botni <b>{name}</b> kanaliga admin qilib qo'shdingiz.\n\n"
+               "Shu kanalni workspace sifatida ulaymizmi? Ulangach signallar "
+               "shu kanalga chiqadi va natijalar signal postiga javob "
+               "sifatida yoziladi."),
+        "ru": ("📢 Вы добавили бота администратором в канал <b>{name}</b>.\n\n"
+               "Подключить этот канал как рабочее пространство? После этого "
+               "сигналы будут публиковаться в нём, а результаты — ответом на "
+               "пост сигнала."),
+        "en": ("📢 You added the bot as an admin to the channel <b>{name}</b>.\n\n"
+               "Connect this channel as a workspace? Signals will then be "
+               "posted there, and results written as replies to the signal "
+               "post."),
+    },
+    "ch.offer_yes": {
+        "uz": "✅ Ha, ulash", "ru": "✅ Да, подключить", "en": "✅ Yes, connect",
+    },
+    "ch.offer_no": {
+        "uz": "❌ Kerak emas", "ru": "❌ Не нужно", "en": "❌ No thanks",
+    },
+    "ch.cancelled": {
+        "uz": ("Bekor qilindi. Fikringiz o'zgarsa, botni kanalda qaytadan "
+               "admin qiling — taklif yana keladi."),
+        "ru": ("Отменено. Если передумаете — снова назначьте бота "
+               "администратором канала, предложение придёт заново."),
+        "en": ("Cancelled. If you change your mind, make the bot a channel "
+               "admin again — the offer will come back."),
+    },
+    "ch.gone": {
+        "uz": ("Kanalga kirib bo'lmadi. Bot hali ham kanal admini ekanini "
+               "tekshiring."),
+        "ru": ("Не удалось получить доступ к каналу. Проверьте, что бот "
+               "всё ещё администратор канала."),
+        "en": ("Could not reach the channel. Check that the bot is still a "
+               "channel admin."),
+    },
+    "ch.admin_only": {
+        "uz": "Faqat kanal admini uni ulay oladi.",
+        "ru": "Подключить канал может только его администратор.",
+        "en": "Only a channel admin can connect it.",
+    },
+    "ch.done": {
+        "uz": ("✅ <b>{name}</b> kanali workspace sifatida ulandi!\n"
+               "Endi botga shaxsiy xabar yozib (/start) signal kirita olasiz."),
+        "ru": ("✅ Канал <b>{name}</b> подключён как рабочее пространство!\n"
+               "Теперь можно писать сигналы боту в личном чате (/start)."),
+        "en": ("✅ The channel <b>{name}</b> is connected as a workspace!\n"
+               "You can now send signals to the bot in private (/start)."),
+    },
+    "ch.steps": {
+        "uz": ("\n\n📢 <b>Kanal</b> ham xuddi shunday ulanadi, faqat "
+               "<code>/setup</code> yozish shart emas: {mention} kanalga "
+               "<b>admin</b> qilib qo'shsangiz, bot o'zi shu yerda "
+               "tasdiqlash tugmasini yuboradi."),
+        "ru": ("\n\n📢 <b>Канал</b> подключается так же, только "
+               "<code>/setup</code> писать не нужно: добавьте {mention} "
+               "в канал <b>администратором</b>, и бот сам пришлёт сюда "
+               "кнопку подтверждения."),
+        "en": ("\n\n📢 A <b>channel</b> connects the same way, without "
+               "<code>/setup</code>: add {mention} to the channel as an "
+               "<b>admin</b> and the bot will send you a confirm button "
+               "right here."),
+    },
+
     "su.group_admin_only": {
         "uz": "Faqat guruh admini o'zgartira oladi.",
         "ru": "Изменить может только админ группы.",

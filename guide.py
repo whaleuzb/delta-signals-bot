@@ -61,6 +61,21 @@ G = {
  "en": ". In the group itself, not in the private chat.",
 },
 "a_cap": {"uz": "Guruhni ulashning uch qadami", "ru": "Три шага подключения группы", "en": "Three steps to connect a group"},
+"a_ch_b": {"uz": "Kanal bo'lsa: ", "ru": "Если это канал: ", "en": "If it is a channel: "},
+"a_ch": {
+    "uz": ("kanalda buyruq yozib bo'lmaydi (kanal postlari kim yozganini "
+           "ko'rsatmaydi), shuning uchun uchinchi qadam kerak emas — botni "
+           "kanalga admin qilib qo'shsangiz, u o'zi sizga shaxsiy chatda "
+           "\"Ulash\" tugmasini yuboradi."),
+    "ru": ("в канале нельзя написать команду (посты канала не показывают "
+           "автора), поэтому третий шаг не нужен — добавьте бота "
+           "администратором канала, и он сам пришлёт вам в личный чат "
+           "кнопку «Подключить»."),
+    "en": ("you cannot type a command in a channel (channel posts do not "
+           "show an author), so the third step is not needed — add the bot "
+           "as a channel admin and it will send you a \"Connect\" button "
+           "in the private chat."),
+},
 "a_warn_b": {"uz": "Diqqat: ", "ru": "Внимание: ", "en": "Note: "},
 "a_warn": {
  "uz": "Faqat guruh admini /setup qila oladi. Bir admin — bitta guruh: sizda allaqachon ulangan guruh bo'lsa, bot ikkinchisini qabul qilmaydi.",
@@ -359,6 +374,7 @@ def content(img: dict | None = None, lang: str = "uz") -> list:
             [t("a_3a"), _b(t("a_3b")), t("a_3c"), _code("/setup"), t("a_3d")],
         ], ordered=True),
         *_fig(img.get("setup"), t("a_cap")),
+        _p(_b(t("a_ch_b")), t("a_ch")),
         {"tag": "blockquote", "children": [_b(t("a_warn_b")), t("a_warn")]},
 
         # ── B ──

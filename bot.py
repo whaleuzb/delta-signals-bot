@@ -27,8 +27,9 @@ from telegram import (
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter, TimedOut
 from telegram.ext import (
-    Application, ApplicationHandlerStop, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ConversationHandler, ContextTypes, TypeHandler, filters,
+    Application, ApplicationHandlerStop, ChatMemberHandler, CommandHandler,
+    MessageHandler, CallbackQueryHandler, ConversationHandler, ContextTypes,
+    TypeHandler, filters,
 )
 
 import card
@@ -184,6 +185,15 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Har bir update'dan OLDIN ishlaydi (group=-1): foydalanuvchini yozib
     qo'yadi va majburiy obunani tekshiradi. Faqat SHAXSIY chat gate qilinadi —
     guruh ichidagi oqimlar (/setup, signal postlari) to'sib qo'yilmaydi."""
+    # Kanal posti ANONIM keladi (`effective_user` yo'q). Uni to'xtatmasak
+    # kanalda yozilgan har qanday buyruq (masalan `/setup`) quyidagi
+    # CommandHandler'larga yetib borardi va ular `update.effective_user.id`
+    # da AttributeError bilan yiqilardi. Kanalda bot hech narsani
+    # "eshitmaydi" — u yerga faqat POST QILADI (kanal ulash `my_chat_member`
+    # orqali, `on_my_chat_member` ga qarang).
+    if update.channel_post or update.edited_channel_post:
+        raise ApplicationHandlerStop
+
     user = update.effective_user
     if not user or user.is_bot:
         return
@@ -349,8 +359,12 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # choice == "group_owner"
     bot_username = ctx.bot.username
     mention = f"@{bot_username}" if bot_username else "@bot"
-    await q.edit_message_text(i18n.t("onb.owner_steps", lang, mention=mention),
-                               parse_mode=ParseMode.HTML)
+    # Kanal ham shu ekranda tushuntiriladi — foydalanuvchi "guruhim bor"
+    # tugmasini bosgan bo'lsa ham, aslida kanali bo'lishi mumkin.
+    await q.edit_message_text(
+        i18n.t("onb.owner_steps", lang, mention=mention)
+        + i18n.t("ch.steps", lang, mention=mention),
+        parse_mode=ParseMode.HTML)
 
 
 async def on_join_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -818,16 +832,35 @@ async def cmd_til(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
             i18n.t("lang.choose_group", ws_lang(ws)), reply_markup=lang_kb("lang:ws"))
         return
-    lang = await user_lang(update.effective_user.id)
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
     await update.message.reply_text(i18n.t("lang.choose", lang), reply_markup=lang_kb())
+
+    # Guruh/kanal xabarlari tili SHAXSIY chatdan ham tanlanadi. Guruhda
+    # `/til` yozish mumkin, KANALDA esa emas (kanal postlari anonim) —
+    # ya'ni bu bo'lmasa kanal ulagan odam post tilini umuman o'zgartira
+    # olmasdi. Guruh egasi uchun ham qulay: guruhga o'tish shart emas.
+    ws = await resolve_workspace(update, ctx)
+    if ws and ws["type"] == "group" and can_manage(uid, ws):
+        await update.message.reply_text(
+            i18n.t("lang.choose_group", ws_lang(ws)),
+            reply_markup=lang_kb(f"lang:ws:{ws['id']}"))
 
 
 async def on_lang_ws_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """Guruh xabarlari tilini saqlaydi."""
+    """Guruh/kanal xabarlari tilini saqlaydi.
+
+    Ikki shakl: `lang:ws:<kod>` — guruh ICHIDA yuborilgan klaviaturadan
+    (workspace chat bo'yicha topiladi); `lang:ws:<wid>:<kod>` — shaxsiy
+    chatdagi klaviaturadan (u yerda chat workspace'ga tegishli emas,
+    shuning uchun ID callback ichida keladi)."""
     q = update.callback_query
-    code = i18n.normalize(q.data.rsplit(":", 1)[1])
-    chat = q.message.chat
-    ws = await db.get_workspace_by_group(chat.id)
+    parts = q.data.split(":")
+    code = i18n.normalize(parts[-1])
+    if len(parts) == 4:
+        ws = await db.get_workspace(int(parts[2]))
+    else:
+        ws = await db.get_workspace_by_group(q.message.chat.id)
     if not ws or not can_manage(q.from_user.id, ws):
         await q.answer("Ruxsat yo'q.", show_alert=True)
         return
@@ -1890,6 +1923,121 @@ async def cmd_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # Guruh avatari darhol olinadi — ochiq sahifada logotip bo'lib turadi.
     await refresh_logo(ctx.bot, wid, chat.id)
 
+
+# ───────────────────────── Kanal ulash ─────────────────────────
+#
+# Kanal GURUHDAN boshqacha ulanadi va buning sababi Telegram'ning o'zida:
+# kanal postlari ANONIM keladi (`from_user` yo'q, faqat `sender_chat`),
+# ya'ni kanal ichida `/setup` yozilsa ham uni KIM yozganini bilib
+# bo'lmaydi — egasini aniqlash imkoni yo'q. Guruhda esa har bir xabarda
+# muallif bor, shuning uchun u yerda `/setup` ishlaydi va o'zgarmaydi.
+#
+# Yechim: bot kanalga admin qilib qo'shilganda Telegram `my_chat_member`
+# yangilanishini yuboradi va unda QO'SHGAN ODAM ko'rsatilgan bo'ladi.
+# O'sha odamga shaxsiy chatda tasdiqlash tugmasi yuboriladi — shu bilan
+# "kim egasi" savoli aniq hal bo'ladi.
+#
+# Bazada kanal ALOHIDA tur EMAS: `workspaces.type` baribir 'group',
+# `group_chat_id` esa kanal ID'si. Post qilish, a'zolik tekshiruvi
+# (`get_chat_member`), logotip olish — hammasi kanalda ham xuddi guruhdek
+# ishlaydi, shuning uchun yangi tur qo'shish ~10 joyni tarmoqlantirardi
+# va foyda bermasdi.
+
+def channel_offer_kb(lang: str, chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton(i18n.t("ch.offer_yes", lang),
+                             callback_data=f"chsetup:{chat_id}"),
+        InlineKeyboardButton(i18n.t("ch.offer_no", lang),
+                             callback_data="chsetup_no"),
+    ]])
+
+
+async def on_my_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Botning o'z a'zolik holati o'zgarganda — kanalga admin qilinganini
+    ushlaydi va egasiga tasdiqlash taklifini yuboradi."""
+    cm = update.my_chat_member
+    if not cm or cm.chat.type != "channel":
+        return                       # guruhlar eski yo'l bilan: /setup
+    if cm.new_chat_member.status != "administrator":
+        return                       # qo'shildi, lekin admin emas — post qila olmaydi
+    user = cm.from_user
+    if not user or user.is_bot:
+        return
+    if await db.get_workspace_by_group(cm.chat.id):
+        # Allaqachon ulangan. Bu yerga admin huquqlari TAHRIRLANGANDA ham
+        # kelinadi (masalan yangi huquq qo'shilganda), shuning uchun
+        # jimgina chiqiladi — aks holda har tahrirda takroriy xabar ketardi.
+        return
+
+    lang = await user_lang(user.id)
+    name = cm.chat.title or "Kanal"
+    if not is_admin(user.id):
+        owned = await db.get_group_workspace_by_owner(user.id)
+        if owned:
+            try:
+                await ctx.bot.send_message(
+                    user.id, i18n.t("su.have_other", lang, name=owned["name"]))
+            except Exception:
+                log.info("Kanal taklifi yuborilmadi (uid=%s)", user.id)
+            return
+
+    log.info("Bot kanalga admin qilindi: %s (%s), qo'shgan uid=%s",
+             name, cm.chat.id, user.id)
+    try:
+        await ctx.bot.send_message(
+            user.id, i18n.t("ch.offer", lang, name=html.escape(name, quote=False)),
+            parse_mode=ParseMode.HTML,
+            reply_markup=channel_offer_kb(lang, cm.chat.id))
+    except Exception:
+        # Odam botni hali /start qilmagan bo'lsa shaxsiy xabar ketmaydi —
+        # bu xato emas, shunchaki taklifni ko'rsata olmadik.
+        log.info("Kanal taklifi yuborilmadi (uid=%s, kanal=%s)", user.id, cm.chat.id)
+
+
+async def on_channel_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    await q.edit_message_text(i18n.t("ch.cancelled", await user_lang(q.from_user.id)))
+
+
+async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    uid = q.from_user.id
+    lang = await user_lang(uid)
+    await q.answer()
+    chat_id = int(q.data.split(":", 1)[1])
+
+    # Taklif yuborilgandan keyin holat o'zgargan bo'lishi mumkin (bot
+    # o'chirilgan, kanal boshqasi tomonidan ulangan) — HAMMASI qaytadan
+    # tekshiriladi, tugmaning o'ziga ishonilmaydi.
+    existing = await db.get_workspace_by_group(chat_id)
+    if existing:
+        await q.edit_message_text(i18n.t("su.already", lang, name=existing["name"]))
+        return
+    if not is_admin(uid):
+        owned = await db.get_group_workspace_by_owner(uid)
+        if owned:
+            await q.edit_message_text(i18n.t("su.have_other", lang, name=owned["name"]))
+            return
+    try:
+        chat = await ctx.bot.get_chat(chat_id)
+        member = await ctx.bot.get_chat_member(chat_id, uid)
+    except Exception:
+        log.warning("Kanalni ulab bo'lmadi (%s)", chat_id, exc_info=True)
+        await q.edit_message_text(i18n.t("ch.gone", lang))
+        return
+    if member.status not in ("creator", "administrator") and not is_admin(uid):
+        await q.edit_message_text(i18n.t("ch.admin_only", lang))
+        return
+
+    name = chat.title or "Kanal"
+    wid = await db.create_group_workspace(uid, chat_id, name)
+    log.info("Yangi workspace (kanal): #%s %s (owner=%s chat=%s)",
+             wid, name, uid, chat_id)
+    await q.edit_message_text(
+        i18n.t("ch.done", lang, name=html.escape(name, quote=False)),
+        parse_mode=ParseMode.HTML)
+    await refresh_logo(ctx.bot, wid, chat_id)
 
 # ─────────────────────────── Signal kiritish — sehrgar (wizard) ───────────────────────────
 
@@ -6346,6 +6494,13 @@ def main() -> None:
     # obunani tekshiradi (obuna bo'lmasa ApplicationHandlerStop bilan to'xtatadi).
     app.add_handler(TypeHandler(Update, gate), group=-1)
     app.add_handler(CallbackQueryHandler(on_subcheck, pattern=r"^subcheck$"))
+    # Kanal ulash: bot kanalga admin qilinganda Telegram shu yangilanishni
+    # yuboradi (kanalda `/setup` yozib bo'lmaydi — `on_my_chat_member`
+    # izohiga qarang).
+    app.add_handler(ChatMemberHandler(on_my_chat_member,
+                                      ChatMemberHandler.MY_CHAT_MEMBER))
+    app.add_handler(CallbackQueryHandler(on_channel_connect, pattern=r"^chsetup:"))
+    app.add_handler(CallbackQueryHandler(on_channel_cancel, pattern=r"^chsetup_no$"))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CallbackQueryHandler(on_admin, pattern=r"^adm:"))
     app.add_handler(CommandHandler("start", cmd_start))

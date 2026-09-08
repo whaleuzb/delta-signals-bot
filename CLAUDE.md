@@ -5139,3 +5139,48 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      joyda u butun funksiyani o'chirib qo'yadi — har doim uchinchi yo'l
      (kamroq ma'lumotli, lekin TO'G'RI post) qoldirish kerak.
      Sinov: `test_news_uz_only.py` 29/29.
+
+161. **Kanalni ham workspace sifatida ulash mumkin.** Foydalanuvchi:
+     "Endi guruhga ham kanalga ham ulash mumkin qilaylik."
+
+     **Nega kanal `/setup` bilan ulanmaydi.** Kanal postlari ANONIM
+     keladi — `from_user` yo'q, faqat `sender_chat`. Ya'ni kanal ichida
+     `/setup` yozilsa ham uni KIM yozganini bilib bo'lmaydi, egasini
+     aniqlash imkoni yo'q. Guruhda esa har bir xabarda muallif bor,
+     shuning uchun u yerda `/setup` ishlaydi va TEGILMADI.
+
+     **Yechim — `my_chat_member`.** Bot kanalga admin qilib qo'shilganda
+     Telegram bu yangilanishni yuboradi va unda QO'SHGAN ODAM
+     ko'rsatilgan bo'ladi. O'sha odamga shaxsiy chatda "Ulash / Kerak
+     emas" tugmalari yuboriladi (`on_my_chat_member` -> `chsetup:<id>`
+     -> `on_channel_connect`). "Kim egasi" savoli shu bilan aniq hal
+     bo'ladi. Tugma bosilganda HAMMA shart qaytadan tekshiriladi
+     (kanal hali ham bormi, bot admin ekanmi, odam admin ekanmi,
+     kanal boshqasi tomonidan ulanib qolmadimi) — tugmaning o'ziga
+     ishonilmaydi, u eskirgan bo'lishi mumkin.
+
+     **Bazada kanal ALOHIDA TUR EMAS:** `workspaces.type` baribir
+     `'group'`, `group_chat_id` esa kanal ID'si. Post qilish, a'zolik
+     tekshiruvi (`get_chat_member` kanalda ham ishlaydi), natijani
+     signal postiga javob qilib yozish, logotip olish — hammasi bir
+     xil. Yangi tur qo'shilsa `ws["type"] == "group"` shartini ~10
+     joyda tarmoqlantirish kerak bo'lardi va hech qanday foyda
+     bermasdi.
+
+     **Yo'l-yo'lakay tuzatilgan ikki narsa:**
+     - `gate` endi KANAL POSTLARINI butunlay to'xtatadi
+       (`ApplicationHandlerStop`). Ilgari kanalda yozilgan istalgan
+       buyruq CommandHandler'larga yetib borardi va ular
+       `update.effective_user.id` da `AttributeError` bilan
+       yiqilardi (kanal postida `effective_user` YO'Q). Kanalda bot
+       hech narsani "eshitmaydi" — u yerga faqat POST QILADI.
+     - Guruh/kanal xabarlari tili endi SHAXSIY chatdagi `/til` dan
+       ham tanlanadi (`lang:ws:<wid>:<kod>`). Kanalda `/til` yozib
+       bo'lmagani uchun busiz kanal egasi post tilini UMUMAN
+       o'zgartira olmasdi.
+
+     Sinov: `test_channel_setup.py` 26/26 — taklifning kelishi va
+     kelmasligi kerak bo'lgan holatlar, qayta tekshiruv, kanal
+     postining to'xtatilishi, shaxsiy chatdan til tanlash va
+     handlerlarning haqiqatan ro'yxatdan o'tgani (naqsh xatosi
+     jimgina o'tib ketmasligi uchun).
