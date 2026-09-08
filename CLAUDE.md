@@ -5053,3 +5053,63 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        uni to'lov botining Mini App'i o'qiydi va u yerdagi yozuvlar
        guruh sahifasi bilan bir xil qolishi kerak — mavjud shartnomani
        jimgina o'zgartirmaymiz.
+
+159. **News Trade kanaliga FAQAT o'zbekcha post ketadi.** Foydalanuvchi:
+     "News trade kanalidagi xabarlar ruscha kelyabti. Buni togrilash
+     kerak. News trade kanalida xabar faqat uzbek tilida kelishi kerak."
+     Tekshirganda ruscha/inglizcha matn kanalga UCH xil yo'ldan
+     chiqayotgani aniqlandi — uchalasi ham tuzatildi:
+
+     **(a) MarketTwits tarjimasi yiqilib, ASL RUSCHA matn postlanardi.**
+     Railway loglari sababni aniq ko'rsatdi: `httpx.ReadTimeout` —
+     `translate.py` 10 soniya kutar, MyMemory esa sekin javob berar edi,
+     va har bir timeout bitta ruscha post degani edi.
+     - `translate.py`: kutish 10s -> **20s**; qayta urinish endi FAQAT
+       429 uchun emas, **har qanday xato** uchun (3 marta, orasida
+       2s/4s); MyMemory butunlay ishlamasa **Claude zaxira tarjimon**
+       sifatida chaqiriladi (`ANTHROPIC_API_KEY` bo'lsa); natijada
+       KIRILL harf qolgan bo'lsa u tarjima hisoblanmaydi va rad etiladi
+       (MyMemory ba'zan matnni o'zgarishsiz qaytaradi).
+     - `translate.to_uz()` endi `str | None` qaytaradi va **`None` =
+       "tarjima BO'LMADI"** degani. `bot.py` shu holatda postni
+       BUTUNLAY o'tkazib yuboradi (hodisa `posted=True` bilan yoziladi
+       — qayta urinilmasin). Asl matnga QAYTISH olib tashlandi: ruscha
+       post chiqqandan ko'ra post umuman chiqmagani yaxshi.
+
+     **(b) `newsai.py` ECON_PROMPT Claude'ga RUSCHA hashtag yozishni
+     BUYURARDI** (`#сша #инфляция #экономика #отчетность`). Shablon
+     rus kanalidan ko'chirilgan edi. Endi hashtaglar o'zbekcha
+     (`#aqsh #inflyatsiya #iqtisodiyot #hisobot`) va shablonga aniq
+     qoida qo'shildi: "BUTUN xabar FAQAT o'zbek tilida bo'lsin".
+
+     **(c) Inglizcha matnlar ham kanalga chiqardi:**
+     - Iqtisodiy taqvim sarlavhalari Forex Factory'dan INGLIZCHA
+       keladi. `econcalendar.title_uz()` qo'shildi — **lug'at**
+       (tarjimon API emas: bu yopiq, kichik, o'zgarmas ro'yxat;
+       "Non-Farm Payrolls" kabi atamalarni API so'zma-so'z, noto'g'ri
+       o'girardi). Aniqlovchilar (Core/Prelim/Flash/Advance/Revised/
+       Final) va davr belgilari (m/m, q/q, y/y) alohida ajratiladi,
+       shuning uchun lug'at kichik bo'lsa ham qamrov keng. Lug'atda
+       yo'q sarlavha ASL holida qoladi (hodisani butunlay yashirgandan
+       afzal) va logga yoziladi — keyin lug'atga qo'shiladi.
+     - Hajm portlashi postidagi CryptoPanic sarlavhalari ham inglizcha
+       edi. Endi har biri `translate.to_uz(..., source="en")` bilan
+       o'giriladi; tarjima bo'lmagani captionga UMUMAN qo'shilmaydi.
+
+     **⚠️ `html.escape()` — `quote=False` bo'lishi SHART.** Taqvim
+     sarlavhalari o'zbekchaga o'girilgach ularda apostrof paydo bo'ldi
+     ("iste'mol"), standart `html.escape()` esa uni `&#x27;` qiladi va
+     Telegram buni ORQAGA o'girmaydi — foydalanuvchiga xom `&#x27;`
+     ko'rinardi. Bu AYNAN `&#10;` xatosining takrori (128-band).
+
+     **Sinov:** `test_news_uz_only.py` (24/24) — tarjima yiqilsa post
+     UMUMAN chiqmasligi, tarjima bo'lsa captionda kirill qolmasligi,
+     `to_uz()` ning qayta urinishi / Claude zaxirasi / kirill-qolgan
+     natijani rad etishi, taqvim sarlavhalari lug'ati, ECON_PROMPT'da
+     kirill yo'qligi va CryptoPanic sarlavhalari tarjimasi tekshiriladi.
+
+     **Eslatma (scratchpad sinovlari).** MarketTwits sinovlari qat'iy
+     `msg_id` ishlatgani uchun BIR MARTA o'tar, ikkinchi yugurishda
+     bazadagi `news_events` qatori dedup bo'lib yiqilardi. Endi har
+     yugurishda tasodifiy `msg_id`/kanal nomi olinadi (`test_reset_stats`
+     ham xuddi shu sababdan `bot_settings` bayrog'ini oldin tozalaydi).

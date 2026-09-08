@@ -90,7 +90,7 @@ chiqadi — ular BITTA xabarda birlashtiriladi.
 Vazifang — quyidagi ANIQ FORMATDA (misoldagek, boshqa hech narsa qo'shmasdan)
 o'zbekcha xabar matni yoz:
 
-❗️🇺🇸 #сша #<mavzuga oid 1-2 ta teg, rus tilida kichik harf bilan> #экономика #отчетность
+❗️🇺🇸 #aqsh #<mavzuga oid 1-2 ta teg, O'ZBEK tilida kichik harf bilan> #iqtisodiyot #hisobot
 AQSh - <KATEGORIYA NOMI KATTA HARFLARDA, o'zbekcha> - <KO'RSATKICH NOMI KATTA HARFLARDA, o'zbekcha> (<hisobot davri oyi, event sanasidan bir oy oldin, o'zbekcha qisqa nom, masalan "iyul">):
 
 <davr nomi kichik harf bilan, masalan "oylik" yoki "yil davomida"> = <ishora bilan foiz> (kutilgan <ishora bilan foiz> / oldingi ko'rsatkich <ishora bilan foiz>)
@@ -98,7 +98,7 @@ AQSh - <KATEGORIYA NOMI KATTA HARFLARDA, o'zbekcha> - <KO'RSATKICH NOMI KATTA HA
 (har bir ko'rsatkich uchun yuqoridagi qatordan, orasida bo'sh qator bilan)
 
 MISOL (aynan shu uslubda, lekin mazmuni har xil ko'rsatkich uchun moslashtiriladi):
-❗️🇺🇸 #сша #инфляция #экономика #отчетность
+❗️🇺🇸 #aqsh #inflyatsiya #iqtisodiyot #hisobot
 AQSh - INFLYATSIYA - PCE NARX INDEKSASI (iyul):
 
 oylik = +0.2% (kutilgan +0.1% / oldingi ko'rsatkich -0.1%)
@@ -111,10 +111,12 @@ Qoidalar:
 - `actual` bo'sh bo'lgan ko'rsatkichni butunlay tashlab ket.
 - Barcha `actual` bo'sh bo'lsa — message_uz'ni bo'sh satr qoldir va
   is_market_moving=false qo'y.
-- Teglarni ko'rsatkich mazmuniga qarab tanla (masalan инфляция, безработица,
-  ставка, ввп, промышленность, розница, рынок труда).
+- Teglarni ko'rsatkich mazmuniga qarab tanla (masalan inflyatsiya, ishsizlik,
+  stavka, yaim, sanoat, chakana_savdo, mehnat_bozori).
+- BUTUN xabar — sarlavha, teglar, izohlar — FAQAT o'zbek tilida bo'lsin;
+  ruscha yoki inglizcha bironta so'z ham qolmasin.
 - Bu odatiy/kam ta'sirli ko'rsatkich bo'lsa is_market_moving=false qo'y
-  (lekin message_uz baribir to'g'ri formatlanган holda yoz)."""
+  (lekin message_uz baribir to'g'ri formatlangan holda yoz)."""
 
 
 async def econ_result(events: list[dict]) -> dict | None:

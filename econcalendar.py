@@ -74,3 +74,127 @@ async def fetch_week() -> list[dict]:
             "actual": item.get("actual") or "",
         })
     return out
+
+
+# ---------------------------------------------------------------------------
+# Sarlavhalarni o'zbekchaga o'girish
+#
+# Manba (Forex Factory) sarlavhalari INGLIZCHA keladi va ilgari kanalga
+# xuddi shu holda chiqardi. Foydalanuvchi talabi: "News trade kanalida
+# xabar faqat uzbek tilida kelishi kerak" — shu sabab bu yerda o'giriladi.
+#
+# Nega tarjimon API emas, LUG'AT? Bu sarlavhalar YOPIQ, kichik va deyarli
+# o'zgarmas ro'yxat (haftasiga ~20 ta, doim bir xil nomlar). Lug'at bilan
+# natija barqaror va bepul; tarjimon API bo'lsa har hafta xuddi shu
+# matnlar uchun so'rov ketardi va "Non-Farm Payrolls" kabi atamalarni
+# so'zma-so'z, noto'g'ri o'girardi.
+# ---------------------------------------------------------------------------
+
+# Sarlavha oldidagi aniqlovchilar (masalan "Core CPI m/m" -> "asosiy ...").
+_PREFIXES = {
+    "core": "asosiy",
+    "prelim": "dastlabki",
+    "preliminary": "dastlabki",
+    "flash": "tezkor",
+    "advance": "oldindan",
+    "revised": "qayta ko'rilgan",
+    "final": "yakuniy",
+}
+
+# Davr belgilari — sarlavha OXIRIDA keladi.
+_PERIODS = {
+    "m/m": "(oylik)",
+    "q/q": "(choraklik)",
+    "y/y": "(yillik)",
+}
+
+# Asosiy hodisa nomlari. Kalit — kichik harfda, aniqlovchi va davrsiz.
+_TITLES = {
+    "cpi": "iste'mol narxlari indeksi (CPI)",
+    "ppi": "ishlab chiqaruvchi narxlari indeksi (PPI)",
+    "pce price index": "PCE narx indeksi",
+    "gdp": "yalpi ichki mahsulot (YaIM)",
+    "gdp price index": "YaIM narx indeksi",
+    "retail sales": "chakana savdo",
+    "non-farm employment change": "qishloq xo'jaligidan tashqari bandlik o'zgarishi",
+    "adp non-farm employment change": "ADP bandlik o'zgarishi",
+    "unemployment rate": "ishsizlik darajasi",
+    "unemployment claims": "ishsizlik nafaqasi arizalari",
+    "average hourly earnings": "o'rtacha soatlik ish haqi",
+    "employment cost index": "mehnat xarajatlari indeksi",
+    "jolts job openings": "ochiq ish o'rinlari (JOLTS)",
+    "federal funds rate": "AQSH Fed foiz stavkasi",
+    "fomc statement": "FOMC bayonoti",
+    "fomc press conference": "FOMC matbuot anjumani",
+    "fomc meeting minutes": "FOMC yig'ilishi bayonnomasi",
+    "fomc economic projections": "FOMC iqtisodiy prognozlari",
+    "beige book": "Fed \"Bej kitob\" hisoboti",
+    "fed chair powell speaks": "Fed rahbari Pauell nutqi",
+    "fed chair powell testifies": "Fed rahbari Pauell Kongressda",
+    "ism manufacturing pmi": "ISM sanoat PMI",
+    "ism services pmi": "ISM xizmatlar PMI",
+    "manufacturing pmi": "sanoat PMI",
+    "services pmi": "xizmatlar PMI",
+    "chicago pmi": "Chikago PMI",
+    "empire state manufacturing index": "Empire State sanoat indeksi",
+    "philly fed manufacturing index": "Philadelphia Fed sanoat indeksi",
+    "richmond manufacturing index": "Richmond sanoat indeksi",
+    "industrial production": "sanoat ishlab chiqarishi",
+    "capacity utilization rate": "quvvatdan foydalanish darajasi",
+    "durable goods orders": "uzoq muddatli tovarlarga buyurtmalar",
+    "factory orders": "zavod buyurtmalari",
+    "trade balance": "savdo balansi",
+    "consumer credit": "iste'mol krediti",
+    "personal income": "shaxsiy daromad",
+    "personal spending": "shaxsiy xarajatlar",
+    "cb consumer confidence": "CB iste'molchi ishonchi",
+    "uom consumer sentiment": "Michigan universiteti iste'molchi kayfiyati",
+    "uom inflation expectations": "Michigan universiteti inflyatsiya kutilmalari",
+    "consumer sentiment": "iste'molchi kayfiyati",
+    "building permits": "qurilish ruxsatnomalari",
+    "housing starts": "yangi uy qurilishi boshlanishi",
+    "new home sales": "yangi uy sotuvlari",
+    "existing home sales": "ikkilamchi uy sotuvlari",
+    "pending home sales": "kutilayotgan uy sotuvlari",
+    "crude oil inventories": "neft zaxiralari",
+    "natural gas storage": "tabiiy gaz zaxiralari",
+    "treasury currency report": "G'aznachilik valyuta hisoboti",
+}
+
+
+def title_uz(title: str) -> str:
+    """Inglizcha taqvim sarlavhasini o'zbekchaga o'giradi.
+
+    Lug'atda yo'q bo'lsa — ASL matn qaytariladi. Hodisani butunlay
+    yashirgandan ko'ra (foydalanuvchi muhim yangilikni ko'rmay qolardi)
+    tanish bo'lmagan nomni asl holda ko'rsatgan afzal; loglarda bunday
+    nomlar ko'rinsa yuqoridagi lug'atga qo'shib qo'yiladi."""
+    raw = (title or "").strip()
+    if not raw:
+        return raw
+
+    core = raw.lower()
+    period = ""
+    for suffix, uz in _PERIODS.items():
+        if core.endswith(" " + suffix):
+            core = core[: -(len(suffix) + 1)].strip()
+            period = " " + uz
+            break
+
+    prefix = ""
+    changed = True
+    while changed:
+        changed = False
+        for eng, uz in _PREFIXES.items():
+            if core.startswith(eng + " "):
+                core = core[len(eng) + 1:].strip()
+                prefix = (prefix + " " + uz).strip()
+                changed = True
+                break
+
+    got = _TITLES.get(core)
+    if got is None:
+        log.info("Taqvimda tanish bo'lmagan sarlavha: %r", raw)
+        return raw
+    out = f"{prefix} {got}".strip() if prefix else got
+    return (out[0].upper() + out[1:] + period).strip()

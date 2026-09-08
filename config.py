@@ -141,7 +141,7 @@ SURGE_SCAN_SECONDS = int(os.getenv("SURGE_SCAN_SECONDS", "300"))
 # --- Kit (whale) faolligi: FAQAT portlash nomzodlarida (foydalanuvchi
 #     qarori — butun bozorni HAR individual savdo darajasida kuzatish
 #     MEXC tezlik chegarasiga zarba beradi, portlash nomzodlari esa
-#     odatda bir vaqtda bittа-ikkitа bo'ladi) — so'nggi WHALE_WINDOW_
+#     odatda bir vaqtda bitta-ikkita bo'ladi) — so'nggi WHALE_WINDOW_
 #     MINUTES ichida xarid YOKI sotuv hajmi 24 soatlik hajmning
 #     WHALE_MIN_PCT foizidan oshsa, alohida xabar (grafiksiz) ---
 WHALE_MIN_PCT = float(os.getenv("WHALE_MIN_PCT", "10"))

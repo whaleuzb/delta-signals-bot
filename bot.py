@@ -3872,7 +3872,7 @@ async def _admin_user_card(bot, uid: int, live: bool = False,
         for w in d["viewing"]:
             mark = ""
             if live:
-                # Jonli a'zolik tekshiruvi — group_viewers faqat "ulanган"ligini
+                # Jonli a'zolik tekshiruvi — group_viewers faqat "ulangan"ligini
                 # bildiradi, hozir haqiqatan a'zomi yo'qmi Telegram aytadi.
                 try:
                     m = await bot.get_chat_member(w["group_chat_id"], uid)
@@ -5108,9 +5108,22 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     body = _HASHTAG_RE.sub("", text).strip()
     display_body = body
     if _CYRILLIC_RE.search(body):
-        translated = await translate.to_uz(body)
-        if translated:
-            display_body = translated
+        display_body = await translate.to_uz(body)
+        # ⚠️ Tarjima bo'lmasa post BUTUNLAY o'tkazib yuboriladi.
+        # Avval asl (RUSCHA) matnga qaytilardi va kanalga ruscha post
+        # chiqib ketardi — foydalanuvchi: "News trade kanalida xabar
+        # faqat uzbek tilida kelishi kerak". Manba (MarketTwits) ruszabon,
+        # ya'ni tarjima ixtiyoriy bezak emas, MAJBURIY bosqich.
+        # Hodisa `posted=True` bilan yoziladi: xabar ko'rib chiqilgan va
+        # rad etilgan, keyin qayta urinilmasin.
+        if not display_body:
+            log.warning("MarketTwits posti tarjima qilinmadi — "
+                        "o'tkazib yuborildi (%s)", external_key)
+            await db.insert_news_event(
+                source="markettwits", external_key=external_key, symbol=None,
+                market=None, headline_en=text[:2000], translation_uz=None,
+                insight_uz=None, event_at=event_at, posted=True)
+            return
 
     eid = await db.insert_news_event(
         source="markettwits", external_key=external_key, symbol=symbol, market=market,
@@ -5229,14 +5242,22 @@ def _econ_digest_text(events: list[dict], now_local: datetime) -> str:
     lines = [head]
     for e in sorted(events, key=lambda e: e["when"]):
         t = e["when"].astimezone(stats.TZ)
-        lines.append(f"\n{t:%H:%M}: {_flag_country('USD')} {html.escape(e['title'])}")
+        # Sarlavha manbadan INGLIZCHA keladi — kanalga faqat o'zbekcha
+        # chiqishi kerak (foydalanuvchi talabi), shuning uchun o'giriladi.
+        # `quote=False` — o'zbekcha sarlavhalarda apostrof ko'p, standart
+        # `html.escape()` esa uni `&#x27;`ga aylantiradi va Telegram buni
+        # ORQAGA o'girmaydi (xom holda ko'rinib qoladi) — MarketTwits
+        # captionidagi bilan AYNI sabab.
+        lines.append(f"\n{t:%H:%M}: {_flag_country('USD')} "
+                     f"{html.escape(econcalendar.title_uz(e['title']), quote=False)}")
     return "".join(lines)
 
 
 def _econ_remind_text(group: list[dict]) -> str:
     lines = [f"⏰ <b>Diqqat, {config.ECON_REMIND_MINUTES} daqiqa keyin:</b>"]
     for e in group:
-        lines.append(f"{_flag_country('USD')} {html.escape(e['title'])}")
+        lines.append(f"{_flag_country('USD')} "
+                     f"{html.escape(econcalendar.title_uz(e['title']), quote=False)}")
     return "\n".join(lines)
 
 
@@ -5417,12 +5438,32 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
     lines = [f"🚀 <b>{html.escape(symbol)}</b> — savdo hajmi keskin oshdi",
             f"\n{config.SURGE_DECLINE_DAYS} kunlik narx: <b>{decline_pct:+.1f}%</b>",
             f"\nHajm: o'rtachadan <b>{ratio:.1f}x</b> ko'p"]
-    if news_items:
+    # CryptoPanic sarlavhalari INGLIZCHA keladi. Kanalga faqat o'zbekcha
+    # matn chiqishi kerak (foydalanuvchi: "News trade kanalida xabar faqat
+    # uzbek tilida kelishi kerak"), shuning uchun har biri tarjima
+    # qilinadi; tarjima bo'lmagani UMUMAN qo'shilmaydi — inglizcha holda
+    # qoldirilmaydi.
+    headlines = []
+    for item in news_items[:3]:
+        title_en = (item["title"] or "").strip()
+        if not title_en:
+            continue
+        title_uz = await translate.to_uz(title_en, source="en")
+        if not title_uz:
+            log.info("Yangilik sarlavhasi tarjima qilinmadi, tashlab ketildi: %r",
+                     title_en[:80])
+            continue
+        headlines.append((title_uz, item["url"] or ""))
+
+    if headlines:
         lines.append("\n\n📰 Bog'liq yangiliklar:")
-        for item in news_items[:3]:
-            title = html.escape(item["title"] or ticker)
-            url = html.escape(item["url"] or "")
-            lines.append(f"\n• <a href=\"{url}\">{title}</a>" if url else f"\n• {title}")
+        for title_uz, url in headlines:
+            # `quote=False` — o'zbekcha matnda apostrof bor, Telegram
+            # `&#x27;`ni orqaga o'girmaydi. URL esa ATRIBUT ichida,
+            # u yerda qo'shtirnoq ekranlanishi SHART (standart holat).
+            t = html.escape(title_uz, quote=False)
+            u = html.escape(url)
+            lines.append(f"\n• <a href=\"{u}\">{t}</a>" if u else f"\n• {t}")
     else:
         lines.append("\n\n<i>Aniq sabab topilmadi — bozor spekulyatsiyasi bo'lishi mumkin.</i>")
     caption = "".join(lines)
