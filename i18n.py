@@ -2561,6 +2561,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "Taklif kodi", "ru": "Код приглашения", "en": "Invite code",
     },
 
+    # ⚠️ O'rin nomi `tl`, `lang` EMAS: `i18n.t(key, lang, **kwargs)` ning
+    # o'z parametri ham `lang` — bir xil nom bo'lsa "multiple values for
+    # argument 'lang'" xatosi chiqadi.
+    "prev.confirm_note_lang": {
+        "uz": ("✅ Tasdiqlasangiz guruhga shu ko'rinishda, <b>{tl}</b> tilida "
+               "yuboriladi."),
+        "ru": ("✅ После подтверждения в группу уйдёт в таком же виде, на "
+               "<b>{tl}</b> языке."),
+        "en": ("✅ Once confirmed, it goes to the group in this same layout, in "
+               "<b>{tl}</b>."),
+    },
+    "lang.name_uz": {"uz": "o'zbek", "ru": "узбекском", "en": "Uzbek"},
+    "lang.name_ru": {"uz": "rus", "ru": "русском", "en": "Russian"},
+    "lang.name_en": {"uz": "ingliz", "ru": "английском", "en": "English"},
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",

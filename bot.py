@@ -768,6 +768,15 @@ async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = q.from_user.id
     await db.set_user_lang(uid, code)
     _LANG_CACHE[uid] = code
+    # Shaxsiy jurnal — bu odamning O'ZI uchun: uning "guruh" tili ham
+    # shu tanlovga ergashadi, aks holda menyu bir tilda, jurnalga
+    # tushadigan signal kartalari boshqa tilda chiqardi (foydalanuvchi:
+    # "til aralash bo'lib ketyabti"). GURUH workspace'lariga tegilmaydi —
+    # u yerda til guruhning umumiy sozlamasi (`/til` guruh ichida).
+    try:
+        await db.set_personal_workspace_lang(uid, code)
+    except Exception:
+        log.warning("Shaxsiy jurnal tili yangilanmadi (%s)", uid, exc_info=True)
     await q.answer(i18n.t("lang.saved", code))
     await q.edit_message_text(i18n.t("lang.saved", code))
 
@@ -1394,13 +1403,18 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
         return True
 
     await db.set_tp_sl(sig_id, parsed["sl"], tps)
-    body = draft_text({"symbol": sig["symbol"], "side": side, "entry": entry,
-                        "sl": parsed["sl"], "tps": tps, "market": sig["market"]},
-                       sig_id, ws_lang(ws))
-    await msg.reply_text(i18n.t("tpsl.placed", lang, body=body),
-                          parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+    # Karta IKKI MARTA chiziladi: shaxsiy javob odamning tilida, guruh
+    # posti esa guruh tilida. Bu shunchaki matn qurish — narx ham,
+    # bazaga so'rov ham yo'q, ya'ni qo'shimcha xarajat sezilmaydi.
+    # Aks holda shaxsiy chatda ikki til aralashib ketardi.
+    d = {"symbol": sig["symbol"], "side": side, "entry": entry,
+         "sl": parsed["sl"], "tps": tps, "market": sig["market"]}
+    await msg.reply_text(
+        i18n.t("tpsl.placed", lang, body=draft_text(d, sig_id, lang)),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
-                                        sym=sig["symbol"], body=body))
+                                        sym=sig["symbol"],
+                                        body=draft_text(d, sig_id, ws_lang(ws))))
     return True
 
 
@@ -2311,8 +2325,15 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
 
 async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id: int,
                         token: str | None = None) -> None:
-    # Ikki xil til: `lang` — odamning shaxsiy tili (tugmalar, ogohlantirishlar),
-    # `glang` — guruh tili (signal kartasining o'zi, chunki u guruhga ketadi).
+    # Ikki xil til. `lang` — odamning shaxsiy tili: SHAXSIY CHATDA
+    # KO'RINADIGAN HAMMA NARSA shu tilda, kartaning o'zi ham. `glang` —
+    # guruh tili: u faqat GURUHGA HAQIQATAN ketadigan post uchun saqlanadi
+    # (`on_go` shu bilan qayta chizadi).
+    #
+    # Avval karta ko'rikda ham guruh tilida chizilardi — natijada odam
+    # tili guruhnikidan farq qilsa, BITTA ekranda ikki til aralashib
+    # ketardi ("Kirish: …" ustida "Which image should be used?").
+    # Foydalanuvchi: "til aralash bo'lib ketyabti".
     lang = await user_lang(msg.from_user.id)
     ws = await db.get_workspace(workspace_id)
     glang = ws_lang(ws)
@@ -2365,7 +2386,7 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
                        "chart_tf": None, "ready_file_id": None, "want_bot_chart": False,
                        "lang": lang, "glang": glang}
 
-    body = draft_text(draft, lang=glang)
+    body = draft_text(draft, lang=lang)
     if warn:
         body += "\n\n" + "\n".join(warn)
     body += "\n\n" + i18n.t("prev.pic_q", lang)
@@ -2404,10 +2425,19 @@ async def send_final_preview(target, ctx, token: str) -> None:
         return
     d = item["draft"]
     lang = item.get("lang")
-    caption = draft_text(d, lang=item.get("glang"))
+    glang = item.get("glang")
+    caption = draft_text(d, lang=lang)
     if item["warn"]:
         caption += "\n\n" + "\n".join(item["warn"])
-    caption += "\n\n" + i18n.t("prev.confirm_note", lang)
+    # Guruh tili boshqacha bo'lsa — buni OCHIQ aytamiz. Ko'rik odamning
+    # tilida, guruh posti esa guruh tilida chiqadi; joylashuv bir xil,
+    # faqat yozuvlar boshqa tilda bo'ladi.
+    if glang and i18n.normalize(glang) != i18n.normalize(lang):
+        caption += "\n\n" + i18n.t(
+            "prev.confirm_note_lang", lang,
+            tl=i18n.t(f"lang.name_{i18n.normalize(glang)}", lang))
+    else:
+        caption += "\n\n" + i18n.t("prev.confirm_note", lang)
     # Telegram rasm sarlavhasi 1024 belgi bilan cheklangan. Uzun bo'lsa
     # send_photo YIQILADI va rasm butunlay yo'qolardi (bot grafigi ham) —
     # shuning uchun oldindan qisqartiramiz.

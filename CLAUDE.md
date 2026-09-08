@@ -4982,3 +4982,34 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - Yo'l-yo'lakay: kartadagi matn (`card.py`) ham tarjima qilindi va
        endi GURUH tilida (`ws_lang`) chiziladi — karta guruh postiga
        biriktiriladi, ya'ni tili ham guruhniki bo'lishi kerak.
+
+156. **⭐ BITTA EKRANDA IKKI TIL ARALASHARDI.** Foydalanuvchi: "til
+     aralash bo'lib ketyabti. Ba'zilar o'zbekcha ba'zilar inglizcha."
+     Ikkita alohida sabab bor edi — ikkalasi ham #154 dagi "ikki xil
+     til" qaroridan kelib chiqqan:
+     - **(a) Ko'rikda karta guruh tilida chizilardi.** Niyat to'g'ri edi
+       ("tasdiqlasangiz guruhga SHU ko'rinishda ketadi"), lekin odam tili
+       guruhnikidan farq qilsa natija shu bo'lardi: "Kirish: 100" ustida
+       "Which image should be used?". **Endi SHAXSIY CHATDA HAMMASI ODAM
+       TILIDA**, kartaning o'zi ham; guruhga esa `on_go` kartani guruh
+       tilida QAYTA chizadi (matn qurish — arzon, tarmoq/baza so'rovi
+       yo'q). Tillar farq qilsa yakuniy ko'rikda buni OCHIQ aytamiz:
+       "guruhga <til> tilida yuboriladi". `handle_tpsl_input` ham xuddi
+       shunday: shaxsiy javob odam tilida, guruh posti guruh tilida —
+       karta ikki marta chiziladi.
+     - **(b) SHAXSIY jurnalning `workspaces.lang` i hech qachon
+       o'rnatilmasdi.** Shaxsiy jurnalda "guruh" — egasining O'ZI, lekin
+       menyu `users.lang` dan, jurnalga tushadigan kartalar esa
+       `workspaces.lang` (NULL -> o'zbekcha) dan o'qilardi. Endi:
+       `/til` tanlanganda `set_personal_workspace_lang()` ham chaqiriladi,
+       yangi jurnal darhol egasining tilida ochiladi, va MIGRATE bloki
+       mavjud jurnallarni bir martalik to'ldiradi (faqat `lang IS NULL`
+       bo'lganlarni — idempotent). **GURUH workspace'lariga TEGILMAYDI**:
+       u yerda til guruhning umumiy sozlamasi (`/til` guruh ichida).
+     - `i18n.t(key, lang, **kwargs)` da o'rin nomi `lang` BO'LMASIN —
+       funksiyaning o'z parametri bilan to'qnashadi ("multiple values for
+       argument 'lang'"). Shu sabab `{tl}` ishlatilgan.
+     - Sinov: `test_lang_mix.py` — ko'rikni 3×3 (odam tili × guruh tili)
+       kombinatsiyada chizib, matnda BOSHQA tilning belgilari yo'qligini
+       tekshiradi; shaxsiy jurnal tilining ergashishini va guruh tiliga
+       tegilmasligini haqiqiy Postgres'da tekshiradi.

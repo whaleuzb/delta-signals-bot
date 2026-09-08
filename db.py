@@ -336,6 +336,17 @@ CREATE INDEX IF NOT EXISTS idx_macd_alerts_posted ON macd_alerts(posted_at);
 ALTER TABLE users      ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS lang TEXT;
 
+-- SHAXSIY jurnalning tili egasining tiliga tenglashtiriladi (bir martalik,
+-- faqat HALI BO'SH bo'lganlar). Shaxsiy jurnalda "guruh" — egasining O'ZI:
+-- menyu `users.lang` dan, jurnalga tushadigan kartalar esa `workspaces.lang`
+-- dan o'qiladi. Ular ajralib qolgani uchun odam bitta chatda ikki tilni
+-- ko'rardi. GURUH workspace'lariga tegilmaydi — u yerda til guruhning umumiy
+-- sozlamasi. Idempotent: NULL bo'lmaganini o'zgartirmaydi.
+UPDATE workspaces w SET lang = u.lang
+  FROM users u
+ WHERE w.type = 'personal' AND w.owner_id = u.user_id
+   AND w.lang IS NULL AND u.lang IS NOT NULL;
+
 -- QISQA taklif kodi (masalan A7K3QM). Havolada `?start=ref_<uid>` ham
 -- ishlayveradi (eski havolalar buzilmasin), lekin ULASHISH KARTASIDA
 -- 10 xonali Telegram id'ni ko'rsatib bo'lmaydi — u na o'qiladi, na
@@ -386,8 +397,11 @@ async def get_or_create_personal_workspace(owner_id: int, name: str) -> asyncpg.
             "SELECT * FROM workspaces WHERE type='personal' AND owner_id=$1", owner_id)
         if row:
             return row
+        # Til ham darhol yoziladi: jurnal kartalari (`ws_lang`) egasining
+        # menyusi (`users.lang`) bilan bir xil tilda bo'lishi kerak.
         wid = await c.fetchval(
-            "INSERT INTO workspaces (type, owner_id, name) VALUES ('personal', $1, $2) "
+            "INSERT INTO workspaces (type, owner_id, name, lang) "
+            "VALUES ('personal', $1, $2, (SELECT lang FROM users WHERE user_id=$1)) "
             "RETURNING id", owner_id, name,
         )
         return await c.fetchrow("SELECT * FROM workspaces WHERE id=$1", wid)
@@ -1348,6 +1362,20 @@ async def set_workspace_lang(workspace_id: int, lang: str) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE workspaces SET lang=$2 WHERE id=$1",
                         workspace_id, lang)
+
+
+async def set_personal_workspace_lang(owner_id: int, lang: str) -> None:
+    """Shaxsiy jurnalning tilini egasining tiliga tenglashtiradi.
+
+    Shaxsiy jurnalda "guruh" — egasining O'ZI: jurnalga tushadigan signal
+    kartalari va natija xabarlari `workspaces.lang` dan o'qiladi, menyu esa
+    `users.lang` dan. Ular ajralib qolsa, bitta odam bitta chatda ikki
+    tilni ko'rardi. Guruh workspace'lariga TEGILMAYDI — u yerda til
+    guruhning umumiy sozlamasi (`/til` guruh ichida)."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET lang=$2 WHERE type='personal' AND owner_id=$1",
+            owner_id, lang)
 
 
 # ───────────────── MACD kesishmasi (dedup) ─────────────────
