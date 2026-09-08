@@ -5076,6 +5076,7 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
         return
 
     if "🇷🇺" in text:
+        log.info("MarketTwits: 🇷🇺 bayroq — o'tkazib yuborildi (%s)", external_key)
         # Foydalanuvchi: "Rossiya bayrog'i bor xabarlar kelmasin" — Rossiya
         # iqtisodiyoti bilan bog'liq postlar butunlay o'tkazib yuboriladi
         # (tiker/hashtag mos kelsa ham — masalan "#T" MOEX'dagi rus
@@ -5089,6 +5090,8 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
 
     symbol, market = await _markettwits_symbol(text)
     if not symbol and not await _markettwits_matches_topic(text):
+        log.info("MarketTwits: tanish tiker/hashtag yo'q — o'tkazib "
+                 "yuborildi (%s)", external_key)
         # Tanish (RESOLVE bo'ladigan) hashtag YO'Q va admin belgilagan
         # qo'shimcha #hashtaglardan biri ham YO'Q — bu bizning AI'siz
         # filtr: faqat shu ikkisidan biriga mos postlar o'tadi.
@@ -5175,6 +5178,9 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     except Exception:
         log.exception("MarketTwits postlanmadi (%s)", external_key)
         return
+    log.info("News Trade: post yuborildi (%s, tiker=%s, tarjima=%s, grafik=%s)",
+             external_key, symbol or "-", "bor" if display_body else "YO'Q",
+             "bor" if photo else "yo'q")
     await db.set_news_message(
         eid, sent.message_id, caption,
         render_tf="1m" if (photo and symbol) else None,

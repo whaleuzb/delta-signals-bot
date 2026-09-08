@@ -122,6 +122,10 @@ async def start_listener(on_message) -> None:
             if not text:
                 return
             channel = event.chat.username if event.chat else "?"
+            # Quvurni KO'RINADIGAN qilish uchun (foydalanuvchi "kanalga
+            # umuman xabar kelmayabti" deganda log butunlay jim edi va
+            # xabar kelmayaptimi, filtr to'sayaptimi — bilib bo'lmasdi).
+            log.info("Manba xabari: %s/%s (%d belgi)", channel, event.id, len(text))
             await on_message(channel, event.id, text, event.date)
         except Exception:
             log.exception("Telegram-manba xabari ishlanmadi")
