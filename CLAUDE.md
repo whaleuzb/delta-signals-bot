@@ -5387,3 +5387,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ⚠️ **Telegraph maqolasi qo'lda qayta chop etilishi kerak:**
      Railway'da `python publish_guide.py` (yoki bitta til uchun
      `python publish_guide.py ru`). Sandbox'dan telegra.ph bloklangan.
+
+167. **Equity grafigi va PDF hisoboti ham tarjima qilindi.**
+     Foydalanuvchi: "equity va pdf hisobot haliyam o'zbekcha chiqyabti."
+
+     **Nega ular tarjimadan chetda qolgan.** Butun bot, veb sahifa va
+     qo'llanmalar uchala tilga o'tkazilgan bo'lsa ham, bu ikkovi
+     MATPLOTLIB RASMIGA chiziladi — matn HTML yoki i18n orqali emas,
+     `set_ylabel()`, `suptitle()`, `fig.text()` ichida qatorga qadalgan
+     edi. `test_lang_mix` ning statik auditi esa faqat `lang` PARAMETRI
+     BOR funksiyalarni tekshiradi — bu funksiyalarda `lang` umuman
+     yo'q edi, ya'ni audit ularni ko'rmasdi ham.
+
+     - `stats.equity_chart(..., lang=)` va `stats.pdf_report(..., lang=)`
+       qo'shildi; barcha yozuvlar yangi `rep.*` kalitlariga o'tdi
+       (o'q nomlari, izohlar, afsona, sarlavha, PDF ko'rsatkichlari va
+       jadval sarlavhalari). `lang` qo'shilgani bilan audit endi bu
+       funksiyalarni HAM qamrab oladi.
+     - **Oy nomi `%b` bilan chiqarilardi** — u tizim lokalidan keladi va
+       tildan qat'i nazar inglizcha bo'lardi. Endi `stats.months_short()`.
+       Sana uchun ataylab QISQA shakl: ruschada "9 Август" g'aliz
+       ("9 августа" bo'lishi kerak), "9 авг" esa uchala tilda ham
+       tabiiy o'qiladi va qaratqich kelishigi muammosini chetlab o'tadi.
+     - **Veb keshida til unutilgan edi:** `equity.png` kaliti `eq{id}`
+       edi, ya'ni BIRINCHI tashrifchi tilidagi rasm hammaga keshlanardi.
+       Endi kalit `eq{id}:{lang}`, sahifadagi `<img src>` esa `keep()`
+       bilan tilni olib o'tadi.
+     - **Yo'l-yo'lakay xato:** `pdf_report` ichida `months = await
+       db.monthly_breakdown(...)` mahalliy o'zgaruvchisi modul
+       darajasidagi `months()` funksiyasini to'sib qo'ygan edi
+       (`month_rows` ga o'zgartirildi).
+
+     **Saboq:** "hammasi tarjima qilindi" degani faqat MATN oqimiga
+     tegishli edi. Rasm ichidagi matn — grafik, PDF, yordam rasmlari —
+     alohida oqim va u har safar unutiladi (166-band ham shu haqda).
+     Yangi rasm chizadigan kod yozilsa, birinchi savol: "bu yerdagi
+     yozuv qaysi tilda?"
+
+     Sinov: `test_report_lang.py` 55/55 — matplotlib chaqiruvlari
+     ushlab qolinib, HAR BIR yozuv tanlangan tilda ekani va o'zbekcha
+     qoldiq yo'qligi tekshiriladi.

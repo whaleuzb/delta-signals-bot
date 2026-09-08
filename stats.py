@@ -62,6 +62,25 @@ _MONTHS = {
 }
 
 
+# Sana oralig'i uchun QISQA shakl. To'liq nom sanada g'aliz chiqadi:
+# ruschada "9 Август" emas, "9 авг" bo'lishi kerak (to'g'ri shakli
+# "9 августа" — qaratqich kelishigi, lekin qisqasi bu muammoni butunlay
+# chetlab o'tadi va uchala tilda ham tabiiy o'qiladi).
+_MONTHS_SHORT = {
+    "uz": ["Yan", "Fev", "Mar", "Apr", "May", "Iyun",
+           "Iyul", "Avg", "Sen", "Okt", "Noy", "Dek"],
+    "ru": ["янв", "фев", "мар", "апр", "мая", "июн",
+           "июл", "авг", "сен", "окт", "ноя", "дек"],
+    "en": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+}
+
+
+def months_short(lang: str | None = None) -> list[str]:
+    """Oyning qisqa nomi — faqat sana oralig'ida ishlatiladi."""
+    return _MONTHS_SHORT[i18n.normalize(lang)]
+
+
 def months(lang: str | None = None) -> list[str]:
     """Oy nomlari — tanlangan tilda. `MONTHS_UZ` eski chaqiruvchilar uchun
     qoldirildi (o'zbekcha ro'yxatning AYNAN o'zi)."""
@@ -297,7 +316,8 @@ def _equity_curve(rows, deposit):
     return weighted, base, eq, deltas
 
 
-async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
+async def equity_chart(workspace_id: int, deposit=None,
+                        lang: str | None = None) -> io.BytesIO | None:
     """Ikki panelli grafik — YUQORIDA kumulyativ balans, PASTDA har bir savdoning
     alohida hissasi. Ikkalasi bir xil x o'qini (savdo tartibi) bo'lishadi, lekin
     har biri o'z o'lchovida — ataylab twinx (ikkita y o'qi bitta panelda)
@@ -345,11 +365,11 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
     axb.fill_between(x, base, eq, color=line_col, alpha=0.13, zorder=2)
     axb.axhline(base, color="#5a6373", lw=1.2, ls="--", zorder=1)
     axb.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-    axb.set_ylabel("Depozit balansi" if weighted else "Balans (boshlanish = 100)",
+    axb.set_ylabel(i18n.t("rep.eq_y_dep" if weighted else "rep.eq_y_raw", lang),
                    color=TXT, fontsize=12, labelpad=10)
     axb.margins(y=0.26)
 
-    axb.annotate(f"boshlang'ich  {base:,.0f}", xy=(n, base),
+    axb.annotate(f"{i18n.t('rep.eq_start', lang)}  {base:,.0f}", xy=(n, base),
                  xytext=(-4, 8), textcoords="offset points",
                  color=TXT, fontsize=11, ha="right", va="bottom")
     axb.annotate(f"{eq[-1]:,.0f}", xy=(n, eq[-1]),
@@ -360,7 +380,7 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
     # yakuniy balans yozuvi bilan ustma-ust tushadi.
     pi = eq.index(max(eq))
     if n - 1 - pi >= 3:
-        axb.annotate(f"cho'qqi {max(eq):,.0f}", xy=(pi + 1, eq[pi]),
+        axb.annotate(f"{i18n.t('rep.eq_peak', lang)} {max(eq):,.0f}", xy=(pi + 1, eq[pi]),
                      xytext=(0, 13), textcoords="offset points",
                      color=TXT, fontsize=10, ha="center")
 
@@ -376,9 +396,9 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
                      ha="center", va="bottom" if d >= 0 else "top",
                      color=GREEN if d > 0 else RED, fontsize=10.5, fontweight="bold")
     axd.axhline(0, color="#5a6373", lw=1)
-    axd.set_ylabel("Har savdo (pul)" if weighted else "Har savdo (%)",
+    axd.set_ylabel(i18n.t("rep.eq_bar_money" if weighted else "rep.eq_bar_pct", lang),
                    color=TXT, fontsize=12, labelpad=10)
-    axd.set_xlabel("Savdo tartibi (eskidan → yangiga)", color=TXT, fontsize=12, labelpad=8)
+    axd.set_xlabel(i18n.t("rep.eq_x", lang), color=TXT, fontsize=12, labelpad=8)
     axd.margins(y=0.26)
     if n <= 20:
         axd.set_xticks(x)
@@ -387,25 +407,28 @@ async def equity_chart(workspace_id: int, deposit=None) -> io.BytesIO | None:
 
     leg = axb.legend(handles=[
         Line2D([0], [0], color=line_col, lw=2.8, marker="o", markerfacecolor=BG,
-               markeredgewidth=2, label="Kumulyativ balans"),
-        Line2D([0], [0], color=GREEN, lw=9, alpha=0.75, label="Foydali savdo"),
-        Line2D([0], [0], color=RED, lw=9, alpha=0.75, label="Zararli savdo"),
+               markeredgewidth=2, label=i18n.t("rep.eq_leg_line", lang)),
+        Line2D([0], [0], color=GREEN, lw=9, alpha=0.75,
+               label=i18n.t("rep.eq_leg_win", lang)),
+        Line2D([0], [0], color=RED, lw=9, alpha=0.75,
+               label=i18n.t("rep.eq_leg_loss", lang)),
     ], loc="upper left", fontsize=10.5, facecolor=BG, edgecolor=GRID, framealpha=0.9)
     for t in leg.get_texts():
         t.set_color(TXT)
 
     change = eq[-1] - base
     change_pct = (eq[-1] / base - 1) * 100 if base else 0.0
-    period = (f"{rows[0]['closed_at'].astimezone(TZ):%d %b} — "
-              f"{rows[-1]['closed_at'].astimezone(TZ):%d %b %Y}")
-    fig.suptitle("Equity — " + ("depozit balansi" if weighted else "balans")
-                 + " va har savdo hissasi",
+    # Oy nomi ATAYLAB `%b` bilan emas: u tizim lokalidan keladi va doim
+    # inglizcha chiqardi. `months()` esa tanlangan tilni beradi.
+    mons = months_short(lang)
+    a, b = rows[0]["closed_at"].astimezone(TZ), rows[-1]["closed_at"].astimezone(TZ)
+    period = f"{a.day} {mons[a.month - 1]} — {b.day} {mons[b.month - 1]} {b.year}"
+    fig.suptitle(i18n.t("rep.eq_title_dep" if weighted else "rep.eq_title_raw", lang),
                  color=TITLE, fontsize=17, fontweight="bold", y=0.975)
+    chg = (f"{change:+,.0f}  ({change_pct:+.1f}%)" if weighted
+           else f"{change_pct:+.1f}%")
     fig.text(0.5, 0.928,
-             f"{n} signal   •   {period}   •   "
-             + (f"{change:+,.0f}  ({change_pct:+.1f}%)" if weighted
-                else f"{change_pct:+.1f}%")
-             + f"   •   max DD {max_dd:.1f}%",
+             i18n.t("rep.eq_sub", lang, n=n, period=period, chg=chg, dd=max_dd),
              ha="center", va="top", color=GREEN if change >= 0 else RED,
              fontsize=13, fontweight="bold")
 
@@ -423,14 +446,17 @@ P_TXT, P_MUTED, P_GRID = "#1a1a1a", "#666666", "#dddddd"
 P_GREEN, P_RED = "#12805c", "#c0392b"
 
 
-def _pdf_metrics(s, rows, deposit, show_money):
+def _pdf_metrics(s, rows, deposit, show_money, lang: str | None = None):
     """PDF ning 1-sahifasidagi ko'rsatkichlar: (yorliq, qiymat, rang) ro'yxati."""
+    def L(key):
+        return i18n.t(key, lang)
+
     total = s["total"]
     wr = s["wins"] / total * 100 if total else 0.0
     out = [
-        ("Signallar", f"{total}", P_TXT),
-        ("Winrate", f"{wr:.1f}%", P_GREEN if wr >= 50 else P_RED),
-        ("Foydali / Zararli", f"{s['wins']} / {s['losses']}", P_TXT),
+        (L("rep.pdf_signals"), f"{total}", P_TXT),
+        (L("rep.pdf_winrate"), f"{wr:.1f}%", P_GREEN if wr >= 50 else P_RED),
+        (L("rep.pdf_win_loss"), f"{s['wins']} / {s['losses']}", P_TXT),
     ]
 
     weighted = None
@@ -440,32 +466,33 @@ def _pdf_metrics(s, rows, deposit, show_money):
                     if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
     if weighted:
         tot = sum(weighted)
-        out.append(("Jami natija (depozitdan)", f"{tot:+.2f}%", P_GREEN if tot >= 0 else P_RED))
+        out.append((L("rep.pdf_total_dep"), f"{tot:+.2f}%", P_GREEN if tot >= 0 else P_RED))
         comp = _compound(weighted)
-        out.append(("Kompaund", f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
+        out.append((L("rep.pdf_compound"), f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
         if show_money and s["real_pnl_money"] is not None:
             m = float(s["real_pnl_money"])
-            out.append(("Real natija", f"{m:+,.2f}", P_GREEN if m >= 0 else P_RED))
+            out.append((L("rep.pdf_real"), f"{m:+,.2f}", P_GREEN if m >= 0 else P_RED))
     else:
         sp = float(s["sum_pct"])
-        out.append(("Jami foiz (hajmsiz)", f"{sp:+.2f}%", P_GREEN if sp >= 0 else P_RED))
+        out.append((L("rep.pdf_total_raw"), f"{sp:+.2f}%", P_GREEN if sp >= 0 else P_RED))
         pcts = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
         comp = _compound(pcts)
-        out.append(("Kompaund", f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
+        out.append((L("rep.pdf_compound"), f"{comp:+.2f}%", P_GREEN if comp >= 0 else P_RED))
 
-    out.append(("O'rtacha R", f"{float(s['avg_r']):+.2f}R", P_TXT))
-    out.append(("O'rt. foyda / zarar",
+    out.append((L("rep.pdf_avg_r"), f"{float(s['avg_r']):+.2f}R", P_TXT))
+    out.append((L("rep.pdf_avg_wl"),
                 f"{float(s['avg_win']):+.2f}% / {float(s['avg_loss']):+.2f}%", P_TXT))
     if s["avg_loss"] and s["losses"]:
         gl = abs(float(s["avg_loss"])) * s["losses"]
         if gl:
             pf = float(s["avg_win"]) * s["wins"] / gl
-            out.append(("Profit factor", f"{pf:.2f}", P_GREEN if pf >= 1 else P_RED))
+            out.append((L("rep.pdf_pf"), f"{pf:.2f}", P_GREEN if pf >= 1 else P_RED))
     return out
 
 
 async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
-                      show_money: bool = True) -> io.BytesIO | None:
+                      show_money: bool = True,
+                      lang: str | None = None) -> io.BytesIO | None:
     """Butun davr bo'yicha PDF hisobot: 1-sahifa — ko'rsatkichlar + balans
     egri chizig'i, 2-sahifa — juftliklar va oylar kesimi. Yopilgan signal
     bo'lmasa None qaytaradi."""
@@ -476,7 +503,7 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         return None
     rows = await db.equity_series(workspace_id)
     syms = await db.top_symbols(workspace_id)
-    months = await db.monthly_breakdown(workspace_id, 12)
+    month_rows = await db.monthly_breakdown(workspace_id, 12)
     now = datetime.now(TZ)
 
     buf = io.BytesIO()
@@ -490,7 +517,7 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         fig.add_artist(plt.Line2D([0.06, 0.94], [0.921, 0.921], color=P_GRID, lw=1))
 
         y = 0.885
-        for label, value, color in _pdf_metrics(s, rows, deposit, show_money):
+        for label, value, color in _pdf_metrics(s, rows, deposit, show_money, lang):
             fig.text(0.06, y, label, fontsize=11, color=P_MUTED)
             fig.text(0.94, y, value, fontsize=11, fontweight="bold", color=color, ha="right")
             y -= 0.030
@@ -509,10 +536,10 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
             ax.fill_between(x, base, eq, color=col, alpha=0.12)
             ax.axhline(base, color=P_MUTED, lw=0.9, ls="--")
             ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-            ax.set_xlabel("Savdo tartibi", color=P_MUTED, fontsize=9)
-            ax.set_ylabel("Balans" if weighted else "Balans (boshlanish = 100)",
+            ax.set_xlabel(i18n.t("rep.pdf_x", lang), color=P_MUTED, fontsize=9)
+            ax.set_ylabel(i18n.t("rep.pdf_y_dep" if weighted else "rep.eq_y_raw", lang),
                           color=P_MUTED, fontsize=9)
-            ax.set_title("Balans o'zgarishi", color=P_TXT, fontsize=12,
+            ax.set_title(i18n.t("rep.pdf_eq_title", lang), color=P_TXT, fontsize=12,
                          fontweight="bold", pad=8)
         pdf.savefig(fig, facecolor="white")
         plt.close(fig)
@@ -520,8 +547,10 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         # ── 2-sahifa: jadvallar ──
         fig = plt.figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor("white")
-        fig.text(0.06, 0.955, "Juftliklar kesimi", fontsize=16, fontweight="bold", color=P_TXT)
-        hdr = f"{'Juftlik':<16}{'N':>6}{'WR':>9}{'Foiz':>13}"
+        fig.text(0.06, 0.955, i18n.t("rep.pdf_syms", lang), fontsize=16,
+                 fontweight="bold", color=P_TXT)
+        hdr = (f"{i18n.t('rep.col_pair', lang):<16}{i18n.t('rep.col_n', lang):>6}"
+               f"{i18n.t('rep.col_wr', lang):>9}{i18n.t('rep.col_pct', lang):>13}")
         y = 0.925
         fig.text(0.06, y, hdr, fontsize=11, fontweight="bold",
                  color=P_MUTED, family="monospace")
@@ -539,16 +568,19 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         # Ro'yxat kalta bo'lsa darhol ostidan boshlanadi; uzun bo'lsa pastki
         # chegaraga tiraladi (avval doim 0.30 ga qadalib, katta bo'sh joy qolardi).
         y = min(y - 0.045, 0.86)
-        fig.text(0.06, y, "Oylik natijalar", fontsize=16, fontweight="bold", color=P_TXT)
+        fig.text(0.06, y, i18n.t("rep.pdf_months", lang), fontsize=16,
+                 fontweight="bold", color=P_TXT)
         y -= 0.034
-        fig.text(0.06, y, f"{'Oy':<16}{'N':>6}{'WR':>9}{'Foiz':>13}",
+        fig.text(0.06, y,
+                 f"{i18n.t('rep.col_month', lang):<16}{i18n.t('rep.col_n', lang):>6}"
+                 f"{i18n.t('rep.col_wr', lang):>9}{i18n.t('rep.col_pct', lang):>13}",
                  fontsize=11, fontweight="bold", color=P_MUTED, family="monospace")
         y -= 0.022
-        for r in months:
+        for r in month_rows:
             m = r["month"]
             # To'liq oy nomi: 3 harfga qisqartirilsa "Iyun" va "Iyul" ikkalasi
             # ham "Iyu" bo'lib, qaysi oy ekani bilinmay qolardi.
-            name = f"{MONTHS_UZ[m.month - 1]} {m.year}"
+            name = f"{months(lang)[m.month - 1]} {m.year}"
             wr = r["wins"] / r["total"] * 100 if r["total"] else 0
             sp_ = float(r["sum_pct"])
             fig.text(0.06, y, f"{name:<16}{r['total']:>6}{wr:>8.0f}%{sp_:>+13.2f}",

@@ -1694,7 +1694,8 @@ async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     note = await msg.reply_text(i18n.t("st.pdf_making", lang))
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     try:
-        buf = await stats.pdf_report(ws["id"], ws["name"], deposit, can_manage(uid, ws))
+        buf = await stats.pdf_report(ws["id"], ws["name"], deposit,
+                                     can_manage(uid, ws), lang=lang)
     finally:
         try:
             await note.delete()
@@ -1879,7 +1880,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     elif action == "equity":
         deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
-        buf = await stats.equity_chart(ws["id"], deposit)
+        buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
         if buf is None:
             await q.message.reply_text(i18n.t("eq.too_few", lang),
                                         reply_markup=menu_back_kb(lang))
@@ -3738,8 +3739,8 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
-    buf = await stats.equity_chart(ws["id"], deposit)
     lang = await user_lang(update.effective_user.id)
+    buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
     if buf is None:
         await update.message.reply_text(i18n.t("eq.too_few", lang),
                                          reply_markup=menu_back_kb(lang))

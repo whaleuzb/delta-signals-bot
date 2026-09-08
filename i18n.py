@@ -770,6 +770,105 @@ STRINGS: dict[str, dict[str, str]] = {
     "st.open_word": {
         "uz": "<i>ochiq</i>", "ru": "<i>открыт</i>", "en": "<i>open</i>",
     },
+    # --- Hisobot grafiklari (equity) va PDF ---
+    # Bular MATPLOTLIB rasmiga chiziladi, ya'ni HTML EMAS: hech qanday
+    # <b> teg bo'lmasligi kerak, aks holda rasmda xom teg ko'rinadi.
+    "rep.eq_title_dep": {
+        "uz": "Equity — depozit balansi va har savdo hissasi",
+        "ru": "Equity — баланс депозита и вклад каждой сделки",
+        "en": "Equity — deposit balance and each trade's contribution",
+    },
+    "rep.eq_title_raw": {
+        "uz": "Equity — balans va har savdo hissasi",
+        "ru": "Equity — баланс и вклад каждой сделки",
+        "en": "Equity — balance and each trade's contribution",
+    },
+    "rep.eq_sub": {
+        "uz": "{n} signal   •   {period}   •   {chg}   •   maks. DD {dd:.1f}%",
+        "ru": "{n} сигн.   •   {period}   •   {chg}   •   макс. DD {dd:.1f}%",
+        "en": "{n} signals   •   {period}   •   {chg}   •   max DD {dd:.1f}%",
+    },
+    "rep.eq_y_dep": {
+        "uz": "Depozit balansi", "ru": "Баланс депозита", "en": "Deposit balance",
+    },
+    "rep.eq_y_raw": {
+        "uz": "Balans (boshlanish = 100)", "ru": "Баланс (старт = 100)",
+        "en": "Balance (start = 100)",
+    },
+    "rep.eq_start": {"uz": "boshlang'ich", "ru": "начало", "en": "start"},
+    "rep.eq_peak": {"uz": "cho'qqi", "ru": "пик", "en": "peak"},
+    "rep.eq_bar_money": {
+        "uz": "Har savdo (pul)", "ru": "Каждая сделка (деньги)",
+        "en": "Each trade (money)",
+    },
+    "rep.eq_bar_pct": {
+        "uz": "Har savdo (%)", "ru": "Каждая сделка (%)", "en": "Each trade (%)",
+    },
+    "rep.eq_x": {
+        "uz": "Savdo tartibi (eskidan → yangiga)",
+        "ru": "Порядок сделок (от старых к новым)",
+        "en": "Trade order (oldest → newest)",
+    },
+    "rep.eq_leg_line": {
+        "uz": "Kumulyativ balans", "ru": "Накопленный баланс",
+        "en": "Cumulative balance",
+    },
+    "rep.eq_leg_win": {
+        "uz": "Foydali savdo", "ru": "Прибыльная сделка", "en": "Winning trade",
+    },
+    "rep.eq_leg_loss": {
+        "uz": "Zararli savdo", "ru": "Убыточная сделка", "en": "Losing trade",
+    },
+
+    "rep.pdf_signals": {"uz": "Signallar", "ru": "Сигналы", "en": "Signals"},
+    "rep.pdf_winrate": {"uz": "Winrate", "ru": "Винрейт", "en": "Win rate"},
+    "rep.pdf_win_loss": {
+        "uz": "Foydali / Zararli", "ru": "Прибыльные / Убыточные",
+        "en": "Wins / Losses",
+    },
+    "rep.pdf_total_dep": {
+        "uz": "Jami natija (depozitdan)", "ru": "Общий результат (к депозиту)",
+        "en": "Total result (vs deposit)",
+    },
+    "rep.pdf_total_raw": {
+        "uz": "Jami foiz (hajmsiz)", "ru": "Общий процент (без размера)",
+        "en": "Total percent (size ignored)",
+    },
+    "rep.pdf_compound": {
+        "uz": "Kompaund", "ru": "Сложный процент", "en": "Compounded",
+    },
+    "rep.pdf_real": {
+        "uz": "Real natija", "ru": "Реальный результат", "en": "Real result",
+    },
+    "rep.pdf_avg_r": {"uz": "O'rtacha R", "ru": "Средний R", "en": "Average R"},
+    "rep.pdf_avg_wl": {
+        "uz": "O'rt. foyda / zarar", "ru": "Ср. прибыль / убыток",
+        "en": "Avg win / loss",
+    },
+    "rep.pdf_pf": {
+        "uz": "Profit factor", "ru": "Профит-фактор", "en": "Profit factor",
+    },
+    "rep.pdf_eq_title": {
+        "uz": "Balans o'zgarishi", "ru": "Изменение баланса",
+        "en": "Balance over time",
+    },
+    "rep.pdf_x": {
+        "uz": "Savdo tartibi", "ru": "Порядок сделок", "en": "Trade order",
+    },
+    "rep.pdf_y_dep": {"uz": "Balans", "ru": "Баланс", "en": "Balance"},
+    "rep.pdf_syms": {
+        "uz": "Juftliklar kesimi", "ru": "Разрез по парам", "en": "By pair",
+    },
+    "rep.pdf_months": {
+        "uz": "Oylik natijalar", "ru": "Результаты по месяцам",
+        "en": "Monthly results",
+    },
+    "rep.col_pair": {"uz": "Juftlik", "ru": "Пара", "en": "Pair"},
+    "rep.col_n": {"uz": "N", "ru": "N", "en": "N"},
+    "rep.col_wr": {"uz": "WR", "ru": "WR", "en": "WR"},
+    "rep.col_pct": {"uz": "Foiz", "ru": "Проц", "en": "Pct"},
+    "rep.col_month": {"uz": "Oy", "ru": "Месяц", "en": "Month"},
+
     "st.tab_all": {"uz": "Barchasi", "ru": "Всё", "en": "All"},
     "st.tab_month": {"uz": "Oy", "ru": "Месяц", "en": "Month"},
     "st.tab_year": {"uz": "Yil", "ru": "Год", "en": "Year"},

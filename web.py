@@ -898,7 +898,8 @@ async def group_page(request):
         f"{invite}</header>"
         f"<div class='grid'>{tiles_html}</div>"
         + (f"<h2>{e(i18n.t('w.equity_h2', lang))}</h2>"
-           f"<img class='chart' src='/g/{ws_id}/equity.png' alt='Equity' loading='lazy'>"
+           f"<img class='chart' src='{e(keep(f'/g/{ws_id}/equity.png', request, lang))}' "
+           f"alt='Equity' loading='lazy'>"
            if pnls_n >= 2 else "")
         + section(i18n.t("w.monthly_h2", lang),
                   f"<th>{e(i18n.t('w.col_month', lang))}</th><th>{c_trades}</th>"
@@ -922,11 +923,15 @@ async def equity_png(request):
     ws = await db.public_workspace(ws_id)
     if not ws:
         raise web.HTTPNotFound()
-    key = f"eq{ws_id}"
+    # Grafik ichidagi yozuvlar sahifa bilan BIR XIL tilda bo'lishi kerak,
+    # shuning uchun kesh kaliti ham tilni o'z ichiga oladi — aks holda
+    # birinchi tashrifchi tili hammaga keshlanib qolardi.
+    lang = req_lang(request, ws)
+    key = f"eq{ws_id}:{lang}"
     buf = _cached(key)
     if buf is None:
         # Grafik chizish qimmat (matplotlib) — shu sabab keshlanadi.
-        img = await stats.equity_chart(ws_id, ws["deposit"])
+        img = await stats.equity_chart(ws_id, ws["deposit"], lang=lang)
         if img is None:
             raise web.HTTPNotFound()
         buf = _put(key, img.getvalue())
