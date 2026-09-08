@@ -22,6 +22,8 @@ import matplotlib
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
+import i18n
+
 log = logging.getLogger("card")
 
 W = H = 1080
@@ -144,9 +146,15 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
              pnl_pct: float, r_multiple: float | None,
              closed_at: datetime, username: str | None, ws_name: str,
              logo: bytes | None, qr_url: str, sig_id: int | None = None,
-             market: str = "crypto", qr_caption: str = "",
-             qr_code: str | None = None) -> io.BytesIO:
-    """Ulashish kartasini chizadi va PNG bayt oqimini qaytaradi."""
+             market: str = "crypto", qr_caption: str | None = None,
+             qr_code: str | None = None, lang: str | None = None) -> io.BytesIO:
+    """Ulashish kartasini chizadi va PNG bayt oqimini qaytaradi.
+
+    `lang` — GURUH tili (`ws_lang`): karta guruh postiga biriktiriladi,
+    ya'ni uning tili ham guruhning tili bo'lishi kerak, kartani yasagan
+    odamning shaxsiy tili emas."""
+    if qr_caption is None:
+        qr_caption = i18n.t("card.ref_code", lang)
     acc = PROFIT if pnl_pct >= 0 else LOSS
 
     img = Image.new("RGBA", (W, H), BG)
@@ -155,7 +163,7 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
 
     # ── Tepa: brend va shamlar bezagi ───────────────────────────────────
     _tracked(d, (PAD, PAD), "TRADE CONTROLLER", _f(30, bold=True), TXT, spacing=4.4)
-    d.text((PAD, PAD + 44), "Savdo jurnali", font=_f(24), fill=FAINT)
+    d.text((PAD, PAD + 44), i18n.t("card.subtitle", lang), font=_f(24), fill=FAINT)
 
     # O'ng yuqoridagi shamlar — birja kartalaridagi bezak o'rnida, lekin
     # ma'noli: uchta sham ko'tarilib boradi (zararda — tushib). Fitilsiz
@@ -177,7 +185,8 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
 
     # ── Sarlavha ────────────────────────────────────────────────────────
     y = 286
-    _tracked(d, (PAD, y), "YOPILGAN SAVDO", _f(27, bold=True), MUTED, spacing=3.6)
+    _tracked(d, (PAD, y), i18n.t("card.closed", lang), _f(27, bold=True),
+             MUTED, spacing=3.6)
 
     # ── Juftlik | yo'nalish | SPOT ──────────────────────────────────────
     y = 344
@@ -208,10 +217,10 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
     d.text((PAD, 446), pct, font=f_big, fill=acc)
 
     # ── Narxlar ─────────────────────────────────────────────────────────
-    rows = [("Kirish narxi", _fmt_price(entry)),
-            ("Chiqish narxi", _fmt_price(exit_price))]
+    rows = [(i18n.t("card.entry", lang), _fmt_price(entry)),
+            (i18n.t("card.exit", lang), _fmt_price(exit_price))]
     if r_multiple is not None:
-        rows.append(("Natija (R)", f"{float(r_multiple):+.2f}R"))
+        rows.append((i18n.t("card.r", lang), f"{float(r_multiple):+.2f}R"))
     f_k, f_v = _f(31), _f(35, bold=True)
     ky = 668
     label_w = max(_tracked_width(d, k, f_k) for k, _ in rows)

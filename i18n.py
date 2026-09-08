@@ -2541,6 +2541,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "adm.role_owner": {"uz": "egasi×{n}", "ru": "владелец×{n}", "en": "owner×{n}"},
     "adm.role_member": {"uz": "a'zo×{n}", "ru": "участник×{n}", "en": "member×{n}"},
 
+    # --- Ulashish kartasi (card.py) — GURUHGA ketadi, ws_lang bilan ---
+    "card.subtitle": {
+        "uz": "Savdo jurnali", "ru": "Журнал сделок", "en": "Trading journal",
+    },
+    "card.closed": {
+        "uz": "YOPILGAN SAVDO", "ru": "СДЕЛКА ЗАКРЫТА", "en": "CLOSED TRADE",
+    },
+    "card.entry": {
+        "uz": "Kirish narxi", "ru": "Цена входа", "en": "Entry price",
+    },
+    "card.exit": {
+        "uz": "Chiqish narxi", "ru": "Цена выхода", "en": "Exit price",
+    },
+    "card.r": {
+        "uz": "Natija (R)", "ru": "Результат (R)", "en": "Result (R)",
+    },
+    "card.ref_code": {
+        "uz": "Taklif kodi", "ru": "Код приглашения", "en": "Invite code",
+    },
+
     # --- Asosiy menyu ---
     "menu.title": {
         "uz": "Trade Controller — {name} 👇",

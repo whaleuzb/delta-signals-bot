@@ -4953,3 +4953,32 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        uch tilda yozib bo'lmaydi.
      - Tekshirildi: 383 ta yangi holat (9 ta til to'plami) + mavjud
        to'plamlar o'zgarishsiz.
+
+155. **⭐ Ulashish kartasi albomda KELMASDI — sabab: oldindan o'ralgan
+     `InputFile`.** Foydalanuvchi: "pnl karta haliyam grafik bilan
+     birgalikda albom sifatida kelmayabti."
+     - `send_close_result()` albomni shunday yasardi:
+       `InputMediaPhoto(InputFile(buf, "signal.png"))`. **Buzuq.**
+       `InputMediaPhoto` o'zi ichida `parse_file_input(..., attach=True)`
+       chaqiradi va faylni `attach://…` havolasi bilan bog'laydi — lekin
+       FAQAT o'zi xom bytes/IO obyektini o'rasa. Oldindan `InputFile()`
+       bilan o'ralgan bo'lsa `parse_file_input` uni o'zgarishsiz
+       qaytaradi va `attach_uri` **None** qolib ketadi → Telegram
+       albomni rad etadi → `except` ishlaydi → **faqat bitta rasm**
+       (grafik) ketadi, karta umuman ko'rinmaydi.
+     - To'g'risi: `InputMediaPhoto(buf, filename="signal.png")`.
+     - **Bu xato bir marta ALLAQACHON topilgan edi** — `_paced_media_edit()`
+       ustidagi "MUHIM" izohida aynan shu yozilgan. Albom kodi keyinroq
+       yozilgan va xatoni QAYTA kiritgan. Yangi kod yozganda shu izohga
+       qaralsin.
+     - **Nega sinov tutmadi:** `test_close_card` `send_media_group`
+       CHAQIRILGANINI tekshirardi, media obyektlarining ICHIGA
+       qaramasdi. Endi `test_album_attach.py` har bir rasmning
+       `attach_uri` si haqiqatan `attach://…` ekanini tekshiradi
+       (tuzatishdan oldingi kodda bu sinov YIQILADI — tekshirilgan).
+       **Dars: "chaqiruv bo'ldimi" degan sinov yetarli emas —
+       yuboriladigan narsaning O'ZI to'g'ri yasalganini tekshirish
+       kerak.**
+     - Yo'l-yo'lakay: kartadagi matn (`card.py`) ham tarjima qilindi va
+       endi GURUH tilida (`ws_lang`) chiziladi — karta guruh postiga
+       biriktiriladi, ya'ni tili ham guruhniki bo'lishi kerak.

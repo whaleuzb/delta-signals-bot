@@ -572,7 +572,7 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         closed_at=sig["closed_at"].astimezone(stats.TZ),
         username=username, ws_name=ws["name"], logo=logo,
         qr_url=qr_url, sig_id=sig["id"], market=sig["market"],
-        qr_caption="Taklif kodi", qr_code=code)
+        qr_code=code, lang=ws_lang(ws))
 
 
 async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:
@@ -601,11 +601,24 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
         log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
 
     # Ikkalasi ham bo'lsa bitta ALBOM: bir bildirishnoma, ikki rasm.
+    #
+    # ⚠️ InputMediaPhoto ga XOM BytesIO beriladi, tayyor InputFile EMAS —
+    # `_paced_media_edit()` dagi bilan AYNI sabab: InputMediaPhoto o'zi
+    # ichida `parse_file_input(..., attach=True)` chaqirib faylni
+    # "attach://…" havolasi bilan bog'laydi, lekin FAQAT o'zi bytes/IO
+    # obyektini o'rasa. Oldindan InputFile() bilan o'ralgan bo'lsa
+    # parse_file_input uni o'zgarishsiz qaytaradi, `attach_uri` None
+    # qolib ketadi va Telegram albomni rad etadi ("media not found") —
+    # natijada pastdagi `except` ishlab, faqat BITTA rasm ketardi, ya'ni
+    # ulashish kartasi umuman ko'rinmasdi. Fayl nomi endi `filename=`
+    # orqali beriladi.
     album = None
     if photo and share:
-        album = [InputMediaPhoto(InputFile(photo, "signal.png"), caption=txt,
+        photo.seek(0)
+        share.seek(0)
+        album = [InputMediaPhoto(photo, filename="signal.png", caption=txt,
                                   parse_mode=ParseMode.HTML),
-                 InputMediaPhoto(InputFile(share, "natija.png"))]
+                 InputMediaPhoto(share, filename="natija.png")]
     single = photo or share
 
     if ws["type"] == "group" and ws["group_chat_id"]:
