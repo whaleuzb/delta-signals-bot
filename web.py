@@ -131,6 +131,17 @@ header{padding:calc(34px + var(--tgtop,0px)) 0 26px;border-bottom:1px solid var(
 h1{font-family:"Space Grotesk",Inter,sans-serif;font-size:clamp(26px,5vw,40px);
    font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .sub{color:var(--mut);margin-top:6px;font-size:15px}
+/* Til almashtirgich — sarlavhaning O'NG YUQORISIDA, sahifa nomidan
+   ustunroq turmasin deb kichik va xira. Telegram WebView'da tepadagi
+   bo'shliq o'zgaruvchan (--tgtop), shuning uchun `header` ichida
+   oqim bilan joylashgan, `position:absolute` EMAS. */
+.langsw{display:flex;gap:6px;justify-content:flex-end;margin-bottom:2px}
+.langsw a{display:inline-block;padding:5px 10px;border-radius:999px;
+          border:1px solid var(--line);font-size:12px;font-weight:600;
+          letter-spacing:.06em;color:var(--mut);text-transform:uppercase;
+          background:rgba(23,23,27,.6)}
+.langsw a:hover{color:var(--txt);text-decoration:none;border-color:var(--silver)}
+.langsw a.on{color:var(--bg);background:var(--silver);border-color:var(--silver)}
 a{color:var(--silver);text-decoration:none}
 a:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;
@@ -434,32 +445,81 @@ def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
-def req_lang(request, ws=None) -> str:
+def keep(path: str, request, lang: str | None = None) -> str:
+    """Ichki havola — joriy `solo`/`embed`/`lang` ni SAQLAB qoladi.
+
+    Aks holda odam tilni tanlab, birinchi havolani bosishi bilan sahifa
+    yana standart tilga qaytib ketardi (tanlov faqat URL'da yashaydi —
+    seans yoki cookie yo'q, chunki sahifa butunlay statik va keshlanadi).
+    """
+    q = []
+    if lang:
+        q.append(f"lang={lang}")
+    if request.query.get("embed") in ("1", "true", "yes"):
+        q.append("embed=1")
+    elif request.query.get("solo") in ("1", "true", "yes"):
+        q.append("solo=1")
+    return path + ("?" + "&".join(q) if q else "")
+
+
+def lang_switch(request, cur: str) -> str:
+    """UZ / RU / EN tugmalari. Joriy til ajratib ko'rsatiladi."""
+    cur = i18n.normalize(cur)
+    out = []
+    for code in i18n.LANGS:
+        on = " class='on'" if code == cur else ""
+        out.append(f"<a href='{e(keep(request.path, request, code))}'{on}>{code}</a>")
+    return f"<div class='langsw'>{''.join(out)}</div>"
+
+
+def req_lang(request, ws=None, reader_first: bool = True) -> str:
     """Sahifa tili.
 
-    Tartib ATAYLAB shunday:
-      1. `?lang=ru` — chaqiruvchi (masalan to'lov botining Mini App'i) aniq
-         so'rasa, uniki ustun;
-      2. guruh sahifasida — GURUH tili (`workspaces.lang`): sahifa o'sha
-         guruhning auditoriyasi uchun, tashrifchining brauzeri uchun emas;
-      3. bosh sahifada — brauzerning `Accept-Language` sarlavhasi (bu yerda
-         "kimning sahifasi" degan tushuncha yo'q);
-      4. hech biri mos kelmasa — o'zbekcha.
+    Tartib:
+      1. `?lang=ru` — ODAM til tugmasini bosgan (yoki chaqiruvchi aniq
+         so'ragan). Har doim ustun.
+      2. brauzerning `Accept-Language` sarlavhasi — sahifani O'QIYOTGAN
+         odam haqidagi yagona signal. Sahifa ochiq, marketing uchun:
+         ruszabon mehmon uni ruscha ko'rgani ma'qul.
+      3. guruh tili (`workspaces.lang`) — brauzer tili uchtasidan
+         birortasiga to'g'ri kelmasa.
+      4. o'zbekcha.
+
+    `reader_first=False` — 2 va 3 o'rin ALMASHADI (guruh tili ustun
+    bo'ladi). `stats.json` shuni ishlatadi: uni to'lov botining Mini
+    App'i o'qiydi va u yerdagi yozuvlar guruh sahifasi bilan bir xil
+    bo'lib qolishi kerak — shartnomani jimgina o'zgartirmaymiz.
+
+    Avval guruh tili brauzerdan USTUN edi. Til tugmalari qo'shilgach
+    bu mantiqsiz bo'lib qoldi: mehmon sahifani begona tilda ochib,
+    keyin qo'lda almashtirishi kerak edi. Endi teskarisi — o'zi
+    kerakli tilda ochiladi, tugma esa istalgan paytda o'zgartiradi.
     """
     q = request.query.get("lang")
     if q and i18n.normalize(q) == q.lower():
         return q.lower()
-    if ws is not None:
+
+    def from_ws():
+        if ws is None:
+            return None
         try:
-            if ws["lang"]:
-                return i18n.normalize(ws["lang"])
+            return i18n.normalize(ws["lang"]) if ws["lang"] else None
         except (KeyError, TypeError):
-            pass
-    header = request.headers.get("Accept-Language", "")
-    for part in header.split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in i18n.LANGS:
-            return code
+            return None
+
+    def from_browser():
+        header = request.headers.get("Accept-Language", "")
+        for part in header.split(","):
+            code = part.split(";")[0].strip().lower()[:2]
+            if code in i18n.LANGS:
+                return code
+        return None
+
+    order = (from_browser, from_ws) if reader_first else (from_ws, from_browser)
+    for src in order:
+        got = src()
+        if got:
+            return got
     return i18n.DEFAULT_LANG
 
 
@@ -506,6 +566,11 @@ async def index(request):
     # Umumiy plitalar (jami signal, umumiy winrate...) olib tashlandi:
     # ular hech kimning natijasi emas — turli guruhlarning aralashmasi.
     # Har bir guruhning o'z raqamlari kartasida va o'z sahifasida.
+    def card_href(wid: int) -> str:
+        # Tanlangan til guruh sahifasiga ham O'TSIN (aks holda odam
+        # kartani bosishi bilan sahifa yana guruh tiliga qaytardi).
+        return e(keep(f"/g/{wid}", request, lang))
+
     cards = []
     for pos, r in enumerate(rows, 1):
         total = r["total"] or 0
@@ -525,7 +590,7 @@ async def index(request):
                 if r["has_logo"] else
                 f"<span class='glogo ph'>{e(r['name'][:1].upper())}</span>")
         cards.append(
-            f"<a class='gcard {_cls(net)}-edge' href='/g/{r['id']}'>"
+            f"<a class='gcard {_cls(net)}-edge' href='{card_href(r['id'])}'>"
             f"<div class='gtop'>"
             f"<div class='gname'><span class='rank {rank_cls}'>{pos}</span>"
             f"{logo}"
@@ -542,7 +607,8 @@ async def index(request):
     # ham bor edi — bir sahifada bitta asosiy harakat yetadi, ikkitasi
     # e'tiborni bo'ladi.
     body = (
-        "<header class='hero'><div class='brand'>Trade Controller</div>"
+        f"<header class='hero'>{lang_switch(request, lang)}"
+        "<div class='brand'>Trade Controller</div>"
         f"<h1>{e(i18n.t('w.index_h1', lang))}</h1>"
         f"<div class='sub'>{e(i18n.t('w.index_sub', lang))}</div></header>"
         + (f"<h2>{e(i18n.t('w.index_top', lang))}</h2>"
@@ -610,7 +676,9 @@ async def stats_json(request):
         return web.json_response({"error": "not_public"}, status=404,
                                  headers=JSON_HEADERS)
 
-    lang = req_lang(request, ws)
+    # `reader_first=False`: bu nuqtani to'lov botining Mini App'i o'qiydi,
+    # undagi yorliqlar guruh sahifasidagi bilan bir xil bo'lib qolsin.
+    lang = req_lang(request, ws, reader_first=False)
     cached = _cached(f"j{ws_id}:{lang}")
     if cached is None:
         n = await _group_numbers(ws, lang)
@@ -755,12 +823,14 @@ async def group_page(request):
                 f"<span class='blogo ph'>{e(ws['name'][:1].upper())}</span>")
 
     # `solo` bo'lsa boshqa guruhlar ro'yxatiga qaytish havolasi chiqmaydi.
+    home = e(keep("/", request, lang))
     back_link = ("" if solo else
-                 "<div class='sub'><a class='ghost back' href='/'>"
+                 f"<div class='sub'><a class='ghost back' href='{home}'>"
                  f"{e(i18n.t('w.back_all', lang))}</a></div>")
 
     body = (
-        f"<header><div class='brand'>Trade Controller</div>"
+        f"<header>{lang_switch(request, lang)}"
+        f"<div class='brand'>Trade Controller</div>"
         f"<div class='htitle'>{big_logo}<h1>{e(ws['name'])}</h1></div>"
         f"{back_link}"
         f"{invite}</header>"

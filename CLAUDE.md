@@ -5030,3 +5030,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - Tilsiz `i18n.t()` ATAYLAB bitta joyda qolgan: `cmd_start` dagi
        birinchi til savoli uchala tilda yozilgan ("Tilni tanlang /
        Выберите язык / Choose language").
+
+158. **Veb sahifada UZ / RU / EN tugmalari.** Foydalanuvchi: "webga ham
+     3 xil til qo'shish kerak, oyna yuqorisida en ru uz tugmalari tursa,
+     odamlar o'zlariga kerak tilda ko'rishlari kerak."
+     - Tugmalar sarlavhaning O'NG YUQORISIDA (`.langsw`), joriy til
+       ajratilgan. `header` ICHIDA, oqim bilan — `position:absolute`
+       EMAS, chunki Telegram WebView'da tepadagi bo'shliq o'zgaruvchan
+       (`--tgtop`).
+     - **Tanlov URL'da yashaydi** (seans ham, cookie ham yo'q — sahifa
+       butunlay statik va keshlanadi). Shu sabab `keep()` yordamchisi:
+       HAR BIR ichki havola (guruh kartasi, "← Barcha guruhlar", til
+       tugmalarining o'zi) joriy `lang` va `solo`/`embed` ni saqlab
+       qoladi. Aks holda birinchi bosishda til yo'qolardi.
+     - **Standart til qoidasi O'ZGARDI:** avval guruh tili brauzer
+       tilidan ustun edi. Tugmalar qo'shilgach bu mantiqsiz: mehmon
+       sahifani begona tilda ochib, keyin qo'lda almashtirishi kerak
+       bo'lardi. Endi `?lang=` -> **brauzer** (`Accept-Language`) ->
+       guruh tili -> o'zbekcha. Sahifa OCHIQ, marketing uchun: o'quvchi
+       haqidagi signal poster haqidagisidan muhimroq.
+     - **`stats.json` ISTISNO** (`req_lang(..., reader_first=False)`):
+       uni to'lov botining Mini App'i o'qiydi va u yerdagi yozuvlar
+       guruh sahifasi bilan bir xil qolishi kerak — mavjud shartnomani
+       jimgina o'zgartirmaymiz.
