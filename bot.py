@@ -287,6 +287,14 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
                                        callback_data=f"ws:{personal['id']}")])
     rows.append([InlineKeyboardButton(i18n.t("ws.btn_join", lang),
                                        callback_data="joingroup")])
+    # O'Z guruhi/kanalini ulash yo'li shu yerda ham kerak: onboarding faqat
+    # hech qanday workspace'i YO'Q odamga ko'rsatiladi, ya'ni shaxsiy
+    # jurnal ochgan odam keyin kanal ulamoqchi bo'lsa bu ekrandan boshqa
+    # kirish nuqtasi qolmasdi. Egasi bo'lgan guruh/kanal bo'lsa ko'rsatilmaydi
+    # — bitta admin bitta workspace qoidasi (`su.have_other`).
+    if not owned_group:
+        rows.append([InlineKeyboardButton(i18n.t("ws.btn_connect", lang),
+                                           callback_data="onboard:connect")])
     await update.effective_message.reply_text(i18n.t("ws.pick", lang),
                                                reply_markup=InlineKeyboardMarkup(rows))
 
@@ -297,7 +305,27 @@ def onboard_kb(lang: str | None = None) -> InlineKeyboardMarkup:
                               callback_data="onboard:personal")],
         [InlineKeyboardButton(i18n.t("onb.btn_group", lang),
                               callback_data="onboard:group")],
+        [InlineKeyboardButton(i18n.t("onb.btn_channel", lang),
+                              callback_data="onboard:channel")],
     ])
+
+
+def add_to_chat_url(bot_username: str | None, kind: str) -> str:
+    """Telegram'ning "botni chatga qo'shish" havolasi.
+
+    `?startchannel` / `?startgroup` — Telegram'ning O'Z chat tanlash
+    oynasini ochadi, ya'ni odam qo'lda "Administratorlar -> Admin
+    qo'shish" ichiga kirib o'tirmaydi. Kanal uchun kerakli huquqlar
+    darhol so'raladi (`admin=...`): signal POST QILISH va keyin uni
+    TAHRIRLASH (natija/holat yangilanishi) uchun.
+
+    Guruhda huquqlar ro'yxati berilmaydi — u yerdagi admin huquqlari
+    boshqacha nomlanadi va ortiqcha so'rov qo'shilsa havola ishlamay
+    qolishi mumkin; guruh oqimi baribir `/setup` bilan yakunlanadi."""
+    name = bot_username or "bot"
+    if kind == "channel":
+        return f"https://t.me/{name}?startchannel&admin=post_messages+edit_messages"
+    return f"https://t.me/{name}?startgroup=true"
 
 
 def group_role_kb(lang: str | None = None) -> InlineKeyboardMarkup:
@@ -356,15 +384,40 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await send_group_picker(q)
         return
 
-    # choice == "group_owner"
+    if choice == "connect":
+        await q.edit_message_text(i18n.t("onb.connect_pick", lang),
+                                   reply_markup=InlineKeyboardMarkup([
+                                       [InlineKeyboardButton(
+                                           i18n.t("onb.btn_pick_group", lang),
+                                           callback_data="onboard:group_owner")],
+                                       [InlineKeyboardButton(
+                                           i18n.t("onb.btn_pick_channel", lang),
+                                           callback_data="onboard:channel")],
+                                   ]))
+        return
+
     bot_username = ctx.bot.username
     mention = f"@{bot_username}" if bot_username else "@bot"
-    # Kanal ham shu ekranda tushuntiriladi — foydalanuvchi "guruhim bor"
+
+    if choice == "channel":
+        await q.edit_message_text(
+            i18n.t("onb.channel_steps", lang, mention=mention),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                i18n.t("onb.btn_add_channel", lang),
+                url=add_to_chat_url(bot_username, "channel"))]]))
+        return
+
+    # choice == "group_owner"
+    # Kanal ham shu ekranda eslatiladi — foydalanuvchi "guruhim bor"
     # tugmasini bosgan bo'lsa ham, aslida kanali bo'lishi mumkin.
     await q.edit_message_text(
         i18n.t("onb.owner_steps", lang, mention=mention)
         + i18n.t("ch.steps", lang, mention=mention),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("onb.btn_add_group", lang),
+            url=add_to_chat_url(bot_username, "group"))]]))
 
 
 async def on_join_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

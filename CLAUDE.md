@@ -5184,3 +5184,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      postining to'xtatilishi, shaxsiy chatdan til tanlash va
      handlerlarning haqiqatan ro'yxatdan o'tgani (naqsh xatosi
      jimgina o'tib ketmasligi uchun).
+
+162. **Kanal — onboardingda KO'RINADIGAN uchinchi yo'l.** Foydalanuvchi:
+     "Hozir shaxsiy jurnal va guruhlar uchun ochiq, endi huddi shu
+     funksiyani kanallarga ham ulaydigan qilishimiz kerak."
+
+     161-bandda kanal ULANADIGAN bo'ldi, lekin UI'da ko'rinmasdi:
+     onboarding menyusida aynan ikkita tugma bor edi — "🧑 Shaxsiy
+     jurnal" va "🏘 Menda yopiq guruh bor". Ya'ni funksiya bor, lekin
+     unga kirish nuqtasi yo'q. Endi:
+
+     - Onboardingda **uchinchi tugma** — "📢 Menda kanal bor", va xush
+       kelibsiz matnida kanal ham tushuntirilgan (uchala tilda).
+     - **Telegram'ning o'z havolasi** ishlatiladi:
+       `?startchannel&admin=post_messages+edit_messages` — bosilganda
+       Telegram kanal tanlash oynasini ochadi va kerakli huquqlarni
+       darhol so'raydi, ya'ni odam "Administratorlar → Admin qo'shish"
+       ichiga kirib o'tirmaydi. Guruh ekraniga ham xuddi shunday
+       `?startgroup=true` tugmasi qo'shildi (guruhda huquqlar ro'yxati
+       ATAYLAB berilmaydi — u yerdagi huquq nomlari boshqacha va
+       ortiqcha so'rov havolani buzishi mumkin).
+     - **Almashtirish ekraniga ham kirish nuqtasi qo'shildi**
+       ("➕ O'z guruhim yoki kanalimni ulash"). Sababi: onboarding FAQAT
+       hech qanday workspace'i YO'Q odamga ko'rsatiladi, ya'ni bir marta
+       shaxsiy jurnal ochgan odam keyin kanal ulamoqchi bo'lsa boshqa
+       kirish nuqtasi qolmasdi. Egasi bo'lgan guruh/kanali bor odamga
+       ko'rsatilmaydi — "bitta admin, bitta workspace" qoidasi.
+
+     **Saboq:** funksiyani ishlaydigan qilish yetarli emas — unga
+     KIRISH NUQTASI bo'lmasa, u yo'q bilan barobar. Yangi imkoniyat
+     qo'shganda "buni odam qayerdan topadi?" degan savolni ham
+     javoblash kerak, va javob "hujjatda yozilgan" bo'lmasligi kerak.
+
+     Sinov: `test_channel_setup.py` 34/34 (161-banddagi 26 tasi ustiga
+     onboarding tugmalari, qo'shish havolalarining aniq shakli va
+     almashtirish ekranidagi tanlov).

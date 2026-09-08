@@ -1176,18 +1176,26 @@ STRINGS: dict[str, dict[str, str]] = {
                "post bo'lmaydi.\n\n"
                "🏘 <b>Guruh</b> — sizda o'z yopiq Telegram guruhingiz bo'lsa (yoki "
                "allaqachon biror guruhga a'zo bo'lsangiz), shu bot orqali "
-               "statistikani ko'rishingiz mumkin."),
+               "statistikani ko'rishingiz mumkin.\n\n"
+               "📢 <b>Kanal</b> — signallaringiz kanalga chiqadi, natijalar esa "
+               "signal postiga javob bo'lib yoziladi. Obunachilar hammasini "
+               "ko'rib turadi."),
         "ru": ("👋 Добро пожаловать! Как вы хотите пользоваться ботом?\n\n"
                "🧑 <b>Личный журнал</b> — записываете свои сигналы и следите за своей "
                "статистикой. Виден только вам, никуда не публикуется.\n\n"
                "🏘 <b>Группа</b> — если у вас есть своя закрытая группа в Telegram "
                "(или вы уже состоите в какой-то), через этого бота можно смотреть "
-               "её статистику."),
+               "её статистику.\n\n"
+               "📢 <b>Канал</b> — сигналы публикуются в канале, а результаты "
+               "пишутся ответом на пост сигнала. Подписчики видят всё."),
         "en": ("👋 Welcome! How do you want to use the bot?\n\n"
                "🧑 <b>Personal journal</b> — record your own trade signals and follow "
                "your stats. Visible only to you, nothing is posted anywhere.\n\n"
                "🏘 <b>Group</b> — if you have your own private Telegram group (or are "
-               "already a member of one), you can follow its stats through this bot."),
+               "already a member of one), you can follow its stats through this bot.\n\n"
+               "📢 <b>Channel</b> — signals are posted to the channel and results "
+               "are written as replies to the signal post. Subscribers see "
+               "everything."),
     },
     "onb.btn_personal": {
         "uz": "🧑 Shaxsiy jurnal ochish", "ru": "🧑 Завести личный журнал",
@@ -1196,6 +1204,59 @@ STRINGS: dict[str, dict[str, str]] = {
     "onb.btn_group": {
         "uz": "🏘 Menda yopiq guruh bor", "ru": "🏘 У меня есть закрытая группа",
         "en": "🏘 I have a private group",
+    },
+    "onb.btn_channel": {
+        "uz": "📢 Menda kanal bor", "ru": "📢 У меня есть канал",
+        "en": "📢 I have a channel",
+    },
+    "onb.btn_add_channel": {
+        "uz": "➕ Botni kanalga qo'shish", "ru": "➕ Добавить бота в канал",
+        "en": "➕ Add the bot to a channel",
+    },
+    "onb.btn_add_group": {
+        "uz": "➕ Botni guruhga qo'shish", "ru": "➕ Добавить бота в группу",
+        "en": "➕ Add the bot to a group",
+    },
+    "onb.channel_steps": {
+        "uz": ("📢 Kanalingizni ulash uchun:\n\n"
+               "1. Pastdagi tugma orqali {mention} kanalingizga qo'shing "
+               "(yoki kanal sozlamalarida — Administratorlar → Admin "
+               "qo'shish).\n"
+               "2. Botga <b>xabar yuborish</b> huquqini bering — signallar "
+               "shu huquq bilan chiqadi.\n\n"
+               "Shundan so'ng bot SHU YERGA, shaxsiy chatingizga "
+               "\"Ulash\" tugmasini yuboradi. Kanalda <code>/setup</code> "
+               "yozish SHART EMAS: kanal postlari kim yozganini "
+               "ko'rsatmaydi, shuning uchun tasdiqlash shu yerda "
+               "so'raladi."),
+        "ru": ("📢 Чтобы подключить свой канал:\n\n"
+               "1. Добавьте {mention} в канал кнопкой ниже (или в "
+               "настройках канала — Администраторы → Добавить админа).\n"
+               "2. Дайте боту право <b>отправлять сообщения</b> — с ним "
+               "и публикуются сигналы.\n\n"
+               "После этого бот пришлёт СЮДА, в личный чат, кнопку "
+               "«Подключить». Писать <code>/setup</code> в канале НЕ "
+               "НУЖНО: посты канала не показывают автора, поэтому "
+               "подтверждение спрашивается здесь."),
+        "en": ("📢 To connect your channel:\n\n"
+               "1. Add {mention} to the channel with the button below (or "
+               "in the channel settings — Administrators → Add admin).\n"
+               "2. Give the bot the <b>post messages</b> right — signals go "
+               "out with it.\n\n"
+               "The bot will then send a \"Connect\" button HERE, in your "
+               "private chat. You do NOT need to type <code>/setup</code> "
+               "in the channel: channel posts do not show an author, so the "
+               "confirmation is asked here."),
+    },
+    "onb.connect_pick": {
+        "uz": "Nimani ulaymiz?", "ru": "Что подключаем?",
+        "en": "What are we connecting?",
+    },
+    "onb.btn_pick_group": {
+        "uz": "🏘 Guruh", "ru": "🏘 Группу", "en": "🏘 A group",
+    },
+    "onb.btn_pick_channel": {
+        "uz": "📢 Kanal", "ru": "📢 Канал", "en": "📢 A channel",
     },
     "onb.btn_member": {
         "uz": "👥 Men guruh a'zosiman", "ru": "👥 Я участник группы",
@@ -1466,6 +1527,12 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Ochiq sahifa (/sahifa) ---
+    "ws.btn_connect": {
+        "uz": "➕ O'z guruhim yoki kanalimni ulash",
+        "ru": "➕ Подключить свою группу или канал",
+        "en": "➕ Connect my own group or channel",
+    },
+
     "web.off": {
         "uz": ("🌐 Ochiq sahifa hali yoqilmagan.\n\n"
                "Yoqish uchun: <code>/public on</code> yozing — so'rov moderatorga "
