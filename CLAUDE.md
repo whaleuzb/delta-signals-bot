@@ -5306,3 +5306,36 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_web_channels.py` 23/23 + haqiqiy Chromium'da ikkala
      bo'lim rasmga olinib, obuna havolasi (`https://t.me/whalesignals`)
      va bo'limlarning almashishi tekshirildi.
+
+165. **Yiqilgan News posti BUTUNLAY yo'qolardi.** Loglar qo'shilgach
+     (162-band) birinchi haqiqiy hodisa ko'rindi: 10:42 da MarketTwits
+     bir vaqtda 7 ta xabar yubordi. Beshtasi filtrdan o'tmadi (2 tasi
+     🇷🇺 bayroq, 3 tasi tanish tikersiz), bittasi postlandi, bittasi esa
+     `telegram.error.TimedOut` bilan yiqildi — o'sha daqiqada
+     `news_live_job` ham tahrirlab turgani uchun Telegram tezlik
+     chegarasiga urildi (`RetryAfter=6`).
+
+     **Asosiy xato yiqilishning O'ZIDA emas, oqibatida edi.** Hodisa
+     qatori `posted=False` bilan ALLAQACHON yozilgan, `news_event_exists()`
+     esa `posted` ga QARAMAYDI — ya'ni bu xabar "ko'rib chiqilgan"
+     hisoblanib, boshqa hech qachon urinilmasdi. MarketTwits tinglovchisi
+     eski xabarni qayta yubormaydi, demak post butunlay yo'qolgan edi.
+
+     - `_send_news_post()` — 3 marta urinadi: `RetryAfter` bo'lsa
+       Telegram aytgancha kutadi, `TimedOut`/`NetworkError` bo'lsa
+       3/6 soniya. Doimiy xatoda (noto'g'ri HTML, huquq yo'q) qayta
+       urinmaydi — foydasi yo'q.
+     - Uchala urinish ham yiqilsa hodisa qatori **o'chiriladi**
+       (`db.delete_news_event`), ya'ni yarim bajarilgan holat qolmaydi.
+
+     **Saboq:** "allaqachon ko'rib chiqilgan" belgisini ISH BOSHLANISHIDA
+     emas, TUGAGANIDA qo'yish kerak. Aks holda har bir vaqtinchalik xato
+     doimiy ma'lumot yo'qotishga aylanadi.
+
+     Bu bandning o'zi 162-banddagi saboqning tasdig'i: log qo'shilmaganda
+     bu xato jimgina davom etaverardi — kanal "ba'zan post qilmaydi"
+     bo'lib ko'rinardi, sababi esa topilmasdi.
+
+     Sinov: `test_news_uz_only.py` 32/32 (RetryAfter -> TimedOut ->
+     muvaffaqiyat ketma-ketligi, uchala urinish yiqilishi, va yiqilgandan
+     keyin bazada qator qolmasligi).

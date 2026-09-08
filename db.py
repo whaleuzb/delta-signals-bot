@@ -1301,6 +1301,15 @@ async def news_event_exists(external_key: str) -> bool:
             "SELECT 1 FROM news_events WHERE external_key=$1", external_key))
 
 
+async def delete_news_event(event_id: int) -> None:
+    """Post YUBORILMAGANDA qatorni o'chiradi.
+
+    `news_event_exists()` `posted` ga qaramaydi — qator qolsa xabar
+    "ko'rib chiqilgan" hisoblanib, BOSHQA HECH QACHON postlanmasdi."""
+    async with pool().acquire() as c:
+        await c.execute("DELETE FROM news_events WHERE id=$1", event_id)
+
+
 async def insert_news_event(*, source: str, external_key: str, symbol: str | None,
                              market: str | None, headline_en: str,
                              translation_uz: str | None, insight_uz: str | None,

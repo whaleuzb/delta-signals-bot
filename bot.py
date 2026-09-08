@@ -5270,6 +5270,44 @@ async def _markettwits_matches_topic(text: str) -> bool:
     return any(c.lower() in tags for c in curated)
 
 
+async def _send_news_post(bot_, caption: str, photo, buttons, key: str):
+    """News kanaliga post — vaqtinchalik xatoda QAYTA URINADI.
+
+    Sabab production'dan (10:42): MarketTwits bir vaqtda 7 ta xabar
+    yuborgan, ustiga `news_live_job` har 4 soniyada tahrirlaydi —
+    Telegram tezlik chegarasiga urilgan (`RetryAfter=6`) va bitta post
+    `TimedOut` bilan yiqilgan. Bitta urinish yetarli emas ekan.
+
+    `None` qaytarsa — post CHIQMADI, chaqiruvchi hodisa qatorini
+    o'chirishi kerak (aks holda xabar boshqa hech qachon urinilmaydi)."""
+    for attempt in range(3):
+        try:
+            if photo:
+                photo.seek(0)
+                return await bot_.send_photo(
+                    config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
+                    caption=caption, parse_mode=ParseMode.HTML,
+                    reply_markup=buttons)
+            return await bot_.send_message(
+                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True, reply_markup=buttons)
+        except RetryAfter as exc:
+            wait = float(getattr(exc, "retry_after", 5)) + 1
+        except (TimedOut, NetworkError):
+            wait = 3 * (attempt + 1)
+        except Exception:
+            # Doimiy xato (noto'g'ri HTML, huquq yo'q) — qayta urinish
+            # yordam bermaydi.
+            log.exception("News posti yuborilmadi (%s)", key)
+            return None
+        if attempt == 2:
+            log.error("News posti 3 urinishdan keyin ham yuborilmadi (%s)", key)
+            return None
+        log.info("News posti qayta urinadi (%s), %.0fs kutamiz", key, wait)
+        await asyncio.sleep(wait)
+    return None
+
+
 async def _process_markettwits_message(bot_, channel: str, msg_id: int,
                                        text: str, event_at: datetime) -> None:
     if not config.NEWS_CHANNEL_ID:
@@ -5371,17 +5409,13 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
             photo, live_pct = rendered
 
     buttons = await _signal_buttons(symbol, market, bot_.username) if symbol else None
-    try:
-        if photo:
-            sent = await bot_.send_photo(
-                config.NEWS_CHANNEL_ID, InputFile(photo, "news.png"),
-                caption=caption, parse_mode=ParseMode.HTML, reply_markup=buttons)
-        else:
-            sent = await bot_.send_message(
-                config.NEWS_CHANNEL_ID, caption, parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True, reply_markup=buttons)
-    except Exception:
-        log.exception("MarketTwits postlanmadi (%s)", external_key)
+    sent = await _send_news_post(bot_, caption, photo, buttons, external_key)
+    if sent is None:
+        # Hodisa qatori O'CHIRILADI. `news_event_exists()` `posted` ga
+        # qaramaydi, ya'ni qator qolsa bu xabar "ko'rib chiqilgan"
+        # hisoblanib boshqa hech qachon postlanmasdi — MarketTwits
+        # tinglovchisi esa eski xabarni qayta yubormaydi.
+        await db.delete_news_event(eid)
         return
     log.info("News Trade: post yuborildi (%s, tiker=%s, tarjima=%s, grafik=%s)",
              external_key, symbol or "-", "bor" if display_body else "YO'Q",
