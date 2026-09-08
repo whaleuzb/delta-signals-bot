@@ -1,27 +1,35 @@
-"""Ruscha matnni o'zbekchaga tarjima qilish — MarketTwits kabi AI'siz
-manbalar uchun (Anthropic kredit tugagani sabab AI ishlatilmaydi, bot.py
-87-band izohiga qarang).
+"""Begona tildagi matnni o'zbekchaga tarjima qilish — MarketTwits kabi
+manbalar uchun. News Trade kanaliga FAQAT o'zbekcha matn chiqadi
+(foydalanuvchi talabi), shuning uchun tarjima ixtiyoriy bezak emas,
+quvurning majburiy bosqichi.
 
-Google Translate'ning norasmiy endpoint'i (`translate.googleapis.com`)
-SINALDI — avtomatlashtirilgan so'rovlarni bloklaydi (429 "Sorry...").
-Shu sabab MyMemory (`api.mymemory.translated.net`) ishlatiladi — bu
-xuddi shu maqsad uchun MAXSUS qurilgan, RASMIY, kalitsiz bepul API.
+IKKI TEKIN, KALITSIZ manba ketma-ket sinaladi:
+  1. MyMemory (`api.mymemory.translated.net`) — aynan shu maqsad uchun
+     qurilgan rasmiy bepul API. `config.TRANSLATE_EMAIL` so'rovga
+     qo'shiladi (tasdiqlanishi SHART EMAS) — hujjatga ko'ra kunlik
+     limitni sezilarli ko'taradi.
+  2. Google'ning `translate_a/single` (gtx) endpointi — norasmiy, ba'zan
+     429 qaytaradi, lekin BEPUL va MyMemory yiqilganda ko'pincha
+     ishlaydi. Shuning uchun u ZAXIRA: MyMemory ishlaganda umuman
+     chaqirilmaydi.
 
-MUHIM (production loglarida tasdiqlangan): email'siz so'rov ham tez-tez
-429 (juda ko'p so'rov) bilan rad etilardi. MyMemory hujjatiga ko'ra
-so'rovga ISTALGAN email qo'shilsa (tasdiqlanishi shart EMAS) kunlik
-limit sezilarli ko'tariladi — `config.TRANSLATE_EMAIL` shu maqsadda.
-429 kelsa bir marta qisqa kutib qayta urinib ko'riladi (vaqtinchalik
-tirbandlikni yengish uchun, doimiy limit tugashini emas).
+CLAUDE TARJIMONI ATAYLAB YO'Q. Bir muddat zaxira sifatida turgan edi,
+foydalanuvchi olib tashlashni so'radi ("claude translate olib tashlash
+kerak") — Anthropic krediti tugagan holatda u har bir yiqilishga
+bekorga kutish qo'shardi va hech qachon natija bermasdi.
 
-MUHIM: MyMemory ko'p qatorli matndagi qator ko'chirishlarni ba'zan
-HTML SON-ENTITY sifatida (`&#10;`) qaytaradi — natijani `html.unescape()`
-qilmasdan ishlatilsa, keyinroq `bot.py`dagi `html.escape()` uni ikki marta
-kodlab, foydalanuvchiga xom `&#10;` matni ko'rinib qolardi (production'da
-tasdiqlangan xato). Shu sabab natija shu yerning o'zida darhol
-`html.unescape()` qilinadi."""
+MUHIM (production loglarida tasdiqlangan):
+- Kutish 10s edi va `httpx.ReadTimeout` MUNTAZAM uchrardi. Endi 20s.
+- Qayta urinish avval FAQAT 429 uchun edi, shuning uchun timeout darhol
+  taslim bo'lardi. Endi HAR QANDAY xato uchun qayta urinadi.
+- MyMemory ko'p qatorli matndagi qator ko'chirishlarni ba'zan HTML
+  SON-ENTITY sifatida (`&#10;`) qaytaradi — natija shu yerning o'zida
+  `html.unescape()` qilinadi, aks holda `bot.py` uni ikkinchi marta
+  kodlab, foydalanuvchiga xom `&#10;` ko'rinardi.
+"""
 import asyncio
 import html
+import json
 import logging
 import re
 
@@ -31,12 +39,10 @@ import config
 
 log = logging.getLogger("translate")
 
-BASE_URL = "https://api.mymemory.translated.net/get"
+MYMEMORY_URL = "https://api.mymemory.translated.net/get"
+GOOGLE_URL = "https://translate.googleapis.com/translate_a/single"
 MAX_CHARS = 480   # MyMemory'ning kalitsiz so'rovdagi taxminiy chegarasi
 
-# Timeout 10s edi — production loglarida `httpx.ReadTimeout` MUNTAZAM
-# uchradi va har biri ruscha post degani edi. MyMemory sekin javob
-# beradigan xizmat, 20s kutish arzon.
 TIMEOUT = 20.0
 ATTEMPTS = 3      # har qanday xato (timeout/tarmoq/429) uchun
 
@@ -48,13 +54,11 @@ async def _request(text: str, source: str) -> httpx.Response:
     if config.TRANSLATE_EMAIL:
         params["de"] = config.TRANSLATE_EMAIL
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        return await client.get(BASE_URL, params=params)
+        return await client.get(MYMEMORY_URL, params=params)
 
 
 async def _mymemory(text: str, source: str) -> str | None:
-    """Bepul, kalitsiz tarjimon. HAR QANDAY xatoda qayta urinadi —
-    avval faqat 429 uchun urinilardi va `ReadTimeout` darhol taslim
-    bo'lardi (production'da eng ko'p uchragan sabab aynan shu)."""
+    """Asosiy tarjimon. HAR QANDAY xatoda qayta urinadi."""
     for attempt in range(ATTEMPTS):
         try:
             r = await _request(text, source)
@@ -78,49 +82,48 @@ async def _mymemory(text: str, source: str) -> str | None:
     return None
 
 
-async def _claude(text: str, source: str) -> str | None:
-    """Zaxira tarjimon. `ANTHROPIC_API_KEY` bo'lmasa yoki kredit tugagan
-    bo'lsa jimgina `None` — chaqiruvchi baribir tekshiradi."""
+async def _google(text: str, source: str) -> str | None:
+    """Zaxira tarjimon — norasmiy gtx endpointi, kalitsiz va bepul.
+
+    Javob ichma-ich massiv: `[[["tarjima","asl",...], ...], ...]` —
+    birinchi elementdagi bo'laklar KETMA-KET ulanadi (uzun matn bir
+    nechta bo'lakka bo'linadi). Format norasmiy, shuning uchun hamma
+    narsa ehtiyotkorlik bilan o'qiladi."""
+    params = {"client": "gtx", "sl": source, "tl": "uz", "dt": "t",
+              "q": text[:MAX_CHARS]}
     try:
-        import newsai
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            r = await client.get(GOOGLE_URL, params=params)
+        r.raise_for_status()
+        data = r.json()
     except Exception:
+        log.warning("Google tarjimasi muvaffaqiyatsiz", exc_info=True)
         return None
-    client = getattr(newsai, "_client", None)
-    if client is None:
-        return None
+
     try:
-        msg = await client.messages.create(
-            model=config.NEWS_MODEL,
-            max_tokens=1000,
-            system=("Sen tarjimonsan. Berilgan moliyaviy yangilik matnini "
-                    "O'ZBEK tiliga tarjima qil. FAQAT tarjimani qaytar — "
-                    "izoh, sarlavha yoki qo'shimcha so'z YOZMA. Tikerlar "
-                    "(BTC, AAPL), raqamlar va foizlar o'zgarmasin."),
-            messages=[{"role": "user", "content": text}],
-        )
-        out = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-        return out.strip() or None
-    except Exception:
-        log.warning("Claude tarjimasi muvaffaqiyatsiz", exc_info=True)
+        chunks = [c[0] for c in data[0] if isinstance(c, list) and c and c[0]]
+    except (TypeError, IndexError, KeyError):
+        log.warning("Google javobi kutilmagan shaklda: %r", str(data)[:120])
         return None
+    out = "".join(chunks).strip()
+    return out or None
 
 
 async def to_uz(text: str, source: str = "ru") -> str | None:
     """O'zbekcha tarjima yoki `None`.
 
-    `None` = TARJIMA BO'LMADI. News Trade kanaliga FAQAT o'zbekcha post
-    ketishi kerak (foydalanuvchi: "News trade kanalida xabar faqat uzbek
-    tilida kelishi kerak"), shuning uchun chaqiruvchi `None` kelganda
-    asl matnga QAYTMASLIGI, postni butunlay o'tkazib yuborishi kerak.
+    `None` = TARJIMA BO'LMADI. Chaqiruvchi asl (begona tildagi) matnga
+    QAYTMASLIGI kerak — News Trade kanaliga faqat o'zbekcha matn
+    chiqadi. `bot.py` bunday holatda matnsiz, o'zbekcha qisqa post va
+    asl xabarga havola yuboradi (kanal jim qolmasligi uchun).
 
-    Ikki bosqich: avval bepul MyMemory, u ishlamasa Claude (kalit bo'lsa).
     Natijada kirill harflari QOLSA — tarjima bo'lmagan hisoblanadi
     (MyMemory ba'zan matnni o'zgarishsiz qaytaradi)."""
     text = text.strip()
     if not text:
         return text
 
-    for name, fn in (("MyMemory", _mymemory), ("Claude", _claude)):
+    for name, fn in (("MyMemory", _mymemory), ("Google", _google)):
         got = await fn(text, source)
         if not got:
             continue

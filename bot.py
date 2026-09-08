@@ -5107,28 +5107,29 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     # (foydalanuvchi: "hashtaglar ham bor ko'payib ketyabti").
     body = _HASHTAG_RE.sub("", text).strip()
     display_body = body
+    source_url = f"https://t.me/{channel}/{msg_id}"
     if _CYRILLIC_RE.search(body):
         display_body = await translate.to_uz(body)
-        # ⚠️ Tarjima bo'lmasa post BUTUNLAY o'tkazib yuboriladi.
-        # Avval asl (RUSCHA) matnga qaytilardi va kanalga ruscha post
-        # chiqib ketardi — foydalanuvchi: "News trade kanalida xabar
-        # faqat uzbek tilida kelishi kerak". Manba (MarketTwits) ruszabon,
-        # ya'ni tarjima ixtiyoriy bezak emas, MAJBURIY bosqich.
-        # Hodisa `posted=True` bilan yoziladi: xabar ko'rib chiqilgan va
-        # rad etilgan, keyin qayta urinilmasin.
+        # ⚠️ Tarjima bo'lmasa ASL (RUSCHA) matnga QAYTILMAYDI — kanalga
+        # faqat o'zbekcha matn chiqadi (foydalanuvchi talabi).
+        #
+        # Lekin postni BUTUNLAY tashlab yuborish ham noto'g'ri bo'lib
+        # chiqdi: tarjimon tez-tez yiqilgani sabab kanal butunlay jim
+        # qoldi (foydalanuvchi: "News trade ai kanaliga umuman xabar
+        # kelmayabti"). Shuning uchun o'rta yo'l — matnsiz, TO'LIQ
+        # O'ZBEKCHA qisqa post va asl xabarga havola. Grafik va tugmalar
+        # o'z joyida qoladi, ya'ni post baribir foydali: qaysi aktivda
+        # yangilik borligi ko'rinadi, matnni xohlagan havoladan o'qiydi.
         if not display_body:
-            log.warning("MarketTwits posti tarjima qilinmadi — "
-                        "o'tkazib yuborildi (%s)", external_key)
-            await db.insert_news_event(
-                source="markettwits", external_key=external_key, symbol=None,
-                market=None, headline_en=text[:2000], translation_uz=None,
-                insight_uz=None, event_at=event_at, posted=True)
-            return
+            log.warning("MarketTwits posti tarjima qilinmadi — havola "
+                        "bilan postlanadi (%s)", external_key)
+            display_body = None
 
     eid = await db.insert_news_event(
         source="markettwits", external_key=external_key, symbol=symbol, market=market,
         headline_en=text[:2000],
-        translation_uz=display_body[:2000] if display_body != body else None,
+        translation_uz=(display_body[:2000]
+                        if display_body and display_body != body else None),
         insight_uz=None, event_at=event_at, posted=False)
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
@@ -5139,8 +5140,15 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     # aylantirardi — Telegram buni ORQAGA parafrazamaydi (xuddi `&#10;`
     # xatosi kabi, foydalanuvchi production'da tasdiqladi), xom holda
     # ko'rinib qolardi.
-    caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
-              f"{html.escape(display_body[:1000], quote=False)}")
+    if display_body:
+        caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
+                  f"{html.escape(display_body[:1000], quote=False)}")
+    else:
+        # Tarjima bo'lmagan holat — matn YO'Q, faqat o'zbekcha izoh va
+        # asl xabarga havola (yuqoridagi izohga qarang).
+        caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
+                   f"Yangi bozor xabari chiqdi.\n"
+                   f"🔗 <a href=\"{html.escape(source_url)}\">Asl xabarni o'qish</a>")
 
     # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan
     # narsa yo'q — matn-only post, jonli yangilanishsiz (narx kuzatilmaydi).

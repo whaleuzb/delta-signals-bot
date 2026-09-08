@@ -5113,3 +5113,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bazadagi `news_events` qatori dedup bo'lib yiqilardi. Endi har
      yugurishda tasodifiy `msg_id`/kanal nomi olinadi (`test_reset_stats`
      ham xuddi shu sababdan `bot_settings` bayrog'ini oldin tozalaydi).
+
+160. **Kanal jim qolib qoldi — 159-banddagi qoida haddan tashqari
+     qattiq edi.** Foydalanuvchi: "News trade ai kanaliga umuman xabar
+     kelmayabti. Menimcha claude translate olib tashlash kerak."
+     Loglar tasdiqladi: kanalning o'zi soz (`news_live_job` ishlab
+     turibdi), lekin 33 daqiqada kelgan IKKALA MarketTwits xabarining
+     ham tarjimasi yiqilgan va 159-banddagi "tarjima bo'lmasa post
+     BUTUNLAY o'tkazib yuboriladi" qoidasi ularni tashlab yuborgan.
+
+     - **Claude zaxira tarjimoni olib tashlandi** (foydalanuvchi
+       so'radi). Anthropic krediti tugagan holatda u hech qachon natija
+       bermasdi, faqat har bir yiqilishga bekorga kutish qo'shardi.
+       O'rniga **Google `translate_a/single` (gtx)** — norasmiy, lekin
+       BEPUL va kalitsiz. U faqat MyMemory yiqilganda chaqiriladi.
+     - **"Post yo'q" o'rniga "matnsiz post":** tarjima bo'lmasa endi
+       TO'LIQ O'ZBEKCHA qisqa xabar va asl postga havola yuboriladi
+       (`https://t.me/<kanal>/<msg_id>`), grafik va tugmalar joyida
+       qoladi. Ruscha matn baribir CHIQMAYDI, lekin kanal ham jim
+       qolmaydi: o'quvchi qaysi aktivda yangilik borligini ko'radi va
+       matnni xohlasa havoladan o'qiydi.
+
+     **Saboq:** "noto'g'ri natijadan ko'ra hech narsa yaxshi" qoidasi
+     faqat XATO KAM bo'lganda ishlaydi. Tashqi bepul xizmatga tayangan
+     joyda u butun funksiyani o'chirib qo'yadi — har doim uchinchi yo'l
+     (kamroq ma'lumotli, lekin TO'G'RI post) qoldirish kerak.
+     Sinov: `test_news_uz_only.py` 29/29.
