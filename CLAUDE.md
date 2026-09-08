@@ -5013,3 +5013,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        kombinatsiyada chizib, matnda BOSHQA tilning belgilari yo'qligini
        tekshiradi; shaxsiy jurnal tilining ergashishini va guruh tiliga
        tegilmasligini haqiqiy Postgres'da tekshiradi.
+
+157. **Bosh menyu tugmalari doim o'zbekcha chiqardi** (skrinshot:
+     sarlavha "Main menu:" inglizcha, tugmalar esa "Yangi signal /
+     Depozit / Statistika…"). Sabab oddiy: `main_menu_kb(uid, ws,
+     private, lang)` TO'RTTA joyda `lang`SIZ chaqirilgan edi
+     (`show_menu`, `on_onboard`, `on_view_join`, `on_workspace_pick`) —
+     standart qiymat esa o'zbekcha.
+     - **Bu xato TAKRORLANADIGAN turdagi:** `lang` ixtiyoriy parametr
+       bo'lgani uchun uni unutish jimgina, xatosiz o'tadi va faqat
+       ekranda ko'rinadi. Shu sabab `test_lang_mix.py` ga **STATIK
+       AUDIT** qo'shildi: `bot.py`/`web.py`/`card.py`/`stats.py`/
+       `parsing.py` AST orqali o'qiladi, `lang` parametri bor har bir
+       funksiya topiladi va ular til BERILMASDAN chaqirilgan joy bo'lsa
+       sinov yiqiladi. Yangi kod yozganda unutilsa — sinov aytadi.
+     - Tilsiz `i18n.t()` ATAYLAB bitta joyda qolgan: `cmd_start` dagi
+       birinchi til savoli uchala tilda yozilgan ("Tilni tanlang /
+       Выберите язык / Choose language").

@@ -334,7 +334,7 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.edit_message_text(i18n.t("onb.personal_ok", lang))
         await q.message.reply_text(
             i18n.t("menu.open_title", lang),
-            reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
+            reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", lang))
         return
 
     if choice == "group":
@@ -384,7 +384,7 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.edit_message_text(i18n.t("ws.joined", lang, name=ws["name"]))
     await q.message.reply_text(
         i18n.t("menu.open_title", lang),
-        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
+        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", lang))
 
 
 async def get_ws_or_prompt(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -425,7 +425,7 @@ async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     await q.edit_message_text(i18n.t("ws.picked", lang, name=ws["name"]))
     await q.message.reply_text(
         i18n.t("menu.open_title", lang),
-        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private"))
+        reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", lang))
 
 
 async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1795,9 +1795,10 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.effective_message.reply_text(text, reply_markup=kb)
         return
+    lang = await user_lang(uid)
     await update.effective_message.reply_text(
-        i18n.t("menu.open_title", await user_lang(uid)),
-        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private"))
+        i18n.t("menu.open_title", lang),
+        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private", lang))
 
 
 # ─────────────────────────── Guruhni ro'yxatdan o'tkazish ───────────────────────────
