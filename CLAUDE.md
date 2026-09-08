@@ -5268,3 +5268,41 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      berdi (`UniqueViolationError`).
 
      Sinov: `test_channel_setup.py` 45/45.
+
+164. **Ochiq sahifada ikki bo'lim: "Yopiq guruhlar" | "Ommaviy kanallar".**
+     Foydalanuvchi: "webda public kanallar alohida oyna qo'shish kerak.
+     U yerda kanallar bo'lsin va har bir kanalning public nickname
+     qo'shilish tugmasi ortida bo'lsin." (skrinshotda Telegram'dagi
+     tugmachali "pill" uslubi ko'rsatilgan).
+
+     **Nega alohida bo'lim.** Guruh va kanalga QO'SHILISH usuli har xil:
+     yopiq guruhga taklif havolasi (`invite_link`) bilan kiriladi,
+     ommaviy kanalga esa ochiq `@nik` orqali obuna bo'linadi. Bitta
+     ro'yxatda aralashsa o'quvchi qaysi biriga qanday qo'shilishini
+     tushunmasdi.
+
+     - **JAVASCRIPTSIZ bo'limlar:** yashirin `<input type=radio>` +
+       CSS `:checked ~ .pane`. Sahifa butunlay statik va keshlanadi
+       (`_cache`), shuning uchun holat saqlaydigan skript ishlatilmadi;
+       radio esa brauzerning o'zida ishlaydi, sahifa qayta yuklanmaydi
+       va URL ham o'zgarmaydi (til tugmalaridan farqli — u yerda tanlov
+       havolalarga ko'chishi SHART edi, bu yerda esa yo'q).
+     - **`workspaces.username`** ustuni qo'shildi — ommaviy `@nik`.
+       `is_channel` bilan bir joyda, `refresh_logo()` ichida
+       `get_chat` javobidan yoziladi (`set_workspace_meta`), ya'ni
+       o'zini o'zi to'ldiradi va qo'lda migratsiya kerak emas.
+     - **Nik TUGMA ORTIDA:** kartada `@nik` matn sifatida
+       KO'RSATILMAYDI, faqat "Obuna bo'lish" havolasi ichida
+       (`https://t.me/<nik>`) — foydalanuvchi aynan shuni so'radi.
+       Niki yo'q kanalda tugma umuman chizilmaydi (karta qoladi).
+     - **`<a>` ichida `<a>` bo'lmaydi:** karta o'zi havola, shuning
+       uchun obuna tugmasi kartadan KEYIN, `.gwrap` o'ramida turadi.
+     - O'rin raqami HAR BO'LIMDA 1 dan boshlanadi — guruhlar va
+       kanallar turli auditoriya, bitta umumiy reyting ma'nosiz.
+     - `w.index_top` sarlavhasi endi "guruhlar" demaydi ("Top daromad
+       beruvchilar") — kanallar bo'limi ochilganda eski sarlavha
+       yolg'on bo'lib qolardi.
+
+     Sinov: `test_web_channels.py` 23/23 + haqiqiy Chromium'da ikkala
+     bo'lim rasmga olinib, obuna havolasi (`https://t.me/whalesignals`)
+     va bo'limlarning almashishi tekshirildi.

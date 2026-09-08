@@ -1897,12 +1897,13 @@ async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
         log.warning("Logotip: #%s guruh ma'lumoti olinmadi", ws_id, exc_info=True)
         return False
 
-    # `is_channel` shu yerda O'ZINI TUZATADI. Ustun bu funksiya paydo
+    # `is_channel` va ommaviy `username` shu yerda O'ZINI TUZATADI. Ustun bu funksiya paydo
     # bo'lishidan oldin ulangan workspace'lar uchun DEFAULT FALSE bilan
     # qo'shilgan, ya'ni eski kanallar "guruh" bo'lib qolgan bo'lishi
     # mumkin. `get_chat` baribir chaqirilyapti — javobdagi chat turi
     # to'g'ri qiymatni bepul beradi (sutkada bir marta, `logo_job`).
-    await db.set_workspace_is_channel(ws_id, getattr(chat, "type", "") == "channel")
+    await db.set_workspace_meta(ws_id, getattr(chat, "type", "") == "channel",
+                                getattr(chat, "username", None))
 
     photo = getattr(chat, "photo", None)
     if not photo:

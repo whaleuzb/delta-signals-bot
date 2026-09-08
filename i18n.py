@@ -1534,6 +1534,27 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "📢 Connect my channel",
     },
 
+    # --- Ochiq sahifadagi bo'limlar (yopiq guruhlar / ommaviy kanallar) ---
+    "w.tab_groups": {
+        "uz": "Yopiq guruhlar", "ru": "Закрытые группы", "en": "Private groups",
+    },
+    "w.tab_channels": {
+        "uz": "Ommaviy kanallar", "ru": "Публичные каналы", "en": "Public channels",
+    },
+    "w.join_channel": {
+        "uz": "Obuna bo'lish", "ru": "Подписаться", "en": "Subscribe",
+    },
+    "w.channels_empty": {
+        "uz": "Hozircha ommaviy kanal yo'q.",
+        "ru": "Публичных каналов пока нет.",
+        "en": "No public channels yet.",
+    },
+    "w.groups_empty": {
+        "uz": "Hozircha ochiq guruh yo'q.",
+        "ru": "Открытых групп пока нет.",
+        "en": "No open groups yet.",
+    },
+
     "web.off": {
         "uz": ("🌐 Ochiq sahifa hali yoqilmagan.\n\n"
                "Yoqish uchun: <code>/public on</code> yozing — so'rov moderatorga "
@@ -1861,9 +1882,12 @@ STRINGS: dict[str, dict[str, str]] = {
                "closed automatically when the market hits a TP or the stop. It "
                "cannot be edited by hand."),
     },
+    # Sarlavha ATAYLAB "guruhlar" demaydi: pastda ikkita bo'lim bor
+    # (yopiq guruhlar / ommaviy kanallar) va kanallar bo'limi ochilganda
+    # "guruhlar" sarlavhasi yolg'on bo'lib qolardi.
     "w.index_top": {
-        "uz": "Top daromad beruvchi guruhlar", "ru": "Самые прибыльные группы",
-        "en": "Top performing groups",
+        "uz": "Top daromad beruvchilar", "ru": "Самые прибыльные",
+        "en": "Top performers",
     },
     "w.index_empty": {
         "uz": "Hozircha ochiq guruh yo'q.", "ru": "Пока нет ни одной публичной группы.",

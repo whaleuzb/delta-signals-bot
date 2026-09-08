@@ -152,6 +152,10 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_link TEXT;
 -- (1) egalik qoidasi (bitta odam bitta guruh VA bitta kanal), (2) ro'yxatda
 -- to'g'ri belgi (👑 / 📢).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS is_channel BOOLEAN NOT NULL DEFAULT FALSE;
+-- Ommaviy @nik (kanal/guruh ochiq bo'lsa). Ochiq sahifadagi "Obuna
+-- bo'lish" tugmasi shundan yasaladi — taklif havolasi (invite_link)
+-- yopiq guruhlar uchun, bu esa ommaviy kanallar uchun.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS username TEXT;
 -- Eski cheklov `UNIQUE (owner_id, type)` edi va kanal ham type='group'
 -- bo'lgani uchun u "guruhi bor odam kanal ulay olmaydi" degan ma'noni
 -- berardi (foydalanuvchi aynan shunga urildi). Endi `is_channel` ham
@@ -459,13 +463,18 @@ async def get_group_workspace_by_owner(owner_id: int,
         return await c.fetchrow(q, *args)
 
 
-async def set_workspace_is_channel(workspace_id: int, is_channel: bool) -> None:
-    """Faqat qiymat O'ZGARGANDA yozadi — `logo_job` har kuni hamma
-    workspace uchun chaqiriladi, bekorga UPDATE qilish shart emas."""
+async def set_workspace_meta(workspace_id: int, is_channel: bool,
+                             username: str | None) -> None:
+    """Telegram'dan olingan ikki maydon: chat KANALmi va ommaviy @nigi.
+
+    Ikkalasi ham `get_chat` javobidan keladi, shuning uchun bitta
+    funksiya. Faqat qiymat O'ZGARGANDA yozadi — `logo_job` har kuni
+    hamma workspace uchun chaqiriladi, bekorga UPDATE qilish shart emas."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE workspaces SET is_channel=$2 WHERE id=$1 AND is_channel IS DISTINCT FROM $2",
-            workspace_id, is_channel)
+            "UPDATE workspaces SET is_channel=$2, username=$3 WHERE id=$1 "
+            "AND (is_channel IS DISTINCT FROM $2 OR username IS DISTINCT FROM $3)",
+            workspace_id, is_channel, username)
 
 
 async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
@@ -908,7 +917,7 @@ async def public_workspaces() -> list[asyncpg.Record]:
     yig'indisi) ga qaytadi. Ikkala raqam ham qaytariladi — tanlov bitta joyda,
     Python tomonida qilinadi va ikki sahifada ikki xil son chiqmaydi."""
     q = f"""
-    SELECT w.id, w.name, w.invite_link, w.deposit,
+    SELECT w.id, w.name, w.invite_link, w.deposit, w.is_channel, w.username,
            (w.logo IS NOT NULL)                              AS has_logo,
            COUNT(s.id)                                       AS total,
            COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)          AS wins,
@@ -925,7 +934,7 @@ async def public_workspaces() -> list[asyncpg.Record]:
          AND s.status IN {CLOSED} AND NOT s.excluded
     WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived
-    GROUP BY w.id, w.name, w.invite_link, w.deposit, w.logo
+    GROUP BY w.id, w.name, w.invite_link, w.deposit, w.logo, w.is_channel, w.username
     ORDER BY last_closed DESC NULLS LAST
     """
     async with pool().acquire() as c:

@@ -188,6 +188,34 @@ tbody tr:hover{background:#ffffff06}
 .b-long{background:#2ecc8f22;color:var(--long)}
 .b-short{background:#ff5c5c22;color:var(--short)}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+/* Bo'limlar: "Yopiq guruhlar" / "Ommaviy kanallar".
+   JAVASCRIPTSIZ — yashirin radio + `:checked` bilan. Sahifa butunlay
+   statik va keshlanadi, shuning uchun holatni saqlaydigan skript
+   ishlatilmaydi; radio esa brauzerning o'zida ishlaydi va sahifa
+   qayta yuklanmaydi (til tugmalari kabi URL ham o'zgarmaydi). */
+.tabs>input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.tabbar{display:inline-flex;gap:4px;padding:4px;margin:0 0 16px;
+        background:rgba(218,221,226,.05);border:1px solid var(--line);
+        border-radius:999px}
+.tabbar label{padding:7px 16px;border-radius:999px;font-size:14px;font-weight:600;
+              color:var(--mut);cursor:pointer;white-space:nowrap;
+              transition:background .18s,color .18s}
+.tabbar label:hover{color:var(--txt)}
+.pane{display:none}
+#tab-g:checked~.tabbar label[for=tab-g],
+#tab-c:checked~.tabbar label[for=tab-c]{background:rgba(218,221,226,.14);color:var(--txt)}
+#tab-g:checked~.pane-g,#tab-c:checked~.pane-c{display:block}
+/* Kartani o'rab turuvchi qism: "Obuna bo'lish" havolasi kartaning
+   ICHIDA bo'lolmaydi (karta o'zi <a>, ichma-ich <a> yaroqsiz HTML),
+   shuning uchun u kartadan KEYIN, shu o'ramda turadi. */
+.gwrap{display:flex;flex-direction:column;gap:8px}
+.gjoin{display:block;text-align:center;padding:9px 14px;border-radius:11px;
+       background:rgba(218,221,226,.06);border:1px solid rgba(218,221,226,.20);
+       color:var(--silver);font-size:13px;font-weight:600;
+       transition:background .18s,color .18s,border-color .18s}
+.gjoin:hover{background:var(--silver);border-color:var(--silver);color:#0A0A0C;
+             text-decoration:none}
+@media (max-width:640px){.tabbar label{padding:7px 12px;font-size:13px}}
 .gcard{background:linear-gradient(155deg,rgba(23,23,27,.88),rgba(16,16,19,.88));
        backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
        border:1px solid var(--line);border-radius:16px;
@@ -560,48 +588,84 @@ async def index(request):
         return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
     rows = await db.public_workspaces()
-    # Eng yaxshi natija yuqorida — bu sahifaning butun mazmuni shu.
-    rows = sorted(rows, key=lambda r: net_result(r), reverse=True)
 
-    # Umumiy plitalar (jami signal, umumiy winrate...) olib tashlandi:
-    # ular hech kimning natijasi emas — turli guruhlarning aralashmasi.
-    # Har bir guruhning o'z raqamlari kartasida va o'z sahifasida.
     def card_href(wid: int) -> str:
         # Tanlangan til guruh sahifasiga ham O'TSIN (aks holda odam
         # kartani bosishi bilan sahifa yana guruh tiliga qaytardi).
         return e(keep(f"/g/{wid}", request, lang))
 
-    cards = []
-    for pos, r in enumerate(rows, 1):
-        total = r["total"] or 0
-        wr = (r["wins"] / total * 100) if total else 0
-        net = net_result(r)
-        when = (f"{r['last_closed'].astimezone(stats.TZ):%d.%m.%Y}"
-                if r["last_closed"] else "—")
-        openb = (f"<span class='chip'>"
-                 f"{e(i18n.t('w.open_chip', lang, n=r['n_open']))}</span>"
-                 if r["n_open"] else "")
-        # O'rin raqami: ro'yxat daromad bo'yicha tartiblangan, shuning uchun
-        # o'rin ma'noli. Birinchi uchtasi alohida rangda.
-        rank_cls = f"r{pos}" if pos <= 3 else ""
-        # Logotip — guruh avatari. Bo'lmasa nomning birinchi harfi.
-        logo = (f"<img class='glogo' src='/g/{r['id']}/logo.png' alt='' "
-                f"loading='lazy' onerror=\"this.remove()\">"
-                if r["has_logo"] else
-                f"<span class='glogo ph'>{e(r['name'][:1].upper())}</span>")
-        cards.append(
-            f"<a class='gcard {_cls(net)}-edge' href='{card_href(r['id'])}'>"
-            f"<div class='gtop'>"
-            f"<div class='gname'><span class='rank {rank_cls}'>{pos}</span>"
-            f"{logo}"
-            f"<span class='n'>{e(r['name'])}</span></div>"
-            f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
-            f"<div class='gstats'>"
-            f"<div><span>{total}</span> {e(i18n.t('w.signal_word', lang))}</div>"
-            f"<div><span>{wr:.0f}%</span> {e(i18n.t('w.winrate_word', lang))}</div>"
-            f"<div><span>{e(when)}</span></div></div>"
-            f"<div class='gfoot'>{openb}"
-            f"<span class='gbtn'>{e(i18n.t('w.more', lang))}</span></div></a>")
+    def render_cards(items) -> str:
+        """Bitta bo'lim kartalari. O'rin raqami HAR BO'LIMDA 1 dan
+        boshlanadi — guruhlar va kanallar alohida ro'yxat, ularni bitta
+        umumiy reytingga qo'shish ma'nosiz bo'lardi (turli auditoriya)."""
+        out = []
+        # Eng yaxshi natija yuqorida — bu sahifaning butun mazmuni shu.
+        for pos, r in enumerate(sorted(items, key=lambda x: net_result(x),
+                                       reverse=True), 1):
+            total = r["total"] or 0
+            wr = (r["wins"] / total * 100) if total else 0
+            net = net_result(r)
+            when = (f"{r['last_closed'].astimezone(stats.TZ):%d.%m.%Y}"
+                    if r["last_closed"] else "—")
+            openb = (f"<span class='chip'>"
+                     f"{e(i18n.t('w.open_chip', lang, n=r['n_open']))}</span>"
+                     if r["n_open"] else "")
+            rank_cls = f"r{pos}" if pos <= 3 else ""
+            # Logotip — guruh avatari. Bo'lmasa nomning birinchi harfi.
+            logo = (f"<img class='glogo' src='/g/{r['id']}/logo.png' alt='' "
+                    f"loading='lazy' onerror=\"this.remove()\">"
+                    if r["has_logo"] else
+                    f"<span class='glogo ph'>{e(r['name'][:1].upper())}</span>")
+            # Ommaviy @nik bo'lsa — "Obuna bo'lish" tugmasi. Nikning O'ZI
+            # ko'rsatilmaydi: foydalanuvchi so'ragandek u TUGMA ORTIDA
+            # (havolada) turadi, karta esa toza qoladi.
+            join = ""
+            if r["is_channel"] and r["username"]:
+                join = (f"<a class='gjoin' target='_blank' rel='noopener' "
+                        f"href='https://t.me/{e(r['username'])}'>"
+                        f"{e(i18n.t('w.join_channel', lang))}</a>")
+            out.append(
+                f"<div class='gwrap'>"
+                f"<a class='gcard {_cls(net)}-edge' href='{card_href(r['id'])}'>"
+                f"<div class='gtop'>"
+                f"<div class='gname'><span class='rank {rank_cls}'>{pos}</span>"
+                f"{logo}"
+                f"<span class='n'>{e(r['name'])}</span></div>"
+                f"<div class='big {_cls(net)}'>{net:+.1f}%</div></div>"
+                f"<div class='gstats'>"
+                f"<div><span>{total}</span> {e(i18n.t('w.signal_word', lang))}</div>"
+                f"<div><span>{wr:.0f}%</span> {e(i18n.t('w.winrate_word', lang))}</div>"
+                f"<div><span>{e(when)}</span></div></div>"
+                f"<div class='gfoot'>{openb}"
+                f"<span class='gbtn'>{e(i18n.t('w.more', lang))}</span></div></a>"
+                f"{join}</div>")
+        return "".join(out)
+
+    def pane(items, empty_key: str) -> str:
+        return (f"<div class='cards'>{render_cards(items)}</div>" if items else
+                f"<div class='empty'>{e(i18n.t(empty_key, lang))}</div>")
+
+    # Yopiq guruhlar va ommaviy kanallar ALOHIDA bo'limlarda: ular turli
+    # narsa — guruhga taklif havolasi bilan kiriladi, kanalga esa ochiq
+    # @nik orqali obuna bo'linadi. Bitta ro'yxatda aralashsa o'quvchi
+    # qaysi biriga qanday qo'shilishini tushunmasdi.
+    groups = [r for r in rows if not r["is_channel"]]
+    channels = [r for r in rows if r["is_channel"]]
+
+    if rows:
+        listing = (
+            "<div class='tabs'>"
+            "<input type='radio' name='wstab' id='tab-g' checked>"
+            "<input type='radio' name='wstab' id='tab-c'>"
+            "<div class='tabbar'>"
+            f"<label for='tab-g'>{e(i18n.t('w.tab_groups', lang))}</label>"
+            f"<label for='tab-c'>{e(i18n.t('w.tab_channels', lang))}</label>"
+            "</div>"
+            f"<div class='pane pane-g'>{pane(groups, 'w.groups_empty')}</div>"
+            f"<div class='pane pane-c'>{pane(channels, 'w.channels_empty')}</div>"
+            "</div>")
+    else:
+        listing = f"<div class='empty'>{e(i18n.t('w.index_empty', lang))}</div>"
 
     # "Botni ochish" faqat sahifa OXIRIDA (join_cta ichida). Avval u tepada
     # ham bor edi — bir sahifada bitta asosiy harakat yetadi, ikkitasi
@@ -611,10 +675,8 @@ async def index(request):
         "<div class='brand'>Trade Controller</div>"
         f"<h1>{e(i18n.t('w.index_h1', lang))}</h1>"
         f"<div class='sub'>{e(i18n.t('w.index_sub', lang))}</div></header>"
-        + (f"<h2>{e(i18n.t('w.index_top', lang))}</h2>"
-           f"<div class='cards'>{''.join(cards)}</div>" if cards else
-           f"<div class='empty'>{e(i18n.t('w.index_empty', lang))}</div>")
-        + (f"<div class='note'>{e(i18n.t('w.index_note', lang))}</div>" if cards else "")
+        + f"<h2>{e(i18n.t('w.index_top', lang))}</h2>" + listing
+        + (f"<div class='note'>{e(i18n.t('w.index_note', lang))}</div>" if rows else "")
         + join_cta(bot, lang))
     cached = _put(f"index:{lang}",
                    page(i18n.t("w.index_title", lang), body, bot, lang=lang))
