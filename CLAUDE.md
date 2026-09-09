@@ -5753,3 +5753,41 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      holatning har bir maydoni ko'chishi, ko'chmasligi kerak
      bo'lganlar, ikki marta nusxalab bo'lmasligi, yopilgan signal
      nusxalanmasligi, tugma qachon chiqishi va uchala til.
+
+174. **Ommaviy kanalda ochiq pozitsiyaning tikeri endi yashirilmaydi.**
+     Foydalanuvchi: "public kanallar uchun pozitsiyalar ma'lumoti ochiq
+     bo'laversin."
+
+     Ochiq sahifada ochiq pozitsiya "Pozitsiya 1 · 05.09 dan beri ·
+     +3.31%" ko'rinishida chiqardi — tiker ataylab yashirilgan, ostida
+     izoh: "Juftlik nomi ko'rsatilmaydi — ochiq savdo guruh
+     a'zolarining haqqi."
+
+     **Bu qoida YOPIQ GURUH uchun to'g'ri, kanal uchun esa ma'nosiz.**
+     Kanaldagi signal ALLAQACHON o'sha kanalda hamma uchun e'lon
+     qilingan — yashiradigan narsa yo'q. Ustiga o'sha sahifadagi
+     YOPILGAN savdolar ro'yxati tikerni baribir ko'rsatib turardi:
+     bitta sahifada bir xil ma'lumot ikki xil qoida bilan chiqardi.
+
+     - `open_public = bool(ws["is_channel"])`. Kanalda kartochka
+       YOPILGAN savdolarnikiga AYNAN o'xshaydi: tiker + yo'nalish
+       nishoni, ostida kirish narxi va sana. CSS o'zgarmadi —
+       `.oname`/`.osub` allaqachon `.tsym`/`.tsub` bilan bir xil edi.
+     - Izoh (`w.open_note`) faqat yashirilgan holatda chiqadi: kanalda
+       tushuntiradigan narsa yo'q.
+     - Yopiq guruhda hamma narsa avvalgidek — sinov buni alohida
+       tekshiradi (tiker ham, kirish narxi ham chiqmasligi).
+     - PENDING ikkala turda ham chiqmaydi (hali ochilmagan).
+
+     **Saboq:** "maxfiylik" qoidasi kontekstga bog'liq. Bir xil kod
+     ikki xil auditoriyaga xizmat qilsa (yopiq guruh a'zosi va ochiq
+     kanal obunachisi), qoida ham ikkiga bo'linishi kerak. Buni
+     ko'rsatib bergan narsa — bir sahifada yonma-yon turgan ikkita
+     ziddiyatli ro'yxat.
+
+     Sinov: `test_open_public.py` 23/23 — kanalda tiker/yo'nalish/
+     kirish narxi bor va izoh yo'q, guruhda esa aksincha; SHORT
+     nishoni; pozitsiya yo'q holat; PENDING; uchala til.
+     Yo'l-yo'lakay sinovda: `w.open_note` sahifada `html.escape` dan
+     o'tgan holda turadi (o'zbekcha apostrof -> `&#x27;`), shuning
+     uchun taqqoslash ham escape qilingan matn bilan qilinadi.

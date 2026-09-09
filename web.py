@@ -819,11 +819,21 @@ async def group_page(request):
         f"{float(r['sum_pct']):+.2f}%</td></tr>"
         for r in months)
 
-    # OCHIQ POZITSIYALAR — faqat joriy foiz, juftlik nomisiz.
-    # Ochiq savdoning tikeri guruh a'zolarining haqqi: ochiq sahifada uni
-    # ko'rsatish signalni tekinga berish bo'lardi. Foiz esa guruh hozir
-    # qanday ishlayotganini ko'rsatadi va hech narsani oshkor qilmaydi.
+    # OCHIQ POZITSIYALAR.
+    #
+    # YOPIQ GURUHDA juftlik nomi YASHIRILADI: ochiq savdoning tikeri
+    # guruh a'zolarining haqqi, uni ochiq sahifada ko'rsatish signalni
+    # tekinga berish bo'lardi. Foiz esa guruh hozir qanday
+    # ishlayotganini ko'rsatadi va hech narsani oshkor qilmaydi.
+    #
+    # OMMAVIY KANALDA aksincha — signal ALLAQACHON o'sha kanalda
+    # hamma uchun e'lon qilingan. Yashirishning hech qanday ma'nosi
+    # yo'q, ustiga yopilgan savdolar ro'yxati tikerni baribir
+    # ko'rsatib turibdi: bitta sahifada bir xil ma'lumot ikki xil
+    # qoida bilan chiqardi.
+    #
     # PENDING'lar chiqmaydi: ular hali ochilmagan, joriy foizi ham yo'q.
+    open_public = bool(ws["is_channel"])
     live = [r for r in await db.live_signals(ws_id) if r["status"] == "ACTIVE"]
     opens = ""
     for i, r in enumerate(live, 1):
@@ -837,11 +847,20 @@ async def group_page(request):
         p = tracker.pnl_at(r["side"], float(r["entry"]), price)
         since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
                  if r["opened_at"] else "—")
+        # Kanalda kartochka YOPILGAN savdolarniki bilan bir xil shaklda:
+        # tiker + yo'nalish nishoni, ostida kirish narxi va sana.
+        if open_public:
+            side_cls = "b-long" if r["side"] == "LONG" else "b-short"
+            name = (f"{e(r['symbol'])} "
+                    f"<span class='badge {side_cls}'>{e(r['side'])}</span>")
+            sub = f"{fmt_price(r['entry'])} · {e(i18n.t('w.since', lang, d=since))}"
+        else:
+            name = e(i18n.t("w.position_n", lang, i=i))
+            sub = e(i18n.t("w.since", lang, d=since))
         opens += (
             f"<div class='open {_cls(p)}-edge'>"
-            f"<div class='ometa'><div class='oname'>"
-            f"{e(i18n.t('w.position_n', lang, i=i))}</div>"
-            f"<div class='osub'>{e(i18n.t('w.since', lang, d=since))}</div></div>"
+            f"<div class='ometa'><div class='oname'>{name}</div>"
+            f"<div class='osub'>{sub}</div></div>"
             f"<div class='opnl {_cls(p)}'>{p:+.2f}%</div></div>")
 
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
@@ -930,7 +949,8 @@ async def group_page(request):
                   f"<th>{e(i18n.t('w.col_month', lang))}</th><th>{c_trades}</th>"
                   f"<th>{c_wr}</th><th>{c_res}</th>", mon_rows)
         + (f"<h2>{e(i18n.t('w.open_h2', lang))}</h2><div class='trades'>{opens}</div>"
-           f"<div class='note'>{e(i18n.t('w.open_note', lang))}</div>"
+           + ("" if open_public
+              else f"<div class='note'>{e(i18n.t('w.open_note', lang))}</div>")
            if opens else "")
         + (f"<h2>{e(i18n.t('w.recent_h2', lang))}</h2><div class='trades'>{trades}</div>"
            if trades else "")
