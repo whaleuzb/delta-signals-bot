@@ -1851,6 +1851,100 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Pozitsiya hajmi (alloc) ---
+    # ── Pozitsiya hajmi: depozit chegarasi ────────────────────────────
+    # Hajm so'raladigan ekran. Ilgari bu matnlar `alloc_prompt()` ichida
+    # qatorga qadalgan va faqat o'zbekcha edi — funksiyada `lang`
+    # parametri yo'qligi uchun `test_lang_mix` auditi ham uni ko'rmasdi
+    # (167-banddagi equity/PDF bilan bir xil tuzoq).
+    "al.head": {
+        "uz": "💰 <b>#{sid} {sym}</b> — pozitsiya hajmi",
+        "ru": "💰 <b>#{sid} {sym}</b> — размер позиции",
+        "en": "💰 <b>#{sid} {sym}</b> — position size",
+    },
+    "al.deposit_line": {
+        "uz": "Depozit: <b>{dep:,.2f}</b>",
+        "ru": "Депозит: <b>{dep:,.2f}</b>",
+        "en": "Deposit: <b>{dep:,.2f}</b>",
+    },
+    "al.dist_line": {
+        "uz": " · Stopgacha: <b>{dist:.2f}%</b>",
+        "ru": " · До стопа: <b>{dist:.2f}%</b>",
+        "en": " · To stop: <b>{dist:.2f}%</b>",
+    },
+    "al.free_line": {
+        "uz": "Bo'sh: <b>{free:,.2f}</b> (ochiq pozitsiyalarda {busy:,.2f})",
+        "ru": "Свободно: <b>{free:,.2f}</b> (в открытых позициях {busy:,.2f})",
+        "en": "Available: <b>{free:,.2f}</b> ({busy:,.2f} in open positions)",
+    },
+    "al.pick_risk": {
+        "uz": "Xavf darajasini tanlang — hajm o'zi hisoblanadi:",
+        "ru": "Выберите уровень риска — размер посчитается сам:",
+        "en": "Pick a risk level — the size is calculated for you:",
+    },
+    "al.capped": {
+        "uz": "<i>Hajm bo'sh depozitdan oshmaydi (spot, leverage yo'q) — cheklandi.</i>",
+        "ru": "<i>Размер не превышает свободный депозит (спот, без плеча) — ограничено.</i>",
+        "en": "<i>Size cannot exceed the available deposit (spot, no leverage) — capped.</i>",
+    },
+    "al.or_type": {
+        "uz": "Yoki summani o'zingiz yozing (masalan <code>100</code>).",
+        "ru": "Или впишите сумму сами (например <code>100</code>).",
+        "en": "Or type the amount yourself (for example <code>100</code>).",
+    },
+    "al.btn_skip": {
+        "uz": "⏭ O'tkazib yuborish",
+        "ru": "⏭ Пропустить",
+        "en": "⏭ Skip",
+    },
+    # Kiritilgan summa bo'sh depozitdan oshib ketgan holat.
+    "al.over": {
+        "uz": ("⚠️ <b>Depozit yetmaydi</b>\n\n"
+               "Siz kiritdingiz: <b>{amt:,.2f}</b>\n"
+               "Bo'sh depozit: <b>{free:,.2f}</b>\n\n"
+               "Umumiy depozit: {dep:,.2f}\n"
+               "Ochiq pozitsiyalarda: {busy:,.2f}\n\n"
+               "Yetishmayapti: <b>{need:,.2f}</b>"),
+        "ru": ("⚠️ <b>Депозита не хватает</b>\n\n"
+               "Вы ввели: <b>{amt:,.2f}</b>\n"
+               "Свободный депозит: <b>{free:,.2f}</b>\n\n"
+               "Общий депозит: {dep:,.2f}\n"
+               "В открытых позициях: {busy:,.2f}\n\n"
+               "Не хватает: <b>{need:,.2f}</b>"),
+        "en": ("⚠️ <b>Not enough deposit</b>\n\n"
+               "You entered: <b>{amt:,.2f}</b>\n"
+               "Available deposit: <b>{free:,.2f}</b>\n\n"
+               "Total deposit: {dep:,.2f}\n"
+               "In open positions: {busy:,.2f}\n\n"
+               "Short by: <b>{need:,.2f}</b>"),
+    },
+    "al.btn_topup": {
+        "uz": "➕ Umumiy depozitga {amt:,.0f} qo'shish",
+        "ru": "➕ Добавить {amt:,.0f} к общему депозиту",
+        "en": "➕ Add {amt:,.0f} to the total deposit",
+    },
+    "al.btn_other": {
+        "uz": "✏️ Boshqa summani kiritish",
+        "ru": "✏️ Ввести другую сумму",
+        "en": "✏️ Enter a different amount",
+    },
+    "al.topped": {
+        "uz": ("✅ Depozit yangilandi: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+               "Pozitsiya hajmi: <b>{amt:,.2f}</b>"),
+        "ru": ("✅ Депозит обновлён: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+               "Размер позиции: <b>{amt:,.2f}</b>"),
+        "en": ("✅ Deposit updated: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+               "Position size: <b>{amt:,.2f}</b>"),
+    },
+    "al.ask_again": {
+        "uz": "Yangi summani yozing. Bo'sh depozit: <b>{free:,.2f}</b>",
+        "ru": "Впишите новую сумму. Свободный депозит: <b>{free:,.2f}</b>",
+        "en": "Type a new amount. Available deposit: <b>{free:,.2f}</b>",
+    },
+    "al.expired": {
+        "uz": "Bu signal endi mavjud emas yoki hajmi allaqachon belgilangan.",
+        "ru": "Этого сигнала уже нет или размер уже задан.",
+        "en": "This signal no longer exists or its size is already set.",
+    },
     "al.no_deposit": {
         "uz": "Depozit belgilanmagan.", "ru": "Депозит не задан.",
         "en": "No deposit is set.",

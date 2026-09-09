@@ -861,6 +861,33 @@ async def set_signal_allocation(sig_id: int, alloc_amount: float, deposit_snapsh
             sig_id, _d(alloc_amount), _d(deposit_snapshot))
 
 
+async def open_allocated(workspace_id: int,
+                         exclude_sig_id: int | None = None) -> float:
+    """Hozir OCHIQ pozitsiyalarda band turgan pul.
+
+    `deposit` — umumiy balans, uning bir qismi allaqachon ochiq
+    savdolarda ishlayotgan bo'lishi mumkin. Yangi pozitsiya faqat
+    QOLGANIDAN ochilishi kerak — aks holda bitta 500$ lik depozitdan
+    bir vaqtning o'zida ikkita 500$ lik pozitsiya "ochilib" ketardi va
+    barcha foizlar yolg'on chiqardi.
+
+    PENDING ham hisobga olinadi: pozitsiya hali ochilmagan bo'lsa ham,
+    o'sha pul unga ATALGAN va boshqa savdoga ikkinchi marta
+    ishlatilmasligi kerak.
+
+    `exclude_sig_id` — hajmi AYNAN HOZIR belgilanayotgan signal: agar
+    unga ilgari hajm qo'yilgan bo'lsa, o'zining eski qiymati o'zini
+    bloklab qo'ymasin."""
+    async with pool().acquire() as c:
+        row = await c.fetchrow(
+            "SELECT COALESCE(SUM(alloc_amount), 0) AS s FROM signals "
+            "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE') "
+            "AND NOT excluded AND alloc_amount IS NOT NULL "
+            "AND ($2::bigint IS NULL OR id <> $2)",
+            workspace_id, exclude_sig_id)
+    return float(row["s"] or 0)
+
+
 async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
     """workspace_id berilmasa — BARCHA workspace'lardagi ochiq signallar (kuzatuv
     sikli uchun; u har birini o'z workspace_id'si bilan qaytaradi)."""

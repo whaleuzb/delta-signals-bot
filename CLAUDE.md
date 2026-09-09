@@ -5532,3 +5532,61 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      invite_link bilan, ikkalasi ham yo'q, guruh eski yo'l bilan,
      guruh @nick bilan, uchala til). `test_web_lang.py` fiksturasiga
      `is_channel`/`username` qo'shildi.
+
+170. **Pozitsiya hajmi depozitdan oshib ketardi — hech qanday tekshiruv
+     yo'q edi.**
+     Foydalanuvchi: "500$ depozit kiritdim. Lekin pozitsiya ochishda
+     1000$ lik ochsam ham hisoblanib ketyabti."
+
+     **Sabab.** `set_signal_allocation()` kelgan summani shundoq
+     yozardi — na qo'lda yozilgan matn yo'lida, na risk tugmasi
+     yo'lida hech qanday chegara yo'q edi. 500 lik depozitga 1000 lik
+     hajm yozilsa, u depozitning **200%** i sifatida hisoblanardi va
+     shu yerdan barcha foizlar (plitka, grafik, PDF, ochiq sahifa)
+     yolg'on chiqardi. 168-banddagi tuzatish natijani to'g'ri
+     BO'LADIGAN qilgan edi — bu esa kiruvchi ma'lumotning o'zi
+     noto'g'ri bo'lishiga yo'l qo'yardi.
+
+     **"Bo'sh depozit" tushunchasi kiritildi.** Depozit — umumiy
+     balans, uning bir qismi allaqachon ochiq savdolarda ishlayotgan
+     bo'lishi mumkin:
+
+         bo'sh = depozit − Σ(ochiq pozitsiyalar hajmi)
+
+     `db.open_allocated(ws_id, exclude_sig_id)` — PENDING va ACTIVE
+     signallarning `alloc_amount` yig'indisi. PENDING ham sanaladi:
+     pozitsiya hali ochilmagan bo'lsa ham o'sha pul unga ATALGAN.
+     `exclude_sig_id` — hajmi hozir belgilanayotgan signalning o'z
+     eski qiymati o'zini bloklab qo'ymasligi uchun.
+
+     - Chegaradan oshsa hajm SAQLANMAYDI; o'rniga raqamlar bilan xabar
+       (kiritilgan / bo'sh / umumiy / band / yetishmayotgan) va ikkita
+       tugma: **"➕ Umumiy depozitga {summa} qo'shish"** (kiritilgan
+       summa depozitga QO'SHILADI — almashtirilmaydi — so'ng hajm
+       saqlanadi) va **"✏️ Boshqa summani kiritish"**.
+     - `risk_amount()` ga `cap` qo'shildi: xavf% umumiy depozitdan
+       hisoblanadi ("depozitimning 1% ini yo'qotaman" degani shu),
+       lekin chiqqan hajm BO'SH depozitdan oshmaydi. Aks holda bot
+       o'zi taklif qilgan tugma o'zining chegarasidan oshib ketardi.
+     - Risk tugmasi bosilganda ham QAYTA tekshiriladi: tugma
+       ko'rsatilgandan keyin boshqa pozitsiya ochilgan bo'lishi mumkin.
+     - Qo'lda yozish yo'lida `AWAITING_ALLOC` ataylab o'chirilmaydi —
+       odam tugma bosmasdan darhol boshqa summa yozsa ham ishlashi kerak.
+
+     **Yo'l-yo'lakay: `alloc_prompt()` umuman tarjima qilinmagan edi.**
+     Matnlar funksiya ichida qatorga qadalgan va faqat o'zbekcha edi;
+     funksiyada `lang` parametri yo'qligi uchun `test_lang_mix` auditi
+     ham uni ko'rmasdi — 167-banddagi equity/PDF bilan AYNAN bir xil
+     tuzoq. Endi `al.head/deposit_line/dist_line/free_line/pick_risk/
+     capped/or_type/btn_skip` kalitlari orqali va `lang` bilan.
+
+     **Saboq:** hisobni to'g'rilash yetarli emas — hisobga KIRADIGAN
+     son ham haqiqatga mos bo'lishi kerak. "Bu son qayerdan keladi va
+     uni kim cheklaydi?" degan savol har bir kiruvchi maydon uchun
+     berilishi kerak edi.
+
+     Sinov: `test_alloc_limit.py` 33/33 haqiqiy Postgres'da —
+     foydalanuvchining aynan holati (500 dep / 1000 hajm), chegara
+     nuqtalari (499/500/501), ochiq pozitsiya bo'sh pulni
+     kamaytirishi, o'zini chetlab o'tish, `risk_amount` cheklovi,
+     callback_data 64 baytdan oshmasligi va uchala til.

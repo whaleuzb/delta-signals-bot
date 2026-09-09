@@ -2460,15 +2460,27 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         if amount is None or amount <= 0:
             await msg.reply_text(i18n.t("al.bad_amount", await user_lang(uid)))
             return
-        AWAITING_ALLOC.pop(uid, None)
         sig = await db.get_signal(alloc_sig_id)
         ws = await db.get_workspace(sig["workspace_id"]) if sig else None
-        if sig and ws and ws["deposit"] is not None:
-            await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
-            alang = await user_lang(uid)
-            await msg.reply_text(
-                i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
-                parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
+        if not (sig and ws and ws["deposit"] is not None):
+            AWAITING_ALLOC.pop(uid, None)
+            return
+        alang = await user_lang(uid)
+
+        # Bo'sh depozitdan oshsa — saqlamaymiz, ikkita tanlov beramiz.
+        # `AWAITING_ALLOC` ATAYLAB o'chirilmaydi: odam tugma bosmasdan
+        # to'g'ridan-to'g'ri boshqa summa yozsa ham ishlashi kerak.
+        over = await alloc_over(ws, alloc_sig_id, amount, alang)
+        if over:
+            await msg.reply_text(over[0], parse_mode=ParseMode.HTML,
+                                 reply_markup=over[1])
+            return
+
+        AWAITING_ALLOC.pop(uid, None)
+        await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
+        await msg.reply_text(
+            i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
         return
 
     token = AWAITING_EDIT.get(uid)
@@ -3018,7 +3030,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if ws["deposit"] is not None:
         AWAITING_ALLOC[q.from_user.id] = sig_id
-        text, kb2 = alloc_prompt(sig_id, d, float(ws["deposit"]))
+        dep, busy, free = await free_deposit(ws, sig_id)
+        text, kb2 = alloc_prompt(sig_id, d, dep, free, busy,
+                                 await user_lang(q.from_user.id))
         await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb2)
 
 
@@ -3026,26 +3040,35 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 RISK_CHOICES = (1, 2, 3)
 
 
-def risk_amount(deposit: float, entry: float, sl: float, risk_pct: float) -> float | None:
+def risk_amount(deposit: float, entry: float, sl: float, risk_pct: float,
+                cap: float | None = None) -> float | None:
     """Depozitning `risk_pct` foizini yo'qotish uchun kerak bo'ladigan hajm.
 
     Stopgacha masofa: d = |entry - sl| / entry. Stop tegsa pozitsiyaning aynan
     shu ulushi yo'qoladi, ya'ni kerakli hajm = (depozit * risk%) / d.
 
-    SPOT uchun hajm depozitdan oshmaydi (leverage yo'q) — juda tor stopda
-    formula depozitdan katta son berardi, shuning uchun cheklanadi."""
+    Xavf HAR DOIM umumiy depozitdan hisoblanadi ("depozitimning 1% ini
+    yo'qotaman" degani shu), lekin chiqqan hajm `cap` dan oshmaydi.
+    `cap` — BO'SH depozit: spotda leverage yo'q, ustiga pulning bir
+    qismi allaqachon ochiq pozitsiyalarda band bo'lishi mumkin.
+    Berilmasa — depozitning o'zi (eski xatti-harakat)."""
     if entry <= 0:
         return None
     d = abs(entry - sl) / entry
     if d <= 0:
         return None
-    return min(deposit * (risk_pct / 100) / d, deposit)
+    return min(deposit * (risk_pct / 100) / d, deposit if cap is None else cap)
 
 
-def alloc_prompt(sig_id: int, d: dict, deposit: float) -> tuple[str, InlineKeyboardMarkup]:
+def alloc_prompt(sig_id: int, d: dict, deposit: float, free: float,
+                 busy: float, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     """Pozitsiya hajmini so'rash — risk bo'yicha tayyor variantlar bilan.
     Avval faqat "necha pul ishlatasiz?" deb so'rardi va hisobni odam o'zi
     qilishi kerak edi.
+
+    `free` — bo'sh depozit (umumiy minus ochiq pozitsiyalarda band
+    turgani). Tayyor tugmalar aynan shundan cheklanadi, aks holda bot
+    o'zi taklif qilgan hajm o'zining chegarasidan oshib ketardi.
 
     `d["sl"]` NULL bo'lishi mumkin (limit-keyin-TP/SL oqimi — stop hali
     kiritilmagan) — bunday holda risk% ga asoslangan tugmalar hisoblab
@@ -3055,28 +3078,66 @@ def alloc_prompt(sig_id: int, d: dict, deposit: float) -> tuple[str, InlineKeybo
     sl = float(d["sl"]) if d.get("sl") is not None else None
     dist = abs(entry - sl) / entry * 100 if (sl is not None and entry > 0) else 0
 
-    t = [f"💰 <b>#{sig_id} {html.escape(str(d['symbol']))}</b> — pozitsiya hajmi",
-         f"Depozit: <b>{deposit:,.2f}</b>" + (f" · Stopgacha: <b>{dist:.2f}%</b>" if sl is not None else "")]
+    line = i18n.t("al.deposit_line", lang, dep=deposit)
+    if sl is not None:
+        line += i18n.t("al.dist_line", lang, dist=dist)
+    t = [i18n.t("al.head", lang, sid=sig_id, sym=html.escape(str(d["symbol"]))), line]
+    # Bu qator FAQAT pulning bir qismi band bo'lsa chiqadi — ochiq
+    # pozitsiyasi yo'q odamga "bo'sh: 500 (ochiqlarda 0)" ortiqcha shovqin.
+    if busy > 0:
+        t.append(i18n.t("al.free_line", lang, free=free, busy=busy))
+
     rows, capped = [], False
     if sl is not None and dist > 0:
         btns = []
         for rp in RISK_CHOICES:
-            amt = risk_amount(deposit, entry, sl, rp)
-            if amt is None:
+            amt = risk_amount(deposit, entry, sl, rp, cap=free)
+            if amt is None or amt <= 0:
                 continue
-            if amt >= deposit - 1e-9:
+            if amt >= free - 1e-9:
                 capped = True
             btns.append(InlineKeyboardButton(
                 f"{rp}% → {amt:,.0f}", callback_data=f"alloc:{sig_id}:{amt:.2f}"))
         if btns:
-            t += ["", "Xavf darajasini tanlang — hajm o'zi hisoblanadi:"]
+            t += ["", i18n.t("al.pick_risk", lang)]
             rows.append(btns)
     if capped:
-        t.append("<i>Hajm depozitdan oshmaydi (spot, leverage yo'q) — cheklandi.</i>")
-    t += ["", "Yoki summani o'zingiz yozing (masalan <code>100</code>)."]
-    rows.append([InlineKeyboardButton("⏭ O'tkazib yuborish",
+        t.append(i18n.t("al.capped", lang))
+    t += ["", i18n.t("al.or_type", lang)]
+    rows.append([InlineKeyboardButton(i18n.t("al.btn_skip", lang),
                                        callback_data=f"allocskip:{sig_id}")])
     return "\n".join(t), InlineKeyboardMarkup(rows)
+
+
+async def free_deposit(ws, exclude_sig_id: int | None = None) -> tuple[float, float, float]:
+    """(umumiy depozit, ochiqlarda band, bo'sh) — uchalasi ham xabarda kerak."""
+    dep = float(ws["deposit"])
+    busy = await db.open_allocated(ws["id"], exclude_sig_id)
+    return dep, busy, max(0.0, dep - busy)
+
+
+def alloc_over_kb(sig_id: int, amount: float, lang: str | None) -> InlineKeyboardMarkup:
+    """Depozit yetmaganda chiqadigan ikkita tugma."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("al.btn_topup", lang, amt=amount),
+                              callback_data=f"alloctop:{sig_id}:{amount:.2f}")],
+        [InlineKeyboardButton(i18n.t("al.btn_other", lang),
+                              callback_data=f"allocagain:{sig_id}")],
+    ])
+
+
+async def alloc_over(ws, sig_id: int, amount: float, lang: str | None):
+    """Hajm bo'sh depozitdan oshsa — (matn, tugmalar), aks holda None.
+
+    ⚠️ Ilgari BUNDAY TEKSHIRUV UMUMAN YO'Q edi: 500$ depozit bilan
+    1000$ lik pozitsiya bemalol yozilib ketardi va u depozitning 200% i
+    sifatida hisoblanardi — barcha foizlar shu yerda buzilardi."""
+    dep, busy, free = await free_deposit(ws, sig_id)
+    if amount <= free + 1e-9:
+        return None
+    return (i18n.t("al.over", lang, amt=amount, free=free, dep=dep,
+                   busy=busy, need=amount - free),
+            alloc_over_kb(sig_id, amount, lang))
 
 
 async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3094,6 +3155,15 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if ws["deposit"] is None:
         await q.answer(i18n.t("al.no_deposit", lang), show_alert=True)
         return
+    # Tugma ko'rsatilgandan keyin boshqa pozitsiya ochilgan bo'lishi
+    # mumkin — hajm o'sha paytda hisoblangan, hozir esa sig'masligi
+    # mumkin. Shuning uchun bosilganda QAYTA tekshiriladi.
+    over = await alloc_over(ws, sig_id, amount, lang)
+    if over:
+        await q.edit_message_text(over[0], parse_mode=ParseMode.HTML,
+                                  reply_markup=over[1])
+        return
+
     AWAITING_ALLOC.pop(q.from_user.id, None)
     dep = float(ws["deposit"])
     await db.set_signal_allocation(sig_id, amount, dep)
@@ -3103,6 +3173,61 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         i18n.t("al.set", lang, sid=sig_id, sym=html.escape(sig["symbol"]),
                amt=amount, risk=risk_money, pct=risk_money / dep * 100),
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+
+async def _alloc_ctx(q):
+    """Tugma bosilganda kerak bo'ladigan uchlik: (signal, workspace, til).
+    Huquq yo'q yoki signal yo'q bo'lsa — (None, None, til)."""
+    sig_id = int(q.data.split(":")[1])
+    sig = await db.get_signal(sig_id)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    lang = await user_lang(q.from_user.id)
+    if not sig or not ws or not can_manage(q.from_user.id, ws) \
+            or ws["deposit"] is None:
+        return None, None, lang
+    return sig, ws, lang
+
+
+async def on_alloc_topup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"Umumiy depozitga qo'shish" — kiritilgan summa depozitga
+    QO'SHILADI (almashtirilmaydi), so'ng hajm o'sha summa bilan
+    saqlanadi.
+
+    Ya'ni odam "menda aslida bu pul bor" deb tasdiqlaydi: 500 lik
+    depozitga 1000 qo'shilsa depozit 1500 bo'ladi va 1000 lik
+    pozitsiya bemalol sig'adi."""
+    q = update.callback_query
+    await q.answer()
+    sig, ws, lang = await _alloc_ctx(q)
+    if not sig:
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
+        return
+    amount = float(q.data.split(":")[2])
+    old = float(ws["deposit"])
+    await db.apply_deposit_delta(ws["id"], amount)
+    dep = old + amount
+    AWAITING_ALLOC.pop(q.from_user.id, None)
+    await db.set_signal_allocation(sig["id"], amount, dep)
+    await q.edit_message_text(
+        i18n.t("al.topped", lang, old=old, dep=dep, amt=amount),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+
+async def on_alloc_again(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"Boshqa summani kiritish" — yozish rejimini qayta yoqadi va
+    bo'sh depozit qancha ekanini eslatadi."""
+    q = update.callback_query
+    await q.answer()
+    sig, ws, lang = await _alloc_ctx(q)
+    if not sig:
+        await q.answer(i18n.t("al.expired", lang), show_alert=True)
+        return
+    AWAITING_ALLOC[q.from_user.id] = sig["id"]
+    _dep, _busy, free = await free_deposit(ws, sig["id"])
+    await q.edit_message_text(
+        i18n.t("al.ask_again", lang, free=free), parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("al.btn_skip", lang), callback_data=f"allocskip:{sig['id']}")]]))
 
 
 async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6663,6 +6788,11 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
+    app.add_handler(CallbackQueryHandler(on_alloc_topup, pattern=r"^alloctop:"))
+    app.add_handler(CallbackQueryHandler(on_alloc_again, pattern=r"^allocagain:"))
+    # `^alloc:` OXIRIDA: ikkinchi nuqta talab qilingani uchun u
+    # "alloctop:"/"allocagain:" ga mos kelmaydi, lekin tartib baribir
+    # aniq bo'lgani ma'qul.
     app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))
     app.add_handler(CallbackQueryHandler(on_tpsl_button, pattern=r"^tpsl:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
