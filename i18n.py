@@ -1917,10 +1917,15 @@ STRINGS: dict[str, dict[str, str]] = {
                "In open positions: {busy:,.2f}\n\n"
                "Short by: <b>{need:,.2f}</b>"),
     },
+    # Tugmada YETISHMAGAN qism turadi, kiritilgan summa emas: depozit
+    # aynan pozitsiya sig'adigan darajaga ko'tariladi va ortiqcha pul
+    # bo'sh qolib ketmaydi. `need` bosilgan PAYTDA qayta hisoblanadi —
+    # tugma ko'rsatilgandan keyin boshqa pozitsiya ochilgan bo'lishi
+    # mumkin, shuning uchun yorliqdagi son taxminiy ko'rsatkich.
     "al.btn_topup": {
-        "uz": "➕ Umumiy depozitga {amt:,.0f} qo'shish",
-        "ru": "➕ Добавить {amt:,.0f} к общему депозиту",
-        "en": "➕ Add {amt:,.0f} to the total deposit",
+        "uz": "➕ Umumiy depozitga {need:,.0f} qo'shish",
+        "ru": "➕ Добавить {need:,.0f} к общему депозиту",
+        "en": "➕ Add {need:,.0f} to the total deposit",
     },
     "al.btn_other": {
         "uz": "✏️ Boshqa summani kiritish",
@@ -1928,11 +1933,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "✏️ Enter a different amount",
     },
     "al.topped": {
-        "uz": ("✅ Depozit yangilandi: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+        "uz": ("✅ Depozitga <b>{need:,.2f}</b> qo'shildi: "
+               "<b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
                "Pozitsiya hajmi: <b>{amt:,.2f}</b>"),
-        "ru": ("✅ Депозит обновлён: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+        "ru": ("✅ К депозиту добавлено <b>{need:,.2f}</b>: "
+               "<b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
                "Размер позиции: <b>{amt:,.2f}</b>"),
-        "en": ("✅ Deposit updated: <b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
+        "en": ("✅ Added <b>{need:,.2f}</b> to the deposit: "
+               "<b>{old:,.2f}</b> → <b>{dep:,.2f}</b>\n"
                "Position size: <b>{amt:,.2f}</b>"),
     },
     "al.ask_again": {

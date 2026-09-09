@@ -3116,10 +3116,16 @@ async def free_deposit(ws, exclude_sig_id: int | None = None) -> tuple[float, fl
     return dep, busy, max(0.0, dep - busy)
 
 
-def alloc_over_kb(sig_id: int, amount: float, lang: str | None) -> InlineKeyboardMarkup:
-    """Depozit yetmaganda chiqadigan ikkita tugma."""
+def alloc_over_kb(sig_id: int, amount: float, need: float,
+                  lang: str | None) -> InlineKeyboardMarkup:
+    """Depozit yetmaganda chiqadigan ikkita tugma.
+
+    `callback_data` da KIRITILGAN summa yuriladi (yetishmagan qism
+    emas): tugma bosilgan paytda bo'sh depozit boshqacha bo'lishi
+    mumkin, shuning uchun yetishmagan qism o'sha yerda qaytadan
+    hisoblanadi. Yorliqdagi `need` esa hozirgi holatni ko'rsatadi."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(i18n.t("al.btn_topup", lang, amt=amount),
+        [InlineKeyboardButton(i18n.t("al.btn_topup", lang, need=need),
                               callback_data=f"alloctop:{sig_id}:{amount:.2f}")],
         [InlineKeyboardButton(i18n.t("al.btn_other", lang),
                               callback_data=f"allocagain:{sig_id}")],
@@ -3137,7 +3143,7 @@ async def alloc_over(ws, sig_id: int, amount: float, lang: str | None):
         return None
     return (i18n.t("al.over", lang, amt=amount, free=free, dep=dep,
                    busy=busy, need=amount - free),
-            alloc_over_kb(sig_id, amount, lang))
+            alloc_over_kb(sig_id, amount, amount - free, lang))
 
 
 async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3189,13 +3195,18 @@ async def _alloc_ctx(q):
 
 
 async def on_alloc_topup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """"Umumiy depozitga qo'shish" — kiritilgan summa depozitga
-    QO'SHILADI (almashtirilmaydi), so'ng hajm o'sha summa bilan
-    saqlanadi.
+    """"Umumiy depozitga qo'shish" — depozitga faqat YETISHMAGAN qism
+    qo'shiladi, so'ng hajm saqlanadi.
 
-    Ya'ni odam "menda aslida bu pul bor" deb tasdiqlaydi: 500 lik
-    depozitga 1000 qo'shilsa depozit 1500 bo'ladi va 1000 lik
-    pozitsiya bemalol sig'adi."""
+    Ya'ni 500 lik depozitga 1000 lik pozitsiya uchun 500 qo'shiladi va
+    depozit AYNAN 1000 bo'ladi. Kiritilgan summani butunlay qo'shish
+    (500 + 1000 = 1500) ham mumkin edi, lekin unda 500 pul bo'sh
+    turib qolardi va statistikadagi "depozitga nisbatan" foizi
+    haqiqatdan pastroq chiqardi.
+
+    Yetishmagan qism AYNAN SHU YERDA qayta hisoblanadi: tugma
+    ko'rsatilgandan keyin boshqa pozitsiya ochilib, bo'sh pul yanada
+    kamaygan bo'lishi mumkin."""
     q = update.callback_query
     await q.answer()
     sig, ws, lang = await _alloc_ctx(q)
@@ -3203,13 +3214,15 @@ async def on_alloc_topup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
     amount = float(q.data.split(":")[2])
-    old = float(ws["deposit"])
-    await db.apply_deposit_delta(ws["id"], amount)
-    dep = old + amount
+    was, _busy, free = await free_deposit(ws, sig["id"])
+    need = max(0.0, amount - free)
+    if need > 0:
+        await db.apply_deposit_delta(ws["id"], need)
+    dep = was + need
     AWAITING_ALLOC.pop(q.from_user.id, None)
     await db.set_signal_allocation(sig["id"], amount, dep)
     await q.edit_message_text(
-        i18n.t("al.topped", lang, old=old, dep=dep, amt=amount),
+        i18n.t("al.topped", lang, need=need, old=was, dep=dep, amt=amount),
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 

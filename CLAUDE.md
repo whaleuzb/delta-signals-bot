@@ -5561,9 +5561,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 
      - Chegaradan oshsa hajm SAQLANMAYDI; o'rniga raqamlar bilan xabar
        (kiritilgan / bo'sh / umumiy / band / yetishmayotgan) va ikkita
-       tugma: **"➕ Umumiy depozitga {summa} qo'shish"** (kiritilgan
-       summa depozitga QO'SHILADI — almashtirilmaydi — so'ng hajm
-       saqlanadi) va **"✏️ Boshqa summani kiritish"**.
+       tugma: **"➕ Umumiy depozitga {yetishmagan} qo'shish"** va
+       **"✏️ Boshqa summani kiritish"**.
+     - **To'ldirish faqat YETISHMAGAN qismni qo'shadi.** 500 lik
+       depozitga 1000 lik pozitsiya uchun 500 qo'shiladi va depozit
+       AYNAN 1000 bo'ladi. Kiritilgan summani butunlay qo'shish
+       (500 + 1000 = 1500) ham ko'rib chiqilgan edi — foydalanuvchi
+       birinchi bo'lib shuni aytgan, keyin ikkinchisini tanladi:
+       aks holda 500 pul bo'sh turib qolardi va "depozitga nisbatan"
+       foizi haqiqatdan pastroq chiqardi (168-band shu bo'luvchi
+       haqda edi).
+     - Yetishmagan qism tugma BOSILGANDA qayta hisoblanadi: yorliq
+       ko'rsatilgandan keyin boshqa pozitsiya ochilib, bo'sh pul yanada
+       kamaygan bo'lishi mumkin. `callback_data` da shu sabab
+       kiritilgan summa yuriladi, yetishmagan qism emas.
      - `risk_amount()` ga `cap` qo'shildi: xavf% umumiy depozitdan
        hisoblanadi ("depozitimning 1% ini yo'qotaman" degani shu),
        lekin chiqqan hajm BO'SH depozitdan oshmaydi. Aks holda bot
@@ -5585,8 +5596,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      uni kim cheklaydi?" degan savol har bir kiruvchi maydon uchun
      berilishi kerak edi.
 
-     Sinov: `test_alloc_limit.py` 33/33 haqiqiy Postgres'da —
+     Sinov: `test_alloc_limit.py` 39/39 haqiqiy Postgres'da —
      foydalanuvchining aynan holati (500 dep / 1000 hajm), chegara
      nuqtalari (499/500/501), ochiq pozitsiya bo'sh pulni
      kamaytirishi, o'zini chetlab o'tish, `risk_amount` cheklovi,
-     callback_data 64 baytdan oshmasligi va uchala til.
+     callback_data 64 baytdan oshmasligi, to'ldirish oqimi
+     (500 → 1000, 1500 EMAS; ochiq pozitsiya bor holda 500 → 800) va
+     uchala til.
