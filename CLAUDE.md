@@ -5631,3 +5631,50 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ("Bo'sh:" `/depozit` dan oldin), depozit belgilanmagan bo'lsa
      bo'sh satr qaytishi va band pul nol bo'lganda ikkinchi qator
      chiqmasligi.
+
+172. **Obuna tugmasi hamon chiqmadi — `username` logotip TTL siga
+     bog'lanib qolgan ekan.**
+     169-band mantiqni to'g'irladi (kanalda `username` ishlatilsin),
+     lekin foydalanuvchi deploydan keyin ham o'sha sahifani ko'rsatdi:
+     tugma yo'q. Demak muammo mantiqda emas, MA'LUMOTDA edi.
+
+     **Sabab.** `username` va `is_channel` faqat `refresh_logo()`
+     ichida (`set_workspace_meta`) yoziladi, u esa `logo_job` →
+     `logo_targets()` qaytargan qatorlar uchungina chaqiriladi:
+
+         WHERE logo_at IS NULL OR logo_at < now() - 24 soat
+
+     Ya'ni **logotipi yangi bo'lgan workspace bu ikki ustunni umuman
+     olmasdi**. Ustunlar qo'shilishidan oldin mavjud bo'lgan
+     workspace'larning logotipi allaqachon yangilangan edi — demak
+     ular @nicksiz qolib ketdi va sahifada tugma chiqmadi. Yangi
+     ulanadigan kanal muammosiz: `on_channel_connect` `refresh_logo`
+     ni o'zi chaqiradi.
+
+     **Yechim — `meta_at` ustuni.** `username IS NULL` ikki xil
+     ma'noni bildirardi: "hali so'ralmagan" va "so'ralgan, lekin kanal
+     yopiq". Ikkovini ajratmasdan turib "qaytadan so'ra" shartini
+     yozib bo'lmasdi (yopiq kanal har siklda qayta so'ralib, LIMIT 25
+     ni band qilardi).
+
+     - `set_workspace_meta()` endi `meta_at=now()` ni HAR DOIM yozadi
+       — qiymat o'zgarmagan bo'lsa ham. Bu "olindi" belgisi.
+     - `logo_targets()` ga `OR meta_at IS NULL` qo'shildi va tartib
+       `meta_at NULLS FIRST` bo'ldi: meta olinmaganlar birinchi
+       navbatda. Shart BIR MARTALIK — meta olingach qator qaytib
+       tanlanmaydi.
+     - `logo_job` ishga tushgandan 90 s keyin va har 24 soatda 25
+       qatordan ishlaydi, ya'ni eski workspace'lar bir-ikki siklda
+       o'z @nikini oladi.
+
+     **Saboq:** ikkita ma'lumot bitta yangilash sikliga qo'shilsa,
+     ular BIR XIL yangilanish shartiga bo'ysunadi. Logotip sutkada bir
+     marta yangilansa yetarli, `username` esa DARHOL kerak edi —
+     "bepul qo'shib qo'yamiz" degan qaror ana shu farqni yashirgan.
+     Kelasi safar: yangi maydonni mavjud jobga qo'shishdan oldin
+     "uning yangilanish shartlari bir xilmi?" deb so'rash kerak.
+
+     Sinov: `test_meta_refresh.py` 11/11 haqiqiy Postgres'da — aynan
+     muammoli holat (logotip yangi + meta yo'q), meta olingach qayta
+     tanlanmaslik, yopiq kanalda cheksiz sikl bo'lmasligi, logotip
+     eskirganda odatdagidek tanlanish va navbat tartibi.

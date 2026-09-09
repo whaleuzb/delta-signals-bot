@@ -156,6 +156,15 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS is_channel BOOLEAN NOT NULL DEFA
 -- bo'lish" tugmasi shundan yasaladi — taklif havolasi (invite_link)
 -- yopiq guruhlar uchun, bu esa ommaviy kanallar uchun.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS username TEXT;
+-- ⚠️ `username` va `is_channel` `refresh_logo()` ichida to'ldiriladi, u esa
+-- FAQAT logotipi eskirgan workspace'lar uchun chaqiriladi (24 soatlik TTL).
+-- Natijada logotipi yangi bo'lgan workspace bu ikki ustunni UMUMAN
+-- olmasdi — ustunlar qo'shilgunga qadar mavjud bo'lgan kanallar
+-- "guruh" bo'lib, @nicksiz qolib ketardi va sahifada obuna tugmasi
+-- chiqmasdi. `meta_at` aynan shu holatni ajratadi: NULL = hali hech
+-- qachon olinmagan (username'ning NULL bo'lishi esa "olindi, lekin
+-- kanal yopiq" degani ham bo'lishi mumkin — ikkovini farqlash kerak).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS meta_at TIMESTAMPTZ;
 -- Eski cheklov `UNIQUE (owner_id, type)` edi va kanal ham type='group'
 -- bo'lgani uchun u "guruhi bor odam kanal ulay olmaydi" degan ma'noni
 -- berardi (foydalanuvchi aynan shunga urildi). Endi `is_channel` ham
@@ -468,13 +477,16 @@ async def set_workspace_meta(workspace_id: int, is_channel: bool,
     """Telegram'dan olingan ikki maydon: chat KANALmi va ommaviy @nigi.
 
     Ikkalasi ham `get_chat` javobidan keladi, shuning uchun bitta
-    funksiya. Faqat qiymat O'ZGARGANDA yozadi — `logo_job` har kuni
-    hamma workspace uchun chaqiriladi, bekorga UPDATE qilish shart emas."""
+    funksiya.
+
+    `meta_at` HAR DOIM yangilanadi — qiymatlar o'zgarmagan bo'lsa ham.
+    Bu "ma'lumot olindi" belgisi: usiz `username IS NULL` ikki xil
+    ma'noni bildirardi — "hali so'ralmagan" va "so'ralgan, lekin kanal
+    yopiq". Kuniga 25 qatorlik yozuv — arzon."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE workspaces SET is_channel=$2, username=$3 WHERE id=$1 "
-            "AND (is_channel IS DISTINCT FROM $2 OR username IS DISTINCT FROM $3)",
-            workspace_id, is_channel, username)
+            "UPDATE workspaces SET is_channel=$2, username=$3, meta_at=now() "
+            "WHERE id=$1", workspace_id, is_channel, username)
 
 
 async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
@@ -1004,13 +1016,22 @@ async def public_logo(workspace_id: int) -> bytes | None:
 
 
 async def logo_targets(max_age_hours: int = 24) -> list[asyncpg.Record]:
-    """Logotipi yo'q yoki eskirgan guruhlar — yangilash sikli uchun."""
+    """Logotipi yo'q yoki eskirgan guruhlar — yangilash sikli uchun.
+
+    `meta_at IS NULL` ham tanlanadi: o'sha sikl `is_channel`/`username`
+    ni ham oladi, lekin ilgari shart FAQAT logotip yoshiga qarardi.
+    Logotipi yangi bo'lgan workspace shu sababli @nicksiz qolib
+    ketardi va ochiq sahifada obuna tugmasi chiqmasdi. Bu shart bir
+    martalik: meta olingach `meta_at` to'ladi va qator qaytib
+    tanlanmaydi (yopiq kanalda `username` NULL qolsa ham)."""
     async with pool().acquire() as c:
         return await c.fetch(
             "SELECT id, group_chat_id FROM workspaces "
             "WHERE type='group' AND group_chat_id IS NOT NULL AND NOT archived "
-            "AND (logo_at IS NULL OR logo_at < now() - ($1 || ' hours')::interval) "
-            "ORDER BY logo_at NULLS FIRST LIMIT 25", str(max_age_hours))
+            "AND (logo_at IS NULL OR meta_at IS NULL "
+            "     OR logo_at < now() - ($1 || ' hours')::interval) "
+            "ORDER BY meta_at NULLS FIRST, logo_at NULLS FIRST LIMIT 25",
+            str(max_age_hours))
 
 
 async def public_signal(sig_id: int) -> asyncpg.Record | None:
