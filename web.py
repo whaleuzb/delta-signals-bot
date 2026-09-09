@@ -872,13 +872,35 @@ async def group_page(request):
         return (f"<h2>{e(title)}</h2><div class='scroll'><table><thead><tr>{header}</tr>"
                 f"</thead><tbody>{body_rows}</tbody></table></div>")
 
-    # Guruhga qo'shilish — sahifaning ASOSIY maqsadi. Avval u sarlavha
-    # ostidagi kichkina matn havolasi edi va ko'zga tashlanmasdi; endi
-    # to'liq tugma, sarlavha ostida alohida qatorda.
+    # Qo'shilish — sahifaning ASOSIY maqsadi. Avval u sarlavha ostidagi
+    # kichkina matn havolasi edi va ko'zga tashlanmasdi; endi to'liq
+    # tugma, sarlavha ostida alohida qatorda.
+    #
+    # ⚠️ KANALDA `invite_link` HECH QACHON to'ldirilmaydi. Guruh egasi uni
+    # `/havola` bilan qo'lda kiritadi, kanal esa `my_chat_member` orqali
+    # ulanadi va u oqimda havola umuman so'ralmaydi. Ommaviy kanalning
+    # manzili — `username` (uni `logo_job` `get_chat` javobidan oladi).
+    # Shu sabab ilgari kanal sahifasida tugma UMUMAN chiqmasdi, holbuki
+    # bosh ro'yxatdagi kartochkada bor edi.
+    #
+    # Ustunlik tartibi turga qarab: kanalda `username` birinchi (o'zi
+    # ommaviy manzil), guruhda `invite_link` birinchi (egasi ataylab
+    # kiritgan, yopiq guruhga kirishning yagona yo'li ham shu).
+    join_url = join_key = ""
+    if ws["is_channel"]:
+        if ws["username"]:
+            join_url, join_key = f"https://t.me/{ws['username']}", "w.join_channel_btn"
+        elif ws["invite_link"]:
+            join_url, join_key = ws["invite_link"], "w.join_channel_btn"
+    elif ws["invite_link"]:
+        join_url, join_key = ws["invite_link"], "w.join_btn"
+    elif ws["username"]:
+        join_url, join_key = f"https://t.me/{ws['username']}", "w.join_btn"
+
     invite = ""
-    if ws["invite_link"]:
-        invite = (f"<a class='btn join' href='{e(ws['invite_link'])}' "
-                  f"rel='nofollow noopener'>{e(i18n.t('w.join_btn', lang))}</a>")
+    if join_url:
+        invite = (f"<a class='btn join' href='{e(join_url)}' target='_blank' "
+                  f"rel='nofollow noopener'>{e(i18n.t(join_key, lang))}</a>")
 
     # Katta logotip sarlavha yonida. Bo'lmasa — nomning birinchi harfi;
     # shunda sarlavha qatori har doim bir xil balandlikda turadi.

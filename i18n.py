@@ -1658,6 +1658,15 @@ STRINGS: dict[str, dict[str, str]] = {
     "w.tab_channels": {
         "uz": "Ommaviy kanallar", "ru": "Публичные каналы", "en": "Public channels",
     },
+    # Kanal sahifasidagi katta tugma. `w.join_channel` dan alohida: u
+    # bosh ro'yxatdagi kartochka ostida turadi va u yerda qisqa bo'lishi
+    # kerak, bu esa sarlavha ostidagi asosiy tugma — `w.join_btn` bilan
+    # bir xil shaklda ("→" bilan) bo'lgani tabiiy ko'rinadi.
+    "w.join_channel_btn": {
+        "uz": "Kanalga obuna bo'lish →",
+        "ru": "Подписаться на канал →",
+        "en": "Subscribe to the channel →",
+    },
     "w.join_channel": {
         "uz": "Obuna bo'lish", "ru": "Подписаться", "en": "Subscribe",
     },

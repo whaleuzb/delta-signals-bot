@@ -5486,3 +5486,49 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_net_pct.py` 13/13 — jumladan "grafik 67.18% ==
      plitka 67.18%", manfiy natija (−20% → −16.67%), nolga bo'linish
      himoyasi va monotonlik (reyting tartibi buzilmasligi).
+
+169. **Kanal sahifasida "obuna bo'lish" tugmasi yo'q edi.**
+     Foydalanuvchi ochiq sahifadagi kanal sahifasini ko'rsatib: "nega
+     bu yerda kanalga qo'shilish tugmasi yo'q?"
+
+     **Sabab.** `group_page()` tugmani FAQAT `invite_link` bo'lsa
+     chizardi. Guruh egasi bu havolani `/havola` bilan qo'lda kiritadi
+     — kanal esa `my_chat_member` orqali ulanadi va o'sha oqimda havola
+     UMUMAN so'ralmaydi. Ya'ni kanalda `invite_link` doim bo'sh, demak
+     tugma hech qachon chiqmasdi.
+
+     Ommaviy kanalning manzili — `username` ustuni (uni `logo_job` har
+     kuni `get_chat` javobidan olib qo'yadi). U allaqachon bor edi va
+     BOSH RO'YXATDAGI kartochkada ishlatilardi ham — faqat kanalning
+     o'z sahifasiga yetib bormagan. Ikkita sahifa bitta narsani ikki
+     xil manbadan olayotgani xatoni yashirib turgan.
+
+     - Endi ustunlik tartibi turga qarab: **kanalda** `username`
+       birinchi (o'zi ommaviy manzil), bo'lmasa `invite_link`;
+       **guruhda** `invite_link` birinchi (egasi ataylab kiritgan va
+       yopiq guruhga kirishning yagona yo'li), bo'lmasa `username`.
+       Guruhning eski xatti-harakati shu bilan bit-ma-bit saqlandi.
+     - Yangi kalit `w.join_channel_btn` ("Kanalga obuna bo'lish →").
+       Mavjud `w.join_channel` ("Obuna bo'lish") bosh ro'yxatdagi
+       kartochka ostida turadi va u yerda qisqa bo'lishi kerak; sahifa
+       sarlavhasi ostidagi asosiy tugma esa `w.join_btn` bilan bir
+       shaklda ("→" bilan) bo'lgani tabiiy ko'rinadi.
+
+     **Sinov yozishda tuzoq.** Birinchi variant butun HTML ichidan
+     `"Guruhga qo'shilish" in h` deb qidirardi va BEXOSDAN o'tardi —
+     o'sha so'zlar sahifaning boshqa joyida ham bor. Endi tugma
+     regex bilan ajratib olinadi va aynan uning matni tekshiriladi.
+     Yo'l-yo'lakay: `e()` = `html.escape(quote=True)`, ya'ni o'zbekcha
+     apostrof `&#x27;` bo'lib chiqadi. Vebda bu MUAMMO EMAS (brauzer
+     ochib ko'rsatadi) — 142-banddagi Telegram xatosi bilan
+     adashtirmaslik kerak; sinov taqqoslashdan oldin `html.unescape`
+     qiladi.
+
+     **Saboq:** bir xil ma'lumot ikki sahifada ikki xil ustundan
+     olinsa, biri yangilanganda ikkinchisi jim qoladi. "Qo'shilish
+     havolasi" degan tushuncha bitta joyda hal bo'lishi kerak edi.
+
+     Sinov: `test_join_btn.py` 14/14 (kanal @nick bilan, kanal faqat
+     invite_link bilan, ikkalasi ham yo'q, guruh eski yo'l bilan,
+     guruh @nick bilan, uchala til). `test_web_lang.py` fiksturasiga
+     `is_channel`/`username` qo'shildi.
