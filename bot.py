@@ -1088,6 +1088,41 @@ AWAITING_ENTRY: dict[int, int] = {}
 AWAITING_TPSL: dict[int, int] = {}
 
 
+async def copy_target(sig) -> "asyncpg.Record | None":
+    """Bu signalni yana QAYSI workspace'ga qo'shish mumkin.
+
+    Egada bitta guruh VA bitta kanal bo'lishi mumkin (1789740 dagi
+    qoida). Savdo ikkalasida ham e'lon qilingan bo'lsa, natija ham
+    ikkalasida sanalishi kerak — lekin `signals.workspace_id` bitta.
+    Shu sabab ikkinchi joyga NUSXA yaratiladi.
+
+    `None` qaytadi: ikkinchi workspace yo'q, signal yopilgan, yoki
+    allaqachon nusxalangan."""
+    if sig["status"] not in ("PENDING", "ACTIVE"):
+        return None
+    # Bu funksiya BOSHQARUV EKRANI chizilayotganda chaqiriladi. Uchta
+    # so'rov qiladi va ularning biri yiqilsa butun ekran ochilmay
+    # qolardi — holbuki bu ekranning ASOSIY vazifasi (stop ko'chirish,
+    # yopish) bazadagi bu qo'shimcha ma'lumotga bog'liq emas. Shuning
+    # uchun xato yutiladi: tugma ko'rinmaydi, ekran esa ishlaydi.
+    try:
+        src = await db.get_workspace(sig["workspace_id"])
+        if not src or src["type"] != "group":
+            return None
+        others = [w for w in await db.get_owned_group_workspaces(src["owner_id"])
+                  if w["id"] != src["id"]]
+        if not others:
+            return None
+        done = await db.signal_copies(sig["id"])
+    except Exception:
+        log.warning("Nusxa manzilini aniqlab bo'lmadi (#%s)", sig["id"], exc_info=True)
+        return None
+    for w in others:
+        if w["id"] not in done:
+            return w
+    return None
+
+
 async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     entry = float(sig["entry"])
     sid = sig["id"]
@@ -1152,6 +1187,15 @@ async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboard
     # PENDING'da "yopish" tushunchasi yo'q (pozitsiya hali OCHILMAGAN) —
     # xuddi shu tugma (close:) close_now()da PENDING uchun ALLAQACHON
     # bekor qilish sifatida ishlaydi, faqat matni aniqroq qilib ko'rsatiladi.
+    # Savdo ikkinchi joyda (kanal/guruh) ham e'lon qilingan bo'lsa —
+    # natijani u yerda ham sanash. Tugma faqat qo'shish MUMKIN bo'lganda
+    # chiqadi: ikkinchi workspace bor va hali nusxalanmagan.
+    tgt = await copy_target(sig)
+    if tgt:
+        rows.append([InlineKeyboardButton(
+            i18n.t("man.btn_copy_ch" if tgt["is_channel"] else "man.btn_copy_gr", lang),
+            callback_data=f"sigcopy:{sid}:{tgt['id']}")])
+
     rows.append([InlineKeyboardButton(
         i18n.t("man.btn_cancel" if pending else "man.btn_close", lang),
         callback_data=f"close:{sid}")])
@@ -3268,6 +3312,84 @@ async def on_alloc_again(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         i18n.t("al.ask_again", lang, free=free), parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
             i18n.t("al.btn_skip", lang), callback_data=f"allocskip:{sig['id']}")]]))
+
+
+async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"Kanalga ham qo'shish" — ochiq signalni ikkinchi workspace'ga
+    nusxalaydi, kartochkasini o'sha chatga yuboradi va (depozit
+    belgilangan bo'lsa) hajmni alohida so'raydi.
+
+    Hajm ATAYLAB ko'chirilmaydi: nusxa boshqa workspace'da va uning
+    depoziti boshqa — u yerda 500 dan 100 ishlatilgan bo'lsa, bu yerda
+    ham 100 bo'lishi shart emas."""
+    q = update.callback_query
+    await q.answer()
+    _, sid_s, tid_s = q.data.split(":", 2)
+    sig_id, target_id = int(sid_s), int(tid_s)
+    lang = await user_lang(q.from_user.id)
+
+    sig = await db.get_signal(sig_id)
+    src = await db.get_workspace(sig["workspace_id"]) if sig else None
+    tgt = await db.get_workspace(target_id)
+    # Huquq MANBA workspace bo'yicha tekshiriladi, ustiga manzil ham
+    # AYNI o'sha egaga tegishli bo'lishi shart — aks holda o'z signalini
+    # birovning kanaliga yozib qo'yish mumkin bo'lardi.
+    if not sig or not src or not tgt or not can_manage(q.from_user.id, src) \
+            or tgt["owner_id"] != src["owner_id"]:
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
+        return
+    if sig["status"] not in ("PENDING", "ACTIVE"):
+        await q.answer(i18n.t("cp.closed", lang), show_alert=True)
+        return
+
+    new_id = await db.copy_signal(sig_id, target_id)
+    if new_id is None:
+        await q.answer(i18n.t("cp.already", lang, name=tgt["name"]), show_alert=True)
+        return
+    log.info("Signal nusxalandi: #%s -> ws#%s (#%s)", sig_id, target_id, new_id)
+
+    # Kartochka manzil chatiga — O'SHA workspace tilida.
+    name = html.escape(tgt["name"], quote=False)
+    posted = True
+    if tgt["group_chat_id"]:
+        d = {"symbol": sig["symbol"], "side": sig["side"],
+             "entry": float(sig["entry"]),
+             "sl": float(sig["sl"]) if sig["sl"] is not None else None,
+             "tps": [float(t) for t in sig["tps"]],
+             "market": sig["market"], "entry_mode": sig["entry_mode"]}
+        body = draft_text(d, new_id, ws_lang(tgt))
+        try:
+            if sig["chart_file_id"]:
+                sent = await ctx.bot.send_photo(
+                    tgt["group_chat_id"], sig["chart_file_id"], caption=body,
+                    parse_mode=ParseMode.HTML,
+                    message_thread_id=tgt["group_topic_id"])
+            else:
+                sent = await ctx.bot.send_message(
+                    tgt["group_chat_id"], body, parse_mode=ParseMode.HTML,
+                    message_thread_id=tgt["group_topic_id"])
+            await db.set_group_msg(new_id, sent.message_id)
+        except Exception:
+            # Xabar ketmasa ham NUSXA QOLADI: foydalanuvchi savdoni
+            # o'sha kanalda ALLAQACHON qo'lda e'lon qilgan bo'lishi
+            # mumkin — asosiy maqsad natijani sanash edi.
+            log.exception("Nusxa kartochkasi yuborilmadi (ws#%s)", target_id)
+            posted = False
+
+    await q.edit_message_text(
+        i18n.t("cp.done", lang, sid=sig_id, name=name, new=new_id) if posted
+        else i18n.t("cp.posted_fail", lang, name=name),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+    # Hajm — manzil workspace'ining o'z depoziti bo'yicha.
+    if tgt["deposit"] is not None:
+        AWAITING_ALLOC[q.from_user.id] = new_id
+        dep, busy, free = await free_deposit(tgt, new_id)
+        text, kb = alloc_prompt(new_id, {"symbol": sig["symbol"],
+                                         "entry": float(sig["entry"]),
+                                         "sl": float(sig["sl"]) if sig["sl"] is not None else None},
+                                dep, free, busy, lang)
+        await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 async def on_alloc_skip(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6828,6 +6950,7 @@ def main() -> None:
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
+    app.add_handler(CallbackQueryHandler(on_signal_copy, pattern=r"^sigcopy:"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
     app.add_handler(CallbackQueryHandler(on_alloc_topup, pattern=r"^alloctop:"))
     app.add_handler(CallbackQueryHandler(on_alloc_again, pattern=r"^allocagain:"))

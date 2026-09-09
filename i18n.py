@@ -1869,6 +1869,46 @@ STRINGS: dict[str, dict[str, str]] = {
     # qatorga qadalgan va faqat o'zbekcha edi — funksiyada `lang`
     # parametri yo'qligi uchun `test_lang_mix` auditi ham uni ko'rmasdi
     # (167-banddagi equity/PDF bilan bir xil tuzoq).
+    # ── Signalni ikkinchi workspace'ga nusxalash ──────────────────────
+    "man.btn_copy_ch": {
+        "uz": "📢 Kanalga ham qo'shish",
+        "ru": "📢 Добавить и в канал",
+        "en": "📢 Add to the channel too",
+    },
+    "man.btn_copy_gr": {
+        "uz": "👥 Guruhga ham qo'shish",
+        "ru": "👥 Добавить и в группу",
+        "en": "👥 Add to the group too",
+    },
+    "cp.done": {
+        "uz": ("✅ <b>#{sid}</b> «{name}» natijasiga ham qo'shildi "
+               "(u yerda <code>#{new}</code>).\n\n"
+               "Ikkovi bir vaqtda va bir xil natija bilan yopiladi."),
+        "ru": ("✅ <b>#{sid}</b> добавлен и в результаты «{name}» "
+               "(там <code>#{new}</code>).\n\n"
+               "Оба закроются одновременно и с одинаковым результатом."),
+        "en": ("✅ <b>#{sid}</b> was added to “{name}” as well "
+               "(<code>#{new}</code> there).\n\n"
+               "Both close at the same time with the same result."),
+    },
+    "cp.already": {
+        "uz": "Bu signal «{name}» ga allaqachon qo'shilgan.",
+        "ru": "Этот сигнал уже добавлен в «{name}».",
+        "en": "This signal is already in “{name}”.",
+    },
+    "cp.closed": {
+        "uz": "Faqat OCHIQ signalni qo'shish mumkin — bu allaqachon yopilgan.",
+        "ru": "Добавить можно только ОТКРЫТЫЙ сигнал — этот уже закрыт.",
+        "en": "Only an OPEN signal can be added — this one is already closed.",
+    },
+    "cp.posted_fail": {
+        "uz": ("✅ Natijaga qo'shildi, lekin «{name}» ga xabar yuborilmadi "
+               "(bot u yerda yoza olmadi). Natija baribir sanaladi."),
+        "ru": ("✅ Добавлено в результаты, но сообщение в «{name}» не ушло "
+               "(бот не смог там написать). Результат всё равно считается."),
+        "en": ("✅ Added to the results, but the post to “{name}” failed "
+               "(the bot could not write there). The result still counts."),
+    },
     "al.head": {
         "uz": "💰 <b>#{sid} {sym}</b> — pozitsiya hajmi",
         "ru": "💰 <b>#{sid} {sym}</b> — размер позиции",

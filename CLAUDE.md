@@ -5700,3 +5700,56 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      tanlanmaslik, yopiq kanalda cheksiz sikl bo'lmasligi, logotip
      eskirganda odatdagidek tanlanish, navbat tartibi va bot
      kirolmaydigan chat navbatni band qilmasligi.
+
+173. **Bitta savdo ikkita joyda: signalni ikkinchi workspace'ga
+     nusxalash.**
+     Foydalanuvchi: "163 signalni kanalimni natijasiga ham qo'shib
+     qo'ya olasanmi? Hali yopilmagan, lekin uni ommaviy kanalda ham
+     bergandim."
+
+     **Nega qo'lda qilib bo'lmadi.** Claude ishlab chiqarish bazasiga
+     tegmaydi (seans boshidagi doimiy qoida) — demak "163 ni qo'shib
+     qo'y" iltimosini bajarishning YAGONA yo'li shu ishni
+     foydalanuvchining o'zi bir tugma bilan qiladigan qilish edi.
+
+     **Model.** `signals.workspace_id` BITTA — savdo faqat bitta joyda
+     sanaladi. Ikkinchi joyda ham sanalishi uchun NUSXA qatori
+     yaratiladi (`copied_from` ustuni kimdan kelganini yozadi).
+
+     - Nusxa MUSTAQIL: o'z workspace'i, o'z depoziti, o'z hajmi, o'z
+       guruh xabari. `tracker` ikkovini alohida kuzatadi, lekin juftlik
+       (tanga, entry, stop, maqsadlar) bir xil bo'lgani uchun ikkovi
+       AYNI paytda va AYNI natija bilan yopiladi — maxsus sinxronlash
+       kerak emas.
+     - `last_checked_ms` ham ko'chiriladi. Usiz `tracker` nusxani
+       ochilish vaqtidan qayta tekshirar va allaqachon o'tib ketgan
+       shamni "yangi hodisa" deb hisoblab yuborishi mumkin edi.
+     - `group_msg_id` va `alloc_amount` ATAYLAB ko'chirilmaydi: nusxa
+       o'z chatiga o'z xabarini yozadi, hajm esa boshqa depozitdan
+       (170-band) alohida so'raladi.
+     - `uq_signal_copy` unikal indeksi bir signalni bitta workspace'ga
+       ikki marta qo'shishni bloklaydi — tugma ikki marta bosilsa
+       natija ikki marta sanalardi.
+     - Tugma boshqaruv ekranida, FAQAT qo'shish mumkin bo'lganda:
+       signal ochiq, egada ikkinchi workspace bor va hali
+       nusxalanmagan.
+
+     **`manage_view` endi bazaga murojaat qiladi** — `copy_target()`
+     uchta so'rov qiladi. Ular `try/except` ichida: biri yiqilsa tugma
+     ko'rinmaydi, lekin ekranning ASOSIY vazifasi (stop ko'chirish,
+     yopish) ishlashda davom etadi. Bu qo'shimcha ma'lumot uchun butun
+     ekranni yo'qotish mumkin emas.
+
+     **Sinov bazasi to'lib ketishi (yana).** `test_meta_refresh`
+     yurishdan yurishga har xil natija berdi: `logo_targets` LIMIT 25
+     bilan ishlaydi, sinov bazasi esa oldingi yurishlardan to'lgan va
+     o'sha qatorlar navbatni egallab qo'yardi. Yechim — sinov boshida
+     mavjud hammasini "bajarilgan" deb belgilash, shunda navbatga
+     faqat o'sha sinov yaratgan qatorlar tushadi. (Bu naqsh CLAUDE.md
+     da uchinchi marta uchrayapti — LIMIT bor so'rovni sinaganda
+     birinchi savol shu bo'lishi kerak.)
+
+     Sinov: `test_signal_copy.py` 35/35 haqiqiy Postgres'da — jonli
+     holatning har bir maydoni ko'chishi, ko'chmasligi kerak
+     bo'lganlar, ikki marta nusxalab bo'lmasligi, yopilgan signal
+     nusxalanmasligi, tugma qachon chiqishi va uchala til.

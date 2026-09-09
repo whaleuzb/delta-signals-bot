@@ -165,6 +165,22 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS username TEXT;
 -- qachon olinmagan (username'ning NULL bo'lishi esa "olindi, lekin
 -- kanal yopiq" degani ham bo'lishi mumkin — ikkovini farqlash kerak).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS meta_at TIMESTAMPTZ;
+
+-- Bitta savdo IKKI joyda e'lon qilingan bo'lishi mumkin: yopiq guruhda
+-- va ommaviy kanalda. `signals.workspace_id` bitta — demak natija ham
+-- faqat bitta joyda sanaladi. `copied_from` shu holat uchun: signal
+-- ikkinchi workspace'ga NUSXALANADI (alohida qator), lekin qaysi
+-- signaldan kelgani yozib qo'yiladi.
+--
+-- Nusxa MUSTAQIL qator: o'z workspace'ining depoziti, o'z hajmi, o'z
+-- guruh xabari bor. `tracker` ikkovini alohida kuzatadi, lekin juftlik
+-- (tanga, entry, stop, maqsadlar) bir xil bo'lgani uchun ikkovi ayni
+-- paytda va ayni natija bilan yopiladi.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS copied_from INT;
+-- Bir signalni bitta workspace'ga IKKI MARTA nusxalab bo'lmaydi —
+-- aks holda tugma ikki marta bosilsa natija ikki marta sanalardi.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_signal_copy
+    ON signals(workspace_id, copied_from) WHERE copied_from IS NOT NULL;
 -- Eski cheklov `UNIQUE (owner_id, type)` edi va kanal ham type='group'
 -- bo'lgani uchun u "guruhi bor odam kanal ulay olmaydi" degan ma'noni
 -- berardi (foydalanuvchi aynan shunga urildi). Endi `is_channel` ham
@@ -863,6 +879,47 @@ async def create_signal(workspace_id: int, d: dict) -> int:
             d.get("market", "crypto"), entry_mode, status, opened_at,
             d.get("chart_tf"),
         )
+
+
+async def copy_signal(sig_id: int, target_ws_id: int) -> int | None:
+    """OCHIQ signalni boshqa workspace'ga nusxalaydi (guruh -> kanal).
+
+    Jonli holat AYNAN ko'chiriladi — `status`, `opened_at`, `tp_hit`,
+    `filled_pct`, `realized_pct`, `last_checked_ms`. `last_checked_ms`
+    ayniqsa muhim: usiz `tracker` nusxani ochilish vaqtidan boshlab
+    QAYTA tekshirar va allaqachon o'tib ketgan shamlarni "yangi
+    hodisa" deb hisoblab yuborishi mumkin edi.
+
+    KO'CHIRILMAYDIGANLAR: `group_msg_id` (nusxa o'z chatiga o'z xabarini
+    yozadi) va `alloc_amount`/`deposit_snapshot` (nusxa boshqa
+    workspace'da, uning depoziti boshqa — hajm alohida so'raladi).
+
+    Allaqachon nusxalangan bo'lsa `None` (unikal indeks himoyasi)."""
+    q = """
+    INSERT INTO signals (workspace_id, copied_from, symbol, side, entry, sl,
+                         sl_initial, tps, tp_hit, filled_pct, realized_pct,
+                         status, created_at, opened_at, last_checked_ms,
+                         ambiguous, chart_file_id, author_id, note, market,
+                         entry_mode, chart_tf)
+    SELECT $2, $1, symbol, side, entry, sl, sl_initial, tps, tp_hit,
+           filled_pct, realized_pct, status, created_at, opened_at,
+           last_checked_ms, ambiguous, chart_file_id, author_id, note,
+           market, entry_mode, chart_tf
+    FROM signals WHERE id = $1 AND status IN ('PENDING','ACTIVE')
+    ON CONFLICT DO NOTHING
+    RETURNING id
+    """
+    async with pool().acquire() as c:
+        return await c.fetchval(q, sig_id, target_ws_id)
+
+
+async def signal_copies(sig_id: int) -> set[int]:
+    """Bu signal qaysi workspace'larga nusxalangan — tugmani ikkinchi
+    marta ko'rsatmaslik uchun."""
+    async with pool().acquire() as c:
+        rows = await c.fetch(
+            "SELECT workspace_id FROM signals WHERE copied_from=$1", sig_id)
+    return {r["workspace_id"] for r in rows}
 
 
 async def set_tp_sl(sig_id: int, sl: float, tps: list[float]) -> None:
