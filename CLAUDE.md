@@ -5603,3 +5603,31 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      callback_data 64 baytdan oshmasligi, to'ldirish oqimi
      (500 → 1000, 1500 EMAS; ochiq pozitsiya bor holda 500 → 800) va
      uchala til.
+
+171. **Bo'sh depozit endi IKKALA ekranda ham ko'rinadi.**
+     Foydalanuvchi: "Depozit tugmasini bosganida qancha bo'sh summa
+     qolganini ham ko'rsatsin. Shuningdek signalga summa kiritayotganda
+     ham bo'sh summani ko'rsatsin."
+
+     170-band bo'sh depozit hisobini kiritdi, lekin uni faqat CHEGARA
+     BUZILGANDA ko'rsatardi. Ya'ni odam summani yozishdan oldin
+     qanchasi ishlatilishi mumkinligini bilmasdi — xatoni oldindan
+     ko'rish o'rniga xatoga urilib bilib olardi.
+
+     - `free_lines(free, busy, lang)` — bitta yordamchi, uchala ekran
+       ham SHUNI ishlatadi (`dep.free_line` + shartli `dep.busy_line`).
+       `dep.*` prefiksi ataylab: bu depozit tushunchasi, hajm ekraniga
+       tegishli emas. Ikki joyda ikki xil atama chalkashtirardi,
+       shuning uchun eski `al.free_line` o'chirildi.
+     - Depozit ekranlariga (`dep.current` — menyu tugmasi,
+       `dep.help` — `/depozit` argumentsiz) `{extra}` o'rni qo'shildi.
+       U qiymatdan KEYIN, "yangilash uchun" ko'rsatmasidan OLDIN
+       turadi — shunda ko'z avval sonlarni, keyin ko'rsatmani ko'radi.
+     - Hajm so'raladigan ekranda "Bo'sh: X" endi HAR DOIM chiqadi
+       (ilgari faqat band pul bo'lganda). "Ochiq pozitsiyalarda: Y"
+       esa hamon shartli — nol bo'lsa hech narsa qo'shmaydi.
+
+     Sinov: `test_alloc_limit.py` 47/47 — jumladan qatorlar tartibi
+     ("Bo'sh:" `/depozit` dan oldin), depozit belgilanmagan bo'lsa
+     bo'sh satr qaytishi va band pul nol bo'lganda ikkinchi qator
+     chiqmasligi.

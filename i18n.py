@@ -909,27 +909,40 @@ STRINGS: dict[str, dict[str, str]] = {
     "dep.unset": {
         "uz": "belgilanmagan", "ru": "не задан", "en": "not set",
     },
+    # Bo'sh pul — depozit ekranida ham, hajm so'raladigan ekranda ham
+    # BIR XIL so'z bilan yoziladi: ikkovi bitta narsani ko'rsatadi va
+    # ikki xil atama chalkashtirardi.
+    "dep.free_line": {
+        "uz": "Bo'sh: <b>{free:,.2f}</b>",
+        "ru": "Свободно: <b>{free:,.2f}</b>",
+        "en": "Available: <b>{free:,.2f}</b>",
+    },
+    "dep.busy_line": {
+        "uz": "Ochiq pozitsiyalarda: {busy:,.2f}",
+        "ru": "В открытых позициях: {busy:,.2f}",
+        "en": "In open positions: {busy:,.2f}",
+    },
     "dep.current": {
-        "uz": "Joriy depozit ({name}): <b>{v}</b>\n\nYangilash uchun: <code>/depozit 1000</code>",
-        "ru": "Текущий депозит ({name}): <b>{v}</b>\n\nИзменить: <code>/depozit 1000</code>",
-        "en": "Current deposit ({name}): <b>{v}</b>\n\nTo change it: <code>/depozit 1000</code>",
+        "uz": "Joriy depozit ({name}): <b>{v}</b>{extra}\n\nYangilash uchun: <code>/depozit 1000</code>",
+        "ru": "Текущий депозит ({name}): <b>{v}</b>{extra}\n\nИзменить: <code>/depozit 1000</code>",
+        "en": "Current deposit ({name}): <b>{v}</b>{extra}\n\nTo change it: <code>/depozit 1000</code>",
     },
     "menu.open_title": {
         "uz": "Bosh menyu:", "ru": "Главное меню:", "en": "Main menu:",
     },
 
     "dep.help": {
-        "uz": ("Joriy depozit ({name}): <b>{v}</b>\n\n"
+        "uz": ("Joriy depozit ({name}): <b>{v}</b>{extra}\n\n"
                "Yangilash uchun: <code>/depozit 1000</code>\n\n"
                "Depozit belgilansa, har bir yangi signal tasdiqlangach \"necha pul "
                "ishlatasiz\" deb so'raladi (ixtiyoriy) — shundan real (pulga bog'liq) "
                "foyda/zarar hisoblanadi."),
-        "ru": ("Текущий депозит ({name}): <b>{v}</b>\n\n"
+        "ru": ("Текущий депозит ({name}): <b>{v}</b>{extra}\n\n"
                "Изменить: <code>/depozit 1000</code>\n\n"
                "Если депозит задан, после подтверждения каждого сигнала бот спросит "
                "«сколько денег вы вкладываете» (по желанию) — из этого считается "
                "реальная прибыль/убыток в деньгах."),
-        "en": ("Current deposit ({name}): <b>{v}</b>\n\n"
+        "en": ("Current deposit ({name}): <b>{v}</b>{extra}\n\n"
                "To change it: <code>/depozit 1000</code>\n\n"
                "With a deposit set, each confirmed signal asks how much money you "
                "are putting in (optional) — the real money profit/loss is computed "
@@ -1870,11 +1883,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": " · Stopgacha: <b>{dist:.2f}%</b>",
         "ru": " · До стопа: <b>{dist:.2f}%</b>",
         "en": " · To stop: <b>{dist:.2f}%</b>",
-    },
-    "al.free_line": {
-        "uz": "Bo'sh: <b>{free:,.2f}</b> (ochiq pozitsiyalarda {busy:,.2f})",
-        "ru": "Свободно: <b>{free:,.2f}</b> (в открытых позициях {busy:,.2f})",
-        "en": "Available: <b>{free:,.2f}</b> ({busy:,.2f} in open positions)",
     },
     "al.pick_risk": {
         "uz": "Xavf darajasini tanlang — hajm o'zi hisoblanadi:",

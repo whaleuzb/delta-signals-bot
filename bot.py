@@ -1876,7 +1876,8 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         cur = ws["deposit"]
         txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await q.message.reply_text(
-            i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt),
+            i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt,
+                   extra=await deposit_extra(ws, lang)),
             parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     elif action == "equity":
         deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
@@ -3081,11 +3082,11 @@ def alloc_prompt(sig_id: int, d: dict, deposit: float, free: float,
     line = i18n.t("al.deposit_line", lang, dep=deposit)
     if sl is not None:
         line += i18n.t("al.dist_line", lang, dist=dist)
-    t = [i18n.t("al.head", lang, sid=sig_id, sym=html.escape(str(d["symbol"]))), line]
-    # Bu qator FAQAT pulning bir qismi band bo'lsa chiqadi — ochiq
-    # pozitsiyasi yo'q odamga "bo'sh: 500 (ochiqlarda 0)" ortiqcha shovqin.
-    if busy > 0:
-        t.append(i18n.t("al.free_line", lang, free=free, busy=busy))
+    # Bo'sh pul HAR DOIM ko'rsatiladi: odam summani yozishdan oldin
+    # qanchasi ishlatilishi mumkinligini bilishi kerak (band pul
+    # bo'lmasa ham). Band pul qatori esa faqat kerak bo'lganda.
+    t = [i18n.t("al.head", lang, sid=sig_id, sym=html.escape(str(d["symbol"]))),
+         line, free_lines(free, busy, lang)]
 
     rows, capped = [], False
     if sl is not None and dist > 0:
@@ -3114,6 +3115,28 @@ async def free_deposit(ws, exclude_sig_id: int | None = None) -> tuple[float, fl
     dep = float(ws["deposit"])
     busy = await db.open_allocated(ws["id"], exclude_sig_id)
     return dep, busy, max(0.0, dep - busy)
+
+
+def free_lines(free: float, busy: float, lang: str | None) -> str:
+    """"Bo'sh: X" (+ band pul bo'lsa "Ochiq pozitsiyalarda: Y") qatorlari.
+
+    Depozit ekrani ham, hajm so'raladigan ekran ham SHU funksiyani
+    ishlatadi — foydalanuvchi ikkala joyda bir xil so'zni va bir xil
+    sonni ko'radi. Band pul nol bo'lsa ikkinchi qator chiqmaydi:
+    "ochiq pozitsiyalarda 0.00" hech narsa qo'shmaydi."""
+    out = i18n.t("dep.free_line", lang, free=free)
+    if busy > 0:
+        out += "\n" + i18n.t("dep.busy_line", lang, busy=busy)
+    return out
+
+
+async def deposit_extra(ws, lang: str | None) -> str:
+    """Depozit ekraniga qo'shiladigan blok (`{extra}` o'rniga).
+    Depozit belgilanmagan bo'lsa — bo'sh satr."""
+    if ws["deposit"] is None:
+        return ""
+    _dep, busy, free = await free_deposit(ws)
+    return "\n" + free_lines(free, busy, lang)
 
 
 def alloc_over_kb(sig_id: int, amount: float, need: float,
@@ -3938,7 +3961,8 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         cur = ws["deposit"]
         txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await update.message.reply_text(
-            i18n.t("dep.help", lang, name=html.escape(ws["name"]), v=txt),
+            i18n.t("dep.help", lang, name=html.escape(ws["name"]), v=txt,
+                   extra=await deposit_extra(ws, lang)),
             parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return
 
