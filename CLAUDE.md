@@ -5674,7 +5674,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Kelasi safar: yangi maydonni mavjud jobga qo'shishdan oldin
      "uning yangilanish shartlari bir xilmi?" deb so'rash kerak.
 
-     Sinov: `test_meta_refresh.py` 11/11 haqiqiy Postgres'da — aynan
+     **Deploydan keyin loglarda topilgan ikkinchi xato — o'zim
+     kiritganim.** `logo_job` muvaffaqiyatli o'tdi, lekin bitta
+     workspace `get_chat` da yiqildi: `#232 — Chat not found` (bot
+     o'sha chatdan chiqarilgan yoki chat o'chirilgan). `refresh_logo`
+     esa bu holatda `set_workspace_meta` GACHA yetmasdan qaytadi, ya'ni
+     `meta_at` abadiy NULL qoladi. Yangi `meta_at NULLS FIRST`
+     tartibi bilan bu qator HAR SIKLDA ro'yxat boshida turib, 25
+     talik navbatni band qilardi — bir nechta o'lik chat to'planса,
+     haqiqiy workspace'lar navbatga umuman yetmasdi.
+
+     `db.mark_meta_attempt()` qo'shildi: `get_chat` yiqilganda faqat
+     `meta_at=now()` yoziladi. `is_channel`/`username` GA TEGILMAYDI —
+     ma'lumot olinmadi, eski qiymatni yolg'onga almashtirish mumkin
+     emas. Keyingi urinish odatdagi 24 soatlik logotip sikli bilan
+     keladi.
+
+     **Saboq (ikkinchisi):** saralash tartibini o'zgartirish "zararsiz"
+     ko'rinadi, lekin `NULLS FIRST` + "NULL hech qachon to'lmaydigan
+     yo'l" = navbatni abadiy bloklash. Yangi saralash kaliti
+     qo'shilganda: "bu ustun HAR DOIM to'ladimi, xato yo'lida ham?"
+
+     Sinov: `test_meta_refresh.py` 17/17 haqiqiy Postgres'da — aynan
      muammoli holat (logotip yangi + meta yo'q), meta olingach qayta
      tanlanmaslik, yopiq kanalda cheksiz sikl bo'lmasligi, logotip
-     eskirganda odatdagidek tanlanish va navbat tartibi.
+     eskirganda odatdagidek tanlanish, navbat tartibi va bot
+     kirolmaydigan chat navbatni band qilmasligi.

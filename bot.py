@@ -1922,6 +1922,10 @@ async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
         chat = await bot.get_chat(chat_id)
     except Exception:
         log.warning("Logotip: #%s guruh ma'lumoti olinmadi", ws_id, exc_info=True)
+        # Urinish belgilanadi, aks holda bu qator `meta_at IS NULL`
+        # bilan har siklda navbat boshida turib qolardi (izohi
+        # `db.mark_meta_attempt` da).
+        await db.mark_meta_attempt(ws_id)
         return False
 
     # `is_channel` va ommaviy `username` shu yerda O'ZINI TUZATADI. Ustun bu funksiya paydo

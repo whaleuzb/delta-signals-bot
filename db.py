@@ -489,6 +489,24 @@ async def set_workspace_meta(workspace_id: int, is_channel: bool,
             "WHERE id=$1", workspace_id, is_channel, username)
 
 
+async def mark_meta_attempt(workspace_id: int) -> None:
+    """`get_chat` YIQILGANDA ham urinishni belgilaydi.
+
+    ⚠️ Usiz `meta_at` abadiy NULL qolardi, `logo_targets()` esa
+    `meta_at NULLS FIRST` bilan saralaydi — ya'ni bot kirolmaydigan
+    chat (o'chirilgan kanal, chiqarib yuborilgan guruh) HAR SIKLDA
+    ro'yxatning boshida turib, 25 talik navbatni band qilardi va
+    haqiqiy workspace'lar hech qachon navbatga yetmasdi.
+
+    `is_channel`/`username` GA TEGILMAYDI: ma'lumot olinmadi, eski
+    qiymat yolg'onga almashtirilmasligi kerak. Faqat "urinib ko'rildi"
+    belgisi qo'yiladi — keyingi urinish odatdagi 24 soatlik logotip
+    sikli bilan keladi."""
+    async with pool().acquire() as c:
+        await c.execute(
+            "UPDATE workspaces SET meta_at=now() WHERE id=$1", workspace_id)
+
+
 async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
     """Egasi bo'lgan HAMMA guruh/kanal workspace'lari — avval guruh,
     keyin kanal. Bitta odamda ikkalasi ham bo'lishi mumkin bo'lgach
