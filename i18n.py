@@ -2258,6 +2258,17 @@ STRINGS: dict[str, dict[str, str]] = {
     "w.col_trades": {"uz": "Savdo", "ru": "Сделки", "en": "Trades"},
     "w.col_winrate": {"uz": "Winrate", "ru": "Винрейт", "en": "Win rate"},
     "w.col_result": {"uz": "Natija", "ru": "Результат", "en": "Result"},
+    # "Oxirgi savdolar" oy kesimida — tab yorliqlari.
+    "w.tab_this_month": {
+        "uz": "Hozirgi oy",
+        "ru": "Текущий месяц",
+        "en": "This month",
+    },
+    "w.month_empty": {
+        "uz": "Bu oyda yopilgan savdo yo'q.",
+        "ru": "В этом месяце нет закрытых сделок.",
+        "en": "No trades closed this month.",
+    },
     "w.open_h2": {
         "uz": "Hozir ochiq", "ru": "Открыто сейчас", "en": "Open right now",
     },

@@ -5791,3 +5791,53 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Yo'l-yo'lakay sinovda: `w.open_note` sahifada `html.escape` dan
      o'tgan holda turadi (o'zbekcha apostrof -> `&#x27;`), shuning
      uchun taqqoslash ham escape qilingan matn bilan qilinadi.
+
+175. **«Oxirgi savdolar» endi oy kesimida.**
+     Foydalanuvchi: "Birinchi kirganida joriy oy yopilgan savdolari.
+     Yonida o'tgan oyni tugmasi tursin, bemalol tarixni ko'ra olsin
+     hamma. Guruhlarga ham kanallarga ham."
+
+     Ilgari ro'yxat 25 ta savdo bilan cheklangan edi va tarixni ko'rish
+     imkoni yo'q edi. Endi tepasida oy tugmalari: joriy oy ochiq
+     turadi, yonida savdosi bo'lgan o'tgan oylar.
+
+     - **Tab yana CSS bilan** (yashirin radio + `:checked ~ .pane`) —
+       sahifa to'liq statik va keshlanadi, JS ham, qo'shimcha so'rov
+       ham yo'q. Farqi: oylar soni O'ZGARUVCHAN, sof CSS esa
+       "belgilangan radio -> mos panel" ni umumiy holda ifodalay
+       olmaydi, shuning uchun qoidalar HAR TAB uchun serverda
+       yasaladi va sahifaga `<style>` bo'lib qo'shiladi.
+     - **Oyga bo'lish SQL'da emas, Python'da.** Kartochkadagi sana
+       `closed_at.astimezone(stats.TZ)` bilan chiqadi, `TZ` esa
+       sozlamadan keladi. SQL `date_trunc` boshqa mintaqada hisoblab,
+       oyning birinchi kunidagi savdoni kartochkada bir oyga, tabda
+       boshqa oyga tushirib yuborishi mumkin edi.
+     - Oy ICHIDA tartib avvalgidek NATIJA bo'yicha (eng katta foyda
+       tepada) — bu `recent_closed` dagi ataylab qilingan tanlov edi
+       va saqlandi.
+     - Savdosi YO'Q oyga tugma yasalmaydi (bo'sh tugma shovqin), lekin
+       joriy oy istisno: unda hali savdo yopilmagan bo'lsa ham tugma
+       turadi va "Bu oyda yopilgan savdo yo'q" deb yozadi — odam
+       "hozir nima bo'lyapti" deb kirganda tushunarli javob olsin.
+       Workspace'da UMUMAN yopilgan savdo bo'lmasa esa butun bo'lim
+       chiqmaydi (sahifada allaqachon "hali yopilgan signal yo'q" bor).
+     - `MONTH_TABS=12` va `PER_MONTH=50` — hamma oy sahifaning ICHIDA
+       kelgani uchun hajmni shu ikkovi ushlab turadi. 12 — yuqoridagi
+       oylik jadval bilan bir xil chuqurlik.
+     - Tab qatori telefonda O'ZI gorizontal suriladi (`.mtabs>.tabbar`),
+       sahifa tanasi emas.
+     - `db.recent_closed()` o'chirildi — endi hech qayerda
+       ishlatilmaydi (`closed_for_months()` uning o'rnini oldi).
+
+     **Fikstura siljishi (yana).** Uchta sinov `db.recent_closed` ni
+     almashtirardi; funksiya nomi o'zgargach ular haqiqiy bazaga
+     urilib "db.init() chaqirilmagan" deb yiqildi. Nom o'zgarganda
+     `grep` ni SINOVLARDA ham yurgizish kerak — ular repo ichida emas,
+     scratchpad'da yotgani uchun oddiy qidiruvga tushmaydi.
+
+     Sinov: `test_month_tabs.py` 30/30 — tugmalar tartibi (yangidan
+     eskisiga), joriy oyning belgilanishi, har savdo o'z oyida,
+     serverda yasalgan CSS qoidalari, oy ichidagi tartib, bo'sh joriy
+     oy, savdosiz oy tashlab ketilishi, ikkala cheklov, eski yildagi
+     oy yorlig'ida yil ko'rinishi, kanal va guruh uchun bir xil
+     ishlashi va uchala til.

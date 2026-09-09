@@ -47,6 +47,13 @@ JSON_HEADERS = {**NO_CACHE, "Access-Control-Allow-Origin": "*"}
 # oshiring.
 MINI_V = "3"
 
+# "Oxirgi savdolar" oy kesimi. Hamma oy sahifaning ICHIDA keladi (CSS
+# tab, qo'shimcha so'rovsiz), shuning uchun ikkala son ham sahifa
+# hajmini ushlab turadi: 12 oy — yuqoridagi oylik jadval bilan bir xil
+# chuqurlik; har oyda 50 ta savdo — telefonda cheksiz skroll bo'lmasin.
+MONTH_TABS = 12
+PER_MONTH = 50
+
 CACHE_TTL = 120.0          # sahifa/grafik keshi (soniya)
 _cache: dict[str, tuple[float, object]] = {}
 
@@ -205,6 +212,14 @@ tbody tr:hover{background:#ffffff06}
 #tab-g:checked~.tabbar label[for=tab-g],
 #tab-c:checked~.tabbar label[for=tab-c]{background:rgba(218,221,226,.14);color:var(--txt)}
 #tab-g:checked~.pane-g,#tab-c:checked~.pane-c{display:block}
+/* Oy tablari — bir necha oy bo'lsa qator telefonga sig'maydi, shuning
+   uchun O'ZI gorizontal suriladi (sahifa tanasi emas). Chetlardagi
+   ichki bo'shliq surish paytida birinchi/oxirgi tugma qirqilib
+   ko'rinmasligi uchun. */
+.mtabs>.tabbar{display:flex;max-width:100%;overflow-x:auto;
+               scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.mtabs>.tabbar::-webkit-scrollbar{display:none}
+.mtabs>.tabbar label{flex:0 0 auto}
 /* Kartani o'rab turuvchi qism: "Obuna bo'lish" havolasi kartaning
    ICHIDA bo'lolmaydi (karta o'zi <a>, ichma-ich <a> yaroqsiz HTML),
    shuning uchun u kartadan KEYIN, shu o'ramda turadi. */
@@ -866,24 +881,82 @@ async def group_page(request):
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
     # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni
     # sahifa ochilishi birjaga o'nlab so'rov yubormaydi.
-    recent = await db.recent_closed(ws_id, 25)
-    trades = ""
-    for r in recent:
-        p = float(r["pnl_pct"]) if r["pnl_pct"] is not None else 0.0
-        side_cls = "b-long" if r["side"] == "LONG" else "b-short"
-        # Sana qisqa: telefonda "0.02038 → 0.02145 · 23.08" bir qatorga sig'sin.
-        # Yil ro'yxatda ortiqcha — savdolar yaqin sanalar bo'yicha tartiblangan.
-        when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
-        exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
-        trades += (
-            f"<div class='trade {_cls(p)}-edge'>"
-            f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
-            f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
-            f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
-            f" · {e(when)}</div></div>"
-            f"<img class='tmini' src='/s/{r['id']}/mini.png?v={MINI_V}' loading='lazy' "
-            f"alt='' onerror=\"this.remove()\">"
-            f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div></div>")
+    #
+    # OY KESIMI: birinchi ochilganda joriy oy, yonida esa o'tgan oylar
+    # tugmalari. Sahifa to'liq statik va keshlanadi, shuning uchun tab
+    # ham CSS bilan (yashirin radio + `:checked ~ .pane`) — JS ham,
+    # yangi so'rov ham kerak emas, hamma oy sahifaning ichida keladi.
+    #
+    # Oyga bo'lish PYTHON tomonida: kartochkadagi sana `stats.TZ` bilan
+    # chiqadi, SQL `date_trunc` esa boshqa mintaqada hisoblab, oyning
+    # birinchi kunidagi savdoni "boshqa tab"ga tashlab yuborishi mumkin
+    # edi.
+    by_month: dict[tuple[int, int], list] = {}
+    for r in await db.closed_for_months(ws_id):
+        d = r["closed_at"].astimezone(stats.TZ)
+        by_month.setdefault((d.year, d.month), []).append(r)
+    # Eng yangi oy birinchi: shunda ochilgan (joriy) tab har doim
+    # ko'rinib turadi, ro'yxat uzun bo'lsa ham surish shart emas.
+    keys = sorted(by_month, reverse=True)[:MONTH_TABS]
+    mon_names = stats.months(lang)
+    now_key = (datetime.now(stats.TZ).year, datetime.now(stats.TZ).month)
+    # Joriy oyda hali savdo yopilmagan bo'lsa ham u BIRINCHI tab
+    # bo'lishi kerak — foydalanuvchi "hozir nima bo'lyapti" deb
+    # kirganda bo'sh emas, tushunarli javob ko'rsin.
+    #
+    # `by_month` SHARTI muhim: workspace'da umuman yopilgan savdo
+    # bo'lmasa butun bo'lim chiqmasligi kerak (sahifada allaqachon
+    # "hali yopilgan signal yo'q" degan xabar bor) — usiz bo'm-bo'sh
+    # "Hozirgi oy" tabi qo'shimcha shovqin bo'lardi.
+    if by_month and now_key not in keys:
+        keys = [now_key] + keys[:MONTH_TABS - 1]
+
+    def trade_cards(rows) -> str:
+        # Oy ICHIDA tartib ataylab SANA bo'yicha emas, NATIJA bo'yicha:
+        # eng katta foyda tepada, eng katta yo'qotish pastda — guruh o'z
+        # eng yaxshi natijalari bilan tanishtirilsin.
+        out = ""
+        for r in sorted(rows, key=lambda x: float(x["pnl_pct"] or 0), reverse=True)[:PER_MONTH]:
+            p = float(r["pnl_pct"]) if r["pnl_pct"] is not None else 0.0
+            side_cls = "b-long" if r["side"] == "LONG" else "b-short"
+            # Sana qisqa: telefonda "0.02038 → 0.02145 · 23.08" bir qatorga
+            # sig'sin. Yil ortiqcha — savdolar tabда allaqachon oy bo'yicha
+            # ajratilgan.
+            when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
+            exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
+            out += (
+                f"<div class='trade {_cls(p)}-edge'>"
+                f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
+                f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
+                f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
+                f" · {e(when)}</div></div>"
+                f"<img class='tmini' src='/s/{r['id']}/mini.png?v={MINI_V}' loading='lazy' "
+                f"alt='' onerror=\"this.remove()\">"
+                f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div></div>")
+        return out
+
+    # Tab uchun CSS qoidalari SERVERDA yasaladi: oylar soni o'zgaruvchan,
+    # sof CSS esa "belgilangan radio -> mos panel" ni umumiy holda
+    # ifodalay olmaydi (har juftlik uchun alohida qoida kerak).
+    tabs_css, tabbar, panes = "", "", ""
+    for i, k in enumerate(keys):
+        rid = f"mt{i}"
+        label = (i18n.t("w.tab_this_month", lang) if k == now_key
+                 else mon_names[k[1] - 1] + (f" {k[0]}" if k[0] != now_key[0] else ""))
+        tabs_css += (f"#{rid}:checked~.tabbar label[for={rid}]"
+                     "{background:rgba(218,221,226,.14);color:var(--txt)}"
+                     f"#{rid}:checked~.pane-{rid}{{display:block}}")
+        tabbar += f"<label for='{rid}'>{e(label)}</label>"
+        cards = trade_cards(by_month.get(k, []))
+        panes += (f"<div class='pane pane-{rid}'>"
+                  + (f"<div class='trades'>{cards}</div>" if cards else
+                     f"<div class='empty'>{e(i18n.t('w.month_empty', lang))}</div>")
+                  + "</div>")
+    inputs = "".join(
+        f"<input type='radio' name='mtab' id='mt{i}'{' checked' if k == now_key else ''}>"
+        for i, k in enumerate(keys))
+    trades = (f"<style>{tabs_css}</style><div class='tabs mtabs'>{inputs}"
+              f"<div class='tabbar'>{tabbar}</div>{panes}</div>") if keys else ""
 
     def section(title, header, body_rows):
         if not body_rows:
@@ -952,7 +1025,7 @@ async def group_page(request):
            + ("" if open_public
               else f"<div class='note'>{e(i18n.t('w.open_note', lang))}</div>")
            if opens else "")
-        + (f"<h2>{e(i18n.t('w.recent_h2', lang))}</h2><div class='trades'>{trades}</div>"
+        + (f"<h2>{e(i18n.t('w.recent_h2', lang))}</h2>{trades}"
            if trades else "")
         + (f"<div class='empty'>{e(i18n.t('w.no_closed', lang))}</div>"
            if not total else ""))
