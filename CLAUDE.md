@@ -5841,3 +5841,73 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      oy, savdosiz oy tashlab ketilishi, ikkala cheklov, eski yildagi
      oy yorlig'ida yil ko'rinishi, kanal va guruh uchun bir xil
      ishlashi va uchala til.
+
+176. **Ikkala bepul tarjimon bir vaqtda 429 berib qoldi — News Trade
+     kanali soatlab matnsiz postladi.**
+     Foydalanuvchi skrinshot bilan: kanalda "Yangi bozor xabari
+     chiqdi" + havola (COIN va TSM postlari) — matn yo'q, havola esa
+     manba kanalga (MarketTwits) olib boryapti.
+
+     **Diagnostika — production loglaridan (2026-09-10).**
+     `04:19:13` dan boshlab **MyMemory** HAR BIR so'rovga 429 ("Client
+     error 429") qaytara boshladi va shu holat kamida soat `07:44`
+     gacha (loglar shu yergacha tekshirilgan) davom etdi — bu kunlik
+     so'z limitining tugashi. Shu vaqt ichida zaxira — **Google**
+     — butun yukni yolg'iz ko'tarib turdi, lekin `07:25:13` dan u ham
+     429 bera boshladi. Ikkalasi ham ishlamagan payt — foydalanuvchi
+     ko'rgan COIN (`07:41`) va TSM (`07:44`) postlari — ishga tushdi.
+
+     **Bu KOD XATOSI EMAS edi.** 167-banddagi qasddan qilingan qoida
+     ("tarjima bo'lmasa kanal jim qolmasin, matnsiz+havola post
+     berilsin") aynan mo'ljallanganidek ishladi — faqat ikkala manba
+     bir vaqtda tugashi kutilmagan holat edi.
+
+     **Havola haqidagi savol ham xato emas.** `source_url` — bot
+     kuzatib turgan ASL manba kanal (`config.TELEGRAM_NEWS_CHANNELS`,
+     hozircha `markettwits`). "Asl xabarni o'qish" tugmasi aynan shuni
+     va'da qiladi: tarjima bo'lmasa o'quvchi o'sha yerdan ruscha asl
+     matnni o'qiy oladi. Bu ataylab shunday.
+
+     **Yechim — Azure Translator, ASOSIY tarjimon sifatida.**
+     Foydalanuvchi avval DeepL so'radi — tekshirilganda **DeepL
+     o'zbek tilini UMUMAN qo'llab-quvvatlamasligi** aniqlandi (rasmiy
+     til ro'yxatida yo'q). Azure esa o'zbek tilini rasman
+     qo'llab-quvvatlaydi (kod: `uz`) va bepul rejasi (F0) oyiga
+     **2 million belgi — DOIMIY** (12 oylik sinov emas), hozirgi
+     yukdan necha o'n barobar katta.
+
+     - `config.AZURE_TRANSLATOR_KEY`/`AZURE_TRANSLATOR_REGION` —
+       ixtiyoriy (bo'sh string andozasi, boshqa API kalitlar kabi).
+       Kalit bo'lmasa Azure bosqichi BUTUNLAY o'tkazib yuboriladi —
+       eski MyMemory→Google zanjiri bit-ma-bit o'zgarishsiz qoladi.
+     - Kalit BO'LSA — `to_uz()` zanjirining BOSHIGA qo'shiladi:
+       Azure → MyMemory → Google. Azure yiqilsa (tarmoq xatosi,
+       o'zining limiti) eski zanjirga tushadi — hech qanday yangi
+       yagona nosozlik nuqtasi qo'shilmadi.
+     - Azure so'rov/javob shakli boshqa ikkovidan farqli — JSON
+       MASSIV va `Ocp-Apim-Subscription-Key` sarlavhasi; mintaqa
+       sarlavhasi faqat `AZURE_TRANSLATOR_REGION` berilganda
+       qo'shiladi ("Global" resurs uchun shart emas).
+     - Kirill-qoldi tekshiruvi (mavjud qoida) Azure natijasiga ham
+       qo'llanadi — u ham "tarjima bo'ldi, lekin hali ruscha" holatini
+       tutadi.
+
+     **Amalga oshirish uchun foydalanuvchiga qoladi:** Azure hisobi
+     ochish (kredit karta so'ralishi mumkin, lekin limitdan o'tsa
+     AVTOMATIK YECHIB OLINMAYDI — shunchaki 429/403 qaytaradi),
+     Translator resursi yaratish, kalitni Railway'ga
+     `AZURE_TRANSLATOR_KEY` sifatida qo'yish. Shu bosqichgacha bot
+     eski (MyMemory/Google) zanjir bilan ishlayveradi.
+
+     **Saboq:** "bepul, kalitsiz" ikkita zaxira ham bitta umumiy
+     zaiflikka ega bo'lishi mumkin — IKKALASI HAM shu xizmat
+     turi (norasmiy/kvota-cheklangan) bo'lgani uchun bir vaqtda
+     tugab qolishi tabiiy edi. Yangi provayder tanlaganda til
+     qo'llab-quvvatlanishini AVVAL tekshirish kerak — DeepL taklif
+     qilingan, lekin tekshiruv uni chetlab o'tdi.
+
+     Sinov: `test_azure_translate.py` 16/16 — kalitsiz holatda Azure
+     chaqirilmasligi, kalit bilan Azure birinchi so'ralishi, Azure
+     yiqilganda eski zanjirga tushish, so'rov shaklining to'g'riligi
+     (sarlavhalar, JSON massiv, `from`/`to` parametrlari), mintaqa
+     ixtiyoriyligi, kirill-qoldi qoidasining Azure'ga ham qo'llanishi.

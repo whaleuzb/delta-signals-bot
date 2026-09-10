@@ -3,7 +3,12 @@ manbalar uchun. News Trade kanaliga FAQAT o'zbekcha matn chiqadi
 (foydalanuvchi talabi), shuning uchun tarjima ixtiyoriy bezak emas,
 quvurning majburiy bosqichi.
 
-IKKI TEKIN, KALITSIZ manba ketma-ket sinaladi:
+UCH MANBA KETMA-KET SINALADI:
+  0. Azure Translator (rasmiy, kalitli, `config.AZURE_TRANSLATOR_KEY`
+     bo'lsa) — ASOSIY. Bepul rejasi (F0) oyiga 2 million belgi,
+     DOIMIY, va o'zbek tilini RASMAN qo'llab-quvvatlaydi. Kalit
+     berilmasa bu bosqich butunlay o'tkazib yuboriladi — eski
+     xatti-harakat (pastdagi ikkovi) o'zgarishsiz qoladi.
   1. MyMemory (`api.mymemory.translated.net`) — aynan shu maqsad uchun
      qurilgan rasmiy bepul API. `config.TRANSLATE_EMAIL` so'rovga
      qo'shiladi (tasdiqlanishi SHART EMAS) — hujjatga ko'ra kunlik
@@ -12,6 +17,13 @@ IKKI TEKIN, KALITSIZ manba ketma-ket sinaladi:
      429 qaytaradi, lekin BEPUL va MyMemory yiqilganda ko'pincha
      ishlaydi. Shuning uchun u ZAXIRA: MyMemory ishlaganda umuman
      chaqirilmaydi.
+
+⚠️ MUAMMO (production, 2026-09-10 tasdiqlangan): MyMemory soat 04:19
+dan boshlab HAR bir so'rovga 429 berib qoldi (kunlik limit), soat
+07:25 dan Google ham 429 bera boshladi — ikkalasi bir vaqtda tugab,
+News Trade kanali soatlab matnsiz (faqat havola bilan) post berdi.
+Azure shu holatga qarshi zaxira: uning limiti shu ikkovidan necha
+o'n barobar katta.
 
 CLAUDE TARJIMONI ATAYLAB YO'Q. Bir muddat zaxira sifatida turgan edi,
 foydalanuvchi olib tashlashni so'radi ("claude translate olib tashlash
@@ -39,9 +51,12 @@ import config
 
 log = logging.getLogger("translate")
 
+AZURE_URL = "https://api.cognitive.microsofttranslator.com/translate"
 MYMEMORY_URL = "https://api.mymemory.translated.net/get"
 GOOGLE_URL = "https://translate.googleapis.com/translate_a/single"
-MAX_CHARS = 480   # MyMemory'ning kalitsiz so'rovdagi taxminiy chegarasi
+MAX_CHARS = 480     # MyMemory'ning kalitsiz so'rovdagi taxminiy chegarasi
+AZURE_MAX_CHARS = 5000   # Azure so'rov boshiga ~50 000 — bu yerga hech
+                         # qachon yetmaydigan katta zaxira bilan
 
 TIMEOUT = 20.0
 ATTEMPTS = 3      # har qanday xato (timeout/tarmoq/429) uchun
@@ -55,6 +70,31 @@ async def _request(text: str, source: str) -> httpx.Response:
         params["de"] = config.TRANSLATE_EMAIL
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         return await client.get(MYMEMORY_URL, params=params)
+
+
+async def _azure(text: str, source: str) -> str | None:
+    """Rasmiy, kalitli tarjimon. `config.AZURE_TRANSLATOR_KEY` bo'sh
+    bo'lsa chaqirilmaydi ham (`to_uz()` ichida tekshiriladi).
+
+    So'rov/javob shakli boshqa ikkovidan farqli — JSON MASSIV: bir
+    so'rovda bir nechta matn yuborish mumkin, biz esa har doim bitta
+    element yuboramiz, shuning uchun javobning birinchi elementi
+    olinadi."""
+    headers = {"Ocp-Apim-Subscription-Key": config.AZURE_TRANSLATOR_KEY,
+              "Content-Type": "application/json"}
+    if config.AZURE_TRANSLATOR_REGION:
+        headers["Ocp-Apim-Subscription-Region"] = config.AZURE_TRANSLATOR_REGION
+    params = {"api-version": "3.0", "from": source, "to": "uz"}
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            r = await client.post(AZURE_URL, params=params, headers=headers,
+                                  json=[{"Text": text[:AZURE_MAX_CHARS]}])
+        r.raise_for_status()
+        data = r.json()
+        return data[0]["translations"][0]["text"].strip() or None
+    except Exception:
+        log.warning("Azure tarjimasi muvaffaqiyatsiz", exc_info=True)
+        return None
 
 
 async def _mymemory(text: str, source: str) -> str | None:
@@ -123,7 +163,10 @@ async def to_uz(text: str, source: str = "ru") -> str | None:
     if not text:
         return text
 
-    for name, fn in (("MyMemory", _mymemory), ("Google", _google)):
+    chain = [("MyMemory", _mymemory), ("Google", _google)]
+    if config.AZURE_TRANSLATOR_KEY:
+        chain.insert(0, ("Azure", _azure))
+    for name, fn in chain:
         got = await fn(text, source)
         if not got:
             continue

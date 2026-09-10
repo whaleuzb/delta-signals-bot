@@ -198,6 +198,21 @@ TELEGRAM_NEWS_CHANNELS = [
 # faqat shu loyiha uchun umumiy/tasodifiy manzil.
 TRANSLATE_EMAIL = os.getenv("TRANSLATE_EMAIL", "newstradeai.bot@tradecontroller.app")
 
+# Azure Translator — ASOSIY tarjimon (bo'sh bo'lsa butun bosqich
+# o'chiq, MyMemory/Google'dan boshlanadi — eski xatti-harakat).
+#
+# ⚠️ MyMemory va Google IKKALASI HAM 429 (limit) berib qolgani
+# production loglarida tasdiqlangan (2026-09-10, soat 04:19 dan
+# boshlab MyMemory HAR bir so'rovga, 07:25 dan Google ham) — News
+# Trade kanali soatlab matnsiz post berardi. Azure rasman o'zbek
+# tilini qo'llab-quvvatlaydi (kod: `uz`) va bepul rejasi (F0) oyiga
+# 2 million belgi — hozirgi yukdan necha barobar ko'p, DOIMIY (12
+# oylik sinov emas). `AZURE_TRANSLATOR_REGION` faqat mintaqaviy
+# resurs yaratilgan bo'lsa kerak; "Global" resursda bo'sh qoldirilsa
+# ham bo'ladi.
+AZURE_TRANSLATOR_KEY = os.getenv("AZURE_TRANSLATOR_KEY", "")
+AZURE_TRANSLATOR_REGION = os.getenv("AZURE_TRANSLATOR_REGION", "")
+
 # --- MACD kesishmasi skaneri (foydalanuvchi so'rovi — Bulltard.com
 #     kanali namunasi: "$CATI/USDT (1d) MACD Bearish crossover") ---
 #     Top hajmli juftliklar bo'yicha 4h va 1d shamlarida MACD(12,26,9)
