@@ -1160,12 +1160,30 @@ async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboard
     lines.append(i18n.t("man.targets", lang) + ": " + " · ".join(
         f"{'✅' if i < sig['tp_hit'] else '◻️'}{fmt_price(t)}"
         for i, t in enumerate(tps)))
+    # Foydalanuvchi: "ochiq signallarni kuzatishda nechpulga kirilgani
+    # va hozir qancha summa ziyonda yoki foydada ekanligi yetishmayabti".
+    # `alloc_amount` — 170-banddagi hajm (bo'sh depozitdan oshmaydigan).
+    # Narxga bog'liq EMAS, shuning uchun quyidagi `if price` shartidan
+    # OLDIN, har doim ko'rsatiladi (hajm belgilangan bo'lsa).
+    alloc = float(sig["alloc_amount"]) if sig["alloc_amount"] is not None else None
+    if alloc is not None:
+        lines.append(i18n.t("man.invested", lang, amt=alloc))
     if filled > 0:
         lines.append(i18n.t("man.closed_share", lang, pct=filled * 100, run=realized))
     if price:
+        # `live` — TO'LIQ pozitsiyaga nisbatan joriy foiz (yopilgan +
+        # ochiq ulush birgalikda) — pastdagi `man.live(_money)` bilan
+        # bir xil hisob, faqat endi shu foizning PUL qiymati ham
+        # qo'shiladi: `live% * hajm`. Bu — signal RASMAN yopilganda
+        # sanaladigan pul bilan bir xil formula (bot.py:1609,
+        # `pnl/100*alloc_amount`), faqat hali yopilmagan holat uchun.
         live = realized + max(0.0, 1.0 - filled) * tracker.pnl_at(
             sig["side"], entry, price)
-        lines.append(i18n.t("man.live", lang, p=fmt_price(price), live=live))
+        if alloc is not None:
+            lines.append(i18n.t("man.live_money", lang, p=fmt_price(price),
+                                live=live, m=live / 100 * alloc))
+        else:
+            lines.append(i18n.t("man.live", lang, p=fmt_price(price), live=live))
     else:
         lines.append(i18n.t("man.no_price", lang))
 

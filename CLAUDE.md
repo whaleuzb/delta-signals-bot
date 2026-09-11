@@ -5911,3 +5911,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      yiqilganda eski zanjirga tushish, so'rov shaklining to'g'riligi
      (sarlavhalar, JSON massiv, `from`/`to` parametrlari), mintaqa
      ixtiyoriyligi, kirill-qoldi qoidasining Azure'ga ham qo'llanishi.
+
+177. **Boshqaruv ekraniga pul ko'rinishi qo'shildi — necha pulga
+     kirilgani va hozirgi foyda/zarar summasi.**
+     Foydalanuvchi: "ochiq signallarni kuzatishda nechpulga kirilgani
+     va hozir qancha summa ziyonda yoki foydada ekanligi yetishmayabti.
+     Buni ochiq signallar bo'limidagi har bir aktivni boshqaruv
+     bo'limiga qo'sh."
+
+     `manage_view()` (⚙️ ekrani — stop ko'chirish, qisman yopish,
+     yopish) foiz ko'rsatardi, pul emas — holbuki hajm (170-band)
+     allaqachon `alloc_amount` da saqlanadi.
+
+     - **"Kiritilgan: X"** — `alloc_amount` bo'lsa, narxga BOG'LIQ
+       EMAS, shuning uchun narx olinmagan holatda ham chiqadi
+       (`man.no_price` bilan bir qatorda).
+     - **Joriy narx qatoriga pul qo'shildi**: `(+50.00)` kabi, `live%
+       * alloc_amount` formulasi bilan — bu signal RASMAN yopilganda
+       ishlatiladigan AYNI formula (`pnl/100*alloc_amount`,
+       bot.py:1609), faqat hali OCHIQ holat uchun. `live%` esa
+       mavjud hisobning o'zi — yopilgan ulush (`realized_pct`) + ochiq
+       ulushning joriy foizi, ya'ni QISMAN yopilgan pozitsiyada ham
+       to'g'ri (5-sinov: 50% +8% da yopilgan, qolgani +12% —
+       to'liq +10% / +100.00 chiqadi, alohida qo'shish shart emas).
+     - `alloc_amount` YO'Q bo'lsa — hech narsa o'zgarmaydi, eski
+       foizsiz qator (`man.live`) turaveradi. Yangi `man.live_money`
+       kaliti FAQAT hajm borida ishlatiladi.
+
+     **Fikstura siljishi (yana).** `test_manage_buttons.py` dagi soxta
+     signal lug'atida `alloc_amount` kaliti umuman yo'q edi —
+     `manage_view()` endi shu maydonga murojaat qilgach `KeyError`
+     bilan yiqildi. Bu funksiyaga yangi maydon qo'shilganda
+     scratchpad'dagi barcha soxta-signal fiksturalarini tekshirish
+     kerakligini yana bir bor ko'rsatdi (170/173-bandlarda ham
+     uchragan naqsh).
+
+     Sinov: `test_manage_money.py` 22/22 — hajmsiz eski xatti-harakat,
+     hajm bilan ikkalasi (foiz+pul), SHORT ishorasi, zararli holat,
+     qisman yopilgan pozitsiyaning to'liq (realized+ochiq) pul hisobi,
+     narx yo'qligida faqat "Kiritilgan" qolishi, TP/SL hali
+     kiritilmagan holatda yiqilmasligi, uchala til.

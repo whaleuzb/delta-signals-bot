@@ -385,6 +385,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Текущая цена: <b>{p}</b> → <b>{live:+.2f}%</b>",
         "en": "Current price: <b>{p}</b> → <b>{live:+.2f}%</b>",
     },
+    # `alloc_amount` belgilangan bo'lsa (170-band — bo'sh depozitdan
+    # oshmaydigan hajm) qatorga pul ko'rinishi ham qo'shiladi. `man.live`
+    # o'zgarmadi — hajm belgilanmagan signalda hamon foizsiz ko'rinadi.
+    "man.live_money": {
+        "uz": "Joriy narx: <b>{p}</b> → <b>{live:+.2f}%</b> (<b>{m:+,.2f}</b>)",
+        "ru": "Текущая цена: <b>{p}</b> → <b>{live:+.2f}%</b> (<b>{m:+,.2f}</b>)",
+        "en": "Current price: <b>{p}</b> → <b>{live:+.2f}%</b> (<b>{m:+,.2f}</b>)",
+    },
+    # "Nechpulga kirilgani" — boshqaruv ekraniga har doim, narx
+    # olinmagan holatda ham chiqadi (narxga bog'liq emas).
+    "man.invested": {
+        "uz": "Kiritilgan: <b>{amt:,.2f}</b>",
+        "ru": "Вложено: <b>{amt:,.2f}</b>",
+        "en": "Invested: <b>{amt:,.2f}</b>",
+    },
     "man.no_price": {
         "uz": "<i>Joriy narx olinmadi</i>",
         "ru": "<i>Текущая цена недоступна</i>",
