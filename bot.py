@@ -120,25 +120,27 @@ async def can_view(bot, uid: int, ws) -> bool:
 
 # ─────────────────────── Majburiy obuna (kanallar) ───────────────────────
 
-_SUB_TTL = 300.0                       # to'liq obuna bo'lganlar shuncha soniya keshlanadi
-_sub_ok_until: dict[int, float] = {}   # uid -> monotonic deadline
-
-
 async def missing_subscriptions(bot, uid: int) -> list:
     """Foydalanuvchi obuna BO'LMAGAN majburiy kanallar ro'yxati.
 
-    MUHIM — xatolikda OCHIQ qoladi (kanal o'chirilgan, bot u yerda admin emas
-    va h.k.): aks holda bitta noto'g'ri sozlama butun botni hamma uchun
-    qulflab qo'yardi. Obuna talabini majburlash foydalanuvchini yo'qotishdan
-    ko'ra muhimroq emas."""
+    ⚠️ ATAYLAB KESHLANMAYDI — HAR safar Telegram'dan JONLI so'raladi.
+    Ilgari "to'liq obuna" holati 5 daqiqa keshlanardi (foydalanuvchi
+    tajribasi/API yuki uchun); amalda bu KATTA teshik bo'lib chiqdi:
+    foydalanuvchi `/start` bosib kanalga obuna bo'ladi, gate() ni bir
+    marta o'tadi, so'ng DARHOL kanaldan chiqadi — va keyingi 5 daqiqa
+    davomida bot unga baribir ishlayveradi (foydalanuvchi: "botga start
+    bosib kanalga obuna bo'lyabtida bot ishlashi bilan darrov kanaldan
+    chiqib ketishyabti"). Majburiy obunaning butun ma'nosi — foydalanuvchi
+    HAR DOIM obunachi bo'lib turishi — shu teshik bilan yo'qqa chiqardi.
+
+    Xato holatida hamon OCHIQ qoladi (kanal o'chirilgan, bot u yerda
+    admin emas va h.k.): aks holda bitta noto'g'ri sozlama butun botni
+    hamma uchun qulflab qo'yardi. Obuna talabini majburlash
+    foydalanuvchini yo'qotishdan ko'ra muhimroq emas."""
     if is_admin(uid):
         return []
     channels = await db.list_required_channels()
     if not channels:
-        return []
-
-    deadline = _sub_ok_until.get(uid)
-    if deadline and time.monotonic() < deadline:
         return []
 
     missing = []
@@ -151,10 +153,6 @@ async def missing_subscriptions(bot, uid: int) -> list:
             # Tekshirib bo'lmadi — bu foydalanuvchining aybi emas, o'tkazamiz.
             log.warning("Obuna tekshirilmadi (kanal=%s uid=%s) — o'tkazib yuborildi",
                          ch["chat_id"], uid)
-    if not missing:
-        _sub_ok_until[uid] = time.monotonic() + _SUB_TTL
-    else:
-        _sub_ok_until.pop(uid, None)
     return missing
 
 
@@ -4555,7 +4553,6 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                    parse_mode=ParseMode.HTML, reply_markup=back)
     elif action.startswith("chdel:"):
         await db.remove_required_channel(int(action.split(":", 1)[1]))
-        _sub_ok_until.clear()
         txt, kb = await _admin_channels_view(lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action == "mth":
@@ -4810,7 +4807,6 @@ async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         warn = i18n.t("adm.ch_warn_unknown", lang)
 
     await db.add_required_channel(chat.id, chat.title, chat.username)
-    _sub_ok_until.clear()
     await msg.reply_text(
         i18n.t("adm.ch_added", lang,
                name=html.escape(chat.title or str(chat.id))) + warn,

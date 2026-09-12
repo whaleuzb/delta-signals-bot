@@ -5951,3 +5951,62 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      qisman yopilgan pozitsiyaning to'liq (realized+ochiq) pul hisobi,
      narx yo'qligida faqat "Kiritilgan" qolishi, TP/SL hali
      kiritilmagan holatda yiqilmasligi, uchala til.
+
+178. **Majburiy obuna keshi olib tashlandi — endi HAR SAFAR jonli
+     tekshiriladi.**
+     Foydalanuvchi: "ba'zilar botga start bosib kanalga obuna
+     bo'lyabtida bot ishlashi bilan darrov kanaldan chiqib
+     ketishyabti. Shuni kanalda bo'lmasa qayta-qayta kanalga obuna
+     bo'lmasangiz bot ishlamaydi deb yozuv chiqadigan qilaylik."
+
+     **Diagnostika: mexanizm allaqachon "qayta-qayta" tekshirardi —
+     lekin 5 daqiqalik teshik bilan.** `missing_subscriptions()` har
+     bir gate() chaqiruvida ishlaydi (haqiqatan HAR safar), lekin
+     TO'LIQ OBUNA holati `_sub_ok_until` da 300 soniya (`_SUB_TTL`)
+     KESHLANARDI. Ya'ni: foydalanuvchi kanalga obuna bo'lib bir marta
+     tekshiruvdan o'tsa, keyingi 5 daqiqa davomida kesh "ha, obunachi"
+     deb javob berardi — API'ga umuman murojaat qilmasdan. Aynan shu
+     oyna orqali "obuna bo'l → botdan foydalan → darhol chiq" hiylasi
+     ishlardi: chiqqandan keyin ham 5 daqiqagacha bot baribir
+     ishlayverardi.
+
+     **Salbiy tomon KESHLANMAGAN edi** (fayl allaqachon to'g'ri
+     yozilgan): `missing` bo'sh bo'lmasa `_sub_ok_until.pop()` chaqirilib
+     kesh darhol tozalanardi, ya'ni obuna bo'lmagan foydalanuvchi HAR
+     doim jonli tekshirilardi. Demak muammo faqat MUSBAT (obunachi)
+     holatda edi.
+
+     **Yechim — musbat kesh butunlay olib tashlandi.** Endi
+     `missing_subscriptions()` har chaqiruvda Telegram'dan JONLI
+     so'raydi (kesh yo'q). Amaliy natija: foydalanuvchi kanaldan
+     chiqqach, ENG YAQIN keyingi harakati (tugma bosish, xabar
+     yozish) darhol bloklanadi va `sub.prompt` qayta ko'rsatiladi —
+     5 daqiqa kutish yo'q.
+
+     - Xato holatida OCHIQ qolish qoidasi (kanal o'chirilgan, bot
+       admin emas va h.k. — `except Exception: ... return []` yo'lida
+       emas, balki har bir kanal alohida tekshirilib xato bo'lsa
+       o'sha kanal `missing` ga QO'SHILMAYDI) o'zgarishsiz qoldi —
+       bitta noto'g'ri sozlama butun botni qulflab qo'ymasligi kerak.
+     - Admin va "majburiy kanal umuman yo'q" yo'llarida Telegram'ga
+       HECH QANDAY murojaat qilinmaydi (erta `return []`) — kesh
+       olib tashlangani bu ikki holatga tegmadi, xarajat oshmadi.
+     - Ikkita `_sub_ok_until.clear()` chaqiruvi (admin kanal
+       qo'shganda/o'chirganda, o'zgarish darhol kuchga kirishi uchun
+       yozilgan edi) endi keraksiz — kesh yo'qligi sababli o'chirildi
+       (mavjud bo'lmagan o'zgaruvchiga murojaat NameError berardi).
+
+     **Savdo-tafovut:** endi har bir shaxsiy chatdagi HAR bir
+     harakat (menyu tugmasi, xabar) uchun bitta qo'shimcha Telegram
+     API chaqiruvi (`get_chat_member`) qo'shildi — majburiy kanal(lar)
+     sozlangan workspace'lar uchun. Bu ataylab: foydalanuvchi
+     to'g'ridan-to'g'ri "qat'iylashtirish" so'ragan, va bu funksiya
+     FAQAT majburiy kanal sozlangan hollarda ishlaydi (aksariyat
+     foydalanuvchilar uchun bu bo'lim umuman ishga tushmaydi).
+
+     Sinov: `test_sub_strict.py` 12/12 — obunachi holatda HAR safar
+     Telegram'ga murojaat qilinishi (kesh yo'qligi isboti), obunadan
+     chiqqach DARHOL (keyingi chaqiriqda, 5 daqiqa kutmasdan)
+     bloklanishi, `kicked` holati, admin har doim o'tishi va
+     Telegram'ga umuman murojaat qilmasligi, majburiy kanal yo'qligida
+     ham murojaat qilinmasligi, xatoda fail-open saqlangani.
