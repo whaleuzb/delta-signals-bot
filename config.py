@@ -57,6 +57,15 @@ TZ = os.getenv("TZ", "Asia/Tashkent")
 # o'chirilgan bo'lsa ham bot hech narsani buzmasdan ishlayveradi.
 WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rstrip("/")
 
+# Pay Members (whaleuzb/paymembers) — obunani sotadigan to'lov botlari
+# platformasi. Yopiq guruh/kanalga "Qo'shilish" tugmasi FAQAT shu yerda
+# yaratilgan bot manziliga qo'yiladi (`paymembers.py`, 182-band). Kalit
+# Pay Members'dagi SIGNALS_API_KEY bilan bir xil bo'lishi kerak. Bo'sh
+# bo'lsa tekshiruv ishlamaydi — yopiq guruhga tugma ham qo'yib bo'lmaydi
+# (ochiq @nikli guruh/kanallarga ta'sir qilmaydi).
+PAYMEMBERS_URL = os.getenv("PAYMEMBERS_URL", "https://www.paymembers.net").rstrip("/")
+PAYMEMBERS_API_KEY = os.getenv("PAYMEMBERS_API_KEY", "")
+
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")

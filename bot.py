@@ -48,6 +48,7 @@ import news
 import newsai
 import stocks
 import parsing
+import paymembers
 import stats
 import tgsource
 import tracker
@@ -4359,7 +4360,7 @@ async def request_public_approval(ctx: ContextTypes.DEFAULT_TYPE, wid: int) -> N
     ws = await db.get_workspace(wid)
     if not ws:
         return
-    link = ws["invite_link"] or "— (belgilanmagan)"
+    link = paymembers.join_url(ws) or "— (belgilanmagan)"
     txt = ("🛡 <b>/top reytingiga so'rov</b>\n\n"
            f"Guruh: <b>{html.escape(ws['name'])}</b>\n"
            f"Havola: <code>{html.escape(link)}</code>\n\n"
@@ -5002,6 +5003,14 @@ async def handle_channel_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/havola — "Qo'shilish" tugmasini ulash (182-band).
+
+    Egasi endi ixtiyoriy havola KIRITMAYDI: yopiq guruh/kanalga tugma
+    faqat Pay Members orqali yaratilgan, shu chatni boshqaradigan to'lov
+    botiga qo'yiladi. Buyruq Pay Members API'dan shu botni so'raydi va
+    topilsa ulaydi. Ochiq (@nikli) guruh/kanal uchun hech narsa kerak
+    emas — tugma ommaviy manzilga avtomatik chiqadi. Guruhni botga
+    ulashning o'zi (/setup) avvalgidek bepul va shartsiz."""
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -5014,36 +5023,71 @@ async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(i18n.t("su.group_ws_only", lang))
         return
 
-    if not ctx.args:
-        cur = ws["invite_link"] or i18n.t("dep.unset", lang)
-        await update.message.reply_text(
-            i18n.t("inv.current", lang, name=html.escape(ws["name"]),
-                   link=html.escape(cur)),
-            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
-        return
-
-    arg = ctx.args[0].strip()
-    if arg.lower() == "off":
-        await db.set_invite_link(ws["id"], None)
+    name = html.escape(ws["name"])
+    if ctx.args and ctx.args[0].strip().lower() == "off":
+        await db.set_pm_bot(ws["id"], None)
         await update.message.reply_text(i18n.t("inv.off_done", lang),
                                          reply_markup=menu_back_kb(lang))
         return
 
-    if not arg.startswith(("http://", "https://")):
-        arg = "https://" + arg
-    changed = arg != ws["invite_link"]
-    await db.set_invite_link(ws["id"], arg)
-    txt = f"✅ Taklif havolasi saqlandi:\n<code>{html.escape(arg)}</code>"
+    if ws["username"]:
+        await update.message.reply_text(
+            i18n.t("inv.public", lang, name=name, u=ws["username"]),
+            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+        return
 
-    # Havola o'zgarsa db.set_invite_link() tasdiqni bekor qiladi — reytingda
-    # turgan guruh yangi havola bilan qayta tasdiqdan o'tishi kerak.
-    if changed and ws["public"] and ws["public_approved"]:
-        await request_public_approval(ctx, ws["id"])
-        txt += ("\n\n⏳ Havola o'zgargani uchun <code>/top</code> reytingidagi "
-                "tasdiq yangilanishi kerak — moderator ko'rib chiqmaguncha "
-                "guruhingiz reytingda ko'rinmaydi.")
+    try:
+        bot_name = await paymembers.bot_for_chat(ws["group_chat_id"])
+    except paymembers.Unavailable as e:
+        log.warning("Pay Members tekshiruvi o'tmadi (ws=%s): %s", ws["id"], e)
+        await update.message.reply_text(i18n.t("inv.unavailable", lang),
+                                         reply_markup=menu_back_kb(lang))
+        return
+
+    await db.set_pm_bot(ws["id"], bot_name)
+    if bot_name:
+        txt = i18n.t("inv.linked", lang, name=name, bot=bot_name)
+    else:
+        txt = i18n.t("inv.need_pm", lang, name=name, url=config.PAYMEMBERS_URL)
     await update.message.reply_text(txt, parse_mode=ParseMode.HTML,
-                                     reply_markup=menu_back_kb(lang))
+                                     reply_markup=menu_back_kb(lang),
+                                     disable_web_page_preview=True)
+
+
+async def pm_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ulangan to'lov botlarini davriy qayta tekshiradi (har 6 soatda).
+
+    Pay Members'da ega loyihasini o'chirsa, to'xtatilsa (suspended) yoki
+    guruhni boshqa botga o'tkazsa — tugma ham shunga moslashadi. Platforma
+    javob bermasa (`Unavailable`) sikl TO'XTAYDI va hech narsa
+    o'zgartirilmaydi: vaqtinchalik uzilish tufayli barcha tugmalar o'chib
+    ketmasin."""
+    if not config.PAYMEMBERS_API_KEY:
+        return
+    try:
+        rows = await db.pm_linked_workspaces()
+    except Exception:
+        log.exception("pm_job: bazadan o'qib bo'lmadi")
+        return
+    for r in rows:
+        try:
+            bot_name = await paymembers.bot_for_chat(r["group_chat_id"])
+        except paymembers.Unavailable as e:
+            log.warning("pm_job: Pay Members javob bermadi, sikl to'xtatildi: %s", e)
+            return
+        if bot_name == r["pm_bot"]:
+            continue
+        await db.set_pm_bot(r["id"], bot_name)
+        if bot_name is None:
+            olang = await user_lang(r["owner_id"])
+            try:
+                await ctx.bot.send_message(
+                    r["owner_id"],
+                    i18n.t("inv.revoked", olang, name=html.escape(r["name"]),
+                           bot=r["pm_bot"]),
+                    parse_mode=ParseMode.HTML)
+            except Exception:
+                log.warning("pm_job: egaga xabar yuborilmadi (ws=%s)", r["id"])
 
 
 async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5064,8 +5108,9 @@ async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         medal = medals[i] if i < 3 else f"{i + 1}."
         wr = r["wins"] / r["total"] * 100 if r["total"] else 0
         name = html.escape(r["name"])
-        if r["invite_link"]:
-            name_txt = f'<a href="{html.escape(r["invite_link"], quote=True)}">{name}</a>'
+        url = paymembers.join_url(r)
+        if url:
+            name_txt = f'<a href="{html.escape(url, quote=True)}">{name}</a>'
         else:
             name_txt = name
         lines.append(
@@ -7227,6 +7272,8 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    # Pay Members to'lov botlari hali faolmi (182-band).
+    app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)
     # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
     app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
     app.job_queue.run_repeating(binance_listing_job, interval=90, first=60)

@@ -414,6 +414,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(ref_code)
 -- yo'q, kanalda esa obunachilar signal BERMAYDI, faqat o'qiydi.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS allow_member_signals
     BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Yopiq guruh/kanalning Pay Members'dagi to'lov boti (username, @siz).
+-- "Qo'shilish" tugmasi FAQAT shu botga olib boradi (182-band). Faqat
+-- Pay Members API tasdiqlagandan keyin yoziladi va `pm_job` uni davriy
+-- qayta tekshiradi. Eski `invite_link` ustuni endi o'qilmaydi — egasi
+-- ixtiyoriy havola qo'ya olmaydi; ustun tarix uchun bazada qoldi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS pm_bot TEXT;
 """
 
 
@@ -605,15 +612,24 @@ async def set_allow_member_signals(workspace_id: int, allow: bool) -> None:
                         workspace_id, allow)
 
 
-async def set_invite_link(workspace_id: int, link: str | None) -> None:
-    """Havola o'zgarsa /top tasdig'i BEKOR qilinadi. Aks holda moderatsiya
-    ma'nosiz bo'lardi: guruh zararsiz havola bilan tasdiqlanib, keyin uni
-    fishing havolasiga almashtirib qo'yishi mumkin edi."""
+async def set_pm_bot(workspace_id: int, bot_username: str | None) -> None:
+    """Pay Members tasdiqlagan to'lov boti (None — tugma olib tashlanadi).
+
+    Eski `set_invite_link` bu yerda /top tasdig'ini bekor qilardi, chunki
+    egasi ixtiyoriy (fishing ham bo'lishi mumkin) havola qo'yardi. Bu
+    qiymatni esa ega emas, Pay Members API beradi — tasdiq saqlanadi."""
     async with pool().acquire() as c:
-        await c.execute(
-            "UPDATE workspaces SET invite_link=$2, "
-            "public_approved = (public_approved AND invite_link IS NOT DISTINCT FROM $2) "
-            "WHERE id=$1", workspace_id, link)
+        await c.execute("UPDATE workspaces SET pm_bot=$2 WHERE id=$1",
+                        workspace_id, bot_username)
+
+
+async def pm_linked_workspaces() -> list[asyncpg.Record]:
+    """`pm_job` uchun — to'lov boti ulangan barcha workspace'lar."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, owner_id, name, group_chat_id, pm_bot FROM workspaces "
+            "WHERE pm_bot IS NOT NULL AND group_chat_id IS NOT NULL "
+            "AND NOT archived ORDER BY id")
 
 
 async def set_public_approved(workspace_id: int, approved: bool) -> None:
@@ -1404,7 +1420,7 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     """/top reytingi uchun — faqat public=TRUE guruh workspace'lari, shu davrda
     yopilgan signallar bo'yicha. Shaxsiy workspace'lar reytingga kirmaydi."""
     q = f"""
-    SELECT w.id, w.name, w.invite_link, COUNT(*) AS total,
+    SELECT w.id, w.name, w.username, w.pm_bot, COUNT(*) AS total,
            COUNT(*) FILTER (WHERE s.pnl_pct > 0) AS wins,
            COALESCE(SUM(s.pnl_pct), 0) AS sum_pct
     FROM signals s
@@ -1412,7 +1428,7 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived AND s.status IN {CLOSED} AND NOT s.excluded
       AND s.closed_at >= $1 AND s.closed_at < $2
-    GROUP BY w.id, w.name, w.invite_link
+    GROUP BY w.id, w.name, w.username, w.pm_bot
     ORDER BY sum_pct DESC
     LIMIT $3
     """

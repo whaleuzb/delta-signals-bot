@@ -6173,3 +6173,58 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      27+11+8+9+7 va `test_tracker.py` o'tdi (`test_confirm_gate`/
      `test_member_alloc` soxta `from_user`iga `username` qo'shildi —
      haqiqiy Telegram `User`da u doim bor).
+
+182. **Yopiq guruh/kanalga "Qo'shilish" tugmasi — faqat Pay Members boti.**
+     Foydalanuvchi: "Agar o'z yopiq guruhini botga qo'shib unga qo'shilish
+     linkini qoldirmoqchi bo'lsa u paymember dan foydalanib ochilgan guruh
+     bo'lishi kerak. Yopiq guruhni qo'shish tekin, ammo unga qo'shilish
+     tugmasini chiqarish uchun paymember orqali yaratilgan bot orqaligina
+     link qo'ya olsin."
+
+     **Nima o'zgardi:** egasi endi ixtiyoriy havola (`/havola <link>`)
+     kirita OLMAYDI. `invite_link` ustuni hech qayerda o'qilmaydi (tarix
+     uchun bazada qoldi), `db.set_invite_link` olib tashlandi. O'rniga
+     `workspaces.pm_bot` — Pay Members tasdiqlagan to'lov boti username'i.
+     Havolaning YAGONA manbai `paymembers.join_url(ws)`: ochiq @nik bo'lsa
+     `t.me/<nik>` (bepul, o'zgarmadi), yopiq bo'lsa FAQAT `t.me/<pm_bot>`,
+     aks holda tugma yo'q. Ishlatiladigan joylar: ochiq sahifa
+     (`web.group_page`), `/top` reytingi (`db.top_workspaces` endi
+     `username, pm_bot` qaytaradi), moderatorga yuboriladigan so'rov.
+     Guruhni ulash (`/setup`) avvalgidek bepul va shartsiz.
+
+     **Tekshiruv:** Pay Members'ga (whaleuzb/paymembers, commit acbc05d)
+     `GET /api/signals/chat-bot?chat_id=…` qo'shildi — `X-Api-Key`
+     sarlavhasi (`SIGNALS_API_KEY`, doimiy vaqtda solishtiriladi),
+     `merchants` jadvalidan `status='active'` va `group_chat_id` yoki
+     `channel_chat_id` mos kelgan eng yangi qatorning `bot_username`i.
+     Faqat username qaytadi. Kalit bo'sh bo'lsa endpoint 404.
+     Bu tomonda `config.PAYMEMBERS_URL` (standart
+     `https://www.paymembers.net`) va `PAYMEMBERS_API_KEY` (Railway bot
+     servisida o'rnatilgan, Pay Members `web` servisidagi
+     `SIGNALS_API_KEY` bilan bir xil).
+
+     **`/havola`:** ochiq guruhga — "tugma avtomatik". Yopiq guruhga —
+     API so'raladi: topilsa `pm_bot` yoziladi ("✅ ulandi: @bot"), topilmasa
+     tushuntirish (paymembers.net'da bot yarating va guruhni ulang, keyin
+     qayta `/havola`). `/havola off` — o'chiradi. Argument sifatida
+     berilgan har qanday havola e'tiborsiz qoldiriladi.
+
+     **Ikki xil "yo'q" (`paymembers.py`):** `None` — platforma aniq "bizda
+     yo'q" dedi; `Unavailable` — javob olinmadi (tarmoq, 403/5xx, kalit
+     yo'q, yaroqsiz username). Ikkinchisida HECH NARSA o'zgartirilmaydi.
+     `pm_job` (har 6 soatda): ulangan har bir workspace'ni qayta
+     tekshiradi; bot almashgan bo'lsa yangilaydi, faol bo'lmasa `pm_bot`
+     ni o'chiradi va egaga xabar beradi; `Unavailable` bo'lsa siklni
+     to'xtatadi — platforma bir soat ishlamay qolsa barcha tugmalar
+     o'chib ketmasin. Username `[A-Za-z0-9_]{4,32}` bilan tekshiriladi,
+     chunki u to'g'ridan-to'g'ri HTML/havolaga tushadi.
+
+     `/top` tasdig'i `pm_bot` o'zgarganda BEKOR QILINMAYDI (eski
+     `set_invite_link` bekor qilardi): u egasi yozgan ixtiyoriy havolaga
+     qarshi himoya edi, `pm_bot`ni esa ega emas, Pay Members beradi.
+
+     Sinov: `test_pm_link.py` 26/26 (join_url qoidasi, API mijozi
+     `httpx.MockTransport` bilan, `/havola` barcha holatlari, `pm_job`,
+     ochiq sahifa tugmasi — eski fishing havolasi chiqmasligi), Pay
+     Members tomonida `test_pm_api.py` 8/8 (sqlite, Flask test client).
+     Avvalgi sinovlar o'zgarishsiz o'tdi.

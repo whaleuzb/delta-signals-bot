@@ -1811,24 +1811,68 @@ STRINGS: dict[str, dict[str, str]] = {
                "If you are a group admin, type <code>/public on</code> to show yours."),
     },
 
-    # --- /havola (guruh taklif havolasi) ---
-    "inv.current": {
-        "uz": ("\"{name}\" guruhingizning taklif havolasi: <b>{link}</b>\n\n"
-               "<code>/top</code> reytingida guruh nomi shu havolaga link qilinadi.\n\n"
-               "Belgilash: <code>/havola https://t.me/+abc123</code>\n"
+    # --- /havola ("Qo'shilish" tugmasi — faqat Pay Members boti, 182) ---
+    "inv.linked": {
+        "uz": ("✅ \"{name}\" uchun «Qo'shilish» tugmasi ulandi: @{bot}\n\n"
+               "Ochiq sahifada va <code>/top</code> reytingida tugma shu to'lov "
+               "botiga olib boradi — u obunani sotadi va guruhga qo'shadi.\n\n"
                "O'chirish: <code>/havola off</code>"),
-        "ru": ("Пригласительная ссылка группы «{name}»: <b>{link}</b>\n\n"
-               "В рейтинге <code>/top</code> название группы ведёт на эту ссылку.\n\n"
-               "Задать: <code>/havola https://t.me/+abc123</code>\n"
+        "ru": ("✅ Кнопка «Вступить» для «{name}» подключена: @{bot}\n\n"
+               "На открытой странице и в рейтинге <code>/top</code> кнопка ведёт "
+               "в этого платёжного бота — он продаёт подписку и добавляет в группу.\n\n"
                "Убрать: <code>/havola off</code>"),
-        "en": ("The invite link of \"{name}\": <b>{link}</b>\n\n"
-               "In the <code>/top</code> ranking the group name links here.\n\n"
-               "Set it: <code>/havola https://t.me/+abc123</code>\n"
-               "Remove it: <code>/havola off</code>"),
+        "en": ("✅ The “Join” button for “{name}” is connected: @{bot}\n\n"
+               "On the public page and in the <code>/top</code> ranking the button "
+               "leads to this payment bot — it sells the subscription and adds "
+               "people to the group.\n\nRemove it: <code>/havola off</code>"),
+    },
+    "inv.need_pm": {
+        "uz": ("🔒 \"{name}\" — yopiq guruh. Unga «Qo'shilish» tugmasi faqat "
+               "<b>Pay Members</b> orqali yaratilgan to'lov boti bilan qo'yiladi.\n\n"
+               "Guruhni Trade Controller'ga ulash bepul — bu faqat qo'shilish "
+               "tugmasi uchun.\n\n"
+               "1. {url} saytida to'lov botingizni yarating va shu guruhni ulang\n"
+               "2. Bot faollashgach, bu yerda qayta <code>/havola</code> yozing"),
+        "ru": ("🔒 «{name}» — закрытая группа. Кнопку «Вступить» можно поставить "
+               "только с платёжным ботом, созданным через <b>Pay Members</b>.\n\n"
+               "Подключить группу к Trade Controller — бесплатно, это условие "
+               "только для кнопки вступления.\n\n"
+               "1. Создайте платёжного бота на {url} и подключите эту группу\n"
+               "2. Когда бот активен, снова напишите здесь <code>/havola</code>"),
+        "en": ("🔒 “{name}” is a private group. A “Join” button can only point to "
+               "a payment bot created with <b>Pay Members</b>.\n\n"
+               "Connecting the group to Trade Controller is free — this applies "
+               "only to the join button.\n\n"
+               "1. Create your payment bot at {url} and connect this group\n"
+               "2. Once the bot is active, type <code>/havola</code> here again"),
+    },
+    "inv.public": {
+        "uz": ("🌐 \"{name}\" ochiq (@{u}) — «Qo'shilish» tugmasi uning ommaviy "
+               "manziliga avtomatik chiqadi, hech narsa sozlash shart emas."),
+        "ru": ("🌐 «{name}» открытая (@{u}) — кнопка «Вступить» автоматически "
+               "ведёт на её публичный адрес, настраивать ничего не нужно."),
+        "en": ("🌐 “{name}” is public (@{u}) — the “Join” button automatically "
+               "points to its public address, nothing to set up."),
+    },
+    "inv.unavailable": {
+        "uz": "⚠️ Pay Members bilan hozir bog'lanib bo'lmadi. Birozdan keyin qayta urinib ko'ring.",
+        "ru": "⚠️ Сейчас не удалось связаться с Pay Members. Попробуйте чуть позже.",
+        "en": "⚠️ Couldn't reach Pay Members right now. Please try again a bit later.",
+    },
+    "inv.revoked": {
+        "uz": ("ℹ️ \"{name}\" uchun Pay Members boti (@{bot}) endi faol emas — "
+               "«Qo'shilish» tugmasi olib tashlandi. Bot qayta faollashgach "
+               "<code>/havola</code> yozing."),
+        "ru": ("ℹ️ Бот Pay Members (@{bot}) для «{name}» больше не активен — "
+               "кнопка «Вступить» убрана. Когда бот снова заработает, напишите "
+               "<code>/havola</code>."),
+        "en": ("ℹ️ The Pay Members bot (@{bot}) for “{name}” is no longer active — "
+               "the “Join” button was removed. Once the bot is active again, "
+               "type <code>/havola</code>."),
     },
     "inv.off_done": {
-        "uz": "🔒 Taklif havolasi o'chirildi.", "ru": "🔒 Пригласительная ссылка убрана.",
-        "en": "🔒 The invite link was removed.",
+        "uz": "🔒 «Qo'shilish» tugmasi o'chirildi.", "ru": "🔒 Кнопка «Вступить» убрана.",
+        "en": "🔒 The “Join” button was removed.",
     },
 
     # --- /hisobot (kunlik yakun sozlamasi) ---
@@ -2139,13 +2183,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "top.footer": {
         "uz": ("Guruhingizni shu reytingda ko'rsatish uchun admin "
                "<code>/public on</code> yozsin.\nGuruh nomini bosilganda o'z "
-               "guruhingizga yo'naltirish uchun: <code>/havola &lt;link&gt;</code>"),
+               "guruhingizga yo'naltirish uchun: <code>/havola</code> (yopiq guruh — "
+               "faqat Pay Members to'lov boti orqali)"),
         "ru": ("Чтобы группа попала в этот рейтинг, админ должен написать "
                "<code>/public on</code>.\nЧтобы клик по названию вёл в вашу "
-               "группу: <code>/havola &lt;link&gt;</code>"),
+               "группу: <code>/havola</code> (закрытая группа — только через "
+               "платёжного бота Pay Members)"),
         "en": ("To show your group in this ranking, its admin should type "
                "<code>/public on</code>.\nTo make the group name link to your "
-               "group: <code>/havola &lt;link&gt;</code>"),
+               "group: <code>/havola</code> (private group — only via a "
+               "Pay Members payment bot)"),
     },
     "top.trades": {
         "uz": "{n} savdo", "ru": "{n} сделок", "en": "{n} trades",

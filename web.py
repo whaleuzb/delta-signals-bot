@@ -25,6 +25,7 @@ from aiohttp import web
 import chart
 import db
 import i18n
+import paymembers
 import stats
 import tracker
 
@@ -968,26 +969,12 @@ async def group_page(request):
     # kichkina matn havolasi edi va ko'zga tashlanmasdi; endi to'liq
     # tugma, sarlavha ostida alohida qatorda.
     #
-    # ⚠️ KANALDA `invite_link` HECH QACHON to'ldirilmaydi. Guruh egasi uni
-    # `/havola` bilan qo'lda kiritadi, kanal esa `my_chat_member` orqali
-    # ulanadi va u oqimda havola umuman so'ralmaydi. Ommaviy kanalning
-    # manzili — `username` (uni `logo_job` `get_chat` javobidan oladi).
-    # Shu sabab ilgari kanal sahifasida tugma UMUMAN chiqmasdi, holbuki
-    # bosh ro'yxatdagi kartochkada bor edi.
-    #
-    # Ustunlik tartibi turga qarab: kanalda `username` birinchi (o'zi
-    # ommaviy manzil), guruhda `invite_link` birinchi (egasi ataylab
-    # kiritgan, yopiq guruhga kirishning yagona yo'li ham shu).
-    join_url = join_key = ""
-    if ws["is_channel"]:
-        if ws["username"]:
-            join_url, join_key = f"https://t.me/{ws['username']}", "w.join_channel_btn"
-        elif ws["invite_link"]:
-            join_url, join_key = ws["invite_link"], "w.join_channel_btn"
-    elif ws["invite_link"]:
-        join_url, join_key = ws["invite_link"], "w.join_btn"
-    elif ws["username"]:
-        join_url, join_key = f"https://t.me/{ws['username']}", "w.join_btn"
+    # Havola `paymembers.join_url()` dan — bot bilan BITTA qoida (182-band):
+    # ochiq @nik bo'lsa o'sha, yopiq guruh/kanal bo'lsa FAQAT Pay Members
+    # tasdiqlagan to'lov boti. Egasi kiritgan ixtiyoriy `invite_link` endi
+    # ishlatilmaydi.
+    join_url = paymembers.join_url(ws) or ""
+    join_key = "w.join_channel_btn" if ws["is_channel"] else "w.join_btn"
 
     invite = ""
     if join_url:
