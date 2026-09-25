@@ -6123,3 +6123,53 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_member_alloc.py` 7/7 (eski kodda 4 tasi YIQILDI —
      teshik tasdiqlandi), qolgan a'zo-signal sinovlari 27+11+8+9 va
      `test_tracker.py` o'zgarishsiz o'tdi.
+
+181. **A'zo O'Z signalini boshqaradi + har bir signalda muallif ko'rsatiladi.**
+     Foydalanuvchi: "Signal aynan qaysi a'zodan berilganligi bilinsin.
+     Ya'ni username si yoki profili har bir kiritilgan signalda
+     belgilansin. Shuningdek signalni tahrirlay olishi va vaqtidan oldin
+     yopa olishi kerak." Bu 179-banddagi "boshqaruv kengaytirilmadi"
+     qarorini ongli ravishda o'zgartiradi — endi egasi aniq so'radi.
+
+     **Huquq — `can_manage_signal(bot, uid, ws, sig)`:** egasi/admin HAR
+     QANDAY signalni; oddiy a'zo FAQAT `author_id == uid` bo'lgan signalni
+     va faqat `can_submit_signal()` hozir ham True bo'lsa (sozlama yoqiq +
+     jonli guruh a'zoligi). Egasi funksiyani o'chirsa yoki a'zo chiqib
+     ketsa — a'zo o'z ochiq signallarini ham boshqara olmaydi, boshqaruv
+     egasida qoladi. Muallifsiz eski signallar (`author_id` NULL) — faqat
+     egasi. `can_manage` o'rniga shu funksiya qo'yilgan joylar:
+     `_manage_guard` (6 ta tugma: ekran, BE, stop, kirish, TP, qisman
+     yopish), `handle_manage_input` (stop/TP/kirish matni — 3 joy),
+     `handle_tpsl_input`, `on_tpsl_button`, `on_close_request`,
+     `on_close_confirm`, `cmd_cancel`. `_manage_guard` endi `bot`ni ham
+     oladi (jonli a'zolik tekshiruvi uchun).
+
+     **Egasida qolganlar (`can_manage`):** depozit, summa ajratish
+     (`on_alloc_*`, `AWAITING_ALLOC` — 180), "kanalga ham qo'shish"
+     (`on_signal_copy`). `manage_view(full=False)` a'zoga kiritilgan
+     summani va jonli foyda/zarar SUMMASINI ko'rsatmaydi (foiz qoladi),
+     nusxa tugmasini ham chiqarmaydi. Qo'lda yopishda depozit hamon
+     avtomatik yangilanadi — bu buxgalteriya, kim yopganiga bog'liq emas.
+
+     **Ochiq signallar ro'yxati:** a'zoga faqat o'z signallari yonida
+     "⚙️ Boshqarish" tugmasi (jonli tekshiruv butun ro'yxat uchun bir
+     marta); egasiga har bir a'zo signali yonida `· 👤 @user`.
+
+     **Muallif qatori (`sig.author`: "👤 Signal berdi: @user"):**
+     `author_html()` — `@username`, bo'lmasa `tg://user?id=` havolali ism
+     (HTML-escape bilan). `shows_author(ws, author_id)`: faqat guruhda
+     (kanal/shaxsiy emas) va (funksiya yoqiq YOKI muallif egasi emas) —
+     ya'ni funksiyani yoqmagan guruhlarning postlari o'zgarmaydi, lekin
+     funksiya keyin o'chirilsa ham eski a'zo signallari belgili qoladi.
+     Qo'shilgan joylar: guruh posti (tasdiqlashda, `q.from_user`dan),
+     yakuniy ko'rik (`send_final_preview`, "shu ko'rinishda yuboriladi"
+     va'dasi uchun), "TP/SL joylashtirildi" guruh xabari (`users`
+     jadvalidan). Hodisa xabarlari (TP, stop, yopildi) asl postga JAVOB
+     sifatida ketadi — muallif u yerda allaqachon ko'rinadi.
+
+     Sinov: `test_member_manage.py` 41/41 (ruxsat matritsasi, boshqaruv
+     ekranida pul yashirilishi, stop matni, yopish, ro'yxat tugmalari,
+     muallif qatori qoidalari, guruh posti, `/cancel`). Avvalgi sinovlar:
+     27+11+8+9+7 va `test_tracker.py` o'tdi (`test_confirm_gate`/
+     `test_member_alloc` soxta `from_user`iga `username` qo'shildi —
+     haqiqiy Telegram `User`da u doim bor).

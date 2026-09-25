@@ -108,17 +108,81 @@ async def can_submit_signal(bot, uid: int, ws) -> bool:
     chiqib ketgan odam ham signal berishda davom etardi, majburiy
     obunadagi 178-band bilan bir xil xato).
 
-    ⚠️ Bu funksiya FAQAT signal YOZISH (kiritish) huquqi — mavjud
-    signalni yopish/TP-SL o'zgartirish HAMON faqat `can_manage()`
-    (egasi/admin). Foydalanuvchi aniq "signal kiritish" so'radi,
-    boshqaruvni emas — kengroq huquq berish so'ralmagan va xavfliroq
-    (a'zo boshqa a'zoning yoki eganing pozitsiyasini yopib qo'yishi
-    mumkin bo'lardi)."""
+    ⚠️ Bu funksiya FAQAT signal YOZISH (kiritish) huquqi. Mavjud signalni
+    boshqarish — `can_manage_signal()` (181-band: a'zo faqat O'ZI bergan
+    signalni)."""
     if can_manage(uid, ws):
         return True
     if ws["type"] != "group" or ws["is_channel"] or not ws["allow_member_signals"]:
         return False
     return await can_view(bot, uid, ws)
+
+
+async def can_manage_signal(bot, uid: int, ws, sig) -> bool:
+    """Mavjud signalni boshqarish (stop/TP/kirish o'zgartirish, qisman va
+    to'liq yopish, bekor qilish, TP/SL qo'shish).
+
+    Egasi/admin — guruhdagi HAR QANDAY signalni. Oddiy a'zo — FAQAT O'ZI
+    bergan signalni (`author_id`) va faqat hozir ham signal bera olsa
+    (`can_submit_signal`: sozlama yoqilgan + hali guruhda). Ya'ni egasi
+    funksiyani o'chirsa yoki a'zo guruhdan chiqsa, uning ochiq signallari
+    boshqaruvi ham DARHOL egasiga qaytadi. Bir a'zo boshqa a'zoning yoki
+    eganing signaliga tegolmaydi.
+
+    Depozit va pul summalari bu huquqqa KIRMAYDI — ular egasiniki
+    (`manage_view(full=False)`, `on_alloc_*` hamon `can_manage`)."""
+    if can_manage(uid, ws):
+        return True
+    if not sig["author_id"] or sig["author_id"] != uid:
+        return False
+    return await can_submit_signal(bot, uid, ws)
+
+
+def author_html(uid: int, username: str | None, first_name: str | None) -> str:
+    """Signal muallifi: `@username` bo'lsa shu (bosilsa profil ochiladi),
+    bo'lmasa ismi profilga havola sifatida."""
+    if username:
+        return "@" + username
+    name = html.escape(first_name or str(uid), quote=False)
+    return f'<a href="tg://user?id={uid}">{name}</a>'
+
+
+def shows_author(ws, author_id) -> bool:
+    """Muallif qatori qachon chiqadi: faqat guruhda (kanal va shaxsiy
+    jurnalda signal doim egasiniki) va a'zolar signal berishi yoqilgan
+    bo'lsa — yoki signalni egasidan boshqa odam bergan bo'lsa (funksiya
+    keyin o'chirilgan bo'lsa ham eski a'zo signallari belgili qoladi).
+    Funksiyani yoqmagan guruhlarda postlar avvalgidek o'zgarmaydi."""
+    if not author_id or ws["type"] != "group" or ws["is_channel"]:
+        return False
+    return bool(ws["allow_member_signals"]) or author_id != ws["owner_id"]
+
+
+def author_line(ws, uid: int, username: str | None, first_name: str | None,
+                lang: str | None) -> str:
+    """Signal matni oxiriga qo'shiladigan qator (kerak bo'lmasa bo'sh)."""
+    if not shows_author(ws, uid):
+        return ""
+    return "\n\n" + i18n.t("sig.author", lang, who=author_html(uid, username, first_name))
+
+
+async def user_author_line(ws, uid: int, lang: str | None) -> str:
+    """`author_line` — ism bazadagi `users`dan (u har bir update'da
+    yangilanadi, `gate`ga qarang)."""
+    if not shows_author(ws, uid):
+        return ""
+    u = None
+    try:
+        u = await db.get_user(uid)
+    except Exception:
+        log.warning("Muallif o'qilmadi (uid=%s)", uid, exc_info=True)
+    return author_line(ws, uid, u["username"] if u else None,
+                       u["first_name"] if u else None, lang)
+
+
+async def sig_author_line(ws, sig, lang: str | None) -> str:
+    """`author_line` — mavjud signal uchun."""
+    return await user_author_line(ws, sig["author_id"], lang)
 
 
 async def can_view(bot, uid: int, ws) -> bool:
@@ -1111,14 +1175,20 @@ async def on_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                 reply_markup=InlineKeyboardMarkup(kb))
 
 
-async def open_signals_view(ws, uid: int,
-                             lang: str | None = None) -> tuple[str, InlineKeyboardMarkup | None]:
+async def open_signals_view(ws, uid: int, lang: str | None = None,
+                             bot=None) -> tuple[str, InlineKeyboardMarkup | None]:
     rows = await db.live_signals(ws["id"])
     if not rows:
         return i18n.t("op.none", lang), None
     lines = [i18n.t("op.head", lang), ""]
     kb_rows = []
     manage = can_manage(uid, ws)
+    # A'zo (181) — faqat O'Z signallari yonida boshqaruv tugmasi. Jonli
+    # a'zolik tekshiruvi bir marta, butun ro'yxat uchun.
+    own = (not manage and bot is not None
+           and any(s["author_id"] == uid for s in rows)
+           and await can_submit_signal(bot, uid, ws))
+    authors: dict[int, str] = {}   # a'zo signallari yonidagi muallif (181)
     for s in rows:
         price = await safe_last_price(s["market"], s["symbol"])
         cur = ""
@@ -1132,11 +1202,23 @@ async def open_signals_view(ws, uid: int,
             mark = "▶️"  # narx olinmadi — yo'nalishni bilib bo'lmadi
         else:
             mark = "📈" if p >= 0 else "📉"  # joriy foyda/zararga qarab
+        who = ""
+        a = s["author_id"]
+        if shows_author(ws, a) and a != ws["owner_id"]:
+            if a not in authors:
+                u = None
+                try:
+                    u = await db.get_user(a)
+                except Exception:
+                    log.warning("Muallif o'qilmadi (uid=%s)", a, exc_info=True)
+                authors[a] = author_html(a, u["username"] if u else None,
+                                         u["first_name"] if u else None)
+            who = f" · 👤 {authors[a]}"
         lines.append(
             f"{mark} <code>#{s['id']}</code> {s['symbol']} {s['side']} "
-            f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}"
+            f"@ {fmt_price(float(s['entry']))} — TP{s['tp_hit']}/{len(s['tps'])}{cur}{who}"
         )
-        if manage:
+        if manage or (own and s["author_id"] == uid):
             kb_rows.append([InlineKeyboardButton(
                 i18n.t("op.btn_manage", lang, sid=s["id"], sym=s["symbol"]),
                 callback_data=f"mng:{s['id']}")])
@@ -1190,7 +1272,11 @@ async def copy_target(sig) -> "asyncpg.Record | None":
     return None
 
 
-async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
+async def manage_view(sig, lang: str | None = None,
+                      full: bool = True) -> tuple[str, InlineKeyboardMarkup]:
+    """`full=False` — signal muallifi bo'lgan oddiy a'zo uchun (181):
+    narx boshqaruvi to'liq, lekin egasining puli (kiritilgan summa, jonli
+    foyda/zarar summasi) va "kanalga ham qo'shish" tugmasi ko'rsatilmaydi."""
     entry = float(sig["entry"])
     sid = sig["id"]
     # PENDING — signal hali entryga TEGMAGAN (limit hali bajarilmagan).
@@ -1232,7 +1318,8 @@ async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboard
     # `alloc_amount` — 170-banddagi hajm (bo'sh depozitdan oshmaydigan).
     # Narxga bog'liq EMAS, shuning uchun quyidagi `if price` shartidan
     # OLDIN, har doim ko'rsatiladi (hajm belgilangan bo'lsa).
-    alloc = float(sig["alloc_amount"]) if sig["alloc_amount"] is not None else None
+    alloc = (float(sig["alloc_amount"])
+             if full and sig["alloc_amount"] is not None else None)
     if alloc is not None:
         lines.append(i18n.t("man.invested", lang, amt=alloc))
     if filled > 0:
@@ -1275,7 +1362,7 @@ async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboard
     # Savdo ikkinchi joyda (kanal/guruh) ham e'lon qilingan bo'lsa —
     # natijani u yerda ham sanash. Tugma faqat qo'shish MUMKIN bo'lganda
     # chiqadi: ikkinchi workspace bor va hali nusxalanmagan.
-    tgt = await copy_target(sig)
+    tgt = await copy_target(sig) if full else None
     if tgt:
         rows.append([InlineKeyboardButton(
             i18n.t("man.btn_copy_ch" if tgt["is_channel"] else "man.btn_copy_gr", lang),
@@ -1288,7 +1375,7 @@ async def manage_view(sig, lang: str | None = None) -> tuple[str, InlineKeyboard
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
-async def _manage_guard(q):
+async def _manage_guard(q, bot):
     """Signalni oladi va huquqni tekshiradi. Mos bo'lmasa (None, None)."""
     lang = await user_lang(q.from_user.id)
     sig = await db.get_signal(int(q.data.split(":")[1]))
@@ -1296,7 +1383,7 @@ async def _manage_guard(q):
         await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=menu_back_kb(lang))
         return None, None
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(q.from_user.id, ws):
+    if not ws or not await can_manage_signal(bot, q.from_user.id, ws, sig):
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return None, None
     return sig, ws
@@ -1319,7 +1406,9 @@ async def _show_manage(q, sig_id: int) -> None:
     sig = await db.get_signal(sig_id)
     if not sig:
         return
-    text, kb = await manage_view(sig, await user_lang(q.from_user.id))
+    ws = await db.get_workspace(sig["workspace_id"])
+    full = bool(ws) and can_manage(q.from_user.id, ws)
+    text, kb = await manage_view(sig, await user_lang(q.from_user.id), full=full)
     try:
         await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception:
@@ -1329,7 +1418,7 @@ async def _show_manage(q, sig_id: int) -> None:
 async def on_manage(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    sig, _ = await _manage_guard(q)
+    sig, _ = await _manage_guard(q, ctx.bot)
     if sig:
         await _show_manage(q, sig["id"])
 
@@ -1339,7 +1428,7 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     shuning uchun alohida tugma."""
     q = update.callback_query
     await q.answer()
-    sig, ws = await _manage_guard(q)
+    sig, ws = await _manage_guard(q, ctx.bot)
     if not sig:
         return
     lang = await user_lang(q.from_user.id)
@@ -1373,7 +1462,7 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    sig, _ = await _manage_guard(q)
+    sig, _ = await _manage_guard(q, ctx.bot)
     if not sig:
         return
     AWAITING_SL[q.from_user.id] = sig["id"]
@@ -1386,7 +1475,7 @@ async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    sig, _ = await _manage_guard(q)
+    sig, _ = await _manage_guard(q, ctx.bot)
     if not sig:
         return
     lang = await user_lang(q.from_user.id)
@@ -1403,7 +1492,7 @@ async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    sig, _ = await _manage_guard(q)
+    sig, _ = await _manage_guard(q, ctx.bot)
     if not sig:
         return
     AWAITING_TPS[q.from_user.id] = sig["id"]
@@ -1417,7 +1506,7 @@ async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    sig, ws = await _manage_guard(q)
+    sig, ws = await _manage_guard(q, ctx.bot)
     if not sig:
         return
     pct = int(q.data.split(":")[2])
@@ -1512,7 +1601,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
                     parse_mode=ParseMode.HTML)
                 return True
         ws = await db.get_workspace(sig["workspace_id"])
-        if not ws or not can_manage(uid, ws):
+        if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
         await db.set_stop(sig_id, price)
         await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig_id,
@@ -1539,7 +1628,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             await msg.reply_text(i18n.t("man.tps_too_few", lang, n=sig["tp_hit"]))
             return True
         ws = await db.get_workspace(sig["workspace_id"])
-        if not ws or not can_manage(uid, ws):
+        if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
         tps = sorted(set(tps), reverse=(sig["side"] == "SHORT"))
         await db.set_tps(sig_id, tps)
@@ -1579,7 +1668,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
                 await msg.reply_text(i18n.t("man.entry_conflict", lang, err=err))
                 return True
         ws = await db.get_workspace(sig["workspace_id"])
-        if not ws or not can_manage(uid, ws):
+        if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
         await db.set_entry(sig_id, price)
         await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig_id,
@@ -1632,7 +1721,7 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
         return True
 
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(uid, ws):
+    if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
         return True
 
     await db.set_tp_sl(sig_id, parsed["sl"], tps)
@@ -1647,7 +1736,8 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
                                         sym=sig["symbol"],
-                                        body=draft_text(d, sig_id, ws_lang(ws))))
+                                        body=draft_text(d, sig_id, ws_lang(ws))
+                                        + await sig_author_line(ws, sig, ws_lang(ws))))
     return True
 
 
@@ -1663,7 +1753,7 @@ async def on_tpsl_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await q.answer(i18n.t("tpsl.not_needed", lang), show_alert=True)
         return
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(q.from_user.id, ws):
+    if not ws or not await can_manage_signal(ctx.bot, q.from_user.id, ws, sig):
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
     AWAITING_TPSL[q.from_user.id] = sig_id
@@ -1681,7 +1771,8 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         await q.edit_message_text(i18n.t("man.gone", lang), reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(q.from_user.id, ws):
+    if not ws or not await can_manage_signal(ctx.bot, q.from_user.id, ws, sig):
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
 
     if sig["status"] == "PENDING":
@@ -1716,7 +1807,8 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         await q.edit_message_text(i18n.t("close.not_found", lang), reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(q.from_user.id, ws):
+    if not ws or not await can_manage_signal(ctx.bot, q.from_user.id, ws, sig):
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
 
     ev = await tracker.close_now(sig_id)
@@ -1995,7 +2087,7 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                     reply_markup=symbols_nav_kb(None, None, lang))
     elif action == "open":
         async with busy(ctx.bot, q.message.chat_id):
-            text, kb = await open_signals_view(ws, q.from_user.id, lang)
+            text, kb = await open_signals_view(ws, q.from_user.id, lang, ctx.bot)
         rows = (list(kb.inline_keyboard) if kb else []) + list(menu_back_kb(lang).inline_keyboard)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML,
                                     reply_markup=InlineKeyboardMarkup(rows))
@@ -2819,6 +2911,11 @@ async def send_final_preview(target, ctx, token: str) -> None:
     lang = item.get("lang")
     glang = item.get("glang")
     caption = draft_text(d, lang=lang)
+    # Guruhda muallif qatori chiqadigan bo'lsa (181) — ko'rikda ham,
+    # "shu ko'rinishda yuboriladi" va'dasi buzilmasin.
+    pws = await db.get_workspace(item["workspace_id"])
+    if pws:
+        caption += await user_author_line(pws, item["user"], lang)
     if item["warn"]:
         caption += "\n\n" + "\n".join(item["warn"])
     # Guruh tili boshqacha bo'lsa — buni OCHIQ aytamiz. Ko'rik odamning
@@ -3133,7 +3230,9 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
-        body = draft_text(d, sig_id, ws_lang(ws))
+        body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
+            ws, q.from_user.id, q.from_user.username, q.from_user.first_name,
+            ws_lang(ws))
         try:
             if post_file_id:
                 sent = await ctx.bot.send_photo(
@@ -4152,7 +4251,7 @@ async def cmd_open(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     lang = await user_lang(update.effective_user.id)
     async with busy(ctx.bot, update.effective_chat.id):
-        text, kb = await open_signals_view(ws, update.effective_user.id, lang)
+        text, kb = await open_signals_view(ws, update.effective_user.id, lang, ctx.bot)
     rows = ((list(kb.inline_keyboard) if kb else [])
             + list(menu_back_kb(lang).inline_keyboard))
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
@@ -4170,7 +4269,7 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                          reply_markup=menu_back_kb(lang))
         return
     ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not can_manage(update.effective_user.id, ws):
+    if not ws or not await can_manage_signal(ctx.bot, update.effective_user.id, ws, sig):
         return
     ok = await db.cancel_signal(sig["id"])
     await update.message.reply_text(

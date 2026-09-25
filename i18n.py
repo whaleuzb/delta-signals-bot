@@ -261,6 +261,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "sig.rr": {
         "uz": "Risk/Reward", "ru": "Риск/Прибыль", "en": "Risk/Reward",
     },
+    "sig.author": {
+        "uz": "👤 Signal berdi: {who}",
+        "ru": "👤 Сигнал дал: {who}",
+        "en": "👤 Signal by: {who}",
+    },
     "sig.accepted": {
         "uz": "✅ Signal <code>#{sid}</code> qabul qilindi.",
         "ru": "✅ Сигнал <code>#{sid}</code> принят.",
