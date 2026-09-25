@@ -816,6 +816,12 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         if ws["type"] == "group" and not ws["is_channel"]:
             rows.append([InlineKeyboardButton(i18n.t("menu.member_signals", lang),
                                               callback_data="m:membersig")])
+        # Har bir guruh VA kanal uchun — /top reytingiga chiqarish (183).
+        # Yopiq (@niksiz) va reytingga chiqarilgan bo'lsa yonida qo'shilish
+        # tugmasini ulash — u faqat Pay Members boti bo'lishi mumkin (182).
+        # Ochiq kanal/guruhga kerak emas: tugma ommaviy manzilga o'zi chiqadi.
+        if ws["type"] == "group":
+            rows.append(top_menu_row(ws, lang))
     elif ws["type"] == "group" and not ws["is_channel"] and ws["allow_member_signals"]:
         # Egasi ruxsat bergan bo'lsa — a'zo "Depozit"siz, faqat "Yangi
         # signal" tugmasini ko'radi.
@@ -849,6 +855,25 @@ def main_menu_kb(uid: int, ws, private: bool = True,
                  InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
     rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
     return InlineKeyboardMarkup(rows)
+
+
+def top_menu_row(ws, lang: str | None = None) -> list:
+    """Menyudagi reyting qatori. Tugmalarda workspace id bor — egada
+    guruh VA kanal bo'lishi mumkin, tugma aynan qaysi biriga tegishli
+    ekani faol tanlovga bog'liq bo'lmasin (eski xabardagi tugma ham)."""
+    wid = ws["id"]
+    if not ws["public"]:
+        key = "menu.top_off"
+    elif ws["public_approved"]:
+        key = "menu.top_on"
+    else:
+        key = "menu.top_wait"
+    row = [InlineKeyboardButton(i18n.t(key, lang), callback_data=f"top:st:{wid}")]
+    if ws["public"] and not ws["username"]:
+        row.append(InlineKeyboardButton(
+            i18n.t("menu.join_ok" if ws["pm_bot"] else "menu.join_set", lang),
+            callback_data=f"jl:set:{wid}"))
+    return row
 
 
 def member_signals_kb(ws, lang: str | None = None) -> InlineKeyboardMarkup:
@@ -4342,15 +4367,103 @@ async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                          reply_markup=menu_back_kb(lang))
         return
 
+    await update.message.reply_text(
+        await public_enable(ctx, ws, lang),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+
+async def public_enable(ctx, ws, lang: str | None) -> str:
+    """Reytingga chiqarish — /public on va "🏆 Topga chiqarish" tugmasi
+    uchun BITTA joy. Avval tasdiqlangan bo'lsa darhol ko'rinadi, aks
+    holda moderatorga so'rov ketadi."""
     await db.set_public(ws["id"], True)
     if ws["public_approved"]:
-        await update.message.reply_text(i18n.t("pub.on_done", lang),
-                                         reply_markup=menu_back_kb(lang))
-        return
+        return i18n.t("pub.on_done", lang)
     await request_public_approval(ctx, ws["id"])
-    await update.message.reply_text(
-        i18n.t("pub.requested", lang),
-        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+    return i18n.t("pub.requested", lang)
+
+
+def top_status_view(ws, lang: str | None) -> tuple[str, InlineKeyboardMarkup]:
+    """"🏆 Topda" tugmasi bosilganda — joriy holat va boshqaruv."""
+    wid = ws["id"]
+    state = i18n.t("pub.state_on" if ws["public_approved"] else "pub.state_wait", lang)
+    lines = [i18n.t("top.status", lang, name=html.escape(ws["name"]), state=state)]
+    rows = []
+    if ws["username"]:
+        lines.append(i18n.t("top.join_public", lang, u=ws["username"]))
+    elif ws["pm_bot"]:
+        lines.append(i18n.t("top.join_pm", lang, bot=ws["pm_bot"]))
+        rows.append([InlineKeyboardButton(i18n.t("top.btn_join_off", lang),
+                                          callback_data=f"jl:off:{wid}")])
+    else:
+        lines.append(i18n.t("top.join_none", lang))
+        rows.append([InlineKeyboardButton(i18n.t("menu.join_set", lang),
+                                          callback_data=f"jl:set:{wid}")])
+    rows.append([InlineKeyboardButton(i18n.t("top.btn_off", lang),
+                                      callback_data=f"top:off:{wid}")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    return "\n\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def _owned_ws_from_cb(q) -> "tuple[asyncpg.Record | None, str | None]":
+    """`top:…:<wid>` / `jl:…:<wid>` — workspace'ni oladi va egaligini
+    tekshiradi. Mos bo'lmasa alert chiqarib (None, lang) qaytaradi."""
+    lang = await user_lang(q.from_user.id)
+    try:
+        wid = int(q.data.rsplit(":", 1)[1])
+    except ValueError:
+        return None, lang
+    ws = await db.get_workspace(wid)
+    if not ws or ws["type"] != "group" or not can_manage(q.from_user.id, ws):
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
+        return None, lang
+    return ws, lang
+
+
+async def on_top_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"🏆 Topga chiqarish" (183). Reytingda bo'lmasa — bitta bosishda
+    chiqaradi (so'rov moderatorga). Reytingda bo'lsa — holat ekrani."""
+    q = update.callback_query
+    await q.answer()
+    ws, lang = await _owned_ws_from_cb(q)
+    if not ws:
+        return
+    action = q.data.split(":")[1]
+    if action == "off":
+        await db.set_public(ws["id"], False)
+        await q.edit_message_text(i18n.t("pub.off_done", lang),
+                                  reply_markup=menu_back_kb(lang))
+        return
+    if not ws["public"]:
+        txt = await public_enable(ctx, ws, lang)
+        ws = await db.get_workspace(ws["id"])
+        rows = [[InlineKeyboardButton(i18n.t("menu.join_set", lang),
+                                      callback_data=f"jl:set:{ws['id']}")]] \
+            if not ws["username"] and not ws["pm_bot"] else []
+        if rows:
+            txt += "\n\n" + i18n.t("top.join_none", lang)
+        rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML,
+                                  reply_markup=InlineKeyboardMarkup(rows))
+        return
+    text, kb = top_status_view(ws, lang)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=kb,
+                              disable_web_page_preview=True)
+
+
+async def on_join_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"🔗 Qo'shilish havolasini qo'yish" — /havola bilan AYNI mantiq
+    (faqat Pay Members boti, 182)."""
+    q = update.callback_query
+    await q.answer()
+    ws, lang = await _owned_ws_from_cb(q)
+    if not ws:
+        return
+    off = q.data.split(":")[1] == "off"
+    txt = await join_link_apply(ws, off, lang)
+    await q.edit_message_text(txt, parse_mode=ParseMode.HTML,
+                              reply_markup=menu_back_kb(lang),
+                              disable_web_page_preview=True)
 
 
 # ── /top moderatsiyasi (reytingdagi guruh nomi va havolasi hammaga ko'rinadi) ──
@@ -4401,10 +4514,16 @@ async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         olang = await user_lang(ws["owner_id"])
-        await ctx.bot.send_message(
-            ws["owner_id"],
-            i18n.t("pub.approved_dm" if approved else "pub.rejected_dm", olang),
-            parse_mode=ParseMode.HTML)
+        dm = i18n.t("pub.approved_dm" if approved else "pub.rejected_dm", olang)
+        kb = None
+        # Yopiq va qo'shilish tugmasi hali yo'q — shu yerning o'zida taklif
+        # qilamiz (183): reytingda turib, bosib bo'lmaydigan nom foydasiz.
+        if approved and not ws["username"] and not ws["pm_bot"]:
+            dm += "\n\n" + i18n.t("top.join_none", olang)
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                i18n.t("menu.join_set", olang), callback_data=f"jl:set:{ws['id']}")]])
+        await ctx.bot.send_message(ws["owner_id"], dm, parse_mode=ParseMode.HTML,
+                                   reply_markup=kb)
     except Exception:
         log.exception("Egaga qaror yuborilmadi (ws=%s)", ws["id"])
 
@@ -5023,35 +5142,31 @@ async def cmd_link(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(i18n.t("su.group_ws_only", lang))
         return
 
+    off = bool(ctx.args) and ctx.args[0].strip().lower() == "off"
+    await update.message.reply_text(await join_link_apply(ws, off, lang),
+                                     parse_mode=ParseMode.HTML,
+                                     reply_markup=menu_back_kb(lang),
+                                     disable_web_page_preview=True)
+
+
+async def join_link_apply(ws, off: bool, lang: str | None) -> str:
+    """Qo'shilish tugmasini ulash/o'chirish — /havola va menyudagi
+    "🔗" tugmasi uchun BITTA joy. Javob matnini qaytaradi."""
     name = html.escape(ws["name"])
-    if ctx.args and ctx.args[0].strip().lower() == "off":
+    if off:
         await db.set_pm_bot(ws["id"], None)
-        await update.message.reply_text(i18n.t("inv.off_done", lang),
-                                         reply_markup=menu_back_kb(lang))
-        return
-
+        return i18n.t("inv.off_done", lang)
     if ws["username"]:
-        await update.message.reply_text(
-            i18n.t("inv.public", lang, name=name, u=ws["username"]),
-            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
-        return
-
+        return i18n.t("inv.public", lang, name=name, u=ws["username"])
     try:
         bot_name = await paymembers.bot_for_chat(ws["group_chat_id"])
     except paymembers.Unavailable as e:
         log.warning("Pay Members tekshiruvi o'tmadi (ws=%s): %s", ws["id"], e)
-        await update.message.reply_text(i18n.t("inv.unavailable", lang),
-                                         reply_markup=menu_back_kb(lang))
-        return
-
+        return i18n.t("inv.unavailable", lang)
     await db.set_pm_bot(ws["id"], bot_name)
     if bot_name:
-        txt = i18n.t("inv.linked", lang, name=name, bot=bot_name)
-    else:
-        txt = i18n.t("inv.need_pm", lang, name=name, url=config.PAYMEMBERS_URL)
-    await update.message.reply_text(txt, parse_mode=ParseMode.HTML,
-                                     reply_markup=menu_back_kb(lang),
-                                     disable_web_page_preview=True)
+        return i18n.t("inv.linked", lang, name=name, bot=bot_name)
+    return i18n.t("inv.need_pm", lang, name=name, url=config.PAYMEMBERS_URL)
 
 
 async def pm_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -7215,6 +7330,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_join_group, pattern=r"^joingroup$"))
     app.add_handler(CallbackQueryHandler(on_view_join, pattern=r"^viewjoin:"))
     app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
+    app.add_handler(CallbackQueryHandler(on_top_button, pattern=r"^top:(st|off):-?\d+$"))
+    app.add_handler(CallbackQueryHandler(on_join_button, pattern=r"^jl:(set|off):-?\d+$"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_manage, pattern=r"^mng:"))
     app.add_handler(CallbackQueryHandler(on_manage_be, pattern=r"^mbe:"))

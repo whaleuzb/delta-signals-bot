@@ -1792,6 +1792,46 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "✅ Ваша группа появилась в рейтинге <code>/top</code>.",
         "en": "✅ Your group is now visible in the <code>/top</code> ranking.",
     },
+    # --- Menyudagi reyting tugmalari (183) ---
+    "menu.top_off": {"uz": "🏆 Topga chiqarish", "ru": "🏆 Вывести в топ", "en": "🏆 Add to top"},
+    "menu.top_on": {"uz": "🏆 Topda ✅", "ru": "🏆 В топе ✅", "en": "🏆 In top ✅"},
+    "menu.top_wait": {"uz": "🏆 Top: kutilmoqda ⏳", "ru": "🏆 Топ: ожидает ⏳",
+                      "en": "🏆 Top: pending ⏳"},
+    "menu.join_set": {"uz": "🔗 Qo'shilish havolasini qo'yish", "ru": "🔗 Поставить ссылку для вступления",
+                      "en": "🔗 Set join link"},
+    "menu.join_ok": {"uz": "🔗 Qo'shilish: ulangan ✅", "ru": "🔗 Вступление: подключено ✅",
+                     "en": "🔗 Join: connected ✅"},
+    "top.status": {
+        "uz": "🏆 \"{name}\" — <code>/top</code> reytingida: <b>{state}</b>",
+        "ru": "🏆 «{name}» — в рейтинге <code>/top</code>: <b>{state}</b>",
+        "en": "🏆 “{name}” — in the <code>/top</code> ranking: <b>{state}</b>",
+    },
+    "top.join_public": {
+        "uz": "🌐 Ochiq (@{u}) — qo'shilish tugmasi avtomatik, sozlash shart emas.",
+        "ru": "🌐 Открытая (@{u}) — кнопка вступления автоматическая, настраивать не нужно.",
+        "en": "🌐 Public (@{u}) — the join button is automatic, nothing to set up.",
+    },
+    "top.join_pm": {
+        "uz": "🔗 Qo'shilish tugmasi: @{bot} (Pay Members to'lov boti)",
+        "ru": "🔗 Кнопка вступления: @{bot} (платёжный бот Pay Members)",
+        "en": "🔗 Join button: @{bot} (Pay Members payment bot)",
+    },
+    "top.join_none": {
+        "uz": ("🔒 Yopiq guruhingizga hali qo'shilish tugmasi yo'q — reytingdagi "
+               "odamlar qanday kirishni bilmaydi. Uni Pay Members to'lov boti "
+               "orqali ulang."),
+        "ru": ("🔒 У вашей закрытой группы пока нет кнопки вступления — люди из "
+               "рейтинга не узнают, как попасть. Подключите её через платёжного "
+               "бота Pay Members."),
+        "en": ("🔒 Your private group has no join button yet — people from the "
+               "ranking won't know how to get in. Connect it via a Pay Members "
+               "payment bot."),
+    },
+    "top.btn_off": {"uz": "🔒 Topdan olib tashlash", "ru": "🔒 Убрать из топа",
+                    "en": "🔒 Remove from top"},
+    "top.btn_join_off": {"uz": "❌ Qo'shilish tugmasini olib tashlash",
+                         "ru": "❌ Убрать кнопку вступления",
+                         "en": "❌ Remove the join button"},
     "pub.rejected_dm": {
         "uz": ("🚫 Guruhingiz <code>/top</code> reytingiga qo'shilmadi. "
                "Guruh nomi yoki havolasini to'g'rilab, qayta urinib ko'ring."),

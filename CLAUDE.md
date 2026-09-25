@@ -6228,3 +6228,38 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ochiq sahifa tugmasi — eski fishing havolasi chiqmasligi), Pay
      Members tomonida `test_pm_api.py` 8/8 (sqlite, Flask test client).
      Avvalgi sinovlar o'zgarishsiz o'tdi.
+
+183. **"Topga chiqarish" va "Qo'shilish havolasi" — menyuda tugma.**
+     Foydalanuvchi: "shu topga chiqarishni tugmaga ko'chiraylik. Har bir
+     guruh va kanal tagida topga chiqarish tugmasi bo'lsin. Topga chiqqan
+     yopiq guruh uchun esa guruhga qo'shilish havolasi qo'yish tugmasi
+     chiqsin. Public kanallar uchun bu shart emas."
+
+     `main_menu_kb` — egasiga (`can_manage`), `type=='group'` (guruh VA
+     kanal; shaxsiy jurnalda yo'q) uchun `top_menu_row()`:
+     - "🏆 Topga chiqarish" / "🏆 Topda ✅" / "🏆 Top: kutilmoqda ⏳"
+       (`public`/`public_approved` ga qarab) → `top:st:<wid>`;
+     - `public` va @nik YO'Q (yopiq) bo'lsa yonida "🔗 Qo'shilish
+       havolasini qo'yish" yoki "🔗 Qo'shilish: ulangan ✅" → `jl:set:<wid>`.
+       Ochiq (@nikli) guruh/kanalga bu tugma chiqmaydi.
+
+     Callback'larda workspace id bor (`_owned_ws_from_cb` egalikni
+     tekshiradi): egada guruh VA kanal bo'lishi mumkin, eski xabardagi
+     tugma ham aynan o'z workspace'iga tegishi kerak — faol tanlovga
+     bog'liq emas.
+
+     `on_top_button`: reytingda bo'lmasa bir bosishda chiqaradi
+     (`public_enable()` — `/public on` bilan umumiy: tasdiqlangan bo'lsa
+     darhol, aks holda moderatorga so'rov) va yopiq bo'lsa qo'shilish
+     tugmasini darhol taklif qiladi; reytingda bo'lsa `top_status_view()`
+     (holat, qo'shilish holati, "🔒 Topdan olib tashlash").
+     `on_join_button` → `join_link_apply()` — `/havola` bilan umumiy
+     mantiq (faqat Pay Members boti, 182). Moderator tasdiqlaganda yopiq
+     va tugmasi yo'q guruh egasiga DM'da shu tugma bilan taklif ketadi.
+     `/public` va `/havola` buyruqlari o'zgarishsiz ishlayveradi.
+
+     Sinov: `test_top_menu.py` 24/24 (menyu tugmalari barcha holatlarda,
+     bir bosishda chiqarish + moderator so'rovi, holat ekrani, olib
+     tashlash, begona odam, Pay Members ulash/olib tashlash, ochiq kanal,
+     tasdiq DM'i, i18n). `test_pm_link.py` endi `pm_job` oldidan boshqa
+     testlar qoldirgan `pm_bot`larni tozalaydi (umumiy test bazasi).
