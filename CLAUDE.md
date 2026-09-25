@@ -6093,3 +6093,33 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      chiqib ketish tasdiqlash bosqichida tutiladi), `test_member_wizard_gate.py`
      9/9 (sehrgar boshlanishi, uchala holat + guruh-chat qoidasi
      o'zgarmagani).
+
+180. **A'zo bergan signalda depozit summasi so'ralmaydi (179 dagi teshik).**
+     Egasi so'radi: "a'zolar signalni vaqtidan oldin yopa olmaydimi?
+     Stop va take'ni o'zgartira olmaydimi?" Tekshiruv natijasi —
+     YOPOLMAYDI va O'ZGARTIROLMAYDI: yopish (`on_close_request`,
+     `on_close_confirm`), stop/TP/kirish/qisman yopish (`_manage_guard`,
+     `handle_manage_input`), TP/SL qo'shish (`handle_tpsl_input`,
+     `on_tpsl_button`) — hammasi `can_manage()` bilan himoyalangan.
+     `can_submit_signal()` faqat YANGI signal berish yo'llarida ishlatiladi
+     (`AWAITING_EDIT` — bu tasdiqlanmagan QORALAMANI tahrirlash, jonli
+     signalni emas).
+
+     **Lekin tekshiruvda haqiqiy teshik topildi:** tasdiqlash bosqichi
+     oxirida `ws["deposit"]` bo'lsa, bot tasdiqlagan ODAMdan summa
+     so'rardi — ya'ni a'zo signal bersa, unga EGASINING depoziti,
+     bo'sh summasi ko'rsatilardi ("Depozit: 1,000.00 · Bo'sh: 1,000.00")
+     va a'zo raqam yozib egasining pulidan ulush ajrata olardi. Tugmalar
+     (`on_alloc_pick`, `on_alloc_topup`, `on_alloc_again`) `can_manage`
+     bilan himoyalangan edi, lekin MATN yo'li (`AWAITING_ALLOC` →
+     `set_signal_allocation`) hech qanday huquq tekshirmasdi.
+
+     Tuzatish (ikki qatlam): (1) summa so'rovi faqat `can_manage()`
+     bo'lsa yuboriladi; (2) matn yo'lida ham `can_manage(uid, ws)`
+     tekshiriladi — so'rov yuborilgandan keyin odam adminlikdan olingan
+     bo'lsa ham o'tmaydi, holat tozalanadi. A'zo bergan signalga egasi
+     summani keyinroq boshqaruv bo'limidan ajratadi.
+
+     Sinov: `test_member_alloc.py` 7/7 (eski kodda 4 tasi YIQILDI —
+     teshik tasdiqlandi), qolgan a'zo-signal sinovlari 27+11+8+9 va
+     `test_tracker.py` o'zgarishsiz o'tdi.

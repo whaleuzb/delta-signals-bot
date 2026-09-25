@@ -2607,7 +2607,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
         sig = await db.get_signal(alloc_sig_id)
         ws = await db.get_workspace(sig["workspace_id"]) if sig else None
-        if not (sig and ws and ws["deposit"] is not None):
+        # Huquq bu yerda HAM tekshiriladi: so'rov yuborilganidan keyin odam
+        # adminlikdan olingan bo'lishi mumkin, tugmalar esa allaqachon
+        # `can_manage` bilan himoyalangan — matn yo'li ulardan qolishmasin.
+        if not (sig and ws and ws["deposit"] is not None and can_manage(uid, ws)):
             AWAITING_ALLOC.pop(uid, None)
             return
         alang = await user_lang(uid)
@@ -3176,7 +3179,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Ochilish xabari yuborilmadi")
 
-    if ws["deposit"] is not None:
+    # Summa FAQAT egasidan so'raladi: depozit egasiniki. Signalni guruh
+    # a'zosi bergan bo'lsa (179), unga depozit, band va bo'sh summa
+    # ko'rsatilmaydi va u egasining pulidan ulush ajrata olmaydi.
+    if ws["deposit"] is not None and can_manage(q.from_user.id, ws):
         AWAITING_ALLOC[q.from_user.id] = sig_id
         dep, busy, free = await free_deposit(ws, sig_id)
         text, kb2 = alloc_prompt(sig_id, d, dep, free, busy,
