@@ -6010,3 +6010,86 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bloklanishi, `kicked` holati, admin har doim o'tishi va
      Telegram'ga umuman murojaat qilmasligi, majburiy kanal yo'qligida
      ham murojaat qilinmasligi, xatoda fail-open saqlangani.
+
+179. **Yopiq guruh a'zolariga ham signal kiritish — egasi yoqib/
+     o'chiradigan sozlama.**
+     Foydalanuvchi: "yopiq guruh a'zolariga ham signal kiritish
+     mumkin bo'ladigan funksiya qo'shishimiz kerak. Buni guruh egasi
+     yoqib o'chiradigan qilishimiz kerak. ... Ha yoqish va Yo'q o'zim
+     beraman. Bu funksiyani harbir yopiq guruh egasini menyusiga
+     qo'shaylik."
+
+     Ilgari signal KIRITISH ham, BOSHQARISH (yopish, TP/SL o'zgartirish)
+     ham bitta funksiyaga — `can_manage()` (egasi yoki super-admin) —
+     bog'langan edi. Ikkovini ajratish kerak edi: foydalanuvchi aniq
+     "signal berish" so'radi, "boshqarish" emas.
+
+     **Yangi ustun:** `workspaces.allow_member_signals` (standart
+     FALSE). **Yangi funksiya:** `can_submit_signal(bot, uid, ws)` —
+     egasi/admin HAR DOIM, oddiy a'zo esa FAQAT: (1) `type=='group'`
+     VA `is_channel=FALSE` (kanalda "a'zo" tushunchasi yo'q, shaxsiy
+     jurnalda ham), (2) `allow_member_signals=TRUE`, (3) HOZIR ham
+     guruhning haqiqiy a'zosi (`can_view()` orqali — 178-band bilan
+     bir xil jonli tekshiruv: kesh yo'q, guruhdan chiqqan odam DARHOL
+     rad etiladi). Xato holatida — majburiy obunadan farqli — FAIL
+     **CLOSED** (ruxsat berilmaydi): u yerda xato ochiq qolishi
+     "botni yo'qotmaslik" edi, bu yerda esa xato ochiq qolsa RUXSATSIZ
+     ODAM SIGNAL YOZA OLARDI — yo'nalish teskari, shuning uchun qoida
+     ham teskari.
+
+     **BOSHQARISH kengaytirilmadi — ataylab.** Signal yopish, TP/SL
+     o'zgartirish hamon FAQAT `can_manage()` (egasi/admin). A'zo o'z
+     yozgan signalini ham yopa olmaydi — bu kengroq va xavfliroq huquq
+     (a'zo BOSHQA a'zoning yoki EGANING pozitsiyasini yopib qo'yishi
+     mumkin bo'lardi), foydalanuvchi buni so'ramagan.
+
+     **Beshta kirish nuqtasi** yangilandi (barchasi
+     `can_manage`->`can_submit_signal` almashtirildi): sehrgar boshlanishi
+     (`wizard_start`), rasm+izoh orqali signal (`on_photo`), erkin matn
+     orqali signal va mavjud loyihani tahrirlash (`on_text_signal`,
+     ikki joy), va ENG MUHIMI — **tasdiqlash bosqichi** (`on_button`,
+     `db.create_signal` chaqirilishidan BEVOSITA OLDIN). Oxirgisi
+     qasddan takroriy tekshiruv: sehrgar boshida ruxsat bo'lgan bo'lsa
+     ham, bir necha bosqichlik oqim davomida (juftlik, TP, SL kiritish
+     — vaqt oladi) egasi sozlamani o'chirib qo'yishi yoki a'zo guruhdan
+     chiqib ketishi mumkin — bazaga YOZISHDAN oldingi so'nggi tekshiruv
+     shu ikkalasini ham tutadi.
+
+     **Menyu (asosiy ekran):**
+     - Egaga: "➕ Yangi signal" + "💰 Depozit" bir qatorda (eski holat),
+       ostida FAQAT egaga — "👥 A'zolar signal bersinmi?" (guruh turi
+       VA kanal emasligida).
+     - Ruxsat berilgan guruhda oddiy a'zoga: FAQAT "➕ Yangi signal" —
+       "Depozit" YO'Q (moliyaviy sozlama, a'zoga tegishli emas — 170-band
+       bilan bog'liq, a'zo bo'sh depozit hisobini ko'rmasligi kerak).
+     - Bu sinxron (`main_menu_kb`) funksiya — bot'ga jonli murojaat
+       qilmaydi, chunki HAR BIR chaqiruvchi joyda undan OLDIN allaqachon
+       `can_view()`/a'zolik tekshiruvi o'tgan (7 ta chaqiruv joyi
+       tekshirildi). Real xavfsizlik chegarasi — yuqoridagi beshta
+       async gate, menyu faqat tugmani ko'rsatish/yashirish.
+
+     **Sozlash ekrani:** `m:membersig` (yangi `on_menu` bo'limi) joriy
+     holatni ko'rsatadi, `member_signals_kb()` ikkita tugma beradi —
+     foydalanuvchining o'z so'zlari bilan: "✅ Ha, yoqish" /
+     "❌ Yo'q, o'zim beraman" (`membersig:on`/`membersig:off`,
+     `on_membersig_toggle`). Faqat egaga — a'zo yoki tashqi odam
+     bossa jim rad etiladi (huquq yo'qligi haqida alert).
+
+     **Muhit sozlashda uchragan ikkita muammo (kod bilan aloqasi yo'q):**
+     `pip install`da `pyaes` (telethon qarami) "AttributeError:
+     install_layout" bilan yiqilardi — `SETUPTOOLS_USE_DISTUTILS=stdlib`
+     bilan tuzatildi (Debian'ning distutils yamog'i bilan yangi
+     setuptools nomuvofiqligi). Shundan keyin `cryptography` (apt
+     paketi, `/usr/lib/python3/dist-packages`) `_rust` moduli bilan
+     nosoz chiqdi — `pip install --ignore-installed cryptography cffi`
+     bilan pip versiyasi ustunlikka qo'yildi (sys.path'da apt
+     paketidan OLDIN turadi).
+
+     Sinov: `test_member_signals.py` 27/27 (ruxsat matritsasi: egasi/
+     admin/a'zo/chiqib ketgan/kicked/kanal/shaxsiy/xato-holat, DB
+     setter, menyu tugmalari, uchala til), `test_member_signals_ui.py`
+     11/11 (sozlash ekrani + ikkala tugma + himoya), `test_confirm_gate.py`
+     8/8 (ENG MUHIM sinov: oraliqda o'chirilgan ruxsat va guruhdan
+     chiqib ketish tasdiqlash bosqichida tutiladi), `test_member_wizard_gate.py`
+     9/9 (sehrgar boshlanishi, uchala holat + guruh-chat qoidasi
+     o'zgarmagani).

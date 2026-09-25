@@ -407,6 +407,13 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS rev INT NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_code TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(ref_code)
     WHERE ref_code IS NOT NULL;
+
+-- Yopiq guruh egasi yoqib/o'chira oladigan sozlama: oddiy a'zolar ham
+-- signal kirita oladimi (standart — FALSE, faqat egasi/admin). Faqat
+-- `type='group'` uchun ma'noli — shaxsiy jurnalda "a'zo" tushunchasi
+-- yo'q, kanalda esa obunachilar signal BERMAYDI, faqat o'qiydi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS allow_member_signals
+    BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -588,6 +595,14 @@ async def apply_deposit_delta(workspace_id: int, delta: float) -> None:
 async def set_public(workspace_id: int, public: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE workspaces SET public=$2 WHERE id=$1", workspace_id, public)
+
+
+async def set_allow_member_signals(workspace_id: int, allow: bool) -> None:
+    """Guruh egasi yoqib/o'chiradigan sozlama — oddiy a'zolar signal
+    kirita oladimi. `bot.can_submit_signal()` shu ustunni o'qiydi."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET allow_member_signals=$2 WHERE id=$1",
+                        workspace_id, allow)
 
 
 async def set_invite_link(workspace_id: int, link: str | None) -> None:

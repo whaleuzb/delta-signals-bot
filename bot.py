@@ -100,6 +100,27 @@ def not_subscriber_kb(lang: str | None = None) -> InlineKeyboardMarkup:
         i18n.t("acc.btn_subscribe", lang), url="https://t.me/mamurjonpaybot")]])
 
 
+async def can_submit_signal(bot, uid: int, ws) -> bool:
+    """Kim signal KIRITA oladi: workspace admini/egasi HAR DOIM, oddiy
+    guruh a'zosi esa FAQAT egasi ruxsat bergan bo'lsa
+    (`allow_member_signals`) VA hozir ham guruhning haqiqiy a'zosi
+    bo'lsa (`can_view` bilan bir xil jonli tekshiruv — usiz kanaldan
+    chiqib ketgan odam ham signal berishda davom etardi, majburiy
+    obunadagi 178-band bilan bir xil xato).
+
+    ⚠️ Bu funksiya FAQAT signal YOZISH (kiritish) huquqi — mavjud
+    signalni yopish/TP-SL o'zgartirish HAMON faqat `can_manage()`
+    (egasi/admin). Foydalanuvchi aniq "signal kiritish" so'radi,
+    boshqaruvni emas — kengroq huquq berish so'ralmagan va xavfliroq
+    (a'zo boshqa a'zoning yoki eganing pozitsiyasini yopib qo'yishi
+    mumkin bo'lardi)."""
+    if can_manage(uid, ws):
+        return True
+    if ws["type"] != "group" or ws["is_channel"] or not ws["allow_member_signals"]:
+        return False
+    return await can_view(bot, uid, ws)
+
+
 async def can_view(bot, uid: int, ws) -> bool:
     """Guruh workspace — whale-payment-bot muddati tugagan obunachilarni guruhdan
     avtomatik chiqarib turadi, shuning uchun "hozir guruh a'zosimi" tekshiruvi
@@ -715,9 +736,25 @@ def main_menu_kb(uid: int, ws, private: bool = True,
     o'zbekcha (i18n.normalize) — hali tarjimaga o'tkazilmagan eski
     chaqiruv joylari shu sabab o'zgarishsiz ishlayveradi."""
     rows = []
-    if can_manage(uid, ws):
+    manage = can_manage(uid, ws)
+    if manage:
+        # "Depozit" — moliyaviy sozlama, faqat egaga: a'zoga ruxsat
+        # berilgan bo'lsa ham u DEPOZITGA tegmaydi (170-band — bo'sh
+        # depozitdan oshmaydigan hajm shu depozitga bog'liq).
         rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig"),
                      InlineKeyboardButton(i18n.t("menu.deposit", lang), callback_data="m:deposit")])
+        # Guruh egasining o'zigagina — a'zolarga signal huquqini
+        # yoqib/o'chirish. Shaxsiy jurnalda "a'zo" tushunchasi yo'q,
+        # kanalda esa obunachilar signal bermaydi — shu sabab FAQAT
+        # `type=='group'` (kanal HAM shu turda, lekin `is_channel`
+        # bayrog'i bilan ajratiladi).
+        if ws["type"] == "group" and not ws["is_channel"]:
+            rows.append([InlineKeyboardButton(i18n.t("menu.member_signals", lang),
+                                              callback_data="m:membersig")])
+    elif ws["type"] == "group" and not ws["is_channel"] and ws["allow_member_signals"]:
+        # Egasi ruxsat bergan bo'lsa — a'zo "Depozit"siz, faqat "Yangi
+        # signal" tugmasini ko'radi.
+        rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig")])
     rows += [
         [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
          InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")],
@@ -747,6 +784,38 @@ def main_menu_kb(uid: int, ws, private: bool = True,
                  InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
     rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
     return InlineKeyboardMarkup(rows)
+
+
+def member_signals_kb(ws, lang: str | None = None) -> InlineKeyboardMarkup:
+    """A'zolar signal huquqi ekranidagi ikkita tugma — foydalanuvchining
+    o'z so'zlari bilan: "Ha yoqish" / "Yo'q o'zim beraman". Joriy
+    holatning tugmasi ham chiqadi (bosilsa hech narsa o'zgarmaydi,
+    faqat tasdiqlanadi) — shunda odam "hozir qaysi holatdaman"ni
+    tugmalarning o'zidan ham ko'radi, matnni qayta o'qimasa ham."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("msig.btn_on", lang), callback_data="membersig:on"),
+         InlineKeyboardButton(i18n.t("msig.btn_off", lang), callback_data="membersig:off")],
+        [InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")],
+    ])
+
+
+async def on_membersig_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = q.from_user.id
+    lang = await user_lang(uid)
+    if not can_manage(uid, ws) or ws["type"] != "group" or ws["is_channel"]:
+        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
+        return
+    allow = q.data.split(":", 1)[1] == "on"
+    await db.set_allow_member_signals(ws["id"], allow)
+    log.info("A'zolar signal huquqi: ws#%s -> %s (egasi=%s)", ws["id"], allow, uid)
+    await q.edit_message_text(
+        i18n.t("msig.enabled" if allow else "msig.disabled", lang),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 def menu_back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
@@ -1947,6 +2016,17 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                         reply_markup=menu_back_kb(lang))
         else:
             await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=menu_back_kb(lang))
+    elif action == "membersig":
+        # Faqat GURUH egasi — tugmaning o'zi ham shu shartda ko'rinadi
+        # (main_menu_kb), lekin callback_data qo'lda ham yuborilishi
+        # mumkin (masalan eski xabar), shuning uchun bu yerda ham
+        # tekshiriladi.
+        if not can_manage(q.from_user.id, ws) or ws["type"] != "group" or ws["is_channel"]:
+            return
+        await q.message.reply_text(
+            i18n.t("msig.current", lang, name=html.escape(ws["name"]),
+                   state=i18n.t("msig.on" if ws["allow_member_signals"] else "msig.off", lang)),
+            parse_mode=ParseMode.HTML, reply_markup=member_signals_kb(ws, lang))
 
 
 async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2232,7 +2312,7 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return ConversationHandler.END
-    if not can_manage(uid, ws):
+    if not await can_submit_signal(ctx.bot, uid, ws):
         await target.reply_text(i18n.t("wiz.no_right", lang))
         return ConversationHandler.END
 
@@ -2449,7 +2529,7 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
-    if not can_manage(update.effective_user.id, ws):
+    if not await can_submit_signal(ctx.bot, update.effective_user.id, ws):
         return
 
     caption = msg.caption or ""
@@ -2558,7 +2638,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
         item = PENDING[token]
         ws = await db.get_workspace(item["workspace_id"])
-        if not ws or not can_manage(uid, ws):
+        if not ws or not await can_submit_signal(ctx.bot, uid, ws):
             PENDING.pop(token, None)
             return
         item["draft"] = draft
@@ -2572,7 +2652,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
-    if not can_manage(uid, ws):
+    if not await can_submit_signal(ctx.bot, uid, ws):
         return
     await show_preview(msg, ctx, draft, None, "matn", ws["id"])
 
@@ -2991,9 +3071,12 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await _clear_kb(q)
         return
 
-    # --- tasdiqlash ---
+    # --- tasdiqlash --- (bazaga YOZISHDAN oldingi SO'NGGI, eng
+    # ishonchli tekshiruv — a'zo ruxsatini sehrgar boshida ko'rgan
+    # bo'lsa ham, shu oraliqda EGASI o'chirib qo'ygan yoki A'ZO
+    # guruhdan chiqib ketgan bo'lishi mumkin.)
     ws = await db.get_workspace(item["workspace_id"])
-    if not ws or not can_manage(q.from_user.id, ws):
+    if not ws or not await can_submit_signal(ctx.bot, q.from_user.id, ws):
         await _edit(q, i18n.t("man.no_right", lang))
         return
 
@@ -6974,6 +7057,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_alloc_pick, pattern=r"^alloc:"))
     app.add_handler(CallbackQueryHandler(on_tpsl_button, pattern=r"^tpsl:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
+    app.add_handler(CallbackQueryHandler(on_membersig_toggle, pattern=r"^membersig:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))

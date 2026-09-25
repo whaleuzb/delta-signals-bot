@@ -3045,6 +3045,51 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Trade Controller — {name} 👇",
         "en": "Trade Controller — {name} 👇",
     },
+    # A'zolarga signal huquqi — 179-band. Tugma FAQAT yopiq guruh
+    # egasiga ko'rinadi (kanalga, shaxsiy jurnalga tegishli emas).
+    "menu.member_signals": {
+        "uz": "👥 A'zolar signal bersinmi?",
+        "ru": "👥 Могут ли участники давать сигналы?",
+        "en": "👥 Can members submit signals?",
+    },
+    "msig.current": {
+        "uz": ("«{name}» guruhida oddiy a'zolar ham signal kirita "
+               "oladimi?\n\nHozirgi holat: <b>{state}</b>"),
+        "ru": ("Могут ли обычные участники группы «{name}» тоже "
+               "добавлять сигналы?\n\nТекущее состояние: <b>{state}</b>"),
+        "en": ("Can regular members of “{name}” submit signals too?\n\n"
+               "Current state: <b>{state}</b>"),
+    },
+    "msig.on": {
+        "uz": "✅ Yoqilgan — a'zolar ham signal beradi",
+        "ru": "✅ Включено — участники тоже дают сигналы",
+        "en": "✅ On — members can submit too",
+    },
+    "msig.off": {
+        "uz": "🔒 O'chirilgan — faqat siz signal berasiz",
+        "ru": "🔒 Выключено — сигналы даёте только вы",
+        "en": "🔒 Off — only you submit signals",
+    },
+    "msig.btn_on": {
+        "uz": "✅ Ha, yoqish",
+        "ru": "✅ Да, включить",
+        "en": "✅ Yes, turn on",
+    },
+    "msig.btn_off": {
+        "uz": "❌ Yo'q, o'zim beraman",
+        "ru": "❌ Нет, буду сам",
+        "en": "❌ No, I'll do it myself",
+    },
+    "msig.enabled": {
+        "uz": "✅ Endi guruh a'zolari ham signal kiritishi mumkin.",
+        "ru": "✅ Теперь участники группы тоже могут добавлять сигналы.",
+        "en": "✅ Group members can now submit signals too.",
+    },
+    "msig.disabled": {
+        "uz": "🔒 Endi faqat siz signal kiritasiz.",
+        "ru": "🔒 Теперь сигналы добавляете только вы.",
+        "en": "🔒 Now only you can submit signals.",
+    },
     "menu.new_signal": {
         "uz": "➕ Yangi signal",
         "ru": "➕ Новый сигнал",
