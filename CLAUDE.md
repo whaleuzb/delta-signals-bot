@@ -6263,3 +6263,43 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      tashlash, begona odam, Pay Members ulash/olib tashlash, ochiq kanal,
      tasdiq DM'i, i18n). `test_pm_link.py` endi `pm_job` oldidan boshqa
      testlar qoldirgan `pm_bot`larni tozalaydi (umumiy test bazasi).
+
+184. **/top so'rovi — moderator uchun batafsil kartochka.**
+     Foydalanuvchi: "topga chiqishni xohlayotgan guruh ma'lumotlari
+     ko'proq kerak. Iloji bo'lsa guruhga qo'shilish imkoniyati va uni
+     yaratgan user ma'lumotlari batafsilroq kerak."
+
+     `request_public_approval` endi `public_review_text(bot, ws)` ni
+     yuboradi (avval faqat nom + havola edi):
+     - **Guruh:** ochiq(@nik)/yopiq, guruh/kanal, chat ID, botga ulangan
+       sana, bot holati va a'zolar soni (`group_health`), tavsif
+       (`get_chat`, 300 belgi).
+     - **Faoliyat** (`db.ws_review_stats`): jami/yopilgan/WR/natija
+       foizi/ochiq, birinchi va oxirgi signal sanasi, signal bergan
+       odamlar soni, botdagi kuzatuvchilar.
+     - **Qo'shilish:** hammaga ko'rinadigan tugma manzili
+       (`paymembers.join_url`) — Pay Members boti bo'lsa belgilanadi.
+     - **Odamlar** (`_person_line`): botdagi egasi — @username, to'liq
+       ism, ID, profil havolasi, bio (`get_chat(uid)`), botda qachondan va
+       oxirgi faollik, botni bloklaganmi; guruhdagi roli. Telegram'dagi
+       HAQIQIY yaratuvchi (`get_chat_administrators` → `creator`): egasi
+       bilan bir odam bo'lsa "✅ shu odamning o'zi", boshqa bo'lsa
+       "⚠️ BOSHQA odam" va uning ma'lumoti; aniqlanmasa shuni aytadi.
+     Har bir Telegram so'rovi alohida `try` — biri yiqilsa qolgani
+     chiqadi. Barcha dinamik matn `html.escape`; 4000 belgidan uzun
+     bo'lsa qisqartiriladi.
+
+     Yangi tugmalar (`on_public_review_extra`, faqat super-admin, YANGI
+     xabar yuboradi — asl so'rov tasdiqlash tugmalari bilan joyida
+     qoladi): "🚪 Guruhga kirib ko'rish" (`pubjoin:<wid>`) — ochiq bo'lsa
+     ommaviy manzil, yopiq bo'lsa bot BIR MARTALIK (1 kishi, 24 soat,
+     nomi "Trade Controller moderatsiya") taklif havolasi yaratadi; faqat
+     bosilganda, har so'rovda guruhda havola to'planmasin. Huquq bo'lmasa
+     tushuntiradi. "👤 Egasi — batafsil" (`pubusr:<wid>`) — admin
+     panelidagi `_admin_user_card`.
+
+     Sinov: `test_pub_review.py` 20/20 (soxta Telegram bot bilan:
+     escape, statistika, Pay Members, yaratuvchi=egasi / boshqa odam /
+     aniqlab bo'lmadi, Telegram butunlay ishlamasa, tugmalar, bir
+     martalik havola, huquqsiz, ochiq guruh, admin bo'lmagan, egasi
+     kartochkasi) + HTML teglar muvozanati tekshirildi.

@@ -4468,26 +4468,175 @@ async def on_join_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
 # ── /top moderatsiyasi (reytingdagi guruh nomi va havolasi hammaga ko'rinadi) ──
 
+async def _person_line(bot, uid: int) -> list[str]:
+    """Moderator uchun bitta odam haqida: bot bazasidagi va Telegram'dagi
+    ma'lumot. Har bir manba alohida — biri yiqilsa qolgani ko'rinadi."""
+    e = html.escape
+    out = []
+    u = None
+    try:
+        u = await db.get_user(uid)
+    except Exception:
+        log.warning("Moderatsiya: foydalanuvchi o'qilmadi (%s)", uid, exc_info=True)
+    full = None
+    try:
+        full = await bot.get_chat(uid)
+    except Exception:
+        pass
+    username = (full.username if full else None) or (u["username"] if u else None)
+    name = " ".join(x for x in ((full.first_name if full else None) or
+                                (u["first_name"] if u else None),
+                                full.last_name if full else None) if x)
+    who = f"@{username}" if username else "—"
+    out.append(f"{e(who)} · {e(name or '—')} · ID <code>{uid}</code> · "
+               f'<a href="tg://user?id={uid}">profil</a>')
+    if full is not None and getattr(full, "bio", None):
+        out.append(f"   Bio: <i>{e(full.bio[:200])}</i>")
+    if u:
+        out.append(f"   Botda: {u['first_seen']:%d.%m.%Y} dan · oxirgi faollik "
+                   f"{u['last_seen']:%d.%m.%Y %H:%M}"
+                   + (" · 🚫 botni bloklagan" if u["blocked"] else ""))
+    else:
+        out.append("   Botda: yozuv yo'q (botni hech ishga tushirmagan)")
+    return out
+
+
+async def public_review_text(bot, ws) -> str:
+    """/top so'rovi uchun moderator kartochkasi (184).
+
+    Foydalanuvchi: "topga chiqishni xohlayotgan guruh ma'lumotlari
+    ko'proq kerak — guruhga qo'shilish imkoniyati va uni yaratgan user
+    ma'lumotlari batafsilroq." Shu sabab: guruhning o'zi (tur, a'zolar,
+    tavsif, bot holati), faoliyati (signal statistikasi), qo'shilish
+    yo'li va Telegram'dagi HAQIQIY yaratuvchi hamda botdagi egasi —
+    ular bir odammi yoki yo'qligi aniq yoziladi. Har bir Telegram so'rovi
+    alohida himoyalangan: biri yiqilsa, qolgan ma'lumot baribir chiqadi."""
+    e = html.escape
+    cid = ws["group_chat_id"]
+    kind = "kanal" if ws["is_channel"] else "guruh"
+    access = f"ochiq (@{ws['username']})" if ws["username"] else "yopiq"
+    t = ["🛡 <b>/top reytingiga so'rov</b>", "",
+         f"{'📢' if ws['is_channel'] else '👥'} <b>{e(ws['name'])}</b> — {access} {kind}",
+         f"   Chat ID: <code>{cid}</code> · botga ulangan: {ws['created_at']:%d.%m.%Y}"]
+    icon, health = await group_health(bot, ws)
+    t.append(f"   Bot holati: {icon} {health}")
+    chat = None
+    try:
+        chat = await bot.get_chat(cid)
+    except Exception:
+        pass
+    if chat is not None and getattr(chat, "description", None):
+        t.append(f"   Tavsif: <i>{e(chat.description[:300])}</i>")
+
+    try:
+        st = await db.ws_review_stats(ws["id"])
+        wr = st["wins"] / st["closed"] * 100 if st["closed"] else 0
+        t += ["", f"📊 Signallar: jami <b>{st['total']}</b> · yopilgan {st['closed']} · "
+                  f"WR {wr:.0f}% · natija <b>{float(st['sum_pct']):+.2f}%</b> · "
+                  f"ochiq {st['open']}"]
+        if st["first_at"]:
+            t.append(f"   Birinchi: {st['first_at']:%d.%m.%Y} · oxirgi: "
+                     f"{st['last_at']:%d.%m.%Y} · signal bergan odamlar: {st['authors']}")
+        t.append(f"   Botdagi kuzatuvchilar: {st['viewers']}")
+    except Exception:
+        log.warning("Moderatsiya: statistika o'qilmadi (ws=%s)", ws["id"], exc_info=True)
+
+    url = paymembers.join_url(ws)
+    t += ["", "🔗 Hammaga ko'rinadigan qo'shilish tugmasi: "
+              + (f"<code>{e(url)}</code>" + (" (Pay Members to'lov boti)" if ws["pm_bot"] and not ws["username"] else "")
+                 if url else "yo'q")]
+
+    creator_id = None
+    try:
+        for m in await bot.get_chat_administrators(cid):
+            if m.status == "creator":
+                creator_id = m.user.id
+                break
+    except Exception:
+        pass
+    owner_id = ws["owner_id"]
+    t += ["", "🙍 <b>Botdagi egasi</b> (so'rovni yuborgan):"] + await _person_line(bot, owner_id)
+    try:
+        om = await bot.get_chat_member(cid, owner_id)
+        t.append(f"   Guruhdagi roli: {om.status}")
+    except Exception:
+        pass
+    if creator_id is None:
+        t.append("👑 Telegram'dagi yaratuvchi: aniqlab bo'lmadi (bot admin emas "
+                 "yoki yaratuvchi yashirin)")
+    elif creator_id == owner_id:
+        t.append("👑 Telegram'dagi yaratuvchi: ✅ shu odamning o'zi")
+    else:
+        t += ["", "👑 <b>Telegram'dagi yaratuvchi</b> — ⚠️ BOSHQA odam:"] \
+            + await _person_line(bot, creator_id)
+
+    t += ["", "Tasdiqlansa, bu nom va havola BARCHA bot foydalanuvchilariga ko'rinadi."]
+    return "\n".join(t)
+
+
 async def request_public_approval(ctx: ContextTypes.DEFAULT_TYPE, wid: int) -> None:
     """Super-adminlarga tasdiq so'rovini yuboradi."""
     ws = await db.get_workspace(wid)
     if not ws:
         return
-    link = paymembers.join_url(ws) or "— (belgilanmagan)"
-    txt = ("🛡 <b>/top reytingiga so'rov</b>\n\n"
-           f"Guruh: <b>{html.escape(ws['name'])}</b>\n"
-           f"Havola: <code>{html.escape(link)}</code>\n\n"
-           "Tasdiqlansa, bu nom va havola BARCHA bot foydalanuvchilariga ko'rinadi.")
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"pubok:{wid}"),
-        InlineKeyboardButton("🚫 Rad etish", callback_data=f"pubno:{wid}"),
-    ]])
+    txt = await public_review_text(ctx.bot, ws)
+    if len(txt) > 4000:
+        txt = txt[:3990].rsplit("\n", 1)[0] + "\n…"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚪 Guruhga kirib ko'rish", callback_data=f"pubjoin:{wid}"),
+         InlineKeyboardButton("👤 Egasi — batafsil", callback_data=f"pubusr:{wid}")],
+        [InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"pubok:{wid}"),
+         InlineKeyboardButton("🚫 Rad etish", callback_data=f"pubno:{wid}")],
+    ])
     for admin_id in config.ADMIN_IDS:
         try:
             await ctx.bot.send_message(admin_id, txt, parse_mode=ParseMode.HTML,
-                                        reply_markup=kb)
+                                        reply_markup=kb, disable_web_page_preview=True)
         except Exception:
             log.exception("Tasdiq so'rovi yuborilmadi (admin=%s)", admin_id)
+
+
+async def on_public_review_extra(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Moderatsiya kartochkasidagi ikki qo'shimcha tugma (faqat super-admin).
+    Ikkalasi ham YANGI xabar yuboradi — asl so'rov (tasdiqlash tugmalari
+    bilan) joyida qoladi.
+
+    `pubjoin` — moderatorning o'ziga guruhni ko'rib chiqish uchun kirish:
+    ochiq bo'lsa ommaviy manzil, yopiq bo'lsa bot BIR MARTALIK (1 kishi,
+    24 soat) taklif havolasi yaratadi. Havola faqat so'ralganda yaratiladi
+    — har bir so'rovda guruhda keraksiz havolalar to'planib qolmasin.
+    `pubusr` — egasining admin paneldagi to'liq kartochkasi."""
+    q = update.callback_query
+    await q.answer()
+    if not is_admin(q.from_user.id):
+        return
+    action, _, raw = q.data.partition(":")
+    ws = await db.get_workspace(int(raw))
+    if not ws:
+        await q.message.reply_text("Guruh topilmadi.")
+        return
+    if action == "pubusr":
+        txt, kb = await _admin_user_card(ctx.bot, ws["owner_id"],
+                                         lang=await user_lang(q.from_user.id))
+        await q.message.reply_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+        return
+    if ws["username"]:
+        await q.message.reply_text(f"🚪 Ochiq: https://t.me/{ws['username']}")
+        return
+    try:
+        link = await ctx.bot.create_chat_invite_link(
+            ws["group_chat_id"], name="Trade Controller moderatsiya",
+            member_limit=1, expire_date=datetime.now(timezone.utc) + timedelta(hours=24))
+    except Exception as ex:
+        log.warning("Moderator havolasi yaratilmadi (ws=%s): %s", ws["id"], ex)
+        await q.message.reply_text(
+            "⚠️ Bot taklif havolasi yarata olmadi — unda «foydalanuvchi qo'shish» "
+            "huquqi yo'q yoki guruhdan chiqarilgan. Egasidan havola so'rang.")
+        return
+    await q.message.reply_text(
+        f"🚪 <b>{html.escape(ws['name'])}</b> — bir martalik kirish havolasi "
+        f"(1 kishi, 24 soat):\n{link.invite_link}",
+        parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
 async def on_public_decision(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -7330,6 +7479,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_join_group, pattern=r"^joingroup$"))
     app.add_handler(CallbackQueryHandler(on_view_join, pattern=r"^viewjoin:"))
     app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
+    app.add_handler(CallbackQueryHandler(on_public_review_extra, pattern=r"^(pubjoin|pubusr):\d+$"))
     app.add_handler(CallbackQueryHandler(on_top_button, pattern=r"^top:(st|off):-?\d+$"))
     app.add_handler(CallbackQueryHandler(on_join_button, pattern=r"^jl:(set|off):-?\d+$"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))

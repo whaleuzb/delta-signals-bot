@@ -638,6 +638,25 @@ async def set_public_approved(workspace_id: int, approved: bool) -> None:
             "UPDATE workspaces SET public_approved=$2 WHERE id=$1", workspace_id, approved)
 
 
+async def ws_review_stats(workspace_id: int) -> asyncpg.Record:
+    """Moderator /top so'rovini ko'rib chiqishi uchun qisqa statistika
+    (184): guruh qanchadan beri, qancha va qanday natija bilan ishlagan."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(f"""
+        SELECT COUNT(*)                                                  AS total,
+               COUNT(*) FILTER (WHERE status IN {CLOSED})                AS closed,
+               COUNT(*) FILTER (WHERE status IN {CLOSED} AND pnl_pct > 0) AS wins,
+               COALESCE(SUM(pnl_pct) FILTER (WHERE status IN {CLOSED}), 0) AS sum_pct,
+               COUNT(*) FILTER (WHERE status IN ('PENDING','ACTIVE'))   AS open,
+               MIN(created_at)                                           AS first_at,
+               MAX(created_at)                                           AS last_at,
+               COUNT(DISTINCT author_id)                                 AS authors,
+               (SELECT COUNT(*) FROM group_viewers v
+                 WHERE v.workspace_id = $1)                              AS viewers
+        FROM signals WHERE workspace_id = $1 AND NOT excluded
+        """, workspace_id)
+
+
 async def list_pending_public() -> list[asyncpg.Record]:
     """Egasi /top ga chiqishni so'ragan, lekin hali tasdiqlanmagan guruhlar."""
     async with pool().acquire() as c:
