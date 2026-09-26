@@ -220,6 +220,13 @@ def _trade_pct(s, price: float | None) -> float:
 async def compute(tid: int, price_fn) -> list[dict]:
     """Barcha qatnashchilar natijasi, reyting tartibida. `price_fn(market,
     symbol)` — async, narx yoki None (bot: `safe_last_price`)."""
+    return (await _compute(tid, price_fn))[0]
+
+
+async def _compute(tid: int, price_fn) -> tuple[list[dict], list[tuple]]:
+    """(reyting, ochiq savdolarning jonli holati [(signal_id, foiz, narx)]).
+    Ikkalasi BITTA narx to'plamidan — veb ko'rsatadigan pozitsiya foizi
+    reytingdagi pul natijasi bilan doim mos keladi."""
     t = await get(tid)
     dep = float(t["deposit"])
     async with db.pool().acquire() as c:
@@ -237,11 +244,15 @@ async def compute(tid: int, price_fn) -> list[dict]:
                 prices[key] = await price_fn(*key)
     acc = {p["user_id"]: {"user_id": p["user_id"], "joined_at": p["joined_at"],
                           "money": 0.0, "trades": 0, "wins": 0} for p in players}
+    live = []
     for r in rows:
         a = acc.get(r["user_id"])
         if a is None or r["status"] in ("CANCELLED", "EXPIRED"):
             continue
-        pct = _trade_pct(r, prices.get((r["market"], r["symbol"])))
+        price = prices.get((r["market"], r["symbol"]))
+        pct = _trade_pct(r, price)
+        if r["status"] == "ACTIVE":
+            live.append((r["id"], pct, price))
         a["money"] += pct / 100 * float(r["amount"])
         if r["status"] != "PENDING":
             a["trades"] += 1
@@ -251,16 +262,23 @@ async def compute(tid: int, price_fn) -> list[dict]:
     for i, a in enumerate(out, 1):
         a["equity"] = dep + a["money"]
         a["rank"] = i
-    return out
+    return out, live
 
 
 async def refresh(tid: int, price_fn) -> list[dict]:
     """`compute` natijasini bazaga yozadi (faqat faol turnirda)."""
-    res = await compute(tid, price_fn)
+    res, live = await _compute(tid, price_fn)
     async with db.pool().acquire() as c:
         async with c.transaction():
             if (await c.fetchval("SELECT status FROM tournaments WHERE id=$1", tid)) != "ACTIVE":
                 return res
+            for sid, pct, price in live:
+                # Narx olinmagan bo'lsa oldingi narx saqlanadi (foiz baribir
+                # yangilanadi — unda faqat qisman yopilgan qism bor).
+                await c.execute(
+                    "UPDATE tournament_trades SET live_pct=$2, "
+                    "live_price=COALESCE($3, live_price) WHERE signal_id=$1",
+                    sid, db._d(pct), db._d(price) if price is not None else None)
             for a in res:
                 await c.execute(
                     "UPDATE tournament_players SET equity=$3, trades=$4, wins=$5, rank=$6, "
@@ -282,6 +300,22 @@ async def finish(tid: int, price_fn) -> list[dict] | None:
             "WHERE id=$1 AND status='ACTIVE'", tid)
     await load_active()
     return res if r.endswith("1") else None
+
+
+async def open_positions(tid: int):
+    """Vebdagi "Ochiq pozitsiyalar" (186): turnirga kirgan (summasi
+    belgilangan), hali ochiq savdolar — kim, nima, qancha va jonli
+    natijasi. Hisobdan chiqarilgan (`excluded`) savdolar ko'rsatilmaydi."""
+    async with db.pool().acquire() as c:
+        return await c.fetch(
+            "SELECT tt.user_id, tt.amount, tt.live_pct, tt.live_price, s.id, s.symbol, "
+            "s.side, s.entry, s.sl, s.tps, s.tp_hit, s.status, s.opened_at, s.created_at, "
+            "u.username, u.first_name FROM tournament_trades tt "
+            "JOIN signals s ON s.id = tt.signal_id "
+            "LEFT JOIN users u ON u.user_id = tt.user_id "
+            "WHERE tt.tournament_id=$1 AND tt.amount IS NOT NULL AND NOT s.excluded "
+            "AND s.status IN ('PENDING','ACTIVE') "
+            "ORDER BY (s.status='ACTIVE') DESC, COALESCE(s.opened_at, s.created_at) DESC", tid)
 
 
 async def standings(tid: int, limit: int | None = None):

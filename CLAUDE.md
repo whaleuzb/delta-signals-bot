@@ -6369,3 +6369,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bosh sahifa tabi + escape, avtomatik yakun, xabarlar, qotish,
      yakundan keyingi signal, qo'lda yakunlash, i18n). Sahifa telefon
      kengligida Chromium'da ko'rib chiqildi.
+
+186. **Turnirdagi ochiq pozitsiyalar — hammaga ochiq.**
+     Foydalanuvchi: "Turnirda ochiq pozitsiyalar ma'lumotlari ko'rinsin
+     hammaga."
+
+     `/t` sahifasida (faqat faol turnirda) reyting ostida "Ochiq
+     pozitsiyalar (N)": har bir kartada juftlik + yo'nalish, qatnashchi
+     (@username/ism, escape), turnir hajmi ($), kirish · SL · keyingi TP
+     (`tps[tp_hit]`), jonli natija foizda va dollarda; to'lmagan limit —
+     "⏳ limit kutilmoqda". Faqat summasi belgilangan va hisobdan
+     chiqarilmagan savdolar (`tournament.open_positions`); faollari
+     tepada, yangilari birinchi. Yakunlangan turnirda bo'lim yo'q.
+
+     Jonli natija vebda HISOBLANMAYDI: `tournament._compute` reyting bilan
+     BIR narx to'plamidan har ochiq savdoning foizini ham qaytaradi,
+     `refresh` uni `tournament_trades.live_pct/live_price`ga yozadi (narx
+     olinmasa oldingi narx saqlanadi). Shunda kartadagi +X$ reytingdagi
+     balans bilan doim mos keladi va veb birjaga so'rov yubormaydi.
+
+     Sinov: `test_tourney.py` 56/56 (yangi: jonli qiymatlar yozilishi,
+     bo'lim va soni, ism/hajm/foiz/$, limit holati, yopilgan va summasiz
+     savdo ko'rinmasligi, darajalar, narx olinmaganda eski narx,
+     yakunlangan turnirda bo'lim yo'qligi). Telefon kengligida ko'rildi.

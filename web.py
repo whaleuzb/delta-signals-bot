@@ -221,6 +221,9 @@ tbody tr:hover{background:#ffffff06}
       margin-right:7px;vertical-align:1px;box-shadow:0 0 0 4px #2ecc8f22}
 .tmore{display:inline-block;margin-top:14px;font-weight:600}
 .plist a{display:block;padding:10px 0;border-bottom:1px solid var(--line)}
+.opens{display:flex;flex-direction:column;gap:9px}
+.omoney{font-size:12px;color:var(--mut);text-align:right;margin-top:3px}
+.opnl.wait{font-size:13px;color:var(--mut);font-weight:500}
 /* Oy tablari — bir necha oy bo'lsa qator telefonga sig'maydi, shuning
    uchun O'ZI gorizontal suriladi (sahifa tanasi emas). Chetlardagi
    ichki bo'shliq surish paytida birinchi/oxirgi tugma qirqilib
@@ -631,6 +634,39 @@ def tourney_table(rows, dep: float, lang: str | None) -> str:
             f"<tbody>{''.join(body)}</tbody></table></div>")
 
 
+def tourney_open_cards(rows, lang: str | None) -> str:
+    """Turnirdagi ochiq pozitsiyalar (186) — hammaga ochiq: kim, juftlik,
+    yo'nalish, hajm, kirish/stop/keyingi TP va jonli natija. Natija
+    `tournament_trades.live_pct`dan — reyting bilan AYNI hisob (bot har
+    5 daqiqada yozadi), veb o'zi narx so'ramaydi."""
+    if not rows:
+        return f"<div class='empty'>{e(i18n.t('w.t_open_none', lang))}</div>"
+    out = []
+    for r in rows:
+        side_cls = "b-long" if r["side"] == "LONG" else "b-short"
+        amt = float(r["amount"])
+        tps = [float(x) for x in (r["tps"] or [])]
+        nxt = tps[min(r["tp_hit"], len(tps) - 1)] if tps else None
+        levels = (f"{e(i18n.t('w.t_entry', lang))} {fmt_price(r['entry'])} · "
+                  f"SL {fmt_price(r['sl']) if r['sl'] is not None else '—'} · "
+                  f"TP {fmt_price(nxt) if nxt is not None else '—'}")
+        who = f"👤 {e(tournament.display_name(r))} · {amt:,.0f}$"
+        if r["status"] == "PENDING":
+            edge, right = "", f"<div class='opnl wait'>{e(i18n.t('w.t_pending', lang))}</div>"
+        else:
+            p = float(r["live_pct"]) if r["live_pct"] is not None else 0.0
+            edge = _cls(p)
+            right = (f"<div><div class='opnl {_cls(p)}'>{p:+.2f}%</div>"
+                     f"<div class='omoney'>{p / 100 * amt:+,.2f}$</div></div>")
+        out.append(
+            f"<div class='open {edge}-edge'><div class='ometa'>"
+            f"<div class='oname'>{e(r['symbol'])} "
+            f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
+            f"<div class='osub'>{who}</div><div class='osub'>{levels}</div></div>"
+            f"{right}</div>")
+    return f"<div class='opens'>{''.join(out)}</div>"
+
+
 def tourney_status(t, lang: str | None) -> str:
     when = f"{t['ends_at'].astimezone(stats.TZ):%d.%m.%Y %H:%M}"
     if t["status"] == "ACTIVE":
@@ -694,6 +730,11 @@ async def tourney_page(request):
         links = "".join(items)
         past_html = f"<h2>{e(i18n.t('w.t_past', lang))}</h2><div class='plist'>{links}</div>"
     live = t["status"] == "ACTIVE"
+    opens_html = ""
+    if live:
+        opens = await tournament.open_positions(t["id"])
+        opens_html = (f"<h2>{e(i18n.t('w.t_open_h2', lang, n=len(opens)))}</h2>"
+                      + tourney_open_cards(opens, lang))
     body = (
         head + f"<h1>{e(i18n.t('w.t_title', lang, id=t['id']))}</h1>"
         f"<div class='sub'>{tourney_status(t, lang)}</div>"
@@ -701,6 +742,7 @@ async def tourney_page(request):
         "</header>"
         f"<div class='grid' style='margin-top:26px'>{tiles}</div>"
         + tourney_table(rows, dep, lang)
+        + opens_html
         + (f"<div class='note'>{e(i18n.t('w.t_updated', lang))}</div>" if live else "")
         + past_html + tourney_cta(bot, live, lang))
     html_ = _put(key, page(i18n.t("w.t_title", lang, id=t["id"]), body, bot, lang=lang))

@@ -463,6 +463,11 @@ CREATE TABLE IF NOT EXISTS tournament_trades (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ttrades_player ON tournament_trades(tournament_id, user_id);
+-- Ochiq savdoning jonli holati (186) — `tournament.refresh()` reyting bilan
+-- BIR VAQTDA yozadi, shunda vebdagi "Ochiq pozitsiyalar" va reyting bir
+-- xil narxdan hisoblangan bo'ladi (veb o'zi narx so'ramaydi).
+ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS live_pct NUMERIC;
+ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS live_price NUMERIC;
 """
 
 
