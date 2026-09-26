@@ -1792,6 +1792,227 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "✅ Ваша группа появилась в рейтинге <code>/top</code>.",
         "en": "✅ Your group is now visible in the <code>/top</code> ranking.",
     },
+    # --- Turnir (185) ---
+    "menu.tourney": {"uz": "🏆 Turnir", "ru": "🏆 Турнир", "en": "🏆 Tournament"},
+    "tr.none": {"uz": "Hozir faol turnir yo'q.", "ru": "Сейчас нет активного турнира.",
+                "en": "There is no active tournament right now."},
+    "tr.rules": {
+        "uz": ("🏆 <b>Turnir #{id}</b>\n\n"
+               "Har bir qatnashchiga alohida turnir depoziti: <b>{dep:,.0f}$</b>\n"
+               "Tugaydi: <b>{ends}</b>\n\n"
+               "<b>Qoidalar:</b>\n"
+               "• Qo'shilgandan keyin shaxsiy jurnalingizda ochgan har bir signal turnirga kiradi.\n"
+               "• Har savdoda turnir depozitidan qancha ishlatishni belgilaysiz — bo'sh summadan oshmaydi.\n"
+               "• Summa signal ochilgach {min} daqiqa ichida (limit hali to'lmagan bo'lsa — to'lguncha) "
+               "kiritiladi va keyin o'zgarmaydi.\n"
+               "• Turnir tugaganda ochiq pozitsiyalar joriy narxda hisoblanadi.\n"
+               "• Reyting ochiq sahifada — u yerda ismingiz (@username) ko'rinadi."),
+        "ru": ("🏆 <b>Турнир #{id}</b>\n\n"
+               "Отдельный турнирный депозит каждому участнику: <b>{dep:,.0f}$</b>\n"
+               "Окончание: <b>{ends}</b>\n\n"
+               "<b>Правила:</b>\n"
+               "• Каждый сигнал, открытый в личном журнале после вступления, идёт в турнир.\n"
+               "• В каждой сделке вы указываете сумму из турнирного депозита — не больше свободной.\n"
+               "• Сумму можно указать в течение {min} мин после открытия сигнала (для лимитки — "
+               "пока она не исполнилась), потом она не меняется.\n"
+               "• По окончании открытые позиции считаются по текущей цене.\n"
+               "• Рейтинг на открытой странице — там видно ваше имя (@username)."),
+        "en": ("🏆 <b>Tournament #{id}</b>\n\n"
+               "Separate tournament deposit for each player: <b>{dep:,.0f}$</b>\n"
+               "Ends: <b>{ends}</b>\n\n"
+               "<b>Rules:</b>\n"
+               "• Every signal you open in your personal journal after joining counts.\n"
+               "• For each trade you set an amount from the tournament deposit — no more than what's free.\n"
+               "• The amount is set within {min} min after the signal opens (for a limit order — "
+               "until it fills) and can't be changed later.\n"
+               "• When the tournament ends, open positions are valued at the current price.\n"
+               "• The ranking is on the public page — your name (@username) is shown there."),
+    },
+    "tr.btn_join": {"uz": "✅ Qatnashaman", "ru": "✅ Участвую", "en": "✅ Join"},
+    "tr.joined": {
+        "uz": ("✅ Siz turnirdasiz! Endi shaxsiy jurnalingizga signal kiriting — "
+               "har birida turnir summasi so'raladi."),
+        "ru": ("✅ Вы в турнире! Теперь вносите сигналы в личный журнал — "
+               "для каждого бот спросит турнирную сумму."),
+        "en": ("✅ You're in! Now add signals to your personal journal — "
+               "the bot will ask for a tournament amount for each."),
+    },
+    "tr.need_personal": {
+        "uz": "Turnirda faqat shaxsiy jurnal orqali qatnashiladi. Menyudan «🔄» bilan shaxsiy jurnalingizga o'ting.",
+        "ru": "В турнире участвуют только через личный журнал. Переключитесь на него кнопкой «🔄» в меню.",
+        "en": "Tournaments are played from your personal journal. Switch to it with «🔄» in the menu.",
+    },
+    "tr.me": {
+        "uz": ("🏆 <b>Turnir #{id}</b> — tugaydi {ends}\n\n"
+               "O'rningiz: <b>{rank}</b> / {n}\n"
+               "Natija: <b>{eq:,.2f}$</b> ({ret:+.2f}%)\n"
+               "Savdolar: {trades} · foydali: {wins}\n"
+               "Bo'sh turnir depoziti: <b>{free:,.2f}$</b>\n\n"
+               "Reyting har 5 daqiqada yangilanadi."),
+        "ru": ("🏆 <b>Турнир #{id}</b> — до {ends}\n\n"
+               "Ваше место: <b>{rank}</b> / {n}\n"
+               "Результат: <b>{eq:,.2f}$</b> ({ret:+.2f}%)\n"
+               "Сделок: {trades} · прибыльных: {wins}\n"
+               "Свободный турнирный депозит: <b>{free:,.2f}$</b>\n\n"
+               "Рейтинг обновляется каждые 5 минут."),
+        "en": ("🏆 <b>Tournament #{id}</b> — ends {ends}\n\n"
+               "Your place: <b>{rank}</b> / {n}\n"
+               "Result: <b>{eq:,.2f}$</b> ({ret:+.2f}%)\n"
+               "Trades: {trades} · winning: {wins}\n"
+               "Free tournament deposit: <b>{free:,.2f}$</b>\n\n"
+               "The ranking updates every 5 minutes."),
+    },
+    "tr.btn_page": {"uz": "🌐 Reyting sahifasi", "ru": "🌐 Страница рейтинга", "en": "🌐 Ranking page"},
+    "tr.amt_head": {
+        "uz": ("🏆 <b>Turnir</b> — #{sid} {sym} uchun turnir depozitidan qancha ishlatasiz?\n"
+               "Balans: <b>{bal:,.2f}$</b> · bo'sh: <b>{free:,.2f}$</b>\n\n"
+               "Tugmani bosing yoki summani yozing (masalan <code>100</code>).\n"
+               "⏱ Savdo ochilgach {min} daqiqa ichida — keyin o'zgartirib bo'lmaydi."),
+        "ru": ("🏆 <b>Турнир</b> — сколько из турнирного депозита на #{sid} {sym}?\n"
+               "Баланс: <b>{bal:,.2f}$</b> · свободно: <b>{free:,.2f}$</b>\n\n"
+               "Нажмите кнопку или напишите сумму (например <code>100</code>).\n"
+               "⏱ В течение {min} мин после открытия сделки — потом изменить нельзя."),
+        "en": ("🏆 <b>Tournament</b> — how much of the tournament deposit for #{sid} {sym}?\n"
+               "Balance: <b>{bal:,.2f}$</b> · free: <b>{free:,.2f}$</b>\n\n"
+               "Tap a button or type an amount (e.g. <code>100</code>).\n"
+               "⏱ Within {min} min after the trade opens — it can't be changed later."),
+    },
+    "tr.btn_skip": {"uz": "➖ Turnirga hisoblanmasin", "ru": "➖ Не учитывать в турнире",
+                    "en": "➖ Don't count in tournament"},
+    "tr.amt_saved": {
+        "uz": "✅ Turnir: #{sid} uchun <b>{amt:,.2f}$</b> belgilandi.",
+        "ru": "✅ Турнир: для #{sid} указано <b>{amt:,.2f}$</b>.",
+        "en": "✅ Tournament: <b>{amt:,.2f}$</b> set for #{sid}.",
+    },
+    "tr.skipped": {"uz": "➖ #{sid} turnir natijasiga ta'sir qilmaydi.",
+                   "ru": "➖ #{sid} не влияет на результат турнира.",
+                   "en": "➖ #{sid} won't affect your tournament result."},
+    "tr.err_closed": {"uz": "Turnir yakunlangan yoki bu savdo turnirga kirmaydi.",
+                      "ru": "Турнир завершён или эта сделка не в турнире.",
+                      "en": "The tournament is over or this trade isn't in it."},
+    "tr.err_already": {"uz": "Bu savdoning turnir summasi allaqachon belgilangan.",
+                       "ru": "Турнирная сумма этой сделки уже указана.",
+                       "en": "This trade's tournament amount is already set."},
+    "tr.err_late": {"uz": "⏱ Kech: summa faqat savdo ochilgach {min} daqiqa ichida kiritiladi.",
+                    "ru": "⏱ Поздно: сумму можно указать только в течение {min} мин после открытия.",
+                    "en": "⏱ Too late: the amount can only be set within {min} min after opening."},
+    "tr.err_amount": {"uz": "Summa musbat son bo'lishi kerak.", "ru": "Сумма должна быть положительной.",
+                      "en": "The amount must be a positive number."},
+    "tr.err_over": {"uz": "Bo'sh turnir depozitidan oshib ketdi. Bo'sh: {free:,.2f}$",
+                    "ru": "Больше свободного турнирного депозита. Свободно: {free:,.2f}$",
+                    "en": "More than the free tournament deposit. Free: {free:,.2f}$"},
+    "tr.final_dm": {
+        "uz": ("🏁 <b>Turnir #{id} yakunlandi!</b>\n\n"
+               "Sizning o'rningiz: <b>{rank}</b> / {n}\n"
+               "Yakuniy natija: <b>{eq:,.2f}$</b> ({ret:+.2f}%)"),
+        "ru": ("🏁 <b>Турнир #{id} завершён!</b>\n\n"
+               "Ваше место: <b>{rank}</b> / {n}\n"
+               "Итог: <b>{eq:,.2f}$</b> ({ret:+.2f}%)"),
+        "en": ("🏁 <b>Tournament #{id} is over!</b>\n\n"
+               "Your place: <b>{rank}</b> / {n}\n"
+               "Final result: <b>{eq:,.2f}$</b> ({ret:+.2f}%)"),
+    },
+    "adm.btn_tourney": {"uz": "🏆 Turnir", "ru": "🏆 Турнир", "en": "🏆 Tournament"},
+    "adm.t_none": {"uz": "🏆 <b>Turnir</b>\n\nHozir faol turnir yo'q.",
+                   "ru": "🏆 <b>Турнир</b>\n\nСейчас активного турнира нет.",
+                   "en": "🏆 <b>Tournament</b>\n\nNo active tournament right now."},
+    "adm.t_last": {"uz": "Oxirgi: #{id} — {n} qatnashchi, g'olib {who} ({ret:+.2f}%)",
+                   "ru": "Последний: #{id} — {n} участн., победитель {who} ({ret:+.2f}%)",
+                   "en": "Last: #{id} — {n} players, winner {who} ({ret:+.2f}%)"},
+    "adm.t_btn_new": {"uz": "▶️ Yangi turnir boshlash", "ru": "▶️ Начать новый турнир",
+                      "en": "▶️ Start a new tournament"},
+    "adm.t_ask": {
+        "uz": ("Turnir depozitini ($) va muddatini (kun) bitta xabarda yozing.\n"
+               "Masalan: <code>1000 30</code> — har bir qatnashchiga 1000$, 30 kun."),
+        "ru": ("Напишите в одном сообщении турнирный депозит ($) и длительность (дней).\n"
+               "Например: <code>1000 30</code> — каждому по 1000$, 30 дней."),
+        "en": ("Send the tournament deposit ($) and duration (days) in one message.\n"
+               "E.g. <code>1000 30</code> — 1000$ per player, 30 days."),
+    },
+    "adm.t_bad": {"uz": "Tushunmadim. Masalan: <code>1000 30</code> (depozit 10–1 000 000, muddat 1–365 kun).",
+                  "ru": "Не понял. Например: <code>1000 30</code> (депозит 10–1 000 000, 1–365 дней).",
+                  "en": "Didn't get it. E.g. <code>1000 30</code> (deposit 10–1,000,000, 1–365 days)."},
+    "adm.t_confirm": {
+        "uz": ("🏆 <b>Yangi turnir</b>\nDepozit: <b>{dep:,.0f}$</b> har bir qatnashchiga\n"
+               "Muddat: <b>{days}</b> kun (tugaydi {ends})\n\n"
+               "Boshlaysizmi? Boshlangach shaxsiy jurnallarda «🏆 Turnir» tugmasi chiqadi."),
+        "ru": ("🏆 <b>Новый турнир</b>\nДепозит: <b>{dep:,.0f}$</b> каждому участнику\n"
+               "Длительность: <b>{days}</b> дн. (до {ends})\n\n"
+               "Начать? После старта в личных журналах появится кнопка «🏆 Турнир»."),
+        "en": ("🏆 <b>New tournament</b>\nDeposit: <b>{dep:,.0f}$</b> per player\n"
+               "Duration: <b>{days}</b> days (ends {ends})\n\n"
+               "Start? After that, personal journals get a «🏆 Tournament» button."),
+    },
+    "adm.t_btn_go": {"uz": "✅ Boshlash", "ru": "✅ Начать", "en": "✅ Start"},
+    "adm.t_btn_cancel": {"uz": "❌ Bekor qilish", "ru": "❌ Отмена", "en": "❌ Cancel"},
+    "adm.t_started": {
+        "uz": "✅ Turnir #{id} boshlandi! E'lon qilish uchun «📣 Xabar yuborish»dan foydalaning.",
+        "ru": "✅ Турнир #{id} начался! Для анонса используйте «📣 Рассылку».",
+        "en": "✅ Tournament #{id} started! Use «📣 Broadcast» to announce it.",
+    },
+    "adm.t_exists": {"uz": "Faol turnir allaqachon bor.", "ru": "Активный турнир уже есть.",
+                     "en": "There is already an active tournament."},
+    "adm.t_active": {
+        "uz": ("🏆 <b>Turnir #{id}</b> — faol\nDepozit: {dep:,.0f}$ · qatnashchilar: {n}\n"
+               "Boshlangan: {start} · tugaydi: {ends}\n\n{top}"),
+        "ru": ("🏆 <b>Турнир #{id}</b> — активен\nДепозит: {dep:,.0f}$ · участников: {n}\n"
+               "Начало: {start} · конец: {ends}\n\n{top}"),
+        "en": ("🏆 <b>Tournament #{id}</b> — active\nDeposit: {dep:,.0f}$ · players: {n}\n"
+               "Started: {start} · ends: {ends}\n\n{top}"),
+    },
+    "adm.t_top_empty": {"uz": "Hali qatnashchi yo'q.", "ru": "Участников пока нет.",
+                        "en": "No players yet."},
+    "adm.t_btn_refresh": {"uz": "🔄 Yangilash", "ru": "🔄 Обновить", "en": "🔄 Refresh"},
+    "adm.t_btn_end": {"uz": "⏹ Hozir yakunlash", "ru": "⏹ Завершить сейчас", "en": "⏹ End now"},
+    "adm.t_end_ask": {
+        "uz": "Turnir #{id} ni hozir yakunlaysizmi? Ochiq pozitsiyalar joriy narxda hisoblanadi.",
+        "ru": "Завершить турнир #{id} сейчас? Открытые позиции будут посчитаны по текущей цене.",
+        "en": "End tournament #{id} now? Open positions will be valued at the current price.",
+    },
+    "adm.t_btn_end_ok": {"uz": "✅ Ha, yakunlash", "ru": "✅ Да, завершить", "en": "✅ Yes, end it"},
+    "adm.t_ended": {"uz": "🏁 Turnir #{id} yakunlandi. G'olib: {who} ({ret:+.2f}%)",
+                    "ru": "🏁 Турнир #{id} завершён. Победитель: {who} ({ret:+.2f}%)",
+                    "en": "🏁 Tournament #{id} is over. Winner: {who} ({ret:+.2f}%)"},
+    "adm.t_ended_empty": {"uz": "🏁 Turnir #{id} yakunlandi (qatnashchi bo'lmadi).",
+                          "ru": "🏁 Турнир #{id} завершён (участников не было).",
+                          "en": "🏁 Tournament #{id} is over (no players)."},
+    "w.tab_tourney": {"uz": "🏆 Turnir", "ru": "🏆 Турнир", "en": "🏆 Tournament"},
+    "w.t_title": {"uz": "Turnir #{id}", "ru": "Турнир #{id}", "en": "Tournament #{id}"},
+    "w.t_live": {"uz": "Faol · tugaydi {ends}", "ru": "Идёт · до {ends}", "en": "Live · ends {ends}"},
+    "w.t_done": {"uz": "Yakunlangan · {ends}", "ru": "Завершён · {ends}", "en": "Finished · {ends}"},
+    "w.t_meta": {"uz": "Har bir qatnashchiga {dep}$ depozit · {n} qatnashchi",
+                 "ru": "Депозит {dep}$ каждому · {n} участников",
+                 "en": "{dep}$ deposit per player · {n} players"},
+    "w.t_none": {"uz": "Hozircha turnir o'tkazilmagan. Tez orada!",
+                 "ru": "Турниров пока не было. Скоро!", "en": "No tournaments yet. Coming soon!"},
+    "w.t_empty": {"uz": "Hali qatnashchi yo'q — birinchi bo'ling!",
+                  "ru": "Участников пока нет — будьте первым!", "en": "No players yet — be the first!"},
+    "w.t_tile_players": {"uz": "Qatnashchilar", "ru": "Участники", "en": "Players"},
+    "w.t_tile_deposit": {"uz": "Depozit", "ru": "Депозит", "en": "Deposit"},
+    "w.t_tile_leader": {"uz": "🥇 Yetakchi", "ru": "🥇 Лидер", "en": "🥇 Leader"},
+    "w.t_cta_h3": {"uz": "Turnirda qatnashing", "ru": "Участвуйте в турнире",
+                   "en": "Join the tournament"},
+    "w.t_cta_next": {
+        "uz": "Keyingi turnir boshlanganda botdagi shaxsiy jurnalingizda «🏆 Turnir» tugmasi paydo bo'ladi.",
+        "ru": "Когда начнётся следующий турнир, в личном журнале в боте появится кнопка «🏆 Турнир».",
+        "en": "When the next tournament starts, a «🏆 Tournament» button appears in your personal journal in the bot.",
+    },
+    "w.t_col_trader": {"uz": "Treyder", "ru": "Трейдер", "en": "Trader"},
+    "w.t_col_equity": {"uz": "Balans", "ru": "Баланс", "en": "Balance"},
+    "w.t_col_ret": {"uz": "Natija", "ru": "Результат", "en": "Result"},
+    "w.t_col_trades": {"uz": "Savdolar", "ru": "Сделки", "en": "Trades"},
+    "w.t_col_wr": {"uz": "WR", "ru": "WR", "en": "WR"},
+    "w.t_how": {
+        "uz": "Qatnashish: botda shaxsiy jurnalingizni oching → «🏆 Turnir» → «✅ Qatnashaman».",
+        "ru": "Как участвовать: откройте личный журнал в боте → «🏆 Турнир» → «✅ Участвую».",
+        "en": "How to join: open your personal journal in the bot → «🏆 Tournament» → «✅ Join».",
+    },
+    "w.t_more": {"uz": "To'liq reyting →", "ru": "Полный рейтинг →", "en": "Full ranking →"},
+    "w.t_past": {"uz": "O'tgan turnirlar", "ru": "Прошлые турниры", "en": "Past tournaments"},
+    "w.t_updated": {"uz": "Reyting har 5 daqiqada yangilanadi, ochiq pozitsiyalar joriy narxda.",
+                    "ru": "Рейтинг обновляется каждые 5 минут, открытые позиции — по текущей цене.",
+                    "en": "The ranking updates every 5 minutes; open positions at the current price."},
+
     # --- Menyudagi reyting tugmalari (183) ---
     "menu.top_off": {"uz": "🏆 Topga chiqarish", "ru": "🏆 Вывести в топ", "en": "🏆 Add to top"},
     "menu.top_on": {"uz": "🏆 Topda ✅", "ru": "🏆 В топе ✅", "en": "🏆 In top ✅"},

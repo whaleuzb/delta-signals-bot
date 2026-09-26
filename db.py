@@ -421,6 +421,48 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS allow_member_signals
 -- qayta tekshiradi. Eski `invite_link` ustuni endi o'qilmaydi — egasi
 -- ixtiyoriy havola qo'ya olmaydi; ustun tarix uchun bazada qoldi.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS pm_bot TEXT;
+
+-- Foydalanuvchilar o'rtasidagi turnirlar (185-band, `tournament.py`).
+-- Bir vaqtda faqat BITTA faol turnir (qisman unikal indeks). `deposit` —
+-- admin belgilagan, har bir qatnashchiga beriladigan alohida (virtual)
+-- turnir depoziti; shaxsiy jurnal depozitiga tegmaydi.
+CREATE TABLE IF NOT EXISTS tournaments (
+    id          SERIAL PRIMARY KEY,
+    deposit     NUMERIC     NOT NULL,
+    status      TEXT        NOT NULL DEFAULT 'ACTIVE',   -- ACTIVE | FINISHED
+    started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ends_at     TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ,
+    created_by  BIGINT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tournament_active
+    ON tournaments ((status)) WHERE status = 'ACTIVE';
+-- Qatnashchi. equity/trades/wins/rank — `tournament.refresh()` har bir
+-- necha daqiqada jonli narx bilan yozadi (veb faqat O'QIYDI, narx so'ramaydi);
+-- turnir yakunlangach shu qiymatlar YAKUNIY bo'lib qotadi.
+CREATE TABLE IF NOT EXISTS tournament_players (
+    tournament_id INT         NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    user_id       BIGINT      NOT NULL,
+    workspace_id  INT         NOT NULL,          -- qatnashchining shaxsiy jurnali
+    joined_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    equity        NUMERIC,
+    trades        INT         NOT NULL DEFAULT 0,
+    wins          INT         NOT NULL DEFAULT 0,
+    rank          INT,
+    updated_at    TIMESTAMPTZ,
+    PRIMARY KEY (tournament_id, user_id)
+);
+-- Turnirga kirgan savdo (shaxsiy jurnal signali). `amount` — turnir
+-- depozitidan ajratilgan hajm; NULL — hali belgilanmagan (natijaga ta'sir
+-- qilmaydi). Faqat qisqa oynada belgilanadi (`tournament.can_set_amount`).
+CREATE TABLE IF NOT EXISTS tournament_trades (
+    signal_id     INT         PRIMARY KEY REFERENCES signals(id) ON DELETE CASCADE,
+    tournament_id INT         NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    user_id       BIGINT      NOT NULL,
+    amount        NUMERIC,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ttrades_player ON tournament_trades(tournament_id, user_id);
 """
 
 

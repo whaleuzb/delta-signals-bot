@@ -26,6 +26,7 @@ import chart
 import db
 import i18n
 import paymembers
+import tournament
 import stats
 import tracker
 
@@ -211,8 +212,15 @@ tbody tr:hover{background:#ffffff06}
 .tabbar label:hover{color:var(--txt)}
 .pane{display:none}
 #tab-g:checked~.tabbar label[for=tab-g],
-#tab-c:checked~.tabbar label[for=tab-c]{background:rgba(218,221,226,.14);color:var(--txt)}
-#tab-g:checked~.pane-g,#tab-c:checked~.pane-c{display:block}
+#tab-c:checked~.tabbar label[for=tab-c],
+#tab-t:checked~.tabbar label[for=tab-t]{background:rgba(218,221,226,.14);color:var(--txt)}
+#tab-g:checked~.pane-g,#tab-c:checked~.pane-c,#tab-t:checked~.pane-t{display:block}
+/* Turnir (185) */
+.tmeta{color:var(--mut);font-size:14px;margin-top:6px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--long);
+      margin-right:7px;vertical-align:1px;box-shadow:0 0 0 4px #2ecc8f22}
+.tmore{display:inline-block;margin-top:14px;font-weight:600}
+.plist a{display:block;padding:10px 0;border-bottom:1px solid var(--line)}
 /* Oy tablari — bir necha oy bo'lsa qator telefonga sig'maydi, shuning
    uchun O'ZI gorizontal suriladi (sahifa tanasi emas). Chetlardagi
    ichki bo'shliq surish paytida birinchi/oxirgi tugma qirqilib
@@ -596,6 +604,109 @@ def net_result(r) -> float:
     return float(r["sum_pct"])
 
 
+def tourney_table(rows, dep: float, lang: str | None) -> str:
+    """Turnir reytingi jadvali (185) — bosh sahifa tabi va /t sahifasi
+    uchun BITTA joy. Qiymatlar `tournament_players`dan (bot har 5 daqiqada
+    jonli narxda yozadi) — veb o'zi narx so'ramaydi."""
+    if not rows:
+        return f"<div class='empty'>{e(i18n.t('w.t_empty', lang))}</div>"
+    k_eq, k_ret, k_tr, k_wr = (e(i18n.t(k, lang)) for k in (
+        "w.t_col_equity", "w.t_col_ret", "w.t_col_trades", "w.t_col_wr"))
+    head = (f"<tr><th>#&nbsp; {e(i18n.t('w.t_col_trader', lang))}</th><th>{k_eq}</th>"
+            f"<th>{k_ret}</th><th>{k_tr}</th><th>{k_wr}</th></tr>")
+    body = []
+    for pos, r in enumerate(rows, 1):
+        eq = float(r["equity"]) if r["equity"] is not None else dep
+        ret = (eq / dep - 1) * 100
+        closed_wr = (f"{r['wins'] / r['trades'] * 100:.0f}%" if r["trades"] else "—")
+        rank = r["rank"] or pos
+        medal = {1: "🥇 ", 2: "🥈 ", 3: "🥉 "}.get(rank, f"{rank}. ")
+        body.append(
+            f"<tr><td>{medal}{e(tournament.display_name(r))}</td>"
+            f"<td data-k='{k_eq}'>{eq:,.2f}$</td>"
+            f"<td data-k='{k_ret}' class='{_cls(ret)}'>{ret:+.2f}%</td>"
+            f"<td data-k='{k_tr}'>{r['trades']}</td>"
+            f"<td data-k='{k_wr}'>{closed_wr}</td></tr>")
+    return (f"<div class='scroll'><table><thead>{head}</thead>"
+            f"<tbody>{''.join(body)}</tbody></table></div>")
+
+
+def tourney_status(t, lang: str | None) -> str:
+    when = f"{t['ends_at'].astimezone(stats.TZ):%d.%m.%Y %H:%M}"
+    if t["status"] == "ACTIVE":
+        return f"<span class='live'></span>{e(i18n.t('w.t_live', lang, ends=when))}"
+    done = f"{(t['finished_at'] or t['ends_at']).astimezone(stats.TZ):%d.%m.%Y}"
+    return e(i18n.t("w.t_done", lang, ends=done))
+
+
+def tourney_cta(bot: str | None, live: bool, lang: str | None) -> str:
+    """Turnir sahifasi ostidagi chaqiruv. Guruhlar uchun `join_cta` bu yerda
+    mos emas ("guruhingizni ulang") — turnirda odam o'zi qatnashadi."""
+    btn = (f"<a class='btn' href='https://t.me/{e(bot)}'>"
+           f"{e(i18n.t('w.cta_btn', lang))}</a>" if bot else "")
+    p = i18n.t("w.t_how" if live else "w.t_cta_next", lang)
+    return (f"<div class='cta'><h3>{e(i18n.t('w.t_cta_h3', lang))}</h3>"
+            f"<p>{e(p)}</p>{btn}</div>")
+
+
+async def tourney_page(request):
+    """/t — joriy (yoki oxirgi) turnir, /t/{id} — istalgan turnir."""
+    bot = request.app["bot_username"]
+    lang = req_lang(request)
+    tid = request.match_info.get("tid")
+    key = f"t:{tid or 'cur'}:{lang}"
+    cached = _cached(key)
+    if cached is not None:
+        return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
+
+    t = await (tournament.get(int(tid)) if tid else tournament.latest())
+    if tid and not t:
+        raise web.HTTPNotFound()
+    head = (f"<header class='hero'>{lang_switch(request, lang)}"
+            f"<div class='brand'><a href='{e(keep('/', request, lang))}'>Trade Controller</a></div>")
+    if not t:
+        body = (head + f"<h1>{e(i18n.t('w.tab_tourney', lang))}</h1></header>"
+                f"<div class='empty'>{e(i18n.t('w.t_none', lang))}</div>"
+                + tourney_cta(bot, False, lang))
+        html_ = _put(key, page(i18n.t("w.tab_tourney", lang), body, bot, lang=lang))
+        return web.Response(text=html_, content_type="text/html", headers=NO_CACHE)
+
+    dep = float(t["deposit"])
+    rows = await tournament.standings(t["id"])
+    leader = (f"{(float(rows[0]['equity'] or dep) / dep - 1) * 100:+.2f}%" if rows else "—")
+    tiles = "".join(
+        f"<div class='tile'><div class='k'>{e(k)}</div><div class='v {c}'>{e(v)}</div></div>"
+        for k, v, c in (
+            (i18n.t("w.t_tile_players", lang), str(len(rows)), ""),
+            (i18n.t("w.t_tile_deposit", lang), f"{dep:,.0f}$", ""),
+            (i18n.t("w.t_tile_leader", lang), leader,
+             _cls(float(leader[:-1])) if rows else "")))
+    past = await tournament.past(12)
+    past_html = ""
+    if past:
+        items = []
+        for p in past:
+            href = e(keep(f"/t/{p['id']}", request, lang))
+            span = (f"{p['started_at'].astimezone(stats.TZ):%d.%m.%Y} — "
+                    f"{(p['finished_at'] or p['ends_at']).astimezone(stats.TZ):%d.%m.%Y}")
+            items.append(f"<a href='{href}'>{e(i18n.t('w.t_title', lang, id=p['id']))} · "
+                         f"{span} · {p['n_players']}</a>")
+        links = "".join(items)
+        past_html = f"<h2>{e(i18n.t('w.t_past', lang))}</h2><div class='plist'>{links}</div>"
+    live = t["status"] == "ACTIVE"
+    body = (
+        head + f"<h1>{e(i18n.t('w.t_title', lang, id=t['id']))}</h1>"
+        f"<div class='sub'>{tourney_status(t, lang)}</div>"
+        f"<div class='tmeta'>{e(i18n.t('w.t_meta', lang, dep=f'{dep:,.0f}', n=len(rows)))}</div>"
+        "</header>"
+        f"<div class='grid' style='margin-top:26px'>{tiles}</div>"
+        + tourney_table(rows, dep, lang)
+        + (f"<div class='note'>{e(i18n.t('w.t_updated', lang))}</div>" if live else "")
+        + past_html + tourney_cta(bot, live, lang))
+    html_ = _put(key, page(i18n.t("w.t_title", lang, id=t["id"]), body, bot, lang=lang))
+    return web.Response(text=html_, content_type="text/html", headers=NO_CACHE)
+
+
 async def index(request):
     bot = request.app["bot_username"]
     lang = req_lang(request)
@@ -668,17 +779,41 @@ async def index(request):
     groups = [r for r in rows if not r["is_channel"]]
     channels = [r for r in rows if r["is_channel"]]
 
-    if rows:
+    # Turnir tabi (185) — turnir o'tkazilgan bo'lsagina chiqadi: joriy
+    # (yoki oxirgi) turnirning TOP-10 i va to'liq sahifaga havola.
+    t_label = t_pane = ""
+    try:
+        t = await tournament.latest()
+        top = await tournament.standings(t["id"], limit=10) if t else []
+    except Exception:
+        # Turnir qismidagi xato bosh sahifani (asosiy reyting) yiqitmasin.
+        log.exception("Bosh sahifa: turnir o'qilmadi")
+        t, top = None, []
+    if t:
+        tdep = float(t["deposit"])
+        t_label = f"<label for='tab-t'>{e(i18n.t('w.tab_tourney', lang))}</label>"
+        t_pane = (
+            "<div class='pane pane-t'>"
+            f"<div class='sub' style='margin-bottom:12px'><b>"
+            f"{e(i18n.t('w.t_title', lang, id=t['id']))}</b> · {tourney_status(t, lang)}</div>"
+            + tourney_table(top, tdep, lang)
+            + f"<a class='tmore' href='{e(keep('/t', request, lang))}'>"
+              f"{e(i18n.t('w.t_more', lang))}</a></div>")
+
+    if rows or t:
         listing = (
             "<div class='tabs'>"
             "<input type='radio' name='wstab' id='tab-g' checked>"
             "<input type='radio' name='wstab' id='tab-c'>"
+            + ("<input type='radio' name='wstab' id='tab-t'>" if t else "") +
             "<div class='tabbar'>"
             f"<label for='tab-g'>{e(i18n.t('w.tab_groups', lang))}</label>"
             f"<label for='tab-c'>{e(i18n.t('w.tab_channels', lang))}</label>"
+            f"{t_label}"
             "</div>"
             f"<div class='pane pane-g'>{pane(groups, 'w.groups_empty')}</div>"
             f"<div class='pane pane-c'>{pane(channels, 'w.channels_empty')}</div>"
+            f"{t_pane}"
             "</div>")
     else:
         listing = f"<div class='empty'>{e(i18n.t('w.index_empty', lang))}</div>"
@@ -1109,6 +1244,8 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", group_page),
+        web.get("/t", tourney_page),
+        web.get(r"/t/{tid:\d+}", tourney_page),
         web.get(r"/g/{wid:\d+}/stats.json", stats_json),
         web.get(r"/g/{wid:\d+}/equity.png", equity_png),
         web.get(r"/g/{wid:\d+}/logo.png", logo_png),

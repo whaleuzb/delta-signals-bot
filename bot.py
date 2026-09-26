@@ -49,6 +49,7 @@ import newsai
 import stocks
 import parsing
 import paymembers
+import tournament
 import stats
 import tgsource
 import tracker
@@ -76,6 +77,12 @@ AWAITING_CHANNEL: dict[int, bool] = {}
 AWAITING_HASHTAG: dict[int, bool] = {}
 # Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
 AWAITING_BROADCAST: dict[int, bool] = {}
+# Turnir (185): odam -> signal_id (turnir summasi kutilmoqda); odam ->
+# signal_id (turnir summasidan KEYIN so'raladigan shaxsiy depozit hajmi —
+# ikki matnli so'rov bir vaqtda turmasin); admin -> True (depozit va muddat).
+AWAITING_TALLOC: dict[int, int] = {}
+DEFER_PERSONAL_ALLOC: dict[int, int] = {}
+AWAITING_TOURNEY: dict[int, bool] = {}
 PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
 # News Trade AI/surge post ostidagi "📝 Jurnalga kiritish" tugmasi orqali
 # kelgan foydalanuvchi: uid -> (symbol, shaxsiy_workspace_id). Tiker
@@ -822,6 +829,10 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         # Ochiq kanal/guruhga kerak emas: tugma ommaviy manzilga o'zi chiqadi.
         if ws["type"] == "group":
             rows.append(top_menu_row(ws, lang))
+        # Shaxsiy jurnalda — faqat admin turnirni BOSHLAGAN bo'lsa (185).
+        if ws["type"] == "personal" and tournament.ACTIVE:
+            rows.append([InlineKeyboardButton(i18n.t("menu.tourney", lang),
+                                              callback_data="tr:menu")])
     elif ws["type"] == "group" and not ws["is_channel"] and ws["allow_member_signals"]:
         # Egasi ruxsat bergan bo'lsa — a'zo "Depozit"siz, faqat "Yangi
         # signal" tugmasini ko'radi.
@@ -2686,6 +2697,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await handle_broadcast_input(update, ctx)
         return
 
+    if AWAITING_TOURNEY.pop(uid, None) and is_admin(uid):
+        await handle_tourney_setup(update, ctx)
+        return
+
     if await handle_ref_code_input(update, ctx):
         return
 
@@ -2715,6 +2730,16 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
     # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
     if await handle_manage_input(update, ctx):
+        return
+
+    tsig = AWAITING_TALLOC.get(uid)
+    if tsig:
+        amount = _parse_price(text)
+        tlang = await user_lang(uid)
+        if amount is None or amount <= 0:
+            await msg.reply_text(i18n.t("tr.err_amount", tlang))
+            return
+        await apply_tourney_amount(msg, uid, tsig, amount, tlang)
         return
 
     alloc_sig_id = AWAITING_ALLOC.get(uid)
@@ -3307,12 +3332,282 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # Summa FAQAT egasidan so'raladi: depozit egasiniki. Signalni guruh
     # a'zosi bergan bo'lsa (179), unga depozit, band va bo'sh summa
     # ko'rsatilmaydi va u egasining pulidan ulush ajrata olmaydi.
+    # Turnir (185): shaxsiy jurnalda faol turnir qatnashchisi — avval turnir
+    # summasi so'raladi, shaxsiy depozit hajmi esa undan KEYIN (ikkita
+    # matnli so'rov bir vaqtda turmasin — raqam qaysi biriga ekani noaniq).
+    if ws["type"] == "personal":
+        sig_row = await db.get_signal(sig_id)
+        if sig_row and await tournament.register_signal(sig_row):
+            if ws["deposit"] is not None and can_manage(q.from_user.id, ws):
+                DEFER_PERSONAL_ALLOC[q.from_user.id] = sig_id
+            await ask_tourney_amount(q.message, sig_row, q.from_user.id,
+                                     await user_lang(q.from_user.id))
+            return
+
     if ws["deposit"] is not None and can_manage(q.from_user.id, ws):
-        AWAITING_ALLOC[q.from_user.id] = sig_id
-        dep, busy, free = await free_deposit(ws, sig_id)
-        text, kb2 = alloc_prompt(sig_id, d, dep, free, busy,
-                                 await user_lang(q.from_user.id))
-        await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb2)
+        await ask_personal_alloc(q.message, ws, sig_id, d, q.from_user.id)
+
+
+async def ask_personal_alloc(message, ws, sig_id: int, d, uid: int) -> None:
+    """Shaxsiy/guruh depozitidan hajm so'rovi (170)."""
+    AWAITING_ALLOC[uid] = sig_id
+    dep, busy, free = await free_deposit(ws, sig_id)
+    text, kb2 = alloc_prompt(sig_id, d, dep, free, busy, await user_lang(uid))
+    await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb2)
+
+
+# ─────────────── Turnir (185) ───────────────
+
+def _tdate(dt) -> str:
+    return f"{dt.astimezone(stats.TZ):%d.%m.%Y %H:%M}"
+
+
+async def ask_tourney_amount(message, sig, uid: int, lang: str | None) -> None:
+    """Turnir depozitidan hajm so'rovi: tayyor ulushlar (balansning 10/25/50%,
+    bo'sh summadan oshmaydi) yoki qo'lda yozilgan summa."""
+    tr = await tournament.trade(sig["id"])
+    if not tr:
+        return
+    bal, _, free = await tournament.balance(tr["tournament_id"], uid)
+    btns = []
+    for p in (10, 25, 50):
+        amt = round(min(bal * p / 100, free), 2)
+        if amt > 0:
+            btns.append(InlineKeyboardButton(f"{p}% → {amt:,.0f}$",
+                                             callback_data=f"tr:amt:{sig['id']}:{amt:.2f}"))
+    rows = [btns] if btns else []
+    rows.append([InlineKeyboardButton(i18n.t("tr.btn_skip", lang),
+                                      callback_data=f"tr:skip:{sig['id']}")])
+    AWAITING_TALLOC[uid] = sig["id"]
+    await message.reply_text(
+        i18n.t("tr.amt_head", lang, sid=sig["id"], sym=html.escape(sig["symbol"]),
+               bal=bal, free=free, min=tournament.AMOUNT_WINDOW // 60),
+        parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def _after_tourney_amount(message, uid: int) -> None:
+    """Turnir summasi hal bo'lgach — kechiktirilgan shaxsiy hajm so'rovi."""
+    sid = DEFER_PERSONAL_ALLOC.pop(uid, None)
+    if not sid:
+        return
+    sig = await db.get_signal(sid)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not (sig and ws and ws["deposit"] is not None and sig["status"] in ("PENDING", "ACTIVE")):
+        return
+    d = {"symbol": sig["symbol"], "entry": float(sig["entry"]),
+         "sl": float(sig["sl"]) if sig["sl"] is not None else None}
+    await ask_personal_alloc(message, ws, sid, d, uid)
+
+
+async def apply_tourney_amount(message, uid: int, sig_id: int, amount: float,
+                               lang: str | None) -> bool:
+    """Summani saqlaydi va javob beradi. Muvaffaqiyatli bo'lsa True."""
+    ok, why = await tournament.set_amount(sig_id, uid, amount)
+    if ok:
+        AWAITING_TALLOC.pop(uid, None)
+        await message.reply_text(i18n.t("tr.amt_saved", lang, sid=sig_id, amt=amount),
+                                 parse_mode=ParseMode.HTML)
+        await _after_tourney_amount(message, uid)
+        return True
+    free = 0.0
+    tr = await tournament.trade(sig_id)
+    if tr:
+        _, _, free = await tournament.balance(tr["tournament_id"], uid)
+    if why in ("tr.err_late", "tr.err_closed", "tr.err_already"):
+        # Bu savdo uchun endi hech narsa qilib bo'lmaydi — kutish holati
+        # yopiladi va navbatdagi (shaxsiy) so'rovga o'tiladi.
+        AWAITING_TALLOC.pop(uid, None)
+    await message.reply_text(i18n.t(why, lang, min=tournament.AMOUNT_WINDOW // 60, free=free))
+    if why in ("tr.err_late", "tr.err_closed", "tr.err_already"):
+        await _after_tourney_amount(message, uid)
+    return False
+
+
+async def _tourney_me_text(t, p, uid: int, lang: str | None) -> str:
+    n = await tournament.player_count(t["id"])
+    _, _, free = await tournament.balance(t["id"], uid)
+    dep = float(t["deposit"])
+    eq = float(p["equity"]) if p["equity"] is not None else dep
+    return i18n.t("tr.me", lang, id=t["id"], ends=_tdate(t["ends_at"]),
+                  rank=p["rank"] or "—", n=n, eq=eq, ret=(eq / dep - 1) * 100,
+                  trades=p["trades"], wins=p["wins"], free=free)
+
+
+def _tourney_page_kb(lang: str | None) -> list:
+    if not config.WEB_URL:
+        return []
+    return [[InlineKeyboardButton(i18n.t("tr.btn_page", lang), url=f"{config.WEB_URL}/t")]]
+
+
+async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shaxsiy jurnaldagi "🏆 Turnir" tugmasi va turnir summasi tugmalari."""
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    lang = await user_lang(uid)
+    parts = q.data.split(":")
+    action = parts[1]
+
+    if action in ("amt", "skip"):
+        sig_id = int(parts[2])
+        if action == "skip":
+            if AWAITING_TALLOC.get(uid) == sig_id:
+                AWAITING_TALLOC.pop(uid, None)
+            try:
+                await q.edit_message_reply_markup(None)
+            except Exception:
+                pass
+            await q.message.reply_text(i18n.t("tr.skipped", lang, sid=sig_id))
+            await _after_tourney_amount(q.message, uid)
+            return
+        if await apply_tourney_amount(q.message, uid, sig_id, float(parts[3]), lang):
+            try:
+                await q.edit_message_reply_markup(None)
+            except Exception:
+                pass
+        return
+
+    t = await tournament.load_active()
+    if not t:
+        await q.message.reply_text(i18n.t("tr.none", lang), reply_markup=menu_back_kb(lang))
+        return
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if ws["type"] != "personal" or ws["owner_id"] != uid:
+        await q.message.reply_text(i18n.t("tr.need_personal", lang),
+                                   reply_markup=menu_back_kb(lang))
+        return
+    if action == "join":
+        await tournament.join(t["id"], uid, ws["id"])
+    p = await tournament.player(t["id"], uid)
+    if p is None:
+        kb = [[InlineKeyboardButton(i18n.t("tr.btn_join", lang), callback_data="tr:join")]]
+        kb += _tourney_page_kb(lang)
+        kb.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+        await q.message.reply_text(
+            i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
+                   ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
+            parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb))
+        return
+    txt = await _tourney_me_text(t, p, uid, lang)
+    if action == "join":
+        txt = i18n.t("tr.joined", lang) + "\n\n" + txt
+    kb = _tourney_page_kb(lang)
+    kb.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    await q.message.reply_text(txt, parse_mode=ParseMode.HTML,
+                               reply_markup=InlineKeyboardMarkup(kb))
+
+
+async def finish_tourney(bot, tid: int) -> None:
+    """Yakunlash + qatnashchilarga va adminlarga xabar."""
+    res = await tournament.finish(tid, safe_last_price)
+    if res is None:
+        return
+    t = await tournament.get(tid)
+    dep = float(t["deposit"])
+    for a in res:
+        plang = await user_lang(a["user_id"])
+        try:
+            await bot.send_message(
+                a["user_id"],
+                i18n.t("tr.final_dm", plang, id=tid, rank=a["rank"], n=len(res),
+                       eq=a["equity"], ret=(a["equity"] / dep - 1) * 100),
+                parse_mode=ParseMode.HTML)
+        except Exception:
+            log.warning("Turnir yakuni yuborilmadi (uid=%s)", a["user_id"])
+    top = await tournament.standings(tid, limit=1)
+    for admin_id in config.ADMIN_IDS:
+        alang = await user_lang(admin_id)
+        if top:
+            w = top[0]
+            txt = i18n.t("adm.t_ended", alang, id=tid, who=html.escape(tournament.display_name(w)),
+                         ret=(float(w["equity"]) / dep - 1) * 100)
+        else:
+            txt = i18n.t("adm.t_ended_empty", alang, id=tid)
+        try:
+            await bot.send_message(admin_id, txt, parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+
+
+async def tournament_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Har 5 daqiqada: faol turnir reytingini jonli narxda yangilaydi,
+    muddati tugagan bo'lsa yakunlaydi."""
+    try:
+        t = await tournament.load_active()
+        if not t:
+            return
+        if datetime.now(timezone.utc) >= t["ends_at"]:
+            await finish_tourney(ctx.bot, t["id"])
+        else:
+            await tournament.refresh(t["id"], safe_last_price)
+    except Exception:
+        log.exception("tournament_job xatosi")
+
+
+async def _admin_tourney_view(lang: str | None) -> tuple[str, InlineKeyboardMarkup]:
+    t = await tournament.load_active()
+    back = [InlineKeyboardButton(i18n.t("adm.back", lang), callback_data="adm:home")]
+    if not t:
+        txt = i18n.t("adm.t_none", lang)
+        last = (await tournament.past(1) or [None])[0]
+        if last:
+            top = await tournament.standings(last["id"], limit=1)
+            if top:
+                dep = float(last["deposit"])
+                txt += "\n\n" + i18n.t(
+                    "adm.t_last", lang, id=last["id"], n=last["n_players"],
+                    who=html.escape(tournament.display_name(top[0])),
+                    ret=(float(top[0]["equity"]) / dep - 1) * 100)
+        return txt, InlineKeyboardMarkup([
+            [InlineKeyboardButton(i18n.t("adm.t_btn_new", lang), callback_data="adm:tour:new")],
+            back])
+    dep = float(t["deposit"])
+    rows = await tournament.standings(t["id"], limit=10)
+    if rows:
+        top = "\n".join(
+            f"{r['rank'] or '—'}. {html.escape(tournament.display_name(r))} — "
+            f"{float(r['equity'] or dep):,.2f}$ ({(float(r['equity'] or dep) / dep - 1) * 100:+.2f}%)"
+            f" · {r['trades']}" for r in rows)
+    else:
+        top = i18n.t("adm.t_top_empty", lang)
+    txt = i18n.t("adm.t_active", lang, id=t["id"], dep=dep,
+                 n=await tournament.player_count(t["id"]),
+                 start=_tdate(t["started_at"]), ends=_tdate(t["ends_at"]), top=top)
+    return txt, InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("adm.t_btn_refresh", lang), callback_data="adm:tour"),
+         InlineKeyboardButton(i18n.t("adm.t_btn_end", lang), callback_data="adm:tour:end")],
+        back])
+
+
+def _parse_tourney_setup(text: str) -> tuple[float, int] | None:
+    nums = re.findall(r"\d+(?:[.,]\d+)?", text.replace(" 000", "000"))
+    if len(nums) != 2:
+        return None
+    dep, days = float(nums[0].replace(",", ".")), float(nums[1].replace(",", "."))
+    if not (10 <= dep <= 1_000_000) or not (1 <= days <= 365) or days != int(days):
+        return None
+    return dep, int(days)
+
+
+async def handle_tourney_setup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.effective_message
+    lang = await user_lang(update.effective_user.id)
+    parsed = _parse_tourney_setup(msg.text or "")
+    if not parsed:
+        AWAITING_TOURNEY[update.effective_user.id] = True
+        await msg.reply_text(i18n.t("adm.t_bad", lang), parse_mode=ParseMode.HTML)
+        return
+    dep, days = parsed
+    ends = datetime.now(timezone.utc) + timedelta(days=days)
+    await msg.reply_text(
+        i18n.t("adm.t_confirm", lang, dep=dep, days=days, ends=_tdate(ends)),
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton(i18n.t("adm.t_btn_go", lang),
+                                 callback_data=f"adm:tour:go:{dep:.0f}:{days}"),
+            InlineKeyboardButton(i18n.t("adm.t_btn_cancel", lang), callback_data="adm:tour")]]))
 
 
 # ─────────────── Risk kalkulyatori ───────────────
@@ -4042,6 +4337,9 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_TPSL.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
+    AWAITING_TALLOC.pop(update.effective_user.id, None)
+    DEFER_PERSONAL_ALLOC.pop(update.effective_user.id, None)
+    AWAITING_TOURNEY.pop(update.effective_user.id, None)
     AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
     AWAITING_REF_CODE.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
@@ -4709,7 +5007,8 @@ def admin_home_kb(lang: str | None = None) -> InlineKeyboardMarkup:
          InlineKeyboardButton(i18n.t("adm.btn_users", lang), callback_data="adm:users:0")],
         [InlineKeyboardButton(i18n.t("adm.btn_channels", lang), callback_data="adm:ch"),
          InlineKeyboardButton(i18n.t("adm.btn_pending", lang), callback_data="adm:pend")],
-        [InlineKeyboardButton(i18n.t("adm.btn_hashtags", lang), callback_data="adm:mth")],
+        [InlineKeyboardButton(i18n.t("adm.btn_hashtags", lang), callback_data="adm:mth"),
+         InlineKeyboardButton(i18n.t("adm.btn_tourney", lang), callback_data="adm:tour")],
         [InlineKeyboardButton(i18n.t("adm.btn_broadcast", lang), callback_data="adm:bc")],
         [InlineKeyboardButton(i18n.t("adm.btn_pdf_groups", lang), callback_data="adm:pdfg"),
          InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu")],
@@ -5074,6 +5373,42 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             run_broadcast, when=0,
             data={"admin": q.from_user.id, "from_chat": from_chat, "msg_id": msg_id})
         await q.edit_message_text(i18n.t("adm.bc_started", lang), reply_markup=back)
+
+    # ── Turnir (185) ──
+    elif action == "tour":
+        AWAITING_TOURNEY.pop(q.from_user.id, None)
+        txt, kb = await _admin_tourney_view(lang)
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "tour:new":
+        if tournament.ACTIVE:
+            await q.edit_message_text(i18n.t("adm.t_exists", lang), reply_markup=back)
+            return
+        AWAITING_TOURNEY[q.from_user.id] = True
+        await q.edit_message_text(i18n.t("adm.t_ask", lang), parse_mode=ParseMode.HTML,
+                                  reply_markup=back)
+    elif action.startswith("tour:go:"):
+        _, _, dep, days = action.split(":")
+        t = await tournament.start(float(dep), int(days), q.from_user.id)
+        if not t:
+            await q.edit_message_text(i18n.t("adm.t_exists", lang), reply_markup=back)
+            return
+        await q.edit_message_text(i18n.t("adm.t_started", lang, id=t["id"]), reply_markup=back)
+    elif action == "tour:end":
+        t = tournament.ACTIVE
+        if not t:
+            txt, kb = await _admin_tourney_view(lang)
+            await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+            return
+        await q.edit_message_text(
+            i18n.t("adm.t_end_ask", lang, id=t["id"]),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(i18n.t("adm.t_btn_end_ok", lang),
+                                     callback_data=f"adm:tour:endok:{t['id']}"),
+                InlineKeyboardButton(i18n.t("adm.t_btn_cancel", lang), callback_data="adm:tour")]]))
+    elif action.startswith("tour:endok:"):
+        await finish_tourney(ctx.bot, int(action.rsplit(":", 1)[1]))
+        txt, kb = await _admin_tourney_view(lang)
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
     # ── PDF eksport ──
     elif action in ("pdfg", "pdfu"):
@@ -7349,6 +7684,7 @@ async def _run_one_time_fixes() -> None:
 async def post_init(app: Application) -> None:
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    await tournament.load_active()
     await _run_one_time_fixes()
     await app.bot.set_my_commands([
         ("start", "Bosh menyu"),
@@ -7481,6 +7817,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
     app.add_handler(CallbackQueryHandler(on_public_review_extra, pattern=r"^(pubjoin|pubusr):\d+$"))
     app.add_handler(CallbackQueryHandler(on_top_button, pattern=r"^top:(st|off):-?\d+$"))
+    app.add_handler(CallbackQueryHandler(
+        on_tourney, pattern=r"^tr:(menu|join|skip:\d+|amt:\d+:\d+(\.\d+)?)$"))
     app.add_handler(CallbackQueryHandler(on_join_button, pattern=r"^jl:(set|off):-?\d+$"))
     app.add_handler(CallbackQueryHandler(on_close_request, pattern=r"^close:"))
     app.add_handler(CallbackQueryHandler(on_manage, pattern=r"^mng:"))
@@ -7541,6 +7879,8 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)
+    # Turnir reytingi va muddati (185).
+    app.job_queue.run_repeating(tournament_job, interval=300, first=120)
     # News Trade AI: NEWS_CHANNEL_ID bo'sh bo'lsa job o'zi hech narsa qilmaydi.
     app.job_queue.run_repeating(news_scan_job, interval=90, first=45)
     app.job_queue.run_repeating(binance_listing_job, interval=90, first=60)

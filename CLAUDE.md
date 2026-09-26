@@ -6303,3 +6303,69 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      aniqlab bo'lmadi, Telegram butunlay ishlamasa, tugmalar, bir
      martalik havola, huquqsiz, ochiq guruh, admin bo'lmagan, egasi
      kartochkasi) + HTML teglar muvozanati tekshirildi.
+
+185. **Foydalanuvchilar o'rtasida turnir (`tournament.py`).**
+     Foydalanuvchi: "webga turnir bo'limini qo'shishimiz kerak. Guruh yoki
+     kanallar emas, userlar orasida turnirlar uyushtiramiz. Turnirni
+     boshlashni admin panelga joylaysan. Turnir uchun beriladigan alohida
+     depozit men tomonimdan belgilanadi. Har bir odam shaxsiy jurnal
+     ichida turnirda qatnashish tugmasi bo'lsin. Men turnirga start
+     bersamgina bu funksiyalar ishlasin."
+     Egasi tanlagan qoidalar (AskUserQuestion): hajm — har savdoda turnir
+     depozitidan summa, bo'shdan oshmaydi; tugash — muddat (kun) +
+     admin oldinroq yakunlay oladi; yakunda ochiq pozitsiyalar joriy
+     narxda; qo'shilgandan keyingi BARCHA shaxsiy jurnal signallari kiradi.
+
+     **Jadval:** `tournaments` (bir vaqtda bitta ACTIVE — qisman unikal
+     indeks), `tournament_players` (equity/trades/wins/rank — yozilgan
+     reyting), `tournament_trades` (signal_id → amount, NULL = belgilanmagan).
+     Turnir depoziti virtual, shaxsiy jurnal depozitiga TEGMAYDI.
+
+     **Admin:** admin panel → "🏆 Turnir": faol bo'lmasa oxirgi natija va
+     "▶️ Yangi turnir boshlash" → matn "1000 30" (depozit 10–1 000 000,
+     1–365 butun kun; `_parse_tourney_setup`) → tasdiq → start. Faol
+     bo'lsa TOP-10, "🔄 Yangilash", "⏹ Hozir yakunlash" (tasdiq bilan).
+
+     **Qatnashchi:** shaxsiy jurnal menyusida "🏆 Turnir" FAQAT faol turnir
+     bo'lsa (`tournament.ACTIVE` keshi — `main_menu_kb` sinxron; ishga
+     tushishda, start/finish va `tournament_job`da yangilanadi). Qoidalar
+     → "✅ Qatnashaman"; qatnashchiga — o'rni, natija, bo'sh turnir
+     depoziti, reyting sahifasi. Guruh/kanal workspace'idan qatnasholmaydi.
+     Signal tasdiqlanganda (`on_button`) shaxsiy jurnalda qatnashchi
+     bo'lsa `register_signal` → `ask_tourney_amount` (balansning 10/25/50%,
+     bo'shdan oshmaydi, yoki matn, yoki "➖ hisoblanmasin"). Shaxsiy
+     depozit hajmi so'rovi (`ask_personal_alloc`, 170) shundan KEYIN
+     (`DEFER_PERSONAL_ALLOC`) — ikki matnli so'rov bir vaqtda turmasin.
+
+     **Firibgarlikka qarshi (`can_set_amount`):** summa BIR MARTA
+     belgilanadi; signal PENDING (limit to'lmagan) bo'lsa istalgan payt,
+     ACTIVE bo'lsa faqat ochilganiga `AMOUNT_WINDOW`=120 s ichida —
+     aks holda foydaga chiqqan savdoga keyin katta summa yozilardi.
+     Admin `/tuzat` bilan chiqargan (`excluded`) savdo sanalmaydi.
+
+     **Hisob (`compute`, BITTA joy):** equity = depozit + Σ(amount ×
+     foiz/100). Yopilgan — `pnl_pct`; ACTIVE — `realized + (1−filled) ×
+     pnl_at(narx)` (boshqaruv ekranidagi `live` bilan bir xil); PENDING /
+     CANCELLED / EXPIRED — 0. `balance()` = depozit + yopilganlar natijasi,
+     band = ochiq savdolar summasi. Reyting: equity kamayish, teng bo'lsa
+     oldin qo'shilgan. `tournament_job` (300 s) — `refresh()` jonli narx
+     bilan bazaga yozadi; muddat o'tgan bo'lsa `finish_tourney` (oxirgi
+     hisob, FINISHED, qatnashchilarga o'rni va natijasi, adminga g'olib).
+     `finish` ikki marta chaqirilsa xavfsiz; yakundan keyin `refresh`
+     hech narsa yozmaydi (natija qotadi).
+
+     **Veb:** `/t` (joriy yoki oxirgi) va `/t/{id}`: holat (faol/yakunlangan),
+     tile'lar (qatnashchilar, depozit, yetakchi), reyting jadvali
+     (`tourney_table` — mobil `data-k`), o'tgan turnirlar, `tourney_cta`.
+     Bosh sahifada uchinchi "🏆 Turnir" tabi (turnir bo'lgan bo'lsa) —
+     TOP-10 + "To'liq reyting →"; turnir qismidagi xato bosh sahifani
+     yiqitmaydi. Veb narx so'ramaydi — faqat yozilgan reytingni o'qiydi.
+     Ismi: @username, bo'lmasa ism (escape bilan), bo'lmasa ID oxiri.
+
+     Sinov: `test_tourney.py` 48/48 (turnirsiz holat, admin oqimi va
+     parse, qatnashish, guruhdan rad, signal→turnir summasi→shaxsiy hajm
+     tartibi, qayta o'zgartirish/ortiqcha/begona/kech/PENDING/skip,
+     balans va reyting hisobi, excluded, "mening natijam", veb /t va
+     bosh sahifa tabi + escape, avtomatik yakun, xabarlar, qotish,
+     yakundan keyingi signal, qo'lda yakunlash, i18n). Sahifa telefon
+     kengligida Chromium'da ko'rib chiqildi.
