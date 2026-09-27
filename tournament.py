@@ -199,6 +199,27 @@ async def set_amount(sig_id: int, uid: int, amount: float) -> tuple[bool, str | 
     return (True, None) if r.endswith("1") else (False, "tr.err_already")
 
 
+async def scale_for_add(sig_id: int, ratio: float) -> float | None:
+    """Turnir savdosiga qo'shimcha kirish (190): turnir summasi ham
+    boshlang'ich summaning SHU ULUSHIDA oshadi (egasi tanlagan qoida —
+    "o'rtachalash tekin bo'lmasin"), lekin bo'sh turnir depozitidan
+    oshmaydi. Qo'shilgan summa, yoki bu savdo turnirda bo'lmasa /
+    summasi belgilanmagan / turnir tugagan bo'lsa None."""
+    tr = await trade(sig_id)
+    if not tr or tr["t_status"] != "ACTIVE" or tr["amount"] is None:
+        return None
+    first = float(tr["amount_first"] if tr["amount_first"] is not None else tr["amount"])
+    _, _, free = await balance(tr["tournament_id"], tr["user_id"])
+    add = round(min(first * ratio, free), 2)
+    if add <= 0:
+        return 0.0
+    async with db.pool().acquire() as c:
+        await c.execute(
+            "UPDATE tournament_trades SET amount_first=COALESCE(amount_first, amount), "
+            "amount = amount + $2 WHERE signal_id=$1", sig_id, db._d(add))
+    return add
+
+
 # ─────────────── Reyting ───────────────
 
 def _trade_pct(s, price: float | None) -> float:

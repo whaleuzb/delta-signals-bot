@@ -6472,3 +6472,64 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_probe.py` 33/33 (yangi: xau, XAU/USD, xauusd, #XAU, gold,
      xag, silver → MEXC; forex chaqirilmaydi; `xaut` to'g'ridan-to'g'ri;
      boshqa so'z metall emas; token yo'q bo'lsa Twelve Data zaxirasi).
+
+190. **Ochiq pozitsiyaga qo'shimcha kirish (o'rtachalash / DCA).**
+     Foydalanuvchi: "Ochiq pozitsiyaga minusda yoki plusda bo'lsa
+     qo'shimcha shu narxda olish. Keyin narxdan pastda qo'shimcha buy
+     limitlar joylashtirish." Egasi tanlagan qoidalar (AskUserQuestion):
+     natija — O'RTACHA narx bo'yicha; hajm — depozit bo'lsa $ (bo'shdan
+     oshmaydi), bo'lmasa boshlang'ichga nisbatan (0.5x/1x/2x); turnirda
+     ham ishlaydi, turnir summasi ham shu ulushda oshadi.
+
+     **Asosiy g'oya:** `signals.entry` qo'shimcha kirishdan keyin O'RTACHA
+     narxga aylanadi — shu sabab foiz, TP/SL, BE, R, statistika, depozit
+     (`pnl × alloc_amount`), grafik va turnir hisobi O'ZGARISHSIZ ishlaydi.
+     O'rtacha MIQDOR bo'yicha (`tracker.avg_entry`: jami hajm / jami
+     miqdor), oddiy o'rtacha EMAS — shunda `pnl_at(o'rtacha) × jami hajm`
+     har bir kirish natijalari yig'indisiga aniq teng (LONG va SHORT).
+     Yangi ustunlar: `entry_first`, `units` (joriy jami hajm), `units_first`;
+     birlik: `alloc_amount` bo'lsa $, aks holda boshlang'ich = 1
+     (`tracker.base_units/first_units`). `$` rejimida `alloc_amount` ham
+     oshadi. Jadval `signal_adds` (MARKET|LIMIT, PENDING|FILLED|CANCELLED).
+
+     **Qoidalar:** faqat ACTIVE, TP/SL qo'yilgan va hech qismi yopilmagan
+     (`filled_pct == 0`) pozitsiyaga; TP1 yoki qisman/to'liq yopishda
+     kutayotgan limitlar bekor qilinadi (`save_progress(cancel_adds)`,
+     `close_now`, `partial_close`). Market qo'shish narxi stopning to'g'ri
+     tomonida bo'lishi kerak; limit — joriy narx bilan stop ORASIDA
+     (LONG: pastda, SHORT: yuqorida), ko'pi bilan 5 ta. `$` rejimida
+     kutayotgan limitlar puli ham BAND (`db.open_allocated` +
+     `pending_add_usd`) va faqat egasi/admin qila oladi (egasining puli,
+     180); nisbat rejimida — `can_manage_signal` (a'zo o'z signaliga).
+
+     **Kuzatuv (`tracker.process`):** ACTIVE shamda limit (LONG: low<=narx)
+     to'lsa — o'rtacha qayta hisoblanadi, `ADD` hodisasi; SL tekshiruvi
+     SHUNDAN KEYIN (narx stopga borguncha limitdan o'tadi), TP esa o'sha
+     shamda TEKSHIRILMAYDI (tartib noma'lum — "kirish shami" qoidasi).
+     Bir shamda bir nechta limit — yaqinidan boshlab. `save_progress`
+     endi tranzaksiyada: asosiy yozuv + o'rtacha/alloc + limit holati;
+     **yozuv o'tmasa (rev o'zgargan) `process` hodisalarni QAYTARMAYDI** —
+     ilgari hodisa yuborilib, keyingi siklda qayta yuborilishi mumkin edi.
+     `db.add_market` qatorni `FOR UPDATE` bilan qulflaydi va `rev`ni
+     oshiradi.
+
+     **UI:** boshqaruv ekranida "➕ Qo'shib olish" (`madd` → joriy narx,
+     o'rtacha, hajm → `maddgo`), "📌 Qo'shimcha limit" (`mlim` → narxlar
+     matni → hajm → `mlimgo`), "✍️ O'zim yozaman" (`maddgoc/mlimgoc` →
+     `AWAITING_ADDSIZE`), kutayotganlar ro'yxati va "❌ bekor" (`mlimx`).
+     O'rtachalangan pozitsiyada "O'rtacha kirish" + "Birinchi kirish".
+     Guruhga: `ev.add_mkt`, `ev.add_lim`, `ev.add_fill`, `ev.add_lim_x`.
+     Turnir: `tournament.scale_for_add(sig, ratio)` — `amount_first ×
+     ratio`, bo'sh turnir depozitidan oshmaydi (market qo'shishda darhol,
+     limit to'lganda `poll_job` ichida).
+     Cheklov: kanalga nusxalangan signal (`copied_from`) qo'shimcha
+     kirishlarni avtomatik olmaydi.
+
+     Sinov: `test_tracker.py` (fixture yangi ustunlar bilan, soxta
+     `save_progress` True qaytaradi; yangi: limit→TP keyingi shamda,
+     limit+stop bir shamda, $ rejimi ikki limit, SHORT, qismi yopilganda
+     bekor, yozilmagan kuzatuv hodisasiz), `test_adds.py` 31/31 (baza:
+     o'rtacha, alloc, rev, pul yig'indisi; bot: egasi, stop/bo'sh depozit
+     rad, a'zo $ rad / nisbat ha, begona; limitlar: noto'g'ri narx rad,
+     band pul, ro'yxat; kuzatuv bazada to'ldiradi; bekor; close_now;
+     qismi yopilgan; turnir ulushi va cheklov).

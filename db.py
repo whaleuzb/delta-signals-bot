@@ -468,6 +468,31 @@ CREATE INDEX IF NOT EXISTS idx_ttrades_player ON tournament_trades(tournament_id
 -- xil narxdan hisoblangan bo'ladi (veb o'zi narx so'ramaydi).
 ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS live_pct NUMERIC;
 ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS live_price NUMERIC;
+
+-- Ochiq pozitsiyaga qo'shimcha kirish (190, o'rtachalash / DCA).
+-- `signals.entry` qo'shimcha kirishdan keyin O'RTACHA narxga aylanadi
+-- (miqdor bo'yicha: jami hajm / jami miqdor) — shu sabab barcha foiz, TP/SL,
+-- statistika va depozit hisobi O'ZGARISHSIZ ishlayveradi. `entry_first` —
+-- birinchi kirish narxi; `units` — joriy jami hajm, `units_first` —
+-- boshlang'ich hajm (birlik: depozit rejimida $, aks holda boshlang'ich=1).
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS entry_first NUMERIC;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS units NUMERIC;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS units_first NUMERIC;
+CREATE TABLE IF NOT EXISTS signal_adds (
+    id         SERIAL PRIMARY KEY,
+    signal_id  INT         NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
+    kind       TEXT        NOT NULL,                   -- MARKET | LIMIT
+    price      NUMERIC     NOT NULL,
+    units      NUMERIC     NOT NULL,
+    usd        BOOLEAN     NOT NULL DEFAULT FALSE,     -- birlik $ (depozitdan)
+    status     TEXT        NOT NULL DEFAULT 'PENDING', -- PENDING | FILLED | CANCELLED
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    filled_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_sadds_sig ON signal_adds(signal_id, status);
+-- Turnir savdosiga qo'shimcha kirish shu ulushda turnir summasini ham
+-- oshiradi; `amount_first` — boshlang'ich summa (nisbat shundan).
+ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS amount_first NUMERIC;
 """
 
 
@@ -1045,6 +1070,68 @@ async def set_signal_allocation(sig_id: int, alloc_amount: float, deposit_snapsh
             sig_id, _d(alloc_amount), _d(deposit_snapshot))
 
 
+async def pending_add_usd(workspace_id: int) -> float:
+    """Kutayotgan qo'shimcha limitlarga ($ rejimida) ATALGAN pul (190)."""
+    async with pool().acquire() as c:
+        v = await c.fetchval(
+            "SELECT COALESCE(SUM(a.units), 0) FROM signal_adds a "
+            "JOIN signals s ON s.id = a.signal_id WHERE s.workspace_id=$1 "
+            "AND a.status='PENDING' AND a.usd AND s.status IN ('PENDING','ACTIVE')",
+            workspace_id)
+    return float(v)
+
+
+async def add_market(sig_id: int, price: float, units: float, usd: bool) -> dict | None:
+    """Hozirgi narxda qo'shimcha kirish (190). Qatorni QULFLAB o'qiydi va
+    o'rtacha narxni shu yerning o'zida qayta hisoblaydi; `rev` oshadi —
+    kuzatuv shu orada eski nusxani yozib yubormasin (`save_progress`).
+    Pozitsiya ochiq va TO'LIQ (hech qismi yopilmagan) bo'lmasa None."""
+    import tracker   # aylanma importdan qochish uchun
+    async with pool().acquire() as c:
+        async with c.transaction():
+            sig = await c.fetchrow("SELECT * FROM signals WHERE id=$1 FOR UPDATE", sig_id)
+            if not sig or sig["status"] != "ACTIVE" or float(sig["filled_pct"]) > 0:
+                return None
+            U = tracker.base_units(sig)
+            entry = float(sig["entry"])
+            new = tracker.avg_entry(entry, U, price, units)
+            await c.execute(
+                "UPDATE signals SET entry=$2, units=$3, units_first=COALESCE(units_first,$4), "
+                "entry_first=COALESCE(entry_first,entry), "
+                "alloc_amount=CASE WHEN $5 AND alloc_amount IS NOT NULL "
+                "THEN alloc_amount + $6 ELSE alloc_amount END, rev=rev+1 WHERE id=$1",
+                sig_id, _d(new), _d(U + units), _d(U), usd, _d(units))
+            await c.execute(
+                "INSERT INTO signal_adds (signal_id, kind, price, units, usd, status, filled_at) "
+                "VALUES ($1,'MARKET',$2,$3,$4,'FILLED',now())",
+                sig_id, _d(price), _d(units), usd)
+    first = float(sig["units_first"]) if sig["units_first"] is not None else U
+    return {"entry": new, "entry_prev": entry, "ratio": units / first}
+
+
+async def place_add_limits(sig_id: int, prices: list[float], units: float, usd: bool) -> None:
+    async with pool().acquire() as c:
+        for p in prices:
+            await c.execute(
+                "INSERT INTO signal_adds (signal_id, kind, price, units, usd) "
+                "VALUES ($1,'LIMIT',$2,$3,$4)", sig_id, _d(p), _d(units), usd)
+
+
+async def signal_adds(sig_id: int, status: str | None = None) -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        if status:
+            return await c.fetch("SELECT * FROM signal_adds WHERE signal_id=$1 AND status=$2 "
+                                 "ORDER BY id", sig_id, status)
+        return await c.fetch("SELECT * FROM signal_adds WHERE signal_id=$1 ORDER BY id", sig_id)
+
+
+async def cancel_pending_adds(sig_id: int) -> int:
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE signal_adds SET status='CANCELLED' "
+                            "WHERE signal_id=$1 AND status='PENDING'", sig_id)
+    return int(r.split()[-1])
+
+
 async def open_allocated(workspace_id: int,
                          exclude_sig_id: int | None = None) -> float:
     """Hozir OCHIQ pozitsiyalarda band turgan pul.
@@ -1069,7 +1156,9 @@ async def open_allocated(workspace_id: int,
             "AND NOT excluded AND alloc_amount IS NOT NULL "
             "AND ($2::bigint IS NULL OR id <> $2)",
             workspace_id, exclude_sig_id)
-    return float(row["s"] or 0)
+    # Kutayotgan qo'shimcha limitlar ($) ham band (190): to'lganda aynan
+    # shu pul ishlatiladi, u boshqa savdoga ikkinchi marta berilmasin.
+    return float(row["s"] or 0) + await pending_add_usd(workspace_id)
 
 
 async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
@@ -1364,14 +1453,33 @@ async def save_progress(sig_id: int, f: dict) -> bool:
         rev = rev + 1
     WHERE id=$1 AND ($14::int IS NULL OR rev = $14)
     """
+    avg = f.get("avg")
     async with pool().acquire() as c:
-        res = await c.execute(
-            q, sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
-            f["status"], f.get("opened_at"), f.get("closed_at"), _d(f.get("exit_price")),
-            _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"],
-            f["ambiguous"], f.get("rev_prev"),
-        )
-    ok = not res.endswith(" 0")
+        async with c.transaction():
+            res = await c.execute(
+                q, sig_id, _d(f["sl"]), f["tp_hit"], _d(f["filled_pct"]), _d(f["realized_pct"]),
+                f["status"], f.get("opened_at"), f.get("closed_at"), _d(f.get("exit_price")),
+                _d(f.get("pnl_pct")), _d(f.get("r_multiple")), f["last_checked_ms"],
+                f["ambiguous"], f.get("rev_prev"),
+            )
+            ok = not res.endswith(" 0")
+            # Qo'shimcha limitlar (190) — faqat asosiy yozuv o'tgan bo'lsa,
+            # aks holda keyingi sikl ularni qaytadan ko'radi.
+            if ok and avg:
+                await c.execute(
+                    "UPDATE signals SET entry=$2, units=$3, units_first=COALESCE(units_first,$4), "
+                    "entry_first=COALESCE(entry_first,$5), "
+                    "alloc_amount=CASE WHEN alloc_amount IS NULL THEN NULL "
+                    "ELSE alloc_amount + $6 END WHERE id=$1",
+                    sig_id, _d(avg["entry"]), _d(avg["units"]), _d(avg["units_first"]),
+                    _d(avg["entry_first"]), _d(avg["alloc_delta"]))
+                await c.execute(
+                    "UPDATE signal_adds SET status='FILLED', filled_at=now() "
+                    "WHERE id = ANY($1::int[]) AND status='PENDING'", avg["filled_ids"])
+            if ok and f.get("cancel_adds"):
+                await c.execute(
+                    "UPDATE signal_adds SET status='CANCELLED' "
+                    "WHERE signal_id=$1 AND status='PENDING'", sig_id)
     if not ok:
         # Bu holat jimgina o'tib ketmasligi kerak — aks holda kelajakda
         # yana "amalim yo'qoldi" degan shikoyat kelsa sababini topib bo'lmaydi.

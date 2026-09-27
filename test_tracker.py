@@ -39,6 +39,10 @@ def signal(**kw):
         # Optimistik qulf versiyasi (#151) — `process()` uni o'qib
         # `save_progress`ga uzatadi.
         "rev": 0,
+        # O'rtachalash ustunlari (190) — haqiqiy qatorda doim bor.
+        "alloc_amount": None, "units": None, "units_first": None, "entry_first": None,
+        # Test uchun: kutayotgan qo'shimcha limitlar (`db.signal_adds` o'rniga).
+        "_adds": [],
     }
     d.update(kw)
     return d
@@ -53,6 +57,7 @@ async def run(sig, candles, resolve_touch_order=None):
     # boshqa javob simulyatsiya qiladi.
     exchange.resolve_touch_order = lambda *a, **k: _ret(resolve_touch_order)
     db.save_progress = _save
+    db.signal_adds = lambda sid, status=None: _ret(list(sig.get("_adds", [])))
     events = await tracker.process(sig)
     return SAVED.copy(), events
 
@@ -64,6 +69,7 @@ async def _ret(v):
 async def _save(sig_id, f):
     SAVED.clear()
     SAVED.update(f)
+    return True     # haqiqiy `db.save_progress` kabi: yozildi
 
 
 def show(name, saved, events, expect_pnl=None):
@@ -319,6 +325,69 @@ async def main():
     assert SAVED.get("status") == "ACTIVE", (
         f"sham TO'LIQ yopilgach entry to'g'ri aniqlanishi kerak edi: {SAVED.get('status')}")
     assert any(e["type"] == "OPEN" for e in ev13b)
+
+    # 14. O'rtachalash (190): qo'shimcha limit to'ladi, o'rtacha narx
+    # MIQDOR bo'yicha, shu shamda TP tekshirilmaydi, keyingi shamda TP.
+    def add(i, price, units=1.0, usd=False):
+        return {"id": i, "price": price, "units": units, "usd": usd}
+    sig14 = signal(status="ACTIVE", opened_at=NOW, tps=[110.0], sl=90.0, sl_initial=90.0,
+                   _adds=[add(1, 95.0)])
+    saved, ev = await run(sig14, [
+        candle(1, 100, 111, 94, 105),    # limit 95 to'ldi; TP 110 ham tegdi — tartib noma'lum
+        candle(2, 105, 111, 104, 110),   # TP
+    ])
+    avg = 2 / (1 / 100 + 1 / 95)
+    show("O'rtachalash: limit to'ldi, keyin TP", saved, ev, round((110 - avg) / avg * 100, 4))
+    assert [e["type"] for e in ev] == ["ADD", "TP"], ev
+    assert abs(ev[0]["avg"] - avg) < 1e-9 and ev[0]["ratio"] == 1.0
+    assert saved["avg"]["filled_ids"] == [1] and abs(saved["avg"]["units"] - 2) < 1e-12
+    assert saved["cancel_adds"] is True          # yopildi — qolganlari bekor
+
+    # 15. Limit to'ladi va O'SHA shamda stop — avval limit (narx pastga
+    # tushishda undan o'tadi), keyin stop o'rtacha narxdan.
+    sig15 = signal(status="ACTIVE", opened_at=NOW, tps=[110.0], sl=90.0, sl_initial=90.0,
+                   _adds=[add(1, 95.0)])
+    saved, ev = await run(sig15, [candle(1, 100, 100, 89, 89)])
+    show("O'rtachalash: limit + stop bir shamda", saved, ev, round((90 - avg) / avg * 100, 4))
+    assert [e["type"] for e in ev] == ["ADD", "STOP"], ev
+
+    # 16. $ rejimi: 100$ pozitsiya + 50$ limit -> alloc +50, o'rtacha
+    # miqdor bo'yicha; ikki limit bitta shamda yuqoridan pastga.
+    sig16 = signal(status="ACTIVE", opened_at=NOW, tps=[130.0], sl=80.0, sl_initial=80.0,
+                   alloc_amount=100.0, _adds=[add(1, 90.0, 50, True), add(2, 95.0, 50, True)])
+    saved, ev = await run(sig16, [candle(1, 100, 100, 89, 92)])
+    want = 200 / (100 / 100 + 50 / 95 + 50 / 90)
+    assert [round(e["price"], 2) for e in ev if e["type"] == "ADD"] == [95.0, 90.0], ev
+    assert abs(saved["avg"]["entry"] - want) < 1e-9 and saved["avg"]["alloc_delta"] == 100
+    assert saved["cancel_adds"] is False         # hali ochiq — bekor qilinmaydi
+    print("  ✓ $ rejimi: ikki limit, alloc +100, o'rtacha", round(want, 4))
+
+    # 17. SHORT: limit YUQORIDA to'ladi (high >= narx).
+    sig17 = signal(status="ACTIVE", opened_at=NOW, side="SHORT", entry=100.0,
+                   tps=[90.0], sl=110.0, sl_initial=110.0, _adds=[add(1, 105.0)])
+    saved, ev = await run(sig17, [candle(1, 100, 106, 99, 104)])
+    assert [e["type"] for e in ev] == ["ADD"], ev
+    assert abs(saved["avg"]["entry"] - 2 / (1 / 100 + 1 / 105)) < 1e-9
+    print("  ✓ SHORT: yuqoridagi limit to'ldi")
+
+    # 18. Qismi yopilgan pozitsiyada (filled > 0) limit TO'LMAYDI va bekor.
+    sig18 = signal(status="ACTIVE", opened_at=NOW, tps=[110.0, 120.0], sl=90.0,
+                   sl_initial=90.0, tp_hit=1, filled_pct=0.5, realized_pct=5.0,
+                   _adds=[add(1, 95.0)])
+    saved, ev = await run(sig18, [candle(1, 100, 100, 94, 96)])
+    assert not [e for e in ev if e["type"] == "ADD"] and saved["avg"] is None
+    assert saved["cancel_adds"] is True
+    print("  ✓ Qismi yopilgan pozitsiyada limit to'lmaydi va bekor qilinadi")
+
+    # 19. Qator orada o'zgargan (save_progress False) — hodisa YUBORILMAYDI.
+    async def _nosave(sig_id, f):
+        return False
+    sig19 = signal(status="ACTIVE", opened_at=NOW, tps=[110.0], _adds=[add(1, 95.0)])
+    exchange.klines = lambda *a, **k: _ret([candle(1, 100, 100, 94, 96)])
+    db.save_progress = _nosave
+    db.signal_adds = lambda sid, status=None: _ret(list(sig19["_adds"]))
+    assert await tracker.process(sig19) == []
+    print("  ✓ Yozilmagan kuzatuv hodisa yubormaydi (keyingi siklda qayta)")
 
     print("\nBarcha holatlar tekshirildi.")
 

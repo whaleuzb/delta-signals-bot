@@ -83,6 +83,12 @@ AWAITING_BROADCAST: dict[int, bool] = {}
 AWAITING_TALLOC: dict[int, int] = {}
 DEFER_PERSONAL_ALLOC: dict[int, int] = {}
 AWAITING_TOURNEY: dict[int, bool] = {}
+# Qo'shimcha kirish (190): odam -> signal_id (limit narx(lar)i kutilmoqda);
+# odam -> (signal_id, narxlar) (narxlar qabul qilindi, hajm kutilmoqda);
+# odam -> (signal_id, "maddgo"|"mlimgo") (hajm QO'LDA yozilmoqda).
+AWAITING_ADDLIM: dict[int, int] = {}
+PENDING_ADDLIM: dict[int, tuple[int, list[float]]] = {}
+AWAITING_ADDSIZE: dict[int, tuple[int, str]] = {}
 PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
 # News Trade AI/surge post ostidagi "📝 Jurnalga kiritish" tugmasi orqali
 # kelgan foydalanuvchi: uid -> (symbol, shaxsiy_workspace_id). Tiker
@@ -1343,9 +1349,12 @@ async def manage_view(sig, lang: str | None = None,
     realized = float(sig["realized_pct"])
     price = await safe_last_price(sig["market"], sig["symbol"])
 
+    entry_lbl = i18n.t("man.entry_avg" if sig["entry_first"] is not None else "man.entry", lang)
     lines = [f"⚙️ <b>#{sig['id']} {sig['symbol']} {sig['side']}</b>",
-             f"{i18n.t('man.entry', lang)}: <b>{fmt_price(entry)}</b> · "
+             f"{entry_lbl}: <b>{fmt_price(entry)}</b> · "
              f"{i18n.t('man.stop', lang)}: <b>{fmt_price(float(sig['sl']))}</b>"]
+    if sig["entry_first"] is not None:
+        lines.append(i18n.t("man.entry_first", lang, p=fmt_price(float(sig["entry_first"]))))
     tps = [float(t) for t in sig["tps"]]
     lines.append(i18n.t("man.targets", lang) + ": " + " · ".join(
         f"{'✅' if i < sig['tp_hit'] else '◻️'}{fmt_price(t)}"
@@ -1387,6 +1396,17 @@ async def manage_view(sig, lang: str | None = None,
     if pending:
         rows.append([InlineKeyboardButton(i18n.t("man.btn_entry", lang),
                                           callback_data=f"mentry:{sid}")])
+    # Qo'shimcha kirish (190) — faqat to'liq ochiq pozitsiyada.
+    pend_adds = await db.signal_adds(sid, "PENDING")
+    if sig["status"] == "ACTIVE" and filled == 0:
+        rows.append([
+            InlineKeyboardButton(i18n.t("man.btn_add", lang), callback_data=f"madd:{sid}"),
+            InlineKeyboardButton(i18n.t("man.btn_addlim", lang), callback_data=f"mlim:{sid}")])
+    if pend_adds:
+        lines.append(i18n.t("man.adds_pending", lang, lst=", ".join(
+            fmt_price(float(a["price"])) for a in pend_adds)))
+        rows.append([InlineKeyboardButton(i18n.t("man.btn_addlim_x", lang),
+                                          callback_data=f"mlimx:{sid}")])
     if sig["status"] == "ACTIVE" and filled < 0.999:
         rows.append([
             InlineKeyboardButton("✂️ 25%", callback_data=f"mpc:{sid}:25"),
@@ -1424,6 +1444,294 @@ async def _manage_guard(q, bot):
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return None, None
     return sig, ws
+
+
+# ─────────────── Qo'shimcha kirish / o'rtachalash (190) ───────────────
+
+async def _add_size_kb(sig, ws, action: str, levels: int, lang) -> tuple[str, list]:
+    """Hajm tanlovi. Depozit rejimida ($, `alloc_amount` bor) — boshlang'ich
+    pozitsiyaning 0.5x/1x/2x i dollarda, bo'sh depozitdan oshmaydigani;
+    aks holda nisbat (0.5x/1x/2x). `levels` — nechta limit (har biriga
+    shu hajm), bo'sh pul shunga bo'lib tekshiriladi."""
+    sid = sig["id"]
+    u0 = tracker.first_units(sig)
+    usd = sig["alloc_amount"] is not None
+    free = None
+    if usd and ws["deposit"] is not None:
+        _, _, free = await free_deposit(ws)
+    btns = []
+    for k in (0.5, 1, 2):
+        units = u0 * k
+        if free is not None and units * levels > free + 1e-9:
+            continue
+        label = f"{k:g}x → {units:,.0f}$" if usd else f"{k:g}x"
+        btns.append(InlineKeyboardButton(label, callback_data=f"{action}:{sid}:{units:.4f}"))
+    rows = [btns] if btns else []
+    rows.append([InlineKeyboardButton(i18n.t("man.btn_add_custom", lang),
+                                      callback_data=f"{action}c:{sid}")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    note = (i18n.t("man.add_size_usd", lang, u0=u0, free=free if free is not None else 0)
+            if usd else i18n.t("man.add_size_x", lang))
+    return note, rows
+
+
+async def _add_guard(q, bot):
+    """`_manage_guard` + qo'shimcha kirish shartlari. Depozit rejimida ($)
+    faqat egasi/admin: bu egasining puli (180 dagi qoida)."""
+    sig, ws = await _manage_guard(q, bot)
+    if not sig:
+        return None, None
+    lang = await user_lang(q.from_user.id)
+    if sig["status"] != "ACTIVE" or float(sig["filled_pct"]) > 0 or sig["sl"] is None:
+        await q.answer(i18n.t("man.add_not_allowed", lang), show_alert=True)
+        return None, None
+    if sig["alloc_amount"] is not None and not can_manage(q.from_user.id, ws):
+        await q.answer(i18n.t("man.add_money_owner", lang), show_alert=True)
+        return None, None
+    return sig, ws
+
+
+def _add_side_ok(sig, price: float) -> bool:
+    """Narx stopning to'g'ri tomonidami (LONG: stopdan yuqori)."""
+    sl = float(sig["sl"])
+    return price > sl if sig["side"] == "LONG" else price < sl
+
+
+async def on_add_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"➕ Hozirgi narxda qo'shish" — joriy narx, o'rtacha va hajm tanlovi."""
+    q = update.callback_query
+    await q.answer()
+    sig, ws = await _add_guard(q, ctx.bot)
+    if not sig:
+        return
+    lang = await user_lang(q.from_user.id)
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if not price:
+        await q.answer(i18n.t("man.add_no_price", lang), show_alert=True)
+        return
+    entry = float(sig["entry"])
+    note, rows = await _add_size_kb(sig, ws, "maddgo", 1, lang)
+    await q.edit_message_text(
+        i18n.t("man.add_head", lang, sid=sig["id"], sym=sig["symbol"], p=fmt_price(price),
+               avg=fmt_price(entry), pnl=tracker.pnl_at(sig["side"], entry, price))
+        + "\n\n" + note,
+        parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
+
+
+async def _do_market_add(message, ctx, uid: int, sig_id: int, units: float) -> None:
+    """Hozirgi (yangi olingan) narxda qo'shish, guruhga xabar, turnir."""
+    lang = await user_lang(uid)
+    sig = await db.get_signal(sig_id)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not sig or not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
+        await message.reply_text(i18n.t("man.no_right", lang))
+        return
+    usd = sig["alloc_amount"] is not None
+    if usd and not can_manage(uid, ws):
+        await message.reply_text(i18n.t("man.add_money_owner", lang))
+        return
+    if units <= 0:
+        await message.reply_text(i18n.t("man.bad_number", lang))
+        return
+    if usd and ws["deposit"] is not None:
+        _, _, free = await free_deposit(ws)
+        if units > free + 1e-9:
+            await message.reply_text(i18n.t("man.add_over", lang, free=free))
+            return
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if not price:
+        await message.reply_text(i18n.t("man.add_no_price", lang))
+        return
+    if sig["sl"] is None or not _add_side_ok(sig, price):
+        await message.reply_text(i18n.t("man.add_past_sl", lang))
+        return
+    res = await db.add_market(sig_id, price, units, usd)
+    if not res:
+        await message.reply_text(i18n.t("man.add_not_allowed", lang))
+        return
+    t_add = await tournament.scale_for_add(sig_id, res["ratio"])
+    await notify_group(ctx, ws, sig, tw("ev.add_mkt", ws, sid=sig_id, sym=sig["symbol"],
+                                        p=fmt_price(price), avg=fmt_price(res["entry"])))
+    txt = i18n.t("man.add_done", lang, p=fmt_price(price), avg=fmt_price(res["entry"]))
+    if t_add:
+        txt += "\n" + i18n.t("man.add_tourney", lang, amt=t_add)
+    text, kb = await manage_view(await db.get_signal(sig_id), lang,
+                                 full=can_manage(uid, ws))
+    await message.reply_text(txt + "\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+async def on_add_go(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _add_guard(q, ctx.bot)
+    if not sig:
+        return
+    try:
+        await q.edit_message_reply_markup(None)
+    except Exception:
+        pass
+    await _do_market_add(q.message, ctx, q.from_user.id, sig["id"], float(q.data.split(":")[2]))
+
+
+async def on_addlim_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"📌 Qo'shimcha limit" — narx(lar)ni so'raydi."""
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _add_guard(q, ctx.bot)
+    if not sig:
+        return
+    lang = await user_lang(q.from_user.id)
+    price = await safe_last_price(sig["market"], sig["symbol"])
+    AWAITING_ADDLIM[q.from_user.id] = sig["id"]
+    key = "man.ask_addlim_long" if sig["side"] == "LONG" else "man.ask_addlim_short"
+    await q.edit_message_text(
+        i18n.t(key, lang, sid=sig["id"], sym=sig["symbol"],
+               p=fmt_price(price) if price else "—", sl=fmt_price(float(sig["sl"]))),
+        parse_mode=ParseMode.HTML)
+
+
+async def _do_place_limits(message, ctx, uid: int, sig_id: int, units: float) -> None:
+    lang = await user_lang(uid)
+    pend = PENDING_ADDLIM.pop(uid, None)
+    sig = await db.get_signal(sig_id)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not pend or pend[0] != sig_id or not sig or not ws:
+        await message.reply_text(i18n.t("man.gone", lang), reply_markup=menu_back_kb(lang))
+        return
+    if not await can_manage_signal(ctx.bot, uid, ws, sig) or sig["status"] != "ACTIVE" \
+            or float(sig["filled_pct"]) > 0:
+        await message.reply_text(i18n.t("man.add_not_allowed", lang))
+        return
+    usd = sig["alloc_amount"] is not None
+    if usd and not can_manage(uid, ws):
+        await message.reply_text(i18n.t("man.add_money_owner", lang))
+        return
+    prices = pend[1]
+    if units <= 0:
+        await message.reply_text(i18n.t("man.bad_number", lang))
+        return
+    if usd and ws["deposit"] is not None:
+        _, _, free = await free_deposit(ws)
+        if units * len(prices) > free + 1e-9:
+            PENDING_ADDLIM[uid] = pend
+            await message.reply_text(i18n.t("man.add_over", lang, free=free))
+            return
+    await db.place_add_limits(sig_id, prices, units, usd)
+    lst = ", ".join(fmt_price(p) for p in prices)
+    await notify_group(ctx, ws, sig, tw("ev.add_lim", ws, sid=sig_id, sym=sig["symbol"], lst=lst))
+    text, kb = await manage_view(await db.get_signal(sig_id), lang, full=can_manage(uid, ws))
+    await message.reply_text(i18n.t("man.addlim_done", lang, lst=lst) + "\n\n" + text,
+                             parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+async def on_addlim_go(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _add_guard(q, ctx.bot)
+    if not sig:
+        return
+    try:
+        await q.edit_message_reply_markup(None)
+    except Exception:
+        pass
+    await _do_place_limits(q.message, ctx, q.from_user.id, sig["id"], float(q.data.split(":")[2]))
+
+
+async def on_add_custom(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"✍️ O'zim yozaman" — hajm matn bilan ($ yoki nisbat)."""
+    q = update.callback_query
+    await q.answer()
+    sig, _ = await _add_guard(q, ctx.bot)
+    if not sig:
+        return
+    lang = await user_lang(q.from_user.id)
+    action = q.data.split(":")[0][:-1]          # "maddgoc" -> "maddgo"
+    AWAITING_ADDSIZE[q.from_user.id] = (sig["id"], action)
+    await q.edit_message_text(i18n.t(
+        "man.ask_add_usd" if sig["alloc_amount"] is not None else "man.ask_add_x", lang),
+        parse_mode=ParseMode.HTML)
+
+
+async def on_addlim_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    sig, ws = await _manage_guard(q, ctx.bot)
+    if not sig:
+        return
+    n = await db.cancel_pending_adds(sig["id"])
+    if n:
+        await notify_group(ctx, ws, sig, tw("ev.add_lim_x", ws, sid=sig["id"], sym=sig["symbol"]))
+    await _show_manage(q, sig["id"])
+
+
+def _parse_prices(text: str) -> list[float]:
+    out = []
+    for tok in re.split(r"[\s;]+", text.replace(", ", " ").strip()):
+        if not tok:
+            continue
+        p = _parse_price(tok)
+        if p is None or p <= 0:
+            return []
+        out.append(p)
+    return out
+
+
+async def handle_add_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Qo'shimcha kirish uchun matnli javoblar (190). Ishlangan bo'lsa True."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    text = (msg.text or "").strip()
+
+    if uid in AWAITING_ADDSIZE:
+        sid, action = AWAITING_ADDSIZE.pop(uid)
+        lang = await user_lang(uid)
+        sig = await db.get_signal(sid)
+        v = _parse_price(text)
+        if not sig or v is None or v <= 0:
+            if sig:
+                AWAITING_ADDSIZE[uid] = (sid, action)
+            await msg.reply_text(i18n.t("man.bad_number", lang))
+            return True
+        units = v if sig["alloc_amount"] is not None else v * tracker.first_units(sig)
+        if action == "maddgo":
+            await _do_market_add(msg, ctx, uid, sid, units)
+        else:
+            await _do_place_limits(msg, ctx, uid, sid, units)
+        return True
+
+    sid = AWAITING_ADDLIM.pop(uid, None)
+    if not sid:
+        return False
+    lang = await user_lang(uid)
+    sig = await db.get_signal(sid)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not sig or not ws or sig["status"] != "ACTIVE" or float(sig["filled_pct"]) > 0:
+        await msg.reply_text(i18n.t("man.add_not_allowed", lang), reply_markup=menu_back_kb(lang))
+        return True
+    prices = _parse_prices(text)
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if not prices or len(prices) > 5:
+        AWAITING_ADDLIM[uid] = sid
+        await msg.reply_text(i18n.t("man.addlim_bad", lang), parse_mode=ParseMode.HTML)
+        return True
+    sl = float(sig["sl"])
+    long_ = sig["side"] == "LONG"
+    bad = [p for p in prices
+           if not (_add_side_ok(sig, p) and (price is None or (p < price if long_ else p > price)))]
+    if bad:
+        AWAITING_ADDLIM[uid] = sid
+        await msg.reply_text(i18n.t("man.addlim_range_long" if long_ else "man.addlim_range_short",
+                                    lang, bad=", ".join(fmt_price(p) for p in bad),
+                                    p=fmt_price(price) if price else "—", sl=fmt_price(sl)),
+                             parse_mode=ParseMode.HTML)
+        return True
+    prices = sorted(set(prices), reverse=long_)
+    PENDING_ADDLIM[uid] = (sid, prices)
+    note, rows = await _add_size_kb(sig, ws, "mlimgo", len(prices), lang)
+    await msg.reply_text(
+        i18n.t("man.addlim_size", lang, lst=", ".join(fmt_price(p) for p in prices)) + "\n\n" + note,
+        parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
+    return True
 
 
 async def notify_group(ctx, ws, sig, text: str) -> None:
@@ -2728,6 +3036,10 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     if await handle_tpsl_input(update, ctx):
         return
 
+    # Qo'shimcha kirish (190): limit narxlari / qo'lda hajm.
+    if await handle_add_input(update, ctx):
+        return
+
     # Ochiq pozitsiyani boshqarish: yangi stop / yangi maqsadlar.
     if await handle_manage_input(update, ctx):
         return
@@ -4008,6 +4320,14 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 txt += i18n.t("ev.tp_closes", lang, pnl=e["final_pnl"], r=e["r"] or 0)
         elif e["type"] == "OPEN":
             txt = i18n.t("ev.open", lang, sid=sid, sym=sym, p=fmt_price(e["price"]))
+        elif e["type"] == "ADD":
+            txt = i18n.t("ev.add_fill", lang, sid=sid, sym=sym, p=fmt_price(e["price"]),
+                         avg=fmt_price(e["avg"]))
+            # Turnir savdosi bo'lsa — turnir summasi ham shu ulushda (190).
+            try:
+                await tournament.scale_for_add(sid, e["ratio"])
+            except Exception:
+                log.exception("Turnir summasi oshirilmadi (#%s)", sid)
         else:
             key = EVENT_KEY.get(e["type"])
             txt = i18n.t(key, lang, sid=sid, sym=sym) if key else ""
@@ -4376,6 +4696,9 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_TALLOC.pop(update.effective_user.id, None)
     DEFER_PERSONAL_ALLOC.pop(update.effective_user.id, None)
     AWAITING_TOURNEY.pop(update.effective_user.id, None)
+    AWAITING_ADDLIM.pop(update.effective_user.id, None)
+    PENDING_ADDLIM.pop(update.effective_user.id, None)
+    AWAITING_ADDSIZE.pop(update.effective_user.id, None)
     AWAITING_JOURNAL_SYMBOL.pop(update.effective_user.id, None)
     AWAITING_REF_CODE.pop(update.effective_user.id, None)
     ctx.user_data.pop("wiz", None)
@@ -7863,6 +8186,12 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_manage_entry, pattern=r"^mentry:"))
     app.add_handler(CallbackQueryHandler(on_manage_tp, pattern=r"^mtp:"))
     app.add_handler(CallbackQueryHandler(on_manage_partial, pattern=r"^mpc:"))
+    app.add_handler(CallbackQueryHandler(on_add_menu, pattern=r"^madd:\d+$"))
+    app.add_handler(CallbackQueryHandler(on_add_go, pattern=r"^maddgo:\d+:[\d.]+$"))
+    app.add_handler(CallbackQueryHandler(on_addlim_menu, pattern=r"^mlim:\d+$"))
+    app.add_handler(CallbackQueryHandler(on_addlim_go, pattern=r"^mlimgo:\d+:[\d.]+$"))
+    app.add_handler(CallbackQueryHandler(on_add_custom, pattern=r"^(maddgoc|mlimgoc):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_addlim_cancel, pattern=r"^mlimx:\d+$"))
     app.add_handler(CallbackQueryHandler(on_close_confirm, pattern=r"^closeok:"))
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))

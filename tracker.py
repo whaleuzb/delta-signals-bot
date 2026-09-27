@@ -41,6 +41,28 @@ def pnl_at(side: str, entry: float, price: float) -> float:
     return (entry - price) / entry * 100
 
 
+def base_units(sig) -> float:
+    """Pozitsiyaning joriy jami hajmi (190). Birlik: depozit rejimida $
+    (`alloc_amount`), aks holda boshlang'ich pozitsiya = 1."""
+    if sig["units"] is not None:
+        return float(sig["units"])
+    if sig["alloc_amount"] is not None:
+        return float(sig["alloc_amount"])
+    return 1.0
+
+
+def first_units(sig) -> float:
+    return float(sig["units_first"]) if sig["units_first"] is not None else base_units(sig)
+
+
+def avg_entry(entry: float, units: float, price: float, add: float) -> float:
+    """Qo'shimcha kirishdan keyingi o'rtacha narx — MIQDOR bo'yicha (birjadagi
+    kabi): jami hajm / jami miqdor. Oddiy o'rtacha emas: shunda
+    `pnl_at(o'rtacha) × jami hajm` har bir kirishning pul natijasi
+    yig'indisiga ANIQ teng bo'ladi (LONG ham, SHORT ham)."""
+    return (units + add) / (units / entry + add / price)
+
+
 async def process(sig) -> list[dict]:
     """Bitta signalni yangilaydi. Yuz bergan hodisalar ro'yxatini qaytaradi."""
     symbol = sig["symbol"]
@@ -110,6 +132,15 @@ async def process(sig) -> list[dict]:
         return []
 
     events: list[dict] = []
+    # Qo'shimcha limitlar (190) — faqat to'liq ochiq pozitsiyada to'ladi.
+    pend = []
+    if status == "ACTIVE" and filled == 0:
+        pend = [dict(a) for a in await db.signal_adds(sig["id"], "PENDING")]
+    units_now = base_units(sig)
+    units0 = first_units(sig)
+    entry_first = float(sig["entry_first"]) if sig["entry_first"] is not None else entry
+    alloc_delta = 0.0
+    filled_ids: list[int] = []
     opened_at = sig["opened_at"]
     closed_at = None
     exit_price = None
@@ -191,10 +222,37 @@ async def process(sig) -> list[dict]:
             # etadi.
             continue
 
+        # --- 1b. Qo'shimcha limitlar (190) ---
+        # Limit stop bilan joriy narx orasida qo'yiladi (bot tekshiradi),
+        # ya'ni narx stopga borguncha avval limitdan o'tadi — shu sabab
+        # to'lish SL tekshiruvidan OLDIN. TP esa bu shamda TEKSHIRILMAYDI:
+        # sham ichida avval pastga (limit) keyin tepaga (TP) bordimi yoki
+        # aksincha — OHLC'dan bilib bo'lmaydi (1-qadamdagi "kirish shami"
+        # qoidasi bilan bir xil konservativ yondashuv).
+        add_filled_now = False
+        if pend and filled == 0:
+            for a in sorted(pend, key=lambda x: -float(x["price"]) if side == "LONG"
+                            else float(x["price"])):
+                p = float(a["price"])
+                if (c.low <= p) if side == "LONG" else (c.high >= p):
+                    u = float(a["units"])
+                    entry = avg_entry(entry, units_now, p, u)
+                    units_now += u
+                    if a["usd"]:
+                        alloc_delta += u
+                    filled_ids.append(a["id"])
+                    pend.remove(a)
+                    add_filled_now = True
+                    events.append({"type": "ADD", "price": p, "avg": entry,
+                                   "ratio": u / units0})
+                    log.info("Signal #%s %s: qo'shimcha limit to'ldi @ %.10g, o'rtacha %.10g",
+                             sig["id"], symbol, p, entry)
+
         # --- 2. Shu shamda SL va TP holati ---
         sl_touched = (c.low <= sl) if side == "LONG" else (c.high >= sl)
         nxt = tps[tp_hit] if tp_hit < len(tps) else None
-        tp_touched = nxt is not None and ((c.high >= nxt) if side == "LONG" else (c.low <= nxt))
+        tp_touched = (not add_filled_now and nxt is not None
+                      and ((c.high >= nxt) if side == "LONG" else (c.low <= nxt)))
 
         if sl_touched or tp_touched:
             log.info(
@@ -294,13 +352,25 @@ async def process(sig) -> list[dict]:
         risk = abs(entry - sl_init) / entry * 100
         r = round(pnl / risk, 3) if risk > 0 else None
 
-    await db.save_progress(sig["id"], {
+    avg = None
+    if filled_ids:
+        avg = {"entry": entry, "units": units_now, "units_first": units0,
+               "entry_first": entry_first, "alloc_delta": alloc_delta,
+               "filled_ids": filled_ids}
+    saved = await db.save_progress(sig["id"], {
         "sl": sl, "rev_prev": rev_prev, "tp_hit": tp_hit, "filled_pct": round(filled, 6),
         "realized_pct": round(realized, 4), "status": status,
         "opened_at": opened_at, "closed_at": closed_at, "exit_price": exit_price,
         "pnl_pct": pnl, "r_multiple": r, "last_checked_ms": last_ms,
-        "ambiguous": ambiguous,
+        "ambiguous": ambiguous, "avg": avg,
+        # Pozitsiya yopildi yoki qismi yopildi — kutayotgan limitlar endi
+        # ma'nosiz (o'rtachalash faqat to'liq ochiq pozitsiyaga).
+        "cancel_adds": status not in ("PENDING", "ACTIVE") or filled > 0,
     })
+    if not saved:
+        # Qator orada o'zgargan — hech narsa yozilmadi, hodisalar ham
+        # yuborilmasin (keyingi siklda yangi holat bilan qaytadan).
+        return []
 
     for e in events:
         e["signal_id"] = sig["id"]
@@ -354,6 +424,7 @@ async def close_now(sig_id: int) -> dict | None:
     # buyrug'i — u kuzatuvning oraliqdagi yozuvidan qat'i nazar bajarilishi
     # kerak (`db.save_progress` qulfni `rev_prev` yo'q bo'lganda o'tkazadi).
     await db.save_progress(sig_id, {
+        "cancel_adds": True,   # yopildi — kutayotgan qo'shimcha limitlar (190) bekor
         "sl": float(sig["sl"]), "tp_hit": sig["tp_hit"], "filled_pct": 1.0,
         "realized_pct": pnl, "status": status,
         "opened_at": sig["opened_at"], "closed_at": datetime.now(timezone.utc),
@@ -413,6 +484,7 @@ async def partial_close(sig_id: int, portion: float, _retry: bool = False) -> di
         exit_price = price
 
     ok = await db.save_progress(sig_id, {
+        "cancel_adds": True,   # qismi yopildi — o'rtachalash endi yo'q (190)
         "sl": float(sig["sl"]), "rev_prev": sig["rev"], "tp_hit": sig["tp_hit"],
         "filled_pct": round(new_filled, 6), "realized_pct": round(realized, 4),
         "status": status, "opened_at": sig["opened_at"], "closed_at": closed_at,
@@ -474,6 +546,7 @@ async def reopen_signal(sig_id: int) -> dict | None:
     prev_alloc_amount = sig["alloc_amount"]
 
     await db.save_progress(sig_id, {
+        "cancel_adds": True,   # yopildi — kutayotgan qo'shimcha limitlar (190) bekor
         "sl": sl_init, "tp_hit": tp_hit, "filled_pct": round(filled_before, 6),
         "realized_pct": round(realized_before, 4), "status": "ACTIVE",
         "opened_at": sig["opened_at"], "closed_at": None, "exit_price": None,

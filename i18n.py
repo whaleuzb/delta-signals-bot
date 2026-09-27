@@ -378,6 +378,129 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # --- Boshqaruv ekrani (ochiq signal) ---
     "man.entry": {"uz": "Kirish", "ru": "Вход", "en": "Entry"},
+    # --- Qo'shimcha kirish / o'rtachalash (190) ---
+    "man.entry_avg": {"uz": "O'rtacha kirish", "ru": "Средний вход", "en": "Average entry"},
+    "man.entry_first": {"uz": "Birinchi kirish: {p}", "ru": "Первый вход: {p}", "en": "First entry: {p}"},
+    "man.btn_add": {"uz": "➕ Qo'shib olish", "ru": "➕ Докупить", "en": "➕ Add to position"},
+    "man.btn_addlim": {"uz": "📌 Qo'shimcha limit", "ru": "📌 Доп. лимит", "en": "📌 Add limit"},
+    "man.adds_pending": {"uz": "📌 Kutilayotgan qo'shimcha limitlar: {lst}",
+                         "ru": "📌 Ожидающие доп. лимиты: {lst}",
+                         "en": "📌 Pending add limits: {lst}"},
+    "man.btn_addlim_x": {"uz": "❌ Qo'shimcha limitlarni bekor qilish", "ru": "❌ Отменить доп. лимиты",
+                         "en": "❌ Cancel add limits"},
+    "man.btn_add_custom": {"uz": "✍️ O'zim yozaman", "ru": "✍️ Ввести вручную", "en": "✍️ Type it"},
+    "man.add_size_usd": {
+        "uz": "Hajmni tanlang (boshlang'ich pozitsiya: {u0:,.0f}$, bo'sh depozit: {free:,.2f}$):",
+        "ru": "Выберите объём (начальная позиция: {u0:,.0f}$, свободно: {free:,.2f}$):",
+        "en": "Choose the size (initial position: {u0:,.0f}$, free deposit: {free:,.2f}$):",
+    },
+    "man.add_size_x": {
+        "uz": "Hajmni tanlang — boshlang'ich pozitsiyaga nisbatan (1x = xuddi shuncha):",
+        "ru": "Выберите объём — относительно начальной позиции (1x = столько же):",
+        "en": "Choose the size — relative to the initial position (1x = the same):",
+    },
+    "man.add_not_allowed": {
+        "uz": "Qo'shimcha kirish faqat to'liq ochiq pozitsiyaga mumkin (TP/SL qo'yilgan, hech qismi yopilmagan).",
+        "ru": "Докупить можно только в полностью открытую позицию (TP/SL заданы, ничего не закрыто).",
+        "en": "You can only add to a fully open position (TP/SL set, nothing closed yet).",
+    },
+    "man.add_money_owner": {
+        "uz": "Bu pozitsiya depozitdan — qo'shimcha kirishni faqat guruh egasi qila oladi.",
+        "ru": "Эта позиция из депозита — докупать может только владелец группы.",
+        "en": "This position uses the deposit — only the group owner can add to it.",
+    },
+    "man.add_no_price": {"uz": "Joriy narx olinmadi, birozdan keyin urinib ko'ring.",
+                         "ru": "Не удалось получить цену, попробуйте чуть позже.",
+                         "en": "Couldn't get the price, try again shortly."},
+    "man.add_head": {
+        "uz": ("➕ <b>#{sid} {sym}</b> — hozirgi narxda qo'shib olish\n"
+               "Joriy narx: <b>{p}</b>\nHozirgi kirish: <b>{avg}</b> ({pnl:+.2f}%)"),
+        "ru": ("➕ <b>#{sid} {sym}</b> — докупить по текущей цене\n"
+               "Текущая цена: <b>{p}</b>\nТекущий вход: <b>{avg}</b> ({pnl:+.2f}%)"),
+        "en": ("➕ <b>#{sid} {sym}</b> — add at the current price\n"
+               "Current price: <b>{p}</b>\nCurrent entry: <b>{avg}</b> ({pnl:+.2f}%)"),
+    },
+    "man.add_over": {"uz": "Bo'sh depozitdan oshib ketdi. Bo'sh: {free:,.2f}$",
+                     "ru": "Больше свободного депозита. Свободно: {free:,.2f}$",
+                     "en": "More than the free deposit. Free: {free:,.2f}$"},
+    "man.add_past_sl": {"uz": "Narx stopdan o'tib ketgan — qo'shimcha kirish qilib bo'lmaydi.",
+                        "ru": "Цена за стопом — докупить нельзя.",
+                        "en": "The price is beyond the stop — can't add."},
+    "man.add_done": {
+        "uz": "✅ {p} narxda qo'shildi. O'rtacha kirish endi: <b>{avg}</b>",
+        "ru": "✅ Докуплено по {p}. Средний вход теперь: <b>{avg}</b>",
+        "en": "✅ Added at {p}. Average entry is now: <b>{avg}</b>",
+    },
+    "man.add_tourney": {"uz": "🏆 Turnir summasi ham +{amt:,.2f}$ oshirildi.",
+                        "ru": "🏆 Турнирная сумма тоже увеличена на {amt:,.2f}$.",
+                        "en": "🏆 The tournament amount was also increased by {amt:,.2f}$."},
+    "man.ask_addlim_long": {
+        "uz": ("📌 <b>#{sid} {sym}</b> — qo'shimcha buy limit\nJoriy narx: {p} · stop: {sl}\n\n"
+               "Limit narx(lar)ini yozing — joriy narxdan <b>past</b>, stopdan <b>yuqori</b>. "
+               "Bir nechta bo'lsa bo'sh joy bilan (ko'pi bilan 5), masalan: <code>62000 61000</code>"),
+        "ru": ("📌 <b>#{sid} {sym}</b> — доп. лимит на покупку\nТекущая цена: {p} · стоп: {sl}\n\n"
+               "Напишите цену(ы) — <b>ниже</b> текущей и <b>выше</b> стопа. "
+               "Несколько — через пробел (до 5), например: <code>62000 61000</code>"),
+        "en": ("📌 <b>#{sid} {sym}</b> — extra buy limit\nCurrent price: {p} · stop: {sl}\n\n"
+               "Send the price(s) — <b>below</b> the current price and <b>above</b> the stop. "
+               "Several — separated by spaces (up to 5), e.g. <code>62000 61000</code>"),
+    },
+    "man.ask_addlim_short": {
+        "uz": ("📌 <b>#{sid} {sym}</b> — qo'shimcha sell limit\nJoriy narx: {p} · stop: {sl}\n\n"
+               "Limit narx(lar)ini yozing — joriy narxdan <b>yuqori</b>, stopdan <b>past</b>. "
+               "Bir nechta bo'lsa bo'sh joy bilan (ko'pi bilan 5), masalan: <code>65000 66000</code>"),
+        "ru": ("📌 <b>#{sid} {sym}</b> — доп. лимит на продажу\nТекущая цена: {p} · стоп: {sl}\n\n"
+               "Напишите цену(ы) — <b>выше</b> текущей и <b>ниже</b> стопа. "
+               "Несколько — через пробел (до 5), например: <code>65000 66000</code>"),
+        "en": ("📌 <b>#{sid} {sym}</b> — extra sell limit\nCurrent price: {p} · stop: {sl}\n\n"
+               "Send the price(s) — <b>above</b> the current price and <b>below</b> the stop. "
+               "Several — separated by spaces (up to 5), e.g. <code>65000 66000</code>"),
+    },
+    "man.addlim_bad": {
+        "uz": "Tushunmadim. Narx(lar)ni bo'sh joy bilan yozing (ko'pi bilan 5), masalan: <code>62000 61000</code>",
+        "ru": "Не понял. Напишите цену(ы) через пробел (до 5), например: <code>62000 61000</code>",
+        "en": "Didn't get it. Send price(s) separated by spaces (up to 5), e.g. <code>62000 61000</code>",
+    },
+    "man.addlim_range_long": {
+        "uz": "❌ {bad} — mos emas: limit joriy narxdan ({p}) past va stopdan ({sl}) yuqori bo'lishi kerak. Qayta yozing:",
+        "ru": "❌ {bad} — не подходит: лимит должен быть ниже текущей цены ({p}) и выше стопа ({sl}). Напишите снова:",
+        "en": "❌ {bad} — doesn't fit: the limit must be below the current price ({p}) and above the stop ({sl}). Try again:",
+    },
+    "man.addlim_range_short": {
+        "uz": "❌ {bad} — mos emas: limit joriy narxdan ({p}) yuqori va stopdan ({sl}) past bo'lishi kerak. Qayta yozing:",
+        "ru": "❌ {bad} — не подходит: лимит должен быть выше текущей цены ({p}) и ниже стопа ({sl}). Напишите снова:",
+        "en": "❌ {bad} — doesn't fit: the limit must be above the current price ({p}) and below the stop ({sl}). Try again:",
+    },
+    "man.addlim_size": {"uz": "📌 Limitlar: {lst}\nHar biri uchun hajm:",
+                        "ru": "📌 Лимиты: {lst}\nОбъём для каждого:",
+                        "en": "📌 Limits: {lst}\nSize for each:"},
+    "man.addlim_done": {
+        "uz": "✅ Qo'shimcha limitlar qo'yildi: {lst}. To'lganda o'rtacha kirish avtomatik qayta hisoblanadi.",
+        "ru": "✅ Доп. лимиты выставлены: {lst}. При исполнении средний вход пересчитается автоматически.",
+        "en": "✅ Add limits placed: {lst}. When they fill, the average entry is recalculated automatically.",
+    },
+    "man.ask_add_usd": {"uz": "Summani $ da yozing (masalan <code>100</code>):",
+                        "ru": "Напишите сумму в $ (например <code>100</code>):",
+                        "en": "Send the amount in $ (e.g. <code>100</code>):"},
+    "man.ask_add_x": {"uz": "Boshlang'ich pozitsiyaga nisbatan yozing (masalan <code>1.5</code>):",
+                      "ru": "Напишите относительно начальной позиции (например <code>1.5</code>):",
+                      "en": "Send it relative to the initial position (e.g. <code>1.5</code>):"},
+    "ev.add_mkt": {
+        "uz": "➕ <b>#{sid} {sym}</b> — qo'shimcha kirish {p} · o'rtacha kirish endi <b>{avg}</b>",
+        "ru": "➕ <b>#{sid} {sym}</b> — докупка по {p} · средний вход теперь <b>{avg}</b>",
+        "en": "➕ <b>#{sid} {sym}</b> — added at {p} · average entry is now <b>{avg}</b>",
+    },
+    "ev.add_lim": {"uz": "📌 <b>#{sid} {sym}</b> — qo'shimcha limitlar: {lst}",
+                   "ru": "📌 <b>#{sid} {sym}</b> — доп. лимиты: {lst}",
+                   "en": "📌 <b>#{sid} {sym}</b> — add limits: {lst}"},
+    "ev.add_fill": {
+        "uz": "✅ <b>#{sid} {sym}</b> — qo'shimcha limit {p} to'ldi · o'rtacha kirish endi <b>{avg}</b>",
+        "ru": "✅ <b>#{sid} {sym}</b> — доп. лимит {p} исполнен · средний вход теперь <b>{avg}</b>",
+        "en": "✅ <b>#{sid} {sym}</b> — add limit {p} filled · average entry is now <b>{avg}</b>",
+    },
+    "ev.add_lim_x": {"uz": "❌ <b>#{sid} {sym}</b> — qo'shimcha limitlar bekor qilindi",
+                     "ru": "❌ <b>#{sid} {sym}</b> — доп. лимиты отменены",
+                     "en": "❌ <b>#{sid} {sym}</b> — add limits cancelled"},
     "man.stop": {"uz": "Stop", "ru": "Стоп", "en": "Stop"},
     "man.targets": {"uz": "Maqsadlar", "ru": "Цели", "en": "Targets"},
     "man.closed_share": {
