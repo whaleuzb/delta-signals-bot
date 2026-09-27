@@ -6632,3 +6632,28 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - `show_menu` (bosh menyu/ortga) boshqaruv kutishlari va taklif kodi
        kutishini tozalaydi.
      Sinov: `test_back.py` 15/15; regressiya testlari o'tdi.
+
+194. **"◀️ Ortga" bosh menyu bo'limlarida (193 ga qo'shimcha).**
+     Foydalanuvchi 193 dan keyin: "chiqmadiyu". Sabab: bosh menyu
+     bo'limlarida (statistika, juftliklar, ochiq signallar, depozit,
+     egri chiziq, a'zolar huquqi, top, turnir, yordam) faqat "🏠 Bosh menyu"
+     bor edi va u YANGI xabar yuborardi; har bir bo'lim ham yangi xabar
+     bo'lib ochilardi — "ortga" tuyg'usi yo'q edi. Onboarding ekranlarida
+     (guruh roli, guruh/kanal qo'shish qadamlari, guruhlar ro'yxati)
+     umuman tugma yo'q edi.
+
+     Endi:
+     - `back_row`/`back_kb` → `menu:back`; `show_menu` `menu:back` da
+       SHU xabarni bosh menyuga tahrirlaydi (`_edit_or_reply`: matnsiz
+       xabar — masalan equity rasmi — yoki tahrirlab bo'lmasa yangi xabar).
+       Oddiy `menu` ("🏠 Bosh menyu") avvalgidek yangi xabar.
+     - Bosh menyu bo'limlari (`on_menu`, turnir, joy almashtirish) endi
+       bosilgan xabar O'RNIDA ochiladi (chat to'lmaydi).
+     - Signal boshqaruvi: "◀️ Ortga" → `m:open` (ochiq signallar) +
+       "🏠 Bosh menyu"; qo'shimcha hajm ekrani → `mng:<sid>`.
+     - Onboarding: `onboard:home` (boshlang'ich ekran), rol tanlash va
+       guruhlar ro'yxatida ortga; guruh/kanal qo'shish qadamlarida
+       `onboard_back_cb` (joyi bor → `switch`, yangi odam → `onboard:home`);
+       guruhga qo'shilish rad javoblarida → `joingroup`.
+     Sinov: `test_back2.py` 24/24, `test_back.py` 15/15, regressiya
+     testlari o'tdi.

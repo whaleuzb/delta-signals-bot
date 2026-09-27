@@ -399,9 +399,12 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
         rows.append([InlineKeyboardButton(i18n.t("ws.btn_add_channel", lang),
                                            callback_data="onboard:channel")])
     if back:
-        rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="menu")])
-    await update.effective_message.reply_text(i18n.t("ws.pick", lang),
-                                               reply_markup=InlineKeyboardMarkup(rows))
+        rows.append(back_row(lang))
+    kb = InlineKeyboardMarkup(rows)
+    if update.callback_query:
+        await _edit_or_reply(update.callback_query, i18n.t("ws.pick", lang), kb, html_mode=False)
+    else:
+        await update.effective_message.reply_text(i18n.t("ws.pick", lang), reply_markup=kb)
 
 
 def onboard_kb(lang: str | None = None) -> InlineKeyboardMarkup:
@@ -439,6 +442,7 @@ def group_role_kb(lang: str | None = None) -> InlineKeyboardMarkup:
                               callback_data="onboard:group_member")],
         [InlineKeyboardButton(i18n.t("onb.btn_owner", lang),
                               callback_data="onboard:group_owner")],
+        [InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="onboard:home")],
     ])
 
 
@@ -449,16 +453,24 @@ async def send_onboarding(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         reply_markup=onboard_kb(lang))
 
 
-async def send_group_picker(q) -> None:
+def onboard_back_cb(ctx) -> str:
+    """Onboarding ekranlaridagi "◀️ Ortga" qayerga (194): joyi bor odam
+    joy almashtirish ro'yxatidan kelgan, yangi odam — boshlang'ich ekrandan."""
+    return "switch" if ctx.user_data.get("workspace_id") else "onboard:home"
+
+
+async def send_group_picker(q, back_cb: str = "onboard:home") -> None:
     """q — CallbackQuery; joriy xabarni tahrirlab guruhlar ro'yxatini ko'rsatadi."""
     lang = await user_lang(q.from_user.id)
+    back = [InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=back_cb)]
     groups = await db.list_group_workspaces()
     if not groups:
         await q.edit_message_text(i18n.t("ws.no_groups", lang),
-                                   reply_markup=menu_back_kb(lang))
+                                   reply_markup=InlineKeyboardMarkup([back]))
         return
     rows = [[InlineKeyboardButton(f"👥 {g['name']}", callback_data=f"viewjoin:{g['id']}")]
             for g in groups]
+    rows.append(back)
     await q.edit_message_text(i18n.t("ws.which_group", lang),
                                reply_markup=InlineKeyboardMarkup(rows))
 
@@ -480,14 +492,23 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=main_menu_kb(uid, ws, q.message.chat.type == "private", lang))
         return
 
+    if choice == "home":
+        await q.edit_message_text(i18n.t("onb.welcome", lang), parse_mode=ParseMode.HTML,
+                                  reply_markup=onboard_kb(lang))
+        return
+
     if choice == "group":
         await q.edit_message_text(i18n.t("onb.who", lang),
                                    reply_markup=group_role_kb(lang))
         return
 
     if choice == "group_member":
-        await send_group_picker(q)
+        await send_group_picker(q, "onboard:group")
         return
+
+    # Joy almashtirish ro'yxatidan kelgan bo'lsa — o'sha yerga, aks holda
+    # boshlang'ich ekranga (194).
+    back = [InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=onboard_back_cb(ctx))]
 
     bot_username = ctx.bot.username
     mention = f"@{bot_username}" if bot_username else "@bot"
@@ -498,7 +519,7 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
                 i18n.t("onb.btn_add_channel", lang),
-                url=add_to_chat_url(bot_username, "channel"))]]))
+                url=add_to_chat_url(bot_username, "channel"))], back]))
         return
 
     # choice == "group_owner"
@@ -510,13 +531,19 @@ async def on_onboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
             i18n.t("onb.btn_add_group", lang),
-            url=add_to_chat_url(bot_username, "group"))]]))
+            url=add_to_chat_url(bot_username, "group"))], back]))
 
 
 async def on_join_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    await send_group_picker(q)
+    await send_group_picker(q, onboard_back_cb(ctx))
+
+
+def _picker_back_kb(lang: str | None) -> InlineKeyboardMarkup:
+    """Guruh tanlashdagi rad javoblari ostida — ro'yxatga qaytish (194)."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("menu.back", lang),
+                                                       callback_data="joingroup")]])
 
 
 async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -528,7 +555,7 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     ws = await db.get_workspace(wid)
     if not ws or ws["type"] != "group" or not ws["group_chat_id"]:
         await q.edit_message_text(i18n.t("ws.group_not_found", lang),
-                                   reply_markup=menu_back_kb(lang))
+                                   reply_markup=_picker_back_kb(lang))
         return
     try:
         member = await ctx.bot.get_chat_member(ws["group_chat_id"], uid)
@@ -537,7 +564,7 @@ async def on_view_join(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         is_member = False
     if not is_member:
         await q.edit_message_text(i18n.t("ws.not_member", lang, name=ws["name"]),
-                                   reply_markup=menu_back_kb(lang))
+                                   reply_markup=_picker_back_kb(lang))
         return
     await db.add_group_viewer(uid, wid)
     ctx.user_data["workspace_id"] = wid
@@ -901,7 +928,7 @@ def member_signals_kb(ws, lang: str | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(i18n.t("msig.btn_on", lang), callback_data="membersig:on"),
          InlineKeyboardButton(i18n.t("msig.btn_off", lang), callback_data="membersig:off")],
-        [InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")],
+        back_row(lang),
     ])
 
 
@@ -928,6 +955,34 @@ def menu_back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
     """Yagona "🏠 Bosh menyu" tugmasi — odamning tilida."""
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")]])
+
+
+def back_row(lang: str | None = None) -> list:
+    """"◀️ Ortga" — bosh menyu bo'limlarida (194). `menu:back` shu xabarning
+    O'ZINI bosh menyuga qaytaradi (yangi xabar yubormaydi)."""
+    return [InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="menu:back")]
+
+
+def back_kb(lang: str | None = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([back_row(lang)])
+
+
+async def _edit_or_reply(q, text: str, kb, html_mode: bool = True) -> None:
+    """Bo'lim shu xabarning o'rnida ochiladi — "◀️ Ortga" orqaga qaytarsa
+    chat to'lib ketmaydi. Tahrirlab bo'lmasa (rasm, eski xabar) — yangi
+    xabar."""
+    pm = ParseMode.HTML if html_mode else None
+    if getattr(q.message, "text", None):
+        try:
+            await q.edit_message_text(text, parse_mode=pm, reply_markup=kb,
+                                      disable_web_page_preview=True)
+            return
+        except BadRequest as e:
+            if "not modified" in str(e).lower():
+                return
+            log.debug("Bo'lim tahrirlanmadi, yangi xabar: %s", e)
+    await q.message.reply_text(text, parse_mode=pm, reply_markup=kb,
+                               disable_web_page_preview=True)
 
 
 # ─────────────────────────── Til (i18n) ───────────────────────────
@@ -987,7 +1042,7 @@ def lang_kb(prefix: str = "lang:set", back_lang: str | None = None) -> InlineKey
     rows = [[InlineKeyboardButton(title, callback_data=f"{prefix}:{code}")]
             for code, title in i18n.LANGS.items()]
     if back_lang is not None:
-        rows.append([InlineKeyboardButton(i18n.t("menu.back", back_lang), callback_data="menu")])
+        rows.append(back_row(back_lang))
     return InlineKeyboardMarkup(rows)
 
 
@@ -1176,7 +1231,7 @@ def help_menu_kb(lang: str | None = None) -> InlineKeyboardMarkup:
     if config.guide_url(lang):
         rows.append([InlineKeyboardButton(i18n.t("help.btn_guide", lang),
                                            url=config.guide_url(lang))])
-    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    rows.append(back_row(lang))
     return InlineKeyboardMarkup(rows)
 
 
@@ -1343,7 +1398,8 @@ async def manage_view(sig, lang: str | None = None,
                 InlineKeyboardButton(i18n.t("man.btn_entry", lang), callback_data=f"mentry:{sid}"),
                 InlineKeyboardButton(i18n.t("man.btn_cancel", lang), callback_data=f"close:{sid}"),
             ])
-        rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+        rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="m:open"),
+                     InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
         return (f"⚙️ <b>#{sid} {sig['symbol']} {sig['side']}</b>\n"
                 f"{i18n.t('man.entry', lang)}: <b>{fmt_price(entry)}</b>\n\n"
                 + i18n.t("man.no_tpsl", lang)), InlineKeyboardMarkup(rows)
@@ -1430,7 +1486,8 @@ async def manage_view(sig, lang: str | None = None,
     rows.append([InlineKeyboardButton(
         i18n.t("man.btn_cancel" if pending else "man.btn_close", lang),
         callback_data=f"close:{sid}")])
-    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="m:open"),
+                 InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -1471,7 +1528,7 @@ async def _add_size_kb(sig, ws, action: str, levels: int, lang) -> tuple[str, li
     rows = [btns] if btns else []
     rows.append([InlineKeyboardButton(i18n.t("man.btn_add_custom", lang),
                                       callback_data=f"{action}c:{sid}")])
-    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    rows.append(list(manage_back_kb(sid, lang).inline_keyboard[0]))
     note = (i18n.t("man.add_size_usd", lang, u0=u0, free=free if free is not None else 0)
             if usd else i18n.t("man.add_size_x", lang))
     return note, rows
@@ -2258,7 +2315,7 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None,
         rows.append(nav)
 
     rows.append([InlineKeyboardButton(i18n.t("st.btn_pdf", lang), callback_data="pdfrep")])
-    rows.append(list(menu_back_kb(lang).inline_keyboard[0]))
+    rows.append(back_row(lang))
     return InlineKeyboardMarkup(rows)
 
 
@@ -2356,7 +2413,7 @@ def symbols_nav_kb(y: int | None, m: int | None,
         row.append(InlineKeyboardButton(i18n.t("st.tab_all", lang), callback_data="sym:all"))
     if ny is not None:
         row.append(InlineKeyboardButton(f"{mon[nm - 1][:3]} ▶", callback_data=f"sym:{ny}:{nm}"))
-    return InlineKeyboardMarkup([row, list(menu_back_kb(lang).inline_keyboard[0])])
+    return InlineKeyboardMarkup([row, back_row(lang)])
 
 
 async def symbols_view_text(ws_id: int, y: int | None, m: int | None,
@@ -2442,36 +2499,33 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # mumkin, shuning uchun "yozmoqda" belgisi ko'rsatiladi.
         async with busy(ctx.bot, q.message.chat_id):
             text = await stats_view_text(ws, q.from_user.id, "all", lang=lang)
-        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=stats_nav_kb("all", lang=lang))
+        await _edit_or_reply(q, text, stats_nav_kb("all", lang=lang))
     elif action == "symbols":
         async with busy(ctx.bot, q.message.chat_id):
             text = await symbols_view_text(ws["id"], None, None, lang)
-        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=symbols_nav_kb(None, None, lang))
+        await _edit_or_reply(q, text, symbols_nav_kb(None, None, lang))
     elif action == "open":
         async with busy(ctx.bot, q.message.chat_id):
             text, kb = await open_signals_view(ws, q.from_user.id, lang, ctx.bot)
-        rows = (list(kb.inline_keyboard) if kb else []) + list(menu_back_kb(lang).inline_keyboard)
-        await q.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                    reply_markup=InlineKeyboardMarkup(rows))
+        rows = (list(kb.inline_keyboard) if kb else []) + [back_row(lang)]
+        await _edit_or_reply(q, text, InlineKeyboardMarkup(rows))
     elif action == "deposit":
         if not can_manage(q.from_user.id, ws):
             return
         cur = ws["deposit"]
         txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
-        await q.message.reply_text(
-            i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt,
-                   extra=await deposit_extra(ws, lang)),
-            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+        await _edit_or_reply(
+            q, i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt,
+                      extra=await deposit_extra(ws, lang)), back_kb(lang))
     elif action == "equity":
         deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
         buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
         if buf is None:
-            await q.message.reply_text(i18n.t("eq.too_few", lang),
-                                        reply_markup=menu_back_kb(lang))
+            await _edit_or_reply(q, i18n.t("eq.too_few", lang), back_kb(lang), html_mode=False)
         else:
-            await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=menu_back_kb(lang))
+            # Rasm matnli xabar o'rniga qo'yilmaydi — yangi xabar; "Ortga"
+            # undan bosh menyuni yangi xabar qilib ochadi.
+            await q.message.reply_photo(InputFile(buf, "equity.png"), reply_markup=back_kb(lang))
     elif action == "membersig":
         # Faqat GURUH egasi — tugmaning o'zi ham shu shartda ko'rinadi
         # (main_menu_kb), lekin callback_data qo'lda ham yuborilishi
@@ -2479,10 +2533,10 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # tekshiriladi.
         if not can_manage(q.from_user.id, ws) or ws["type"] != "group" or ws["is_channel"]:
             return
-        await q.message.reply_text(
-            i18n.t("msig.current", lang, name=html.escape(ws["name"]),
-                   state=i18n.t("msig.on" if ws["allow_member_signals"] else "msig.off", lang)),
-            parse_mode=ParseMode.HTML, reply_markup=member_signals_kb(ws, lang))
+        await _edit_or_reply(
+            q, i18n.t("msig.current", lang, name=html.escape(ws["name"]),
+                      state=i18n.t("msig.on" if ws["allow_member_signals"] else "msig.off", lang)),
+            member_signals_kb(ws, lang))
 
 
 async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2502,9 +2556,12 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(uid)
-    await update.effective_message.reply_text(
-        i18n.t("menu.open_title", lang),
-        reply_markup=main_menu_kb(uid, ws, update.effective_chat.type == "private", lang))
+    kb = main_menu_kb(uid, ws, update.effective_chat.type == "private", lang)
+    # "◀️ Ortga" (194) — bo'lim xabarining o'zi bosh menyuga aylanadi.
+    if q and q.data == "menu:back":
+        await _edit_or_reply(q, i18n.t("menu.open_title", lang), kb, html_mode=False)
+        return
+    await update.effective_message.reply_text(i18n.t("menu.open_title", lang), reply_markup=kb)
 
 
 # ─────────────────────────── Guruhni ro'yxatdan o'tkazish ───────────────────────────
@@ -3843,14 +3900,14 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     t = await tournament.load_active()
     if not t:
-        await q.message.reply_text(i18n.t("tr.none", lang), reply_markup=menu_back_kb(lang))
+        await _edit_or_reply(q, i18n.t("tr.none", lang), back_kb(lang), html_mode=False)
         return
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
     if ws["type"] != "personal" or ws["owner_id"] != uid:
-        await q.message.reply_text(i18n.t("tr.need_personal", lang),
-                                   reply_markup=menu_back_kb(lang))
+        await _edit_or_reply(q, i18n.t("tr.need_personal", lang), back_kb(lang),
+                             html_mode=False)
         return
     if action == "join":
         await tournament.join(t["id"], uid, ws["id"])
@@ -3858,19 +3915,18 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if p is None:
         kb = [[InlineKeyboardButton(i18n.t("tr.btn_join", lang), callback_data="tr:join")]]
         kb += _tourney_page_kb(lang)
-        kb.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
-        await q.message.reply_text(
-            i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
-                   ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
-            parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb))
+        kb.append(back_row(lang))
+        await _edit_or_reply(
+            q, i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
+                      ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
+            InlineKeyboardMarkup(kb))
         return
     txt = await _tourney_me_text(t, p, uid, lang)
     if action == "join":
         txt = i18n.t("tr.joined", lang) + "\n\n" + txt
     kb = _tourney_page_kb(lang)
-    kb.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
-    await q.message.reply_text(txt, parse_mode=ParseMode.HTML,
-                               reply_markup=InlineKeyboardMarkup(kb))
+    kb.append(back_row(lang))
+    await _edit_or_reply(q, txt, InlineKeyboardMarkup(kb))
 
 
 async def finish_tourney(bot, tid: int) -> None:
@@ -5084,7 +5140,7 @@ def top_status_view(ws, lang: str | None) -> tuple[str, InlineKeyboardMarkup]:
                                           callback_data=f"jl:set:{wid}")])
     rows.append([InlineKeyboardButton(i18n.t("top.btn_off", lang),
                                       callback_data=f"top:off:{wid}")])
-    rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+    rows.append(back_row(lang))
     return "\n\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -5125,7 +5181,7 @@ async def on_top_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             if not ws["username"] and not ws["pm_bot"] else []
         if rows:
             txt += "\n\n" + i18n.t("top.join_none", lang)
-        rows.append([InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
+        rows.append(back_row(lang))
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML,
                                   reply_markup=InlineKeyboardMarkup(rows))
         return
@@ -8194,7 +8250,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_tpsl_button, pattern=r"^tpsl:"))
     app.add_handler(CallbackQueryHandler(on_menu, pattern=r"^m:"))
     app.add_handler(CallbackQueryHandler(on_membersig_toggle, pattern=r"^membersig:"))
-    app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu$"))
+    app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu(:back)?$"))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
     app.add_handler(CallbackQueryHandler(on_onboard, pattern=r"^onboard:"))
