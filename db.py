@@ -619,12 +619,6 @@ async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
             "ORDER BY is_channel, id", owner_id)
 
 
-async def set_workspace_topic(workspace_id: int, topic_id: int | None) -> None:
-    async with pool().acquire() as c:
-        await c.execute(
-            "UPDATE workspaces SET group_topic_id=$2 WHERE id=$1", workspace_id, topic_id)
-
-
 async def list_group_workspaces() -> list[asyncpg.Record]:
     """Barcha ro'yxatdan o'tgan guruh workspace'lari — "men a'zoman" tanlovi uchun."""
     async with pool().acquire() as c:
@@ -1663,15 +1657,6 @@ async def insert_news_event(*, source: str, external_key: str, symbol: str | Non
             "ON CONFLICT (external_key) DO NOTHING RETURNING id",
             source, external_key, symbol, market, headline_en,
             translation_uz, insight_uz, event_at, posted)
-
-
-async def pending_news_events() -> list[asyncpg.Record]:
-    """Hali post qilinmagan hodisalar (masalan kelajakdagi webhook manbalari
-    uchun) — hozircha barcha manbalar `posted=True` bilan yaratiladi, shuning
-    uchun bu ro'yxat odatda bo'sh."""
-    async with pool().acquire() as c:
-        return await c.fetch(
-            "SELECT * FROM news_events WHERE NOT posted ORDER BY event_at")
 
 
 async def set_news_message(event_id: int, message_id: int, caption: str, *,

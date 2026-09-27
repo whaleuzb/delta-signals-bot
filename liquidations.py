@@ -80,7 +80,9 @@ async def liquidation_candidates() -> list[Spike]:
             "interval": INTERVAL, "from": from_ts, "to": now,
             "convert_to_usd": "true", "api_key": config.COINALYZE_API_KEY,
         })
-        r.raise_for_status()
+        if r.status_code != 200:
+            # URL'da `api_key` bor — xato matniga kirmasin (191).
+            raise RuntimeError(f"Coinalyze: HTTP {r.status_code}")
         data = r.json()
 
     out: list[Spike] = []

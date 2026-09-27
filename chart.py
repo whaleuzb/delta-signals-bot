@@ -17,6 +17,11 @@ from datetime import datetime, timezone
 
 import matplotlib
 matplotlib.use("Agg")
+# Formula tahlili ($...$) O'CHIQ (191): guruh nomi va username rasmlarga
+# tushadi; "$\x$" kabi nom matplotlib'ni ParseFatalException bilan yiqitardi
+# (grafik, karta, PDF eksport yo'qolardi), "1,000$ … 2,000$" esa formula
+# bo'lib buzilardi. Loyihada formulalar ataylab ishlatilmaydi.
+matplotlib.rcParams["text.parse_math"] = False
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 

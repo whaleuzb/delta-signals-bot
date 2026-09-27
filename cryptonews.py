@@ -35,7 +35,9 @@ async def search(ticker: str) -> list[dict]:
                 "currencies": ticker,
                 "public": "true",
             })
-            r.raise_for_status()
+            if r.status_code != 200:
+                # URL'da `auth_token` bor — xato matniga kirmasin (191).
+                raise RuntimeError(f"CryptoPanic: HTTP {r.status_code}")
             data = r.json()
     except Exception:
         log.warning("CryptoPanic so'rovi muvaffaqiyatsiz (%s)", ticker, exc_info=True)

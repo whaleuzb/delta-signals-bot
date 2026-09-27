@@ -1277,8 +1277,18 @@ async def on_stop(app):
         await db._pool.close()
 
 
+@web.middleware
+async def security_headers(request, handler):
+    """Asosiy xavfsizlik sarlavhalari (191). `X-Frame-Options` ATAYLAB yo'q:
+    sahifa to'lov botining Mini App'i ichida iframe'da ochiladi (`?embed=1`)."""
+    resp = await handler(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return resp
+
+
 def build_app() -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[security_headers])
     app["bot_username"] = os.getenv("BOT_USERNAME", "")
     # Birjaga bir vaqtda ketadigan grafik so'rovlari soni (pastda izoh).
     app["mini_sem"] = asyncio.Semaphore(2)
@@ -1302,4 +1312,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+    # httpx har so'rov URL'ini INFO'da yozadi — Twelve Data `apikey`
+    # parametri bilan birga (191). Bot servisidagi kabi o'chiriladi.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     web.run_app(build_app(), port=int(os.getenv("PORT", 8080)))

@@ -41,7 +41,10 @@ async def valid_symbols() -> set[str]:
     if _symbols and time.time() - _symbols_ts < 3600:
         return _symbols
     r = await _client.get("/forex_pairs", params={"apikey": config.TWELVE_DATA_API_KEY})
-    r.raise_for_status()
+    if r.status_code != 200:
+        # `raise_for_status()` EMAS: uning xato matnida to'liq URL — ya'ni
+        # `apikey` ham — bo'ladi va u `exc_info` bilan logga tushardi (191).
+        raise RuntimeError(f"Twelve Data /forex_pairs: HTTP {r.status_code}")
     data = r.json().get("data", [])
     _symbols = {p["symbol"].replace("/", "") for p in data}
     _symbols_ts = time.time()

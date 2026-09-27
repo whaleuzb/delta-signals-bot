@@ -96,6 +96,17 @@ async def _save_session() -> None:
     await db.set_setting("telethon_session", client.session.save())
 
 
+async def close() -> None:
+    """Bot to'xtaganda userbot'ni TOZA uzadi (191). Aks holda har deployda
+    Telethon ichki sikllari yopilgan event loop ustida qolib, logga
+    "Event loop is closed" / "send loop" xatolari ketma-ket tushardi."""
+    if _client is not None and _client.is_connected():
+        try:
+            await _client.disconnect()
+        except Exception:
+            log.warning("Telethon uzilmadi", exc_info=True)
+
+
 async def start_listener(on_message) -> None:
     """`on_message(channel_username, msg_id, text, event_at)` — har bir
     yangi xabar uchun chaqiriladi (async funksiya bo'lishi kerak).

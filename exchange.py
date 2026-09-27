@@ -20,6 +20,7 @@ _client = httpx.AsyncClient(base_url=config.EXCHANGE_BASE, timeout=15)
 # so'rovi bilan sinaladi ("Binance'da pul ko'p aylanadi" — savdo hajmi
 # portlashini Binance ma'lumotidan aniqlash MEXC'dan ancha aniqroq).
 _binance_client = httpx.AsyncClient(base_url="https://api.binance.com", timeout=15)
+_binance_blocked_until = 0.0
 
 _symbols: set[str] = set()
 _symbols_ts: float = 0.0
@@ -321,13 +322,23 @@ async def volume_ticker_24hr() -> dict[str, float]:
     Futures API'da bu ilgari tasdiqlangan, Spot API boshqa domen bo'lgani
     uchun alohida sinaladi) — MEXC'ga jimgina qaytadi, hech narsa
     to'xtamaydi."""
-    try:
-        r = await _binance_client.get("/api/v3/ticker/24hr")
-        r.raise_for_status()
-        return _parse_ticker_24hr(r.json())
-    except Exception:
-        log.warning("Binance hajm surati olinmadi, MEXC'ga qaytilmoqda", exc_info=True)
-        return await ticker_24hr()
+    global _binance_blocked_until
+    if time.time() >= _binance_blocked_until:
+        try:
+            r = await _binance_client.get("/api/v3/ticker/24hr")
+            if r.status_code == 451:
+                # Hudud bloki (Railway) — doimiy holat. Har 15 daqiqada qayta
+                # urinib, har gal traceback bilan logni to'ldirish o'rniga
+                # 24 soatga to'xtatiladi (191).
+                _binance_blocked_until = time.time() + 86400
+                log.info("Binance hududni bloklagan (451) — 24 soat MEXC ishlatiladi")
+            else:
+                r.raise_for_status()
+                return _parse_ticker_24hr(r.json())
+        except Exception as e:
+            log.warning("Binance hajm surati olinmadi (%s), MEXC'ga qaytilmoqda",
+                        type(e).__name__)
+    return await ticker_24hr()
 
 
 # --- Xarid/sotuv (Volume Delta) profili haqiqiy savdolardan ---

@@ -41,7 +41,6 @@ MUHIM (production loglarida tasdiqlangan):
 """
 import asyncio
 import html
-import json
 import logging
 import re
 

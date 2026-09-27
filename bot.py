@@ -592,13 +592,8 @@ async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await send_workspace_switcher(update, ctx)
 
 
-def provider_for(market: str):
-    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
-    if market == "forex":
-        return forex
-    if market == "stock":
-        return stocks
-    return exchange
+# `tracker.provider` bilan AYNAN bir xil edi — bitta joy qoldi (191).
+provider_for = tracker.provider
 
 
 async def safe_last_price(market: str, symbol: str, fresh: bool = False):
@@ -1912,7 +1907,6 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             AWAITING_SL[uid] = sig_id
             await msg.reply_text(i18n.t("man.bad_number", lang))
             return True
-        entry = float(sig["entry"])
         # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
         # tashqarisi rad etilardi). Foydalanuvchi: "har bir odamni riski
         # o'ziga bog'liq". Xavfli holat — stopni narxning NARIGI tomoniga
@@ -3120,7 +3114,9 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     workspace'ga mavzu qo'shish kerak bo'lganda)."""
     chat = update.effective_chat
     msg = update.effective_message
-    log.info("DEBUG guruh xabari: chat_id=%s title=%r type=%s thread_id=%s",
+    # DEBUG darajasida (191): INFO'da har bir guruhdagi HAR BIR xabar logga
+    # tushib, loglarni to'ldirardi.
+    log.debug("DEBUG guruh xabari: chat_id=%s title=%r type=%s thread_id=%s",
               chat.id, chat.title, chat.type, msg.message_thread_id)
 
 
@@ -8075,6 +8071,7 @@ async def post_init(app: Application) -> None:
 
 
 async def post_shutdown(app: Application) -> None:
+    await tgsource.close()
     await exchange.close()
     await forex.close()
     await stocks.close()

@@ -6533,3 +6533,51 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      rad, a'zo $ rad / nisbat ha, begona; limitlar: noto'g'ri narx rad,
      band pul, ro'yxat; kuzatuv bazada to'ldiradi; bekor; close_now;
      qismi yopilgan; turnir ulushi va cheklov).
+
+191. **Tizim auditi: xavfsizlik, kamchiliklar, soddalashtirish.**
+     Foydalanuvchi: "butun boshli tizimdagi kamchiliklarni tuzat.
+     Xavfsizlik choralarini ko'r. Keraksiz narsalarni soddalashtir."
+
+     **Tekshirildi va TOZA (o'zgartirish kerak emas):**
+     - Barcha callback handler'lar (50+): ID/token oladiganlarining har
+       birida huquq tekshiruvi bor (`can_manage`/`can_manage_signal`/
+       `is_admin`/egalik; qoralama tokeni `item["user"]` bilan).
+     - SQL: barcha qiymatlar parametr; f-string'larda faqat konstanta
+       (`CLOSED`, `config.TZ`, `int(days)`, `$n` o'rinlari).
+     - Web XSS: foydalanuvchi maydonlari (`name/username/first_name/
+       symbol/...`) hammasi `e()` orqali; rasm/JSON endpoint'lar
+       `public_*` darvozasidan o'tadi (yopiq guruh savdosini ID sanab
+       ko'rib bo'lmaydi). Bot HTML xabarlarida ism/guruh nomi escape'li.
+
+     **Tuzatildi:**
+     - **Matplotlib formula (`$...$`) orqali yiqitish:** `$\x$` kabi guruh
+       nomi/username grafik, karta va admin PDF eksportini
+       `ParseFatalException` bilan yiqitardi (tasdiqlandi);
+       `rcParams["text.parse_math"] = False` (chart.py, stats.py) —
+       "1,000$ … 2,000$" kabi pul yozuvlari ham formula bo'lib buzilmaydi.
+     - **API kalitlari logga sizishi:** web servis `httpx` INFO'da har
+       so'rovni to'liq URL (Twelve Data `apikey=`) bilan yozardi —
+       `logging.getLogger("httpx").setLevel(WARNING)` (bot'dagi kabi).
+       Twelve Data `/forex_pairs`, Coinalyze, CryptoPanic'da
+       `raise_for_status()` o'rniga URL'siz `RuntimeError(HTTP kod)` —
+       xato matni (`exc_info` bilan logga tushadi) kalitni olmaydi.
+     - **Web'da forex/aksiya grafiklari 401:** web servisda
+       `TWELVE_DATA_API_KEY` yo'q edi — Railway'da
+       `${{bot.TWELVE_DATA_API_KEY}}` havolasi bilan qo'yildi (qiymat
+       ko'rilmagan/nusxalanmagan).
+     - **Binance 451 shovqini:** Railway hududi bloklangan, lekin har 15
+       daqiqada urinib to'liq traceback yozardi — 451 dan keyin 24 soat
+       to'g'ridan-to'g'ri MEXC (`_binance_blocked_until`), boshqa xatolar
+       qisqa WARNING.
+     - **Deployda Telethon xatolari** ("Event loop is closed", "send
+       loop"): `tgsource.close()` — `post_shutdown`da toza uzish.
+     - Web xavfsizlik sarlavhalari (`security_headers` middleware):
+       `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
+       `X-Frame-Options` ATAYLAB yo'q (Mini App iframe, `?embed=1`).
+
+     **Soddalashtirildi:** o'lik `db.set_workspace_topic`,
+     `db.pending_news_events`; `bot.provider_for` = `tracker.provider`
+     (aynan takror edi); ishlatilmagan `json` importi va o'zgaruvchi
+     (pyflakes toza — faqat qo'shtirnoqdagi `asyncpg` tip izohlari);
+     har guruh xabarini yozadigan debug log va #134 vaqtinchalik
+     diagnostikasi INFO'dan DEBUG'ga.

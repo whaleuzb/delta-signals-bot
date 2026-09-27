@@ -185,14 +185,14 @@ async def process(sig) -> list[dict]:
                     sig["id"], symbol, entry, c.open_ms, c.close_ms, c.low, c.high,
                     start_ms, entry)
             else:
-                # VAQTINCHA diagnostika (#134 shikoyati: "limitga keldi lekin
-                # aktivlashmadi") — PENDING holatda TEGMAGAN har bir shamni
+                # Diagnostika (#134 shikoyati: "limitga keldi lekin
+                # aktivlashmadi"; muammo hal qilingan — endi DEBUG, 191) — PENDING holatda TEGMAGAN har bir shamni
                 # ham yozadi, entry qanchaga yetmay qolganini ko'rsatish
                 # uchun. Faqat entryga YAQIN (0.5% ichida) shamlar uchun —
                 # aks holda log haddan tashqari ko'payib ketardi.
                 near = min(abs(c.low - entry), abs(c.high - entry)) / entry
                 if near < 0.005:
-                    log.info(
+                    log.debug(
                         "Signal #%s %s: PENDING, entryga TEGMADI — sham "
                         "open=%s close=%s (low=%.10g high=%.10g), entry=%.10g "
                         "(farq=%.4f%%)",
