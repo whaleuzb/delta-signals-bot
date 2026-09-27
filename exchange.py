@@ -149,6 +149,53 @@ async def resolve(raw: str, probe: bool = False) -> str | None:
     return s if await _probe(s) else None
 
 
+# Metallar (189): MEXC spotda oltin/kumush tokenlari. Ilovada "GOLD(XAUT)",
+# "SILVER(XAG)" deb ko'rinadi, API'dagi nomi esa boshqacha bo'lishi mumkin —
+# shu sabab bir nechta nomzod, `_online` ro'yxatida BIRINCHI mavjudi olinadi.
+_METAL_ALIASES = {
+    "XAU": ("XAUTUSDT", "GOLDUSDT", "PAXGUSDT"),
+    "GOLD": ("XAUTUSDT", "GOLDUSDT", "PAXGUSDT"),
+    "XAG": ("XAGUSDT", "SILVERUSDT", "XAGTUSDT"),
+    "SILVER": ("XAGUSDT", "SILVERUSDT", "XAGTUSDT"),
+}
+_metal_logged = False
+
+
+def _metal_key(raw: str) -> str:
+    s = raw.upper().strip().lstrip("#$")
+    for ch in ("/", "-", ":", "_", " ", "\t"):
+        s = s.replace(ch, "")
+    for suf in ("USDT", "USD"):
+        if s.endswith(suf) and len(s) > len(suf):
+            s = s[: -len(suf)]
+            break
+    return s
+
+
+async def resolve_metal(raw: str) -> str | None:
+    """`XAU`/`XAUUSD`/`GOLD` -> MEXC'dagi oltin tokeni, `XAG`/`SILVER` ->
+    kumush (189). Foydalanuvchi: "XAU, XAG deb so'raganda avtomatik
+    topadigan qila olasanmi?" — MEXC ilovasida GOLD(XAUT), SILVER(XAG).
+    Topilmasa None — chaqiruvchi Twelve Data (forex) ga o'tadi."""
+    global _metal_logged
+    cands = _METAL_ALIASES.get(_metal_key(raw))
+    if not cands:
+        return None
+    await valid_symbols()
+    for c in cands:
+        if c in _online:
+            return c
+    if not _metal_logged:
+        # Nomzodlarning hech biri yo'q — MEXC'dagi haqiqiy nomlarni bir marta
+        # logga yozamiz (keyin nomzodlar ro'yxatini to'g'rilash uchun).
+        _metal_logged = True
+        near = sorted(x for x in _online
+                      if x.startswith(("XAU", "XAG", "PAXG")) or "GOLD" in x or "SILVER" in x)
+        log.info("MEXC: metall tokeni topilmadi (%s); o'xshash juftliklar: %s",
+                 raw, near[:40])
+    return None
+
+
 async def resolve_stock_token(raw: str) -> str | None:
     """Aksiya tikeri -> MEXC'dagi tokenlashgan aksiya (188).
 

@@ -2830,6 +2830,17 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
             break
         if sym:
             return sym, "crypto"
+    # Oltin/kumush — MEXC tokeni (GOLD(XAUT), SILVER(XAG)) forex'dan OLDIN
+    # (189): narx birjadan, Twelve Data limitlarisiz. Topilmasa forex
+    # (Twelve Data XAU/USD) avvalgidek zaxira.
+    for raw in cands[:2]:
+        try:
+            sym = await exchange.resolve_metal(raw)
+        except Exception:
+            log.warning("MEXC metall tokenlari tekshirilmadi", exc_info=True)
+            break
+        if sym:
+            return sym, "crypto"
     if forex.enabled():
         for raw in cands:
             try:

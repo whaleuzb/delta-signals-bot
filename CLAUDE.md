@@ -6447,3 +6447,28 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bitta ro'yxat so'rovi, offline token, kripto ustunligi, tokeni yo'q
      aksiya Twelve Data'ga, `MRNA/USDT`; eski AAPL holati MSFT'ga
      almashtirildi — AAPL endi ataylab MEXC tokeniga ketadi).
+
+189. **XAU / XAG — MEXC'dagi oltin va kumush tokenlari.**
+     Foydalanuvchi (MEXC ilovasi skrinshoti: spotda "GOLD(XAUT)/USDT",
+     "SILVER(XAG)"): "XAU, XAG deb so'raganda avtomatik topadigan qila
+     olasanmi?" Ilgari XAU/XAG faqat Twelve Data (forex, `_METALS`, 63-band)
+     orqali topilardi — o'sha limitlarga bog'liq.
+
+     `exchange.resolve_metal(raw)`: `_metal_key` (#/$ va ajratgichlar
+     tashlanadi, oxiridagi USDT/USD kesiladi) → `XAU`/`GOLD` yoki
+     `XAG`/`SILVER` bo'lsa nomzodlar `_online`da tartib bilan tekshiriladi:
+     oltin `XAUTUSDT, GOLDUSDT, PAXGUSDT`; kumush `XAGUSDT, SILVERUSDT,
+     XAGTUSDT`. API'dagi aniq nom sandboxdan tekshirib bo'lmagani uchun
+     ro'yxat; hech biri topilmasa MEXC'dagi o'xshash nomlar (XAU*/XAG*/
+     PAXG*/*GOLD*/*SILVER*) BIR MARTA INFO logga yoziladi — shu log bilan
+     nomzodlarni to'g'rilash kerak.
+
+     `bot.resolve_symbol` tartibi: MEXC kripto → **MEXC metall tokeni**
+     (dastlabki 2 nomzod) → forex (Twelve Data — topilmasa zaxira) → MEXC
+     aksiya tokeni (188) → Twelve Data aksiyalari → probe. Oltin/kumush
+     token narxi spot XAU/XAG'dan biroz farq qilishi mumkin (odatda
+     0.1–0.5%) — foydalanuvchiga aytilgan.
+
+     Sinov: `test_probe.py` 33/33 (yangi: xau, XAU/USD, xauusd, #XAU, gold,
+     xag, silver → MEXC; forex chaqirilmaydi; `xaut` to'g'ridan-to'g'ri;
+     boshqa so'z metall emas; token yo'q bo'lsa Twelve Data zaxirasi).
