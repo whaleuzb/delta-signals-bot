@@ -6392,3 +6392,30 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bo'lim va soni, ism/hajm/foiz/$, limit holati, yopilgan va summasiz
      savdo ko'rinmasligi, darajalar, narx olinmaganda eski narx,
      yakunlangan turnirda bo'lim yo'qligi). Telefon kengligida ko'rildi.
+
+187. **MEXC'da bor, lekin botda "topilmadi" — alohida tekshiruv.**
+     Foydalanuvchi (skrinshot: MEXC ilovasida MRNAON/USDT, botda "mrnaon
+     topilmadi"): "Ba'zi aktivlar MEXC'da bor lekin botda chiqmayapti".
+     MRNAON — RealStocks bo'limidagi tokenlashgan aksiya. Kripto juftliklar
+     `exchange.valid_symbols()` (umumiy `exchangeInfo`, `isSpotTradingAllowed`
+     + `status` filtri) dan olinadi; bunday tokenlar shu filtrdan tushib
+     qoladi. Sandbox MEXC'ga chiqa olmagani uchun aniq qaysi maydon
+     sabab ekanini ko'rib bo'lmadi — shu sabab filtr o'zgartirilmadi,
+     o'rniga ZAXIRA tekshiruv qo'shildi.
+
+     `exchange._probe(symbol)`: juftlikka jonli narx (`ticker/price`) VA
+     so'nggi 7 kunda shamlar (`klines` — kuzatuv shu bilan ishlaydi) bo'lsa
+     qabul qilinadi; `exchangeInfo?symbol=` javobidagi status/flaglar INFO
+     logiga yoziladi (keyin filtrni aniqlashtirish uchun). Ijobiy natija
+     1 soat, salbiy 10 daqiqa keshlanadi; tarmoq xatosi "yo'q" deb
+     eslanmaydi. `resolve(raw, probe=False)` — probe standart O'CHIQ.
+
+     `bot.resolve_symbol` tartibi: MEXC ro'yxati → forex → aksiya → faqat
+     shundan KEYIN dastlabki 2 nomzod uchun probe. Ya'ni avval topilgan
+     natijalar (masalan Twelve Data aksiyasi) o'zgarmaydi, erkin matndagi
+     har bir so'z birjaga so'rov yubormaydi. Likvidatsiya oqimi
+     (`exchange.resolve(base)`) probe'siz — eski xatti-harakat.
+
+     Sinov: `test_probe.py` 14/14 (`httpx.MockTransport` bilan: ro'yxatdagi,
+     probe'siz/probe bilan, kesh, mavjud emas, shamsiz, tarmoq xatosi,
+     `resolve_symbol` tartibi va aksiya ustunligi, probe faqat 2 nomzodga).

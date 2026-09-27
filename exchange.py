@@ -72,9 +72,66 @@ def normalize(raw: str) -> str:
     return s
 
 
-async def resolve(raw: str) -> str | None:
+# Umumiy ro'yxatda YO'Q, lekin alohida tekshiruvdan o'tgan juftliklar
+# (187). Qiymat — tekshirilgan vaqt; salbiy natija qisqa muddat eslanadi,
+# shunda bir xil noto'g'ri nom har safar birjaga so'rov yubormaydi.
+_probed_ok: dict[str, float] = {}
+_probed_no: dict[str, float] = {}
+_PROBE_OK_TTL = 3600.0
+_PROBE_NO_TTL = 600.0
+
+
+async def _probe(symbol: str) -> bool:
+    """Umumiy `exchangeInfo` ro'yxatidan tushib qolgan juftlikni ALOHIDA
+    tekshiradi (187).
+
+    Foydalanuvchi: "ba'zi aktivlar MEXC'da bor, lekin botda chiqmayapti"
+    (masalan MRNAONUSDT — RealStocks bo'limidagi tokenlashgan aksiya,
+    ilovada savdo qilinadi). Umumiy ro'yxat `isSpotTradingAllowed` va
+    `status` bo'yicha filtrlanadi; bunday tokenlarda bu maydonlar boshqacha
+    bo'lishi mumkin. Bot uchun haqiqiy shart esa bitta: juftlik bo'yicha
+    NARX va SHAMLAR olinadimi (kuzatuv `klines` bilan ishlaydi). Shu ikkisi
+    bo'lsa — qabul qilinadi. Umumiy ro'yxat nega uni o'tkazib yuborgani
+    logga yoziladi (keyinchalik filtrni aniqlashtirish uchun)."""
+    now = time.time()
+    if now - _probed_ok.get(symbol, 0) < _PROBE_OK_TTL:
+        return True
+    if now - _probed_no.get(symbol, 0) < _PROBE_NO_TTL:
+        return False
+    try:
+        price = await last_price(symbol, fresh=True)
+        ok = bool(price and price > 0)
+        if ok:
+            now_ms = int(now * 1000)
+            ok = bool(await klines(symbol, now_ms - 7 * 86_400_000, limit=5, tf="1h"))
+        if ok:
+            try:
+                r = await _client.get("/api/v3/exchangeInfo", params={"symbol": symbol})
+                info = next((x for x in (r.json().get("symbols") or [])
+                             if x.get("symbol") == symbol), None) if r.status_code == 200 else None
+            except Exception:
+                info = None
+            log.info("MEXC: %s umumiy ro'yxatda yo'q, lekin narx va shamlar bor — qabul "
+                     "qilindi (status=%r, isSpotTradingAllowed=%r, permissions=%r)",
+                     symbol, info and info.get("status"),
+                     info and info.get("isSpotTradingAllowed"),
+                     info and info.get("permissions"))
+    except Exception:
+        # Tarmoq xatosi — "yo'q" deb eslab qolmaymiz, keyingi urinishda qayta.
+        log.warning("MEXC: %s alohida tekshirilmadi", symbol, exc_info=True)
+        return False
+    (_probed_ok if ok else _probed_no)[symbol] = now
+    return ok
+
+
+async def resolve(raw: str, probe: bool = False) -> str | None:
+    """`probe=True` — umumiy ro'yxatda bo'lmasa alohida tekshiruv (`_probe`).
+    Standart holatda O'CHIQ: har bir notanish so'z birjaga so'rov
+    yubormasin; chaqiruvchi uni faqat boshqa manbalar topolmaganda yoqadi."""
     s = normalize(raw)
-    return s if s in await valid_symbols() else None
+    if s in await valid_symbols():
+        return s
+    return s if probe and await _probe(s) else None
 
 
 # Ichki timeframe kodi -> MEXC interval nomi. MEXC 1 soatni "60m" deb ataydi.

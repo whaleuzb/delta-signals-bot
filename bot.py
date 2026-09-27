@@ -2855,6 +2855,18 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
                 break
             if sym:
                 return sym, "stock"
+    # MEXC'da bor, lekin umumiy ro'yxatdan tushib qolgan juftlik (masalan
+    # RealStocks tokenlari — MRNAONUSDT, 187). ENG OXIRIDA va faqat dastlabki
+    # ikkita nomzod: bu tarmoq so'rovi, va avvalgi manbalar (forex, aksiya)
+    # topgan natijalar o'zgarmasligi kerak.
+    for raw in cands[:2]:
+        try:
+            sym = await exchange.resolve(raw, probe=True)
+        except Exception:
+            log.warning("MEXC alohida tekshiruvi o'tmadi", exc_info=True)
+            break
+        if sym:
+            return sym, "crypto"
     return None, "crypto"
 
 
