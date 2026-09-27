@@ -3602,6 +3602,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🔁 Сменить рабочее место",
         "en": "🔁 Switch workspace",
     },
+    "menu.back": {"uz": "◀️ Ortga", "ru": "◀️ Назад", "en": "◀️ Back"},
     "menu.home": {
         "uz": "🏠 Bosh menyu",
         "ru": "🏠 Главное меню",

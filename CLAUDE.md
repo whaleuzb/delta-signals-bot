@@ -6607,3 +6607,28 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      sahifalar rasmga aylantirib ko'rildi (7 sahifa: ko'rsatkichlar,
      juftliklar, oylar, 4 albom sahifa pozitsiyalar); admin PDF 130 qator
      → 3 sahifa; regressiya testlari o'tdi.
+
+193. **Har bir menyuda ortga qaytish tugmasi.**
+     Foydalanuvchi: "har bir menyuga kirilganda ortga qaytish tugmasini
+     qo'sh. Signal kiritayotganda shart emas." Callback javoblari
+     avtomatik ko'zdan kechirildi (tugmasiz `edit_message_text`/
+     `reply_text`); asosiy bo'limlarda (statistika, juftliklar, yordam,
+     ochiq signallar, depozit, turnir, top, admin) "🏠 Bosh menyu" allaqachon
+     bor edi. Signal kiritish (sehrgar, ko'rik, rasm) ATAYLAB tegilmadi —
+     u yerda "Bekor qilish" bor.
+
+     Qo'shildi (`menu.back` = "◀️ Ortga"):
+     - Boshqaruvdagi matn so'rovlari (yangi stop, TP, kirish, TP/SL,
+       qo'shimcha limit narxi, qo'lda hajm) — `manage_back_kb(sid)` →
+       `mng:<sid>`. `on_manage` endi `clear_manage_waits(uid)` chaqiradi:
+       ortga bosilgach keyingi raqam eski so'rovga (masalan yangi stop deb)
+       tushib qolmaydi.
+     - Joy almashtirish ro'yxati: `on_switch` joriy joyni ENDI o'chirmaydi
+       (yangisi `ws:` bilan tanlanganda o'zi almashadi) va joriy joy bo'lsa
+       "◀️ Ortga" → joriy menyu (`send_workspace_switcher(back=True)`).
+     - Til menyusi (`lang_kb(back_lang=...)`, faqat menyudan ochilganda).
+     - Kanal ulash natijalari va bekor qilish, taklif kodi so'rovi —
+       "🏠 Bosh menyu".
+     - `show_menu` (bosh menyu/ortga) boshqaruv kutishlari va taklif kodi
+       kutishini tozalaydi.
+     Sinov: `test_back.py` 15/15; regressiya testlari o'tdi.

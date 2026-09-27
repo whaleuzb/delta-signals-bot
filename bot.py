@@ -366,7 +366,8 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     return None  # 0 ta — onboarding; 2+ ta — switcher (tanlash kerak)
 
 
-async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE,
+                                  back: bool = False) -> None:
     uid = update.effective_user.id
     lang = await user_lang(uid)
     owned = await db.get_owned_group_workspaces(uid)
@@ -397,6 +398,8 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
     if not any(w["is_channel"] for w in owned):
         rows.append([InlineKeyboardButton(i18n.t("ws.btn_add_channel", lang),
                                            callback_data="onboard:channel")])
+    if back:
+        rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="menu")])
     await update.effective_message.reply_text(i18n.t("ws.pick", lang),
                                                reply_markup=InlineKeyboardMarkup(rows))
 
@@ -588,8 +591,9 @@ async def on_workspace_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
 async def on_switch(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    ctx.user_data.pop("workspace_id", None)
-    await send_workspace_switcher(update, ctx)
+    # Joriy joy ENDI o'chirilmaydi (193): yangisi tanlanganda (`ws:`)
+    # o'zi almashadi, "◀️ Ortga" esa joriy joy menyusiga qaytaradi.
+    await send_workspace_switcher(update, ctx, back=bool(ctx.user_data.get("workspace_id")))
 
 
 # `tracker.provider` bilan AYNAN bir xil edi — bitta joy qoldi (191).
@@ -978,17 +982,20 @@ def tw(key: str, ws, **kwargs) -> str:
     return i18n.t(key, ws_lang(ws), **kwargs)
 
 
-def lang_kb(prefix: str = "lang:set") -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(title, callback_data=f"{prefix}:{code}")]
-         for code, title in i18n.LANGS.items()])
+def lang_kb(prefix: str = "lang:set", back_lang: str | None = None) -> InlineKeyboardMarkup:
+    """`back_lang` berilsa — ostida "◀️ Ortga" (menyudan ochilganda, 193)."""
+    rows = [[InlineKeyboardButton(title, callback_data=f"{prefix}:{code}")]
+            for code, title in i18n.LANGS.items()]
+    if back_lang is not None:
+        rows.append([InlineKeyboardButton(i18n.t("menu.back", back_lang), callback_data="menu")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def on_lang_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
     lang = await user_lang(q.from_user.id)
-    await q.edit_message_text(i18n.t("lang.choose", lang), reply_markup=lang_kb())
+    await q.edit_message_text(i18n.t("lang.choose", lang), reply_markup=lang_kb(back_lang=lang))
 
 
 async def on_lang_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1582,7 +1589,7 @@ async def on_addlim_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     await q.edit_message_text(
         i18n.t(key, lang, sid=sig["id"], sym=sig["symbol"],
                p=fmt_price(price) if price else "—", sl=fmt_price(float(sig["sl"]))),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML, reply_markup=manage_back_kb(sig["id"], lang))
 
 
 async def _do_place_limits(message, ctx, uid: int, sig_id: int, units: float) -> None:
@@ -1644,7 +1651,7 @@ async def on_add_custom(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_ADDSIZE[q.from_user.id] = (sig["id"], action)
     await q.edit_message_text(i18n.t(
         "man.ask_add_usd" if sig["alloc_amount"] is not None else "man.ask_add_x", lang),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML, reply_markup=manage_back_kb(sig["id"], lang))
 
 
 async def on_addlim_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1755,9 +1762,25 @@ async def _show_manage(q, sig_id: int) -> None:
         await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
+def manage_back_kb(sid: int, lang: str | None) -> InlineKeyboardMarkup:
+    """Boshqaruvdagi matn so'rovlari ostida (193): signal boshqaruviga qaytish."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        i18n.t("menu.back", lang), callback_data=f"mng:{sid}")]])
+
+
+def clear_manage_waits(uid: int) -> None:
+    """Boshqaruvdagi barcha matn kutishlarini bekor qiladi — "◀️ Ortga"
+    bosilgach keyingi yozilgan raqam eski so'rovga (masalan yangi stop
+    deb) tushib qolmasin."""
+    for d in (AWAITING_SL, AWAITING_TPS, AWAITING_ENTRY, AWAITING_TPSL,
+              AWAITING_ADDLIM, PENDING_ADDLIM, AWAITING_ADDSIZE):
+        d.pop(uid, None)
+
+
 async def on_manage(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
+    clear_manage_waits(q.from_user.id)
     sig, _ = await _manage_guard(q, ctx.bot)
     if sig:
         await _show_manage(q, sig["id"])
@@ -1806,10 +1829,11 @@ async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not sig:
         return
     AWAITING_SL[q.from_user.id] = sig["id"]
+    lang = await user_lang(q.from_user.id)
     await q.edit_message_text(
-        i18n.t("man.ask_sl", await user_lang(q.from_user.id), sid=sig["id"],
+        i18n.t("man.ask_sl", lang, sid=sig["id"],
                sym=sig["symbol"], cur=fmt_price(float(sig["sl"]))),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML, reply_markup=manage_back_kb(sig["id"], lang))
 
 
 async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1826,7 +1850,7 @@ async def on_manage_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     await q.edit_message_text(
         i18n.t("man.ask_entry", lang, sid=sig["id"], sym=sig["symbol"],
                cur=fmt_price(float(sig["entry"]))),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML, reply_markup=manage_back_kb(sig["id"], lang))
 
 
 async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1837,10 +1861,10 @@ async def on_manage_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     AWAITING_TPS[q.from_user.id] = sig["id"]
     cur = " ".join(fmt_price(float(t)) for t in sig["tps"])
+    lang = await user_lang(q.from_user.id)
     await q.edit_message_text(
-        i18n.t("man.ask_tps", await user_lang(q.from_user.id), sid=sig["id"],
-               sym=sig["symbol"], cur=cur),
-        parse_mode=ParseMode.HTML)
+        i18n.t("man.ask_tps", lang, sid=sig["id"], sym=sig["symbol"], cur=cur),
+        parse_mode=ParseMode.HTML, reply_markup=manage_back_kb(sig["id"], lang))
 
 
 async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2097,7 +2121,8 @@ async def on_tpsl_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         return
     AWAITING_TPSL[q.from_user.id] = sig_id
     await q.message.reply_text(_tpsl_prompt(sig_id, sig["symbol"], lang),
-                                parse_mode=ParseMode.HTML)
+                                parse_mode=ParseMode.HTML,
+                                reply_markup=manage_back_kb(sig_id, lang))
 
 
 async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2464,6 +2489,10 @@ async def show_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     if q:
         await q.answer()
+        # Bosh menyuga / ortga qaytildi (193) — tugallanmagan matn so'rovlari
+        # bekor: keyingi yozilgan narsa eski so'rovga tushib qolmasin.
+        clear_manage_waits(q.from_user.id)
+        AWAITING_REF_CODE.pop(q.from_user.id, None)
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
         return
@@ -2656,7 +2685,8 @@ async def on_my_chat_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
 async def on_channel_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
-    await q.edit_message_text(i18n.t("ch.cancelled", await user_lang(q.from_user.id)))
+    lang = await user_lang(q.from_user.id)
+    await q.edit_message_text(i18n.t("ch.cancelled", lang), reply_markup=menu_back_kb(lang))
 
 
 async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2671,22 +2701,22 @@ async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
     # tekshiriladi, tugmaning o'ziga ishonilmaydi.
     existing = await db.get_workspace_by_group(chat_id)
     if existing:
-        await q.edit_message_text(i18n.t("su.already", lang, name=existing["name"]))
+        await q.edit_message_text(i18n.t("su.already", lang, name=existing["name"]), reply_markup=menu_back_kb(lang))
         return
     if not is_admin(uid):
         owned = await db.get_group_workspace_by_owner(uid, is_channel=True)
         if owned:
-            await q.edit_message_text(i18n.t("ch.have_other", lang, name=owned["name"]))
+            await q.edit_message_text(i18n.t("ch.have_other", lang, name=owned["name"]), reply_markup=menu_back_kb(lang))
             return
     try:
         chat = await ctx.bot.get_chat(chat_id)
         member = await ctx.bot.get_chat_member(chat_id, uid)
     except Exception:
         log.warning("Kanalni ulab bo'lmadi (%s)", chat_id, exc_info=True)
-        await q.edit_message_text(i18n.t("ch.gone", lang))
+        await q.edit_message_text(i18n.t("ch.gone", lang), reply_markup=menu_back_kb(lang))
         return
     if member.status not in ("creator", "administrator") and not is_admin(uid):
-        await q.edit_message_text(i18n.t("ch.admin_only", lang))
+        await q.edit_message_text(i18n.t("ch.admin_only", lang), reply_markup=menu_back_kb(lang))
         return
 
     name = chat.title or "Kanal"
@@ -6148,7 +6178,7 @@ async def on_ref_code_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     AWAITING_REF_CODE[uid] = True
     await q.message.reply_text(
         i18n.t("ref.ask_code", lang, mn=REF_CODE_MIN, mx=REF_CODE_MAX),
-        parse_mode=ParseMode.HTML)
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 async def handle_ref_code_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
