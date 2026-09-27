@@ -6419,3 +6419,31 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_probe.py` 14/14 (`httpx.MockTransport` bilan: ro'yxatdagi,
      probe'siz/probe bilan, kesh, mavjud emas, shamsiz, tarmoq xatosi,
      `resolve_symbol` tartibi va aksiya ustunligi, probe faqat 2 nomzodga).
+
+188. **Aksiya tikeri "ON"siz: `MRNA` → `MRNAONUSDT` (MEXC RealStocks).**
+     Foydalanuvchi: "ON qo'shib yozmasa ham chiqadigan qilsak bo'ladimi?
+     Shunda bizda aksiyalar bazasidagi muammo hal bo'lardi."
+     187-banddagi log sababni ko'rsatdi: MEXC bu tokenlarni `status='1'`,
+     `isSpotTradingAllowed=False` bilan beradi (API savdosi yopiq, narx va
+     shamlar bor). Endi `valid_symbols()` bir vaqtda `_online` to'plamini
+     ham to'ldiradi (status online, flagdan qat'i nazar). Asosiy
+     `_symbols` filtri O'ZGARMADI — oddiy kripto qidiruvi avvalgidek.
+
+     `exchange.resolve_stock_token(raw)`: tikerni normallashtiradi va
+     `{BASE}ONUSDT` `_online`da bo'lsa qaytaradi (keshdagi ro'yxat, tarmoq
+     so'rovi yo'q; offline status olinmaydi; allaqachon "ON" bilan
+     tugaganini qayta kengaytirmaydi). `resolve(probe=True)` ham avval
+     `_online`ni tekshiradi, keyin `_probe`.
+
+     `bot.resolve_symbol` tartibi: MEXC kripto → forex → **MEXC aksiya
+     tokeni** (dastlabki 2 nomzod) → Twelve Data aksiyalari → probe.
+     Ya'ni MEXC'da tokeni bor aksiya endi Twelve Data'dan EMAS, birjadan
+     kuzatiladi (bozor `crypto`, narx kechikmaydi, Twelve Data limitlari
+     yo'q); tokeni yo'q aksiyalar uchun Twelve Data zaxira bo'lib qoladi.
+     Kripto baribir ustun: bir xil nomli kripto juftlik bo'lsa o'sha
+     olinadi (aksiyani `…ON` deb yozish kerak bo'ladi).
+
+     Sinov: `test_probe.py` 22/22 (yangi: `mrna`, `AAPL` Twelve Data'siz,
+     bitta ro'yxat so'rovi, offline token, kripto ustunligi, tokeni yo'q
+     aksiya Twelve Data'ga, `MRNA/USDT`; eski AAPL holati MSFT'ga
+     almashtirildi — AAPL endi ataylab MEXC tokeniga ketadi).

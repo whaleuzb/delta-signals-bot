@@ -2839,6 +2839,19 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
                 break
             if sym:
                 return sym, "forex"
+    # Aksiya — avval MEXC'dagi tokenlashgan ko'rinishi (188): `MRNA` ->
+    # `MRNAONUSDT`. Kuzatuv birjadan (bozor `crypto`), Twelve Data
+    # limitlariga bog'liq emas. Keshdagi ro'yxatda qidiruv, lekin baribir
+    # faqat dastlabki ikkita nomzod — erkin matndagi tasodifiy so'z (masalan
+    # "AI") biror token bilan to'qnashmasin.
+    for raw in cands[:2]:
+        try:
+            sym = await exchange.resolve_stock_token(raw)
+        except Exception:
+            log.warning("MEXC aksiya tokenlari tekshirilmadi", exc_info=True)
+            break
+        if sym:
+            return sym, "crypto"
     # Aksiyalar — ENG OXIRIDA. Sabab: "BTC" kabi so'z tasodifan biror tiker
     # bilan to'qnashib qolsa, kripto ustun bo'lib qolsin (bot asosan kripto
     # uchun ishlatiladi).

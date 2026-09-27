@@ -23,6 +23,11 @@ _binance_client = httpx.AsyncClient(base_url="https://api.binance.com", timeout=
 
 _symbols: set[str] = set()
 _symbols_ts: float = 0.0
+# Online, lekin `isSpotTradingAllowed=False` juftliklar ham kiradi (188).
+# MEXC RealStocks tokenlarini (MRNAONUSDT, AAPLONUSDT…) shunday belgilaydi:
+# API orqali savdo yopiq, ilovada esa oddiy savdo qilinadi, narx va shamlar
+# API'da bor (187-banddagi log: status='1', isSpotTradingAllowed=False).
+_online: set[str] = set()
 
 
 @dataclass
@@ -41,8 +46,13 @@ async def valid_symbols() -> set[str]:
     global _symbols, _symbols_ts
     if _symbols and time.time() - _symbols_ts < 3600:
         return _symbols
+    global _online
     r = await _client.get("/api/v3/exchangeInfo")
     r.raise_for_status()
+    _online = {
+        s["symbol"] for s in r.json()["symbols"]
+        if str(s.get("status", "")).upper() in ("1", "ENABLED", "TRADING")
+    }
     # status: MEXC "1" qaytaradi, lekin hujjatlarda "ENABLED" ham uchraydi —
     # ikkalasini ham qabul qilamiz. Agar bir kun yozilishi yana o'zgarsa,
     # butun ro'yxat bo'shab qolib BARCHA signallar rad etilishi mumkin edi;
@@ -131,7 +141,29 @@ async def resolve(raw: str, probe: bool = False) -> str | None:
     s = normalize(raw)
     if s in await valid_symbols():
         return s
-    return s if probe and await _probe(s) else None
+    if not probe:
+        return None
+    # Ro'yxatda online turibdi (RealStocks tokeni) — alohida so'rov kerak emas.
+    if s in _online:
+        return s
+    return s if await _probe(s) else None
+
+
+async def resolve_stock_token(raw: str) -> str | None:
+    """Aksiya tikeri -> MEXC'dagi tokenlashgan aksiya (188).
+
+    Foydalanuvchi: "ON qo'shib yozmasa ham chiqadigan qilsak bo'ladimi?
+    Shunda bizda aksiyalar bazasidagi muammo hal bo'lardi." Ya'ni `MRNA`
+    yozilsa `MRNAONUSDT`. Bunday aksiya MEXC orqali kuzatiladi (bozor
+    `crypto`) — narx va shamlar birjadan, Twelve Data limitlarisiz.
+    Faqat keshdagi ro'yxatda qidiruv, tarmoq so'rovi yo'q."""
+    s = normalize(raw)
+    base = s[: -len(config.QUOTE)]
+    if not base or base.endswith("ON"):
+        return None
+    await valid_symbols()
+    cand = f"{base}ON{config.QUOTE}"
+    return cand if cand in _online else None
 
 
 # Ichki timeframe kodi -> MEXC interval nomi. MEXC 1 soatni "60m" deb ataydi.
