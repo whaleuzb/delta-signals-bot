@@ -1539,6 +1539,20 @@ async def monthly_breakdown(workspace_id: int, limit: int = 12) -> list[asyncpg.
         return await c.fetch(q, workspace_id, limit)
 
 
+async def report_positions(workspace_id: int) -> list[asyncpg.Record]:
+    """PDF hisobotdagi "Barcha pozitsiyalar" (192): yopilgan va hali ochiq
+    (kutilayotgan limit ham) savdolar, ochilish vaqti bo'yicha. Bekor
+    qilingan/muddati o'tganlar pozitsiya emas — kirmaydi; admin hisobdan
+    chiqarganlari (`excluded`) ham kirmaydi (statistika bilan bir xil)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, symbol, side, entry, entry_first, exit_price, sl, tps, tp_hit, "
+            "status, created_at, opened_at, closed_at, pnl_pct, r_multiple, alloc_amount "
+            "FROM signals WHERE workspace_id=$1 AND NOT excluded "
+            "AND status IN ('TP','SL','BREAKEVEN','ACTIVE','PENDING') "
+            "ORDER BY COALESCE(opened_at, created_at), id", workspace_id)
+
+
 async def equity_series(workspace_id: int, since=None, until=None) -> list[asyncpg.Record]:
     """since/until berilmasa — butun davr (equity_chart() shunday chaqiradi,
     grafik har doim to'liq tarixni ko'rsatadi). summary() esa davrga mos

@@ -6581,3 +6581,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (pyflakes toza — faqat qo'shtirnoqdagi `asyncpg` tip izohlari);
      har guruh xabarini yozadigan debug log va #134 vaqtinchalik
      diagnostikasi INFO'dan DEBUG'ga.
+
+192. **PDF hisobot: to'liq juftliklar/oylar + har bir pozitsiya sana-vaqt bilan.**
+     Foydalanuvchi: "pdf xisobotda juftliklar butun davrdagini to'liq
+     ko'rsatmayapti. Iloji bo'lsa har bir pozitsiya ma'lumotlarini
+     to'liqroq yozish kerak. Sana vaqti bilan."
+     Sabab: 2-sahifada juftliklar `syms[:26]` va `y < 0.34` da kesilar,
+     oylar `monthly_breakdown(..., 12)` — faqat so'nggi 12 oy edi.
+
+     - Juftliklar va oylar endi TO'LIQ (`monthly_breakdown(..., 1200)`),
+       sig'masa keyingi sahifa (`stats._paged_lines`: sarlavha va jadval
+       boshi har sahifada, bo'sh ro'yxatda sahifa yo'q).
+     - Yangi bo'lim "Barcha pozitsiyalar — N ta" (`db.report_positions`:
+       yopilgan + ACTIVE + PENDING, `excluded`siz, ochilish vaqti bo'yicha)
+       — albom (landscape) sahifalarda, 8pt monospace: #, juftlik, yo'nalish,
+       ochilgan va yopilgan sana-vaqt (`TZ`, dd.mm.yy HH:MM), kirish
+       (o'rtachalangan bo'lsa `*`, 190), chiqish, stop, TP (tegdi/jami),
+       holat (TP/SL/BE/OCHIQ/LIMIT), natija %, R; `show_money` bo'lsa
+       (egasi) summa $ va foyda $ (`pnl × alloc_amount`). Rang natijaga
+       qarab; pastda izoh (`*` ma'nosi va vaqt mintaqasi).
+     - `stats._fp` — narxni ixcham, lekin kichik tangalarda ham aniq yozadi.
+     - `pdf_table_report` (admin PDF'lari) endi `_paged_lines` ustida —
+       takrorlangan sahifalash kodi olib tashlandi.
+     Sinov: 150 pozitsiya / 42 juftlik / 20 oy bilan hisobot yaratilib,
+     sahifalar rasmga aylantirib ko'rildi (7 sahifa: ko'rsatkichlar,
+     juftliklar, oylar, 4 albom sahifa pozitsiyalar); admin PDF 130 qator
+     → 3 sahifa; regressiya testlari o'tdi.

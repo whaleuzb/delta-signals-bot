@@ -536,8 +536,8 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
                       show_money: bool = True,
                       lang: str | None = None) -> io.BytesIO | None:
     """Butun davr bo'yicha PDF hisobot: 1-sahifa — ko'rsatkichlar + balans
-    egri chizig'i, 2-sahifa — juftliklar va oylar kesimi. Yopilgan signal
-    bo'lmasa None qaytaradi."""
+    egri chizig'i; keyin TO'LIQ juftliklar va oylar kesimi, so'ng har bir
+    pozitsiya sana-vaqti bilan (192). Yopilgan signal bo'lmasa None."""
     from matplotlib.backends.backend_pdf import PdfPages
 
     s = await db.period_stats(workspace_id)
@@ -545,7 +545,8 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         return None
     rows = await db.equity_series(workspace_id)
     syms = await db.top_symbols(workspace_id)
-    month_rows = await db.monthly_breakdown(workspace_id, 12)
+    month_rows = await db.monthly_breakdown(workspace_id, 1200)   # butun davr
+    positions = await db.report_positions(workspace_id)
     now = datetime.now(TZ)
 
     buf = io.BytesIO()
@@ -586,38 +587,22 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
         pdf.savefig(fig, facecolor="white")
         plt.close(fig)
 
-        # ── 2-sahifa: jadvallar ──
-        fig = plt.figure(figsize=(8.27, 11.69))
-        fig.patch.set_facecolor("white")
-        fig.text(0.06, 0.955, i18n.t("rep.pdf_syms", lang), fontsize=16,
-                 fontweight="bold", color=P_TXT)
-        hdr = (f"{i18n.t('rep.col_pair', lang):<16}{i18n.t('rep.col_n', lang):>6}"
-               f"{i18n.t('rep.col_wr', lang):>9}{i18n.t('rep.col_pct', lang):>13}")
-        y = 0.925
-        fig.text(0.06, y, hdr, fontsize=11, fontweight="bold",
-                 color=P_MUTED, family="monospace")
-        y -= 0.022
-        for r in syms[:26]:
+        # ── Jadvallar (192): endi TO'LIQ — sig'masa keyingi sahifaga ──
+        # Avval juftliklar 26 qatorda va sahifaning yarmida kesilar, oylar
+        # esa faqat so'nggi 12 tasi edi ("butun davrdagini to'liq
+        # ko'rsatmayapti").
+        cols = (f"{i18n.t('rep.col_n', lang):>6}{i18n.t('rep.col_wr', lang):>9}"
+                f"{i18n.t('rep.col_pct', lang):>13}")
+        lines = []
+        for r in syms:
             wr = r["wins"] / r["closed"] * 100 if r["closed"] else 0
             sp_ = float(r["sum_pct"])
-            fig.text(0.06, y,
-                     f"{r['symbol'][:16]:<16}{r['closed']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
-                     fontsize=11, color=P_GREEN if sp_ >= 0 else P_RED, family="monospace")
-            y -= 0.021
-            if y < 0.34:
-                break
+            lines.append((f"{r['symbol'][:16]:<16}{r['closed']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
+                          P_GREEN if sp_ >= 0 else P_RED))
+        _paged_lines(pdf, i18n.t("rep.pdf_syms", lang), ws_name,
+                     f"{i18n.t('rep.col_pair', lang):<16}{cols}", lines, fontsize=11)
 
-        # Ro'yxat kalta bo'lsa darhol ostidan boshlanadi; uzun bo'lsa pastki
-        # chegaraga tiraladi (avval doim 0.30 ga qadalib, katta bo'sh joy qolardi).
-        y = min(y - 0.045, 0.86)
-        fig.text(0.06, y, i18n.t("rep.pdf_months", lang), fontsize=16,
-                 fontweight="bold", color=P_TXT)
-        y -= 0.034
-        fig.text(0.06, y,
-                 f"{i18n.t('rep.col_month', lang):<16}{i18n.t('rep.col_n', lang):>6}"
-                 f"{i18n.t('rep.col_wr', lang):>9}{i18n.t('rep.col_pct', lang):>13}",
-                 fontsize=11, fontweight="bold", color=P_MUTED, family="monospace")
-        y -= 0.022
+        lines = []
         for r in month_rows:
             m = r["month"]
             # To'liq oy nomi: 3 harfga qisqartirilsa "Iyun" va "Iyul" ikkalasi
@@ -625,53 +610,119 @@ async def pdf_report(workspace_id: int, ws_name: str, deposit=None,
             name = f"{months(lang)[m.month - 1]} {m.year}"
             wr = r["wins"] / r["total"] * 100 if r["total"] else 0
             sp_ = float(r["sum_pct"])
-            fig.text(0.06, y, f"{name:<16}{r['total']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
-                     fontsize=11, color=P_GREEN if sp_ >= 0 else P_RED, family="monospace")
-            y -= 0.021
-            if y < 0.04:
-                break
-        pdf.savefig(fig, facecolor="white")
-        plt.close(fig)
+            lines.append((f"{name:<16}{r['total']:>6}{wr:>8.0f}%{sp_:>+13.2f}",
+                          P_GREEN if sp_ >= 0 else P_RED))
+        _paged_lines(pdf, i18n.t("rep.pdf_months", lang), ws_name,
+                     f"{i18n.t('rep.col_month', lang):<16}{cols}", lines, fontsize=11)
+
+        # ── Barcha pozitsiyalar (192) — albom sahifalarda, sana-vaqt bilan ──
+        header, lines = _position_lines(positions, show_money, lang)
+        _paged_lines(pdf, i18n.t("rep.pdf_positions", lang, n=len(positions)), ws_name,
+                     header, lines, fontsize=8, landscape=True,
+                     footnote=i18n.t("rep.pdf_pos_note", lang, tz=str(TZ)))
 
     buf.seek(0)
     return buf
 
 
+def _fp(x) -> str:
+    """Narx — ixcham, lekin aniq (kichik tangalarda ham raqamlar yo'qolmasin)."""
+    if x is None:
+        return "—"
+    x = float(x)
+    if x >= 1000:
+        return f"{x:,.2f}"
+    if x >= 1:
+        return f"{x:.4f}".rstrip("0").rstrip(".")
+    return f"{x:.8f}".rstrip("0").rstrip(".")
+
+
+def _position_lines(rows, show_money: bool, lang: str | None) -> tuple[str, list]:
+    """"Barcha pozitsiyalar" jadvali: sarlavha va (qator, rang) ro'yxati."""
+    t = lambda k: i18n.t(k, lang)
+    header = (f"{'#':<7}{t('rep.col_pair'):<13}{t('rep.c_side'):<6}{t('rep.c_open'):<16}"
+              f"{t('rep.c_close'):<16}{t('rep.c_entry'):>13}{t('rep.c_exit'):>12}"
+              f"{t('rep.c_stop'):>12}{'TP':>6}{t('rep.c_status'):>8}{t('rep.c_res'):>10}{'R':>7}")
+    if show_money:
+        header += f"{t('rep.c_amt'):>11}{t('rep.c_profit'):>11}"
+    out = []
+    for r in rows:
+        st = r["status"]
+        closed = st in ("TP", "SL", "BREAKEVEN")
+        opened = r["opened_at"] or r["created_at"]
+        o = f"{opened.astimezone(TZ):%d.%m.%y %H:%M}" if opened else "—"
+        c = f"{r['closed_at'].astimezone(TZ):%d.%m.%y %H:%M}" if r["closed_at"] else "—"
+        entry = _fp(r["entry"]) + ("*" if r["entry_first"] is not None else "")
+        tps = r["tps"] or []
+        tp = f"{r['tp_hit']}/{len(tps)}" if tps else "—"
+        label = {"TP": "TP", "SL": "SL", "BREAKEVEN": "BE"}.get(st) or t(
+            "rep.st_open" if st == "ACTIVE" else "rep.st_pending")
+        pnl = float(r["pnl_pct"]) if (closed and r["pnl_pct"] is not None) else None
+        res = f"{pnl:+.2f}%" if pnl is not None else "—"
+        rr = f"{float(r['r_multiple']):+.2f}" if (closed and r["r_multiple"] is not None) else "—"
+        line = (f"{'#' + str(r['id']):<7}{r['symbol'][:12]:<13}{r['side'][:5]:<6}{o:<16}{c:<16}"
+                f"{entry:>13}{_fp(r['exit_price']) if closed else '—':>12}"
+                f"{_fp(r['sl']):>12}{tp:>6}{label[:7]:>8}{res:>10}{rr:>7}")
+        if show_money:
+            amt = float(r["alloc_amount"]) if r["alloc_amount"] is not None else None
+            prof = pnl / 100 * amt if (pnl is not None and amt is not None) else None
+            line += (f"{f'{amt:,.0f}' if amt is not None else '—':>11}"
+                     f"{f'{prof:+,.2f}' if prof is not None else '—':>11}")
+        col = (P_GREEN if pnl > 0 else P_RED if pnl < 0 else P_MUTED) if pnl is not None \
+            else (P_TXT if st == "ACTIVE" else P_MUTED)
+        out.append((line, col))
+    return header, out
+
+
+def _paged_lines(pdf, title: str, subtitle: str, header: str, lines: list[tuple[str, str]],
+                 fontsize: float = 10, landscape: bool = False,
+                 footnote: str | None = None) -> None:
+    """Monospace jadvalni kerakli miqdordagi sahifalarga yozadi (192).
+    Qatorlar soni CHEKLANMAGAN — sig'maganda yangi sahifa, sarlavha va
+    jadval boshi har sahifada qaytariladi. Bo'sh ro'yxatda hech narsa
+    yozilmaydi."""
+    if not lines:
+        return
+    size = (11.69, 8.27) if landscape else (8.27, 11.69)
+    step = fontsize / 72 / size[1] * 1.45          # qator balandligi (fig ulushi)
+    i, page = 0, 1
+    while i < len(lines):
+        fig = plt.figure(figsize=size)
+        fig.patch.set_facecolor("white")
+        fig.text(0.05, 0.95, title + (f" ({page})" if page > 1 else ""),
+                 fontsize=16, fontweight="bold", color=P_TXT)
+        if subtitle:
+            fig.text(0.05, 0.922, subtitle, fontsize=10, color=P_MUTED)
+        fig.text(0.95, 0.95, f"{datetime.now(TZ):%d.%m.%Y %H:%M}",
+                 fontsize=9, color=P_MUTED, ha="right")
+        fig.add_artist(plt.Line2D([0.05, 0.95], [0.905, 0.905], color=P_GRID, lw=1))
+        y = 0.88
+        fig.text(0.05, y, header, fontsize=fontsize, fontweight="bold",
+                 color=P_MUTED, family="monospace")
+        y -= step * 1.3
+        bottom = 0.075 if footnote else 0.05
+        while i < len(lines) and y > bottom:
+            txt, col = lines[i]
+            fig.text(0.05, y, txt, fontsize=fontsize, color=col, family="monospace")
+            y -= step
+            i += 1
+        if footnote:
+            fig.text(0.05, 0.03, footnote, fontsize=8, color=P_MUTED)
+        fig.text(0.95, 0.03, str(page), fontsize=9, color=P_MUTED, ha="right")
+        pdf.savefig(fig, facecolor="white")
+        plt.close(fig)
+        page += 1
+
+
 def pdf_table_report(title: str, subtitle: str, header: str,
                       lines: list[tuple[str, str]]) -> io.BytesIO:
-    """Monospace jadvalli ko'p sahifali PDF (admin ro'yxatlari uchun).
-    lines — (matn, rang) juftliklari; sahifa to'lganda avtomatik yangisi
-    ochiladi, shuning uchun qatorlar soni cheklanmagan."""
+    """Monospace jadvalli ko'p sahifali PDF (admin ro'yxatlari uchun) —
+    `_paged_lines` ustida (192: ilgari o'z nusxasi bor edi)."""
     from matplotlib.backends.backend_pdf import PdfPages
 
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        i, page = 0, 1
-        while True:
-            fig = plt.figure(figsize=(8.27, 11.69))
-            fig.patch.set_facecolor("white")
-            fig.text(0.06, 0.955, title, fontsize=18, fontweight="bold", color=P_TXT)
-            if subtitle:
-                fig.text(0.06, 0.932, subtitle, fontsize=11, color=P_MUTED)
-            fig.text(0.94, 0.955, f"{datetime.now(TZ):%d.%m.%Y %H:%M}",
-                     fontsize=9, color=P_MUTED, ha="right")
-            fig.add_artist(plt.Line2D([0.06, 0.94], [0.921, 0.921], color=P_GRID, lw=1))
-
-            y = 0.895
-            fig.text(0.06, y, header, fontsize=10, fontweight="bold",
-                     color=P_MUTED, family="monospace")
-            y -= 0.023
-            while i < len(lines) and y > 0.04:
-                txt, col = lines[i]
-                fig.text(0.06, y, txt, fontsize=10, color=col, family="monospace")
-                y -= 0.020
-                i += 1
-            fig.text(0.94, 0.022, str(page), fontsize=9, color=P_MUTED, ha="right")
-            pdf.savefig(fig, facecolor="white")
-            plt.close(fig)
-            if i >= len(lines):
-                break
-            page += 1
+        _paged_lines(pdf, title, subtitle, header, lines or [("—", P_MUTED)])
     buf.seek(0)
     return buf
 
