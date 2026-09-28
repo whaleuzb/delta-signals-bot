@@ -1827,9 +1827,75 @@ async def insert_volume_snapshots(rows: list[tuple[str, float]]) -> None:
                 "DELETE FROM volume_snapshots WHERE recorded_at < now() - interval '14 days'")
 
 
+_volume_compacted = False
+
+
+async def compact_volume_snapshots(exclude_hours: float) -> int:
+    """`volume_snapshots` ixchamlash (195). Suratlar har 15 daqiqada BARCHA
+    juftliklar (~2500) uchun yoziladi — 14 kunda ~3.4 mln qator va jadval
+    Postgres xotirasining asosiy qismini egallardi. Bazaviy o'rtacha faqat
+    `exclude_hours`dan ESKI yozuvlardan olinadi va u yerda 15 daqiqalik
+    aniqlik kerak emas: soatiga BITTA (birinchi) yozuv qoldiriladi —
+    o'rtacha amalda o'zgarmaydi, jadval ~4 barobar kichrayadi.
+
+    Jarayon boshida bir marta butun tarix (va keyin VACUUM + vaqt indeksi),
+    keyin har safar faqat yangi eskirgan 3 soatlik oyna. Qaytaradi:
+    o'chirilgan qatorlar soni."""
+    global _volume_compacted
+    full = not _volume_compacted
+    upto = 15 * 24 if full else exclude_hours + 3
+    async with pool().acquire() as c:
+        r = await c.execute(
+            """DELETE FROM volume_snapshots WHERE ctid IN (
+                   SELECT ctid FROM (
+                       SELECT ctid, row_number() OVER (
+                           PARTITION BY symbol, date_trunc('hour', recorded_at)
+                           ORDER BY recorded_at) AS rn
+                       FROM volume_snapshots
+                       WHERE recorded_at <  now() - make_interval(secs => $1)
+                         AND recorded_at >= now() - make_interval(secs => $2)
+                   ) t WHERE rn > 1)""",
+            float(exclude_hours) * 3600, float(upto) * 3600)
+        n = int(r.split()[-1])
+        if full:
+            # Katta o'chirishdan keyin joy qayta ishlatilsin; vaqt indeksi
+            # "oxirgi surat" so'rovini butun jadvalni o'qishdan qutqaradi.
+            # MIGRATE'da emas: web ham MIGRATE'ni ishlatadi — katta jadvalda
+            # ikki jarayon bir vaqtda indeks qurmasin.
+            # Ko'p o'chirilgan bo'lsa (birinchi marta — millionlab qator)
+            # VACUUM FULL: fayl haqiqatan kichrayadi (oddiy VACUUM faqat
+            # joyni qayta ishlatishga beradi). Faqat shu jadvalni bir necha
+            # soniya qulflaydi; keyingi deploylarda o'chiriladigan narsa oz —
+            # oddiy ANALYZE yetadi.
+            await c.execute("VACUUM (FULL, ANALYZE) volume_snapshots" if n > 100_000
+                            else "ANALYZE volume_snapshots")
+            await c.execute("CREATE INDEX IF NOT EXISTS idx_volume_snapshots_time "
+                            "ON volume_snapshots(recorded_at)")
+            _volume_compacted = True
+    return n
+
+
+async def housekeeping() -> int:
+    """Kunlik tozalash (195), bot jarayonidan chaqiriladi.
+    - `news_events.profile_data` (hajm profili, katta JSON) faqat jonli oyna
+      (~20 daqiqa) va shu vaqtdagi kit xabari uchun kerak — 3 kundan eski
+      qatorlarda bo'shatiladi (xabarning o'zi, natija va dedup qoladi).
+    - `news_events(event_at)` indeksi: `news_live_job` har 4 soniyada
+      so'nggi hodisalarni so'raydi — indekssiz butun jadval o'qilardi.
+    Qaytaradi: bo'shatilgan profillar soni."""
+    async with pool().acquire() as c:
+        await c.execute("CREATE INDEX IF NOT EXISTS idx_news_events_event_at "
+                        "ON news_events(event_at)")
+        r = await c.execute(
+            "UPDATE news_events SET profile_data=NULL "
+            "WHERE profile_data IS NOT NULL AND event_at < now() - interval '3 days'")
+    return int(r.split()[-1])
+
+
 async def volume_surge_candidates(multiplier: float, exclude_hours: float,
                                    min_snapshots: int = 3,
-                                   min_volume_usd: float = 0) -> list[asyncpg.Record]:
+                                   min_volume_usd: float = 0,
+                                   latest_hours: float = 2) -> list[asyncpg.Record]:
     """Oxirgi hajm o'zining (`exclude_hours`dan OLDINGI) o'rtacha hajmidan
     kamida `multiplier` marta katta bo'lgan juftliklar. `min_snapshots` —
     ishonchli o'rtacha uchun tarixda kamida shuncha eski yozuv bo'lishi
@@ -1840,27 +1906,36 @@ async def volume_surge_candidates(multiplier: float, exclude_hours: float,
     juda past" tangalarni chiqarib tashlash uchun — nisbiy % o'sish
     qancha katta bo'lmasin, mutlaq hajm past bo'lsa baribir e'tiborga
     olinmaydi)."""
+    # 195: ilgari har 5 daqiqada BUTUN jadval (millionlab qator) saralanardi.
+    # Endi "oxirgi surat" faqat so'nggi `latest_hours` ichidan (vaqt
+    # indeksi), bazaviy o'rtacha esa faqat hajm chegarasidan o'tgan
+    # juftliklar uchun (symbol+vaqt indeksi) hisoblanadi — natija bir xil.
+    # `latest_hours` ichida surat bo'lmasa (skaner to'xtab qolgan) eskirgan
+    # hajm bilan "portlash" e'lon qilinmaydi.
     q = """
     WITH latest AS (
         SELECT DISTINCT ON (symbol) symbol, volume AS latest_volume
         FROM volume_snapshots
+        WHERE recorded_at > now() - make_interval(secs => $5)
         ORDER BY symbol, recorded_at DESC
     ),
+    big AS (
+        SELECT symbol, latest_volume FROM latest WHERE latest_volume >= $4
+    ),
     baseline AS (
-        SELECT symbol, AVG(volume) AS avg_volume, COUNT(*) AS n
-        FROM volume_snapshots
-        WHERE recorded_at < now() - ($1 || ' hours')::interval
-        GROUP BY symbol
+        SELECT v.symbol, AVG(v.volume) AS avg_volume, COUNT(*) AS n
+        FROM volume_snapshots v JOIN big USING (symbol)
+        WHERE v.recorded_at < now() - make_interval(secs => $1)
+        GROUP BY v.symbol
     )
     SELECT l.symbol, l.latest_volume, b.avg_volume
-    FROM latest l JOIN baseline b ON b.symbol = l.symbol
+    FROM big l JOIN baseline b ON b.symbol = l.symbol
     WHERE b.n >= $2 AND b.avg_volume > 0 AND l.latest_volume > b.avg_volume * $3
-          AND l.latest_volume >= $4
     ORDER BY (l.latest_volume / b.avg_volume) DESC
     """
     async with pool().acquire() as c:
-        return await c.fetch(q, str(exclude_hours), min_snapshots, multiplier,
-                             _d(min_volume_usd))
+        return await c.fetch(q, float(exclude_hours) * 3600, min_snapshots, multiplier,
+                             _d(min_volume_usd), float(latest_hours) * 3600)
 
 
 async def latest_volume_snapshot(symbol: str) -> float | None:

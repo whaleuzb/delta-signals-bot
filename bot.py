@@ -7251,6 +7251,23 @@ async def volume_snapshot_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await db.insert_volume_snapshots(list(volumes.items()))
     except Exception:
         log.exception("Hajm surati bazaga yozilmadi")
+        return
+    try:
+        n = await db.compact_volume_snapshots(config.SURGE_BASELINE_EXCLUDE_HOURS)
+        if n > 1000:
+            log.info("Hajm tarixi ixchamlandi: %s ta ortiqcha qator o'chirildi", n)
+    except Exception:
+        log.warning("Hajm tarixi ixchamlanmadi", exc_info=True)
+
+
+async def housekeeping_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Kunlik baza tozalash (195) — `db.housekeeping` izohiga qarang."""
+    try:
+        n = await db.housekeeping()
+        if n:
+            log.info("Tozalash: %s ta eski hajm profili bo'shatildi", n)
+    except Exception:
+        log.warning("Kunlik tozalash bajarilmadi", exc_info=True)
 
 
 async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
@@ -8325,6 +8342,7 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)
     # Turnir reytingi va muddati (185).

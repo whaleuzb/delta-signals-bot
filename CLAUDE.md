@@ -6657,3 +6657,31 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        guruhga qo'shilish rad javoblarida → `joingroup`.
      Sinov: `test_back2.py` 24/24, `test_back.py` 15/15, regressiya
      testlari o'tdi.
+
+195. **Baza tozalash: Railway xarajati (Postgres 0.64 GB RAM).**
+     Foydalanuvchi Railway hisobi ($22.47) haqida so'radi, keyin "keraksiz
+     keshlarni tozala" dedi (hamma loyiha kerak). 7 kunlik metrikalar: shu
+     loyihaning Postgres'i o'rtacha 0.64 GB RAM (boshqa loyihalardagi
+     Postgres'lar ~0.05 GB) va doimiy CPU. Sabab — `volume_snapshots`:
+     har 15 daqiqada BARCHA juftliklar (~2500), 14 kun → ~3.4 mln qator
+     (~420 MB), `volume_surge_candidates` esa har 5 daqiqada butun jadvalni
+     saralardi (DISTINCT ON + GROUP BY).
+
+     - `db.compact_volume_snapshots(exclude_hours)` (`volume_snapshot_job`
+       yozgandan keyin): `exclude_hours`dan eski yozuvlarda soatiga BITTA
+       qoladi (bazaviy o'rtacha faqat shu eski qismdan olinadi — farq
+       <0.1%). Jarayon boshida bir marta butun tarix; ko'p o'chirilsa
+       `VACUUM FULL` (fayl haqiqatan kichrayadi, faqat shu jadval bir necha
+       soniya qulflanadi), keyin `recorded_at` indeksi (MIGRATE'da emas —
+       web ham MIGRATE'ni ishlatadi, katta jadvalda ikki jarayon bir vaqtda
+       indeks qurmasin). Keyingi chaqiriqlar faqat yangi eskirgan 3 soatlik
+       oyna.
+     - Nomzod so'rovi: "oxirgi surat" faqat so'nggi `latest_hours` (2) ichidan,
+       bazaviy o'rtacha faqat `min_volume_usd`dan o'tgan juftliklar uchun.
+       Suratlar to'xtab qolsa eskirgan hajm bilan portlash e'lon qilinmaydi.
+     - `housekeeping_job` (kuniga bir): 3 kundan eski `news_events.profile_data`
+       (katta JSON, faqat jonli oynada kerak) bo'shatiladi; `news_events(event_at)`
+       indeksi (`news_live_job` har 4 soniyada so'raydi).
+     Sinov (3.36 mln qatorli sintetik baza): natija eski so'rov bilan aynan
+     bir xil; 3.36 mln → 0.93 mln qator, 417 → 96 MB; so'rov 2.9 s → 0.18 s.
+     `test_volcompact.py` 12/12, `test_housekeep.py` OK.
