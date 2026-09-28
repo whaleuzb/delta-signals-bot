@@ -8155,6 +8155,17 @@ async def post_init(app: Application) -> None:
         log.warning("Baza ko'chirish: %s — %s", *move)
         if move[0] in ("moved", "already"):
             config.DATABASE_URL = target
+    # Eski bazadagi kod sxemasida yo'q jadvallarni arxivlash (196) — eski
+    # servis o'chirilishidan oldin bir marta. Bo'sh yoki joriy baza bo'lsa jim.
+    legacy = os.getenv("COPY_LEGACY_FROM", "").strip()
+    if legacy and legacy != config.DATABASE_URL:
+        try:
+            note = await dbmove.copy_legacy(legacy, config.DATABASE_URL)
+        except Exception as e:
+            log.exception("Eski jadvallar arxivlanmadi")
+            note = f"xato: {type(e).__name__}: {e}"
+        log.warning("Eski jadvallar: %s", note)
+        move = ("legacy", note)
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
     if move and move[0] != "already":

@@ -120,3 +120,42 @@ async def run(src_url: str, dst_url: str) -> tuple[str, str]:
     if skipped:
         note += f"; yangi sxemada yo'q, o'tkazib yuborildi: {', '.join(skipped)}"
     return "moved", note
+
+
+async def copy_legacy(src_url: str, dst_url: str) -> str:
+    """Eski bazada bo'lib, kod sxemasida YO'Q jadvallarni (masalan
+    `memberships`, `star_payments`) yangi bazaga ARXIV sifatida ko'chiradi —
+    eski servis o'chirilishidan oldin, ular abadiy yo'qolmasin. Faqat
+    ustunlar va turlar (default/cheklovlarsiz). Yangi bazada allaqachon bor
+    jadvalga tegilmaydi — qayta ishga tushsa hech narsa qilmaydi."""
+    src = await asyncpg.connect(src_url, timeout=30)
+    dst = await asyncpg.connect(dst_url, timeout=30)
+    try:
+        have = set(await _tables(dst))
+        todo = [t for t in await _tables(src) if t not in have]
+        if not todo:
+            return "arxivlanadigan jadval yo'q"
+        done = []
+        async with dst.transaction():
+            for t in todo:
+                cols = await src.fetch(
+                    "SELECT attname, format_type(atttypid, atttypmod) AS typ "
+                    "FROM pg_attribute WHERE attrelid = $1::regclass "
+                    "AND attnum > 0 AND NOT attisdropped ORDER BY attnum",
+                    f"public.{_q(t)}")
+                await dst.execute(f"CREATE TABLE {_q(t)} (" + ", ".join(
+                    f"{_q(c['attname'])} {c['typ']}" for c in cols) + ")")
+                names = [c["attname"] for c in cols]
+                with tempfile.TemporaryFile() as f:
+                    await src.copy_from_table(t, columns=names, output=f, format="csv")
+                    f.seek(0)
+                    await dst.copy_to_table(t, source=f, columns=names, format="csv")
+                n_src = await src.fetchval(f"SELECT count(*) FROM {_q(t)}")
+                n_dst = await dst.fetchval(f"SELECT count(*) FROM {_q(t)}")
+                if n_src != n_dst:
+                    raise RuntimeError(f"{t}: eski {n_src}, yangi {n_dst} qator")
+                done.append(f"{t} {n_dst}")
+        return "arxivlandi: " + ", ".join(done)
+    finally:
+        await src.close()
+        await dst.close()
