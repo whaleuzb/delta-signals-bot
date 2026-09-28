@@ -6685,3 +6685,24 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov (3.36 mln qatorli sintetik baza): natija eski so'rov bilan aynan
      bir xil; 3.36 mln → 0.93 mln qator, 417 → 96 MB; so'rov 2.9 s → 0.18 s.
      `test_volcompact.py` 12/12, `test_housekeep.py` OK.
+
+196. **Postgres diskka ko'chirildi (ma'lumot yo'qolish xavfi).**
+     Postgres'ni restart qilishdan oldingi tekshiruvda chiqdi: shu loyihaning
+     Postgres'i 19-avgustdan beri DOIMIY DISKSIZ ishlagan — `postgres-data`
+     volume'i va uning ulanishi Railway'da "staged" holatda qolib ketgan edi.
+     Restart/ko'chish bo'lsa butun baza yo'qolishi mumkin edi. Staged patch
+     foydalanuvchi tomonidan dashboard'da "Discard" qilindi (28-sentabr).
+     ⚠️ Eski `Postgres` servisini RESTART QILMANG, unga volume ULAMANG.
+
+     Yangi diskli `Postgres-T1tW` (shablon, 5 GB volume) yaratildi.
+     `dbmove.py` — bir martalik ko'chirish: botda `MOVE_DB_TO` bo'lsa,
+     `post_init` BOSHIDA (job/handlerlardan oldin) eski bazadagi har jadval
+     (kod sxemasida bor ustunlar) CSV COPY bilan BITTA tranzaksiyada
+     ko'chiriladi, FK tekshiruvi `session_replication_role=replica`, SERIAL
+     hisoblagichlari `setval`, har jadval qator soni solishtiriladi (mos
+     kelmasa rollback). Oxirida `_moved_from_old_db` belgi jadvali.
+     Holatlar: moved/already → jarayon yangi baza bilan; refused (yangi bazada
+     belgisiz ma'lumot) / failed → eski bazada qoladi. Natija adminlarga DM.
+     `MOVE_DB_TO == DATABASE_URL` bo'lsa hech narsa qilinmaydi.
+     Sinov: `test_dbmove.py` 11/11 (bytea, jsonb, NULL/'' , maxsus belgilar,
+     kodda yo'q jadval/ustun, qayta ishga tushirish, xato holatlari).

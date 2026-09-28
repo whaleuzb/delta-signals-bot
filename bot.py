@@ -52,6 +52,7 @@ import paymembers
 import tournament
 import stats
 import tgsource
+import dbmove
 import tracker
 import translate
 
@@ -8140,8 +8141,29 @@ async def _run_one_time_fixes() -> None:
 
 
 async def post_init(app: Application) -> None:
+    # Bir martalik baza ko'chirish (196): `MOVE_DB_TO` bo'lsa — hech qanday
+    # job/handler ishlamasdan OLDIN eski bazadan yangisiga ko'chiriladi va
+    # muvaffaqiyatli bo'lsa jarayon yangi baza bilan davom etadi.
+    move = None
+    target = os.getenv("MOVE_DB_TO", "").strip()
+    if target and target != config.DATABASE_URL:
+        try:
+            move = await dbmove.run(config.DATABASE_URL, target)
+        except Exception as e:     # hech qachon botni yiqitmasin
+            log.exception("Baza ko'chirish kutilmagan xato")
+            move = ("failed", f"{type(e).__name__}: {e}")
+        log.warning("Baza ko'chirish: %s — %s", *move)
+        if move[0] in ("moved", "already"):
+            config.DATABASE_URL = target
     await db.init()
     log.info("Baza tayyor. Super-adminlar: %s", config.ADMIN_IDS)
+    if move and move[0] != "already":
+        for admin in config.ADMIN_IDS:
+            try:
+                await app.bot.send_message(
+                    admin, f"🗄 Baza ko'chirish: {move[0]}\n{move[1]}"[:4000])
+            except Exception:
+                log.warning("Ko'chirish natijasi adminga yuborilmadi (%s)", admin)
     await tournament.load_active()
     await _run_one_time_fixes()
     await app.bot.set_my_commands([
