@@ -6706,3 +6706,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `MOVE_DB_TO == DATABASE_URL` bo'lsa hech narsa qilinmaydi.
      Sinov: `test_dbmove.py` 11/11 (bytea, jsonb, NULL/'' , maxsus belgilar,
      kodda yo'q jadval/ustun, qayta ishga tushirish, xato holatlari).
+
+     BAJARILDI (28-sentabr, 06:17 UTC): "moved — 16 jadval, 589 379 qator"
+     (volume_snapshots 576 797, news_events 6 212, macd_alerts 3 610, users
+     1 572, workspaces 596). Keyin bot VA web `DATABASE_URL` =
+     `${{Postgres-T1tW.DATABASE_URL}}`; ikkalasi yangi bazada ishlayapti.
+     Botda `MOVE_DB_TO` qoldi — endi `DATABASE_URL` bilan bir xil, hech narsa
+     qilmaydi. Eski `Postgres` servisi ZAXIRA sifatida o'zgarishsiz qoldirildi;
+     unda kod sxemasida yo'q eski `memberships`, `star_payments` jadvallari
+     bor (ko'chirilmadi). Bir necha kundan keyin, foydalanuvchi tasdiqlasa,
+     o'chiriladi (~0.6 GB RAM tejaladi).
