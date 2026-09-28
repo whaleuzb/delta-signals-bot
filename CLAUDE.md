@@ -6712,7 +6712,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      1 572, workspaces 596). Keyin bot VA web `DATABASE_URL` =
      `${{Postgres-T1tW.DATABASE_URL}}`; ikkalasi yangi bazada ishlayapti.
      Botda `MOVE_DB_TO` qoldi — endi `DATABASE_URL` bilan bir xil, hech narsa
-     qilmaydi. Eski `Postgres` servisi ZAXIRA sifatida o'zgarishsiz qoldirildi;
-     unda kod sxemasida yo'q eski `memberships`, `star_payments` jadvallari
-     bor (ko'chirilmadi). Bir necha kundan keyin, foydalanuvchi tasdiqlasa,
-     o'chiriladi (~0.6 GB RAM tejaladi).
+     qilmaydi. Kod sxemasida yo'q eski `memberships`, `star_payments`
+     jadvallari `dbmove.copy_legacy` (`COPY_LEGACY_FROM`) bilan yangi bazaga
+     arxivlandi — ikkalasi ham bo'sh (0 qator) chiqdi; `COPY_LEGACY_FROM`
+     keyin "" qilindi. Eski disksiz `Postgres` servisi foydalanuvchi
+     so'rovi bilan O'CHIRILDI (28-sentabr, ~06:50 UTC; ~0.6 GB RAM tejaldi).
+     Endi loyihada yagona baza — `Postgres-T1tW` (diskli).
