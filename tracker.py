@@ -11,17 +11,21 @@ import config
 import db
 import exchange
 import forex
+import futures
 import stocks
 
 log = logging.getLogger(__name__)
 
 
 def provider(market: str):
-    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
+    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, fyuchers —
+    MEXC kontraktlari (198), aks holda MEXC spot."""
     if market == "forex":
         return forex
     if market == "stock":
         return stocks
+    if market == "futures":
+        return futures
     return exchange
 
 

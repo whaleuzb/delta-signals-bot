@@ -17,10 +17,7 @@ from matplotlib.lines import Line2D
 
 import config
 import db
-import exchange
-import forex
 import i18n
-import stocks
 import tracker
 
 TZ = ZoneInfo(config.TZ)
@@ -35,13 +32,8 @@ GREEN = "#26a69a"
 RED = "#ef5350"
 
 
-def _provider(market: str):
-    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, aks holda MEXC."""
-    if market == "forex":
-        return forex
-    if market == "stock":
-        return stocks
-    return exchange
+# Kuzatuv bilan BITTA qoida (fyuchers ham, 198).
+_provider = tracker.provider
 
 
 async def _safe_price(market: str, symbol: str):

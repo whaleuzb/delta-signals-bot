@@ -6744,3 +6744,18 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Sinov: `test_backfill.py` 25/25 (sintetik 48 kunlik tarix: ochiq qolishi
      +44.93%, tarixda stop −10.7% va sanasi, kanalga 0 xabar, oynalar
      uzluksiz ≤500 daq); regressiya testlari o'tdi.
+
+198. **MEXC fyuchers narx manbasi (`futures.py`).**
+     `/eski TRBUSDT …` "juftligi topilmadi" berdi: TRB MEXC spot'da umuman
+     yo'q (probe narx topmadi — log ham yo'q), faqat fyuchersda. `futures.py`
+     — `exchange` bilan bir xil interfeys (`resolve`, `klines`, `last_price`,
+     `close`), `contract.mexc.com` (kalitsiz): `/api/v1/contract/detail`
+     (state 0, faqat `_USDT`, 1 soat kesh), `/ticker?symbol=TRB_USDT`
+     (`data.lastPrice`), `/kline/TRB_USDT?interval=Min1&start=<s>&end=<s>`
+     (`data.time/open/high/low/close/vol` massivlar; soniyalar). Juftlik bot
+     ichida `TRBUSDT`, bozor `futures`; `klines` oynani doim BOSHIDAN
+     `limit` (≤2000) sham bilan cheklaydi. `resolve_symbol` — ENG OXIRIDA
+     (spot bo'lsa spot ustun). `tracker.provider('futures')`; `stats._provider`
+     endi `tracker.provider` (bitta qoida). Karta "FUTURES" deb ko'rsatadi.
+     ⚠️ API formati sandboxdan tekshirib bo'lmadi (domen yopiq) — hujjat
+     bo'yicha; prodda log bilan tasdiqlanadi. Sinov: `test_futures.py` 12/12.

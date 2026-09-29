@@ -53,6 +53,7 @@ import tournament
 import stats
 import tgsource
 import dbmove
+import futures
 import tracker
 import translate
 
@@ -3287,6 +3288,17 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
             break
         if sym:
             return sym, "crypto"
+    # MEXC fyuchers (198) — spot'da umuman yo'q juftliklar (masalan TRBUSDT).
+    # ENG OXIRIDA: spot bor bo'lsa u ustun (narx deyarli bir xil, spot
+    # kuzatuvi sinalgan). Kontraktlar ro'yxati keshda — tarmoq so'rovi soatda bir.
+    for raw in cands[:2]:
+        try:
+            sym = await futures.resolve(raw)
+        except Exception:
+            log.warning("MEXC fyuchers ro'yxati olinmadi", exc_info=True)
+            break
+        if sym:
+            return sym, "futures"
     return None, "crypto"
 
 
@@ -8347,6 +8359,7 @@ async def post_init(app: Application) -> None:
 async def post_shutdown(app: Application) -> None:
     await tgsource.close()
     await exchange.close()
+    await futures.close()
     await forex.close()
     await stocks.close()
 
