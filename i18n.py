@@ -3613,6 +3613,69 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🌐 Язык",
         "en": "🌐 Language",
     },
+    # ── Eski (o'tgan sanali) signal — /eski (197) ──
+    "bf.usage": {
+        "uz": ("📜 <b>Eski signal qo'shish</b> (joriy guruh/kanal/jurnalga)\n\n"
+               "<code>/eski JUFTLIK KIRISH STOP TP1 [TP2 ...] SANA VAQT</code>\n"
+               "Masalan: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
+               "Vaqt — Toshkent vaqti; kirish shu vaqtdagi bozor narxida deb olinadi. "
+               "Yo'nalish TP'dan aniqlanadi (xohlasangiz LONG/SHORT yozing). "
+               "Bot haqiqiy narx tarixini qayta ko'rib chiqadi — kanalga eski "
+               "xabarlar ketmaydi, tugagach sizga yozadi."),
+        "ru": ("📜 <b>Добавить старый сигнал</b> (в текущую группу/канал/журнал)\n\n"
+               "<code>/eski ПАРА ВХОД СТОП TP1 [TP2 ...] ДАТА ВРЕМЯ</code>\n"
+               "Например: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
+               "Время — ташкентское; вход по рыночной цене в это время. "
+               "Направление определяется по TP (можно указать LONG/SHORT). "
+               "Бот заново пройдёт реальную историю цены — старые сообщения в канал "
+               "не отправляются, по завершении бот напишет вам."),
+        "en": ("📜 <b>Add a past signal</b> (to the current group/channel/journal)\n\n"
+               "<code>/eski PAIR ENTRY STOP TP1 [TP2 ...] DATE TIME</code>\n"
+               "Example: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
+               "Time is Tashkent time; entry is taken at market at that moment. "
+               "Direction is inferred from TP (or write LONG/SHORT). "
+               "The bot replays the real price history — no old messages are posted "
+               "to the channel; it will message you when done."),
+    },
+    "bf.bad_date": {
+        "uz": "❌ Sana/vaqt noto'g'ri. Masalan: <code>2026-08-12 08:29</code> yoki <code>12.08.2026 08:29</code> — o'tmishda, 180 kundan eski emas.",
+        "ru": "❌ Неверная дата/время. Например: <code>2026-08-12 08:29</code> или <code>12.08.2026 08:29</code> — в прошлом, не старше 180 дней.",
+        "en": "❌ Invalid date/time. E.g. <code>2026-08-12 08:29</code> or <code>12.08.2026 08:29</code> — in the past, not older than 180 days.",
+    },
+    "bf.bad_levels": {
+        "uz": "❌ Narxlar mos emas: LONG'da STOP < KIRISH < TP, SHORT'da aksincha.",
+        "ru": "❌ Цены не сходятся: для LONG СТОП < ВХОД < TP, для SHORT наоборот.",
+        "en": "❌ Levels don't fit: for LONG STOP < ENTRY < TP, for SHORT the reverse.",
+    },
+    "bf.not_found": {
+        "uz": "❌ <b>{sym}</b> juftligi topilmadi.",
+        "ru": "❌ Пара <b>{sym}</b> не найдена.",
+        "en": "❌ Pair <b>{sym}</b> not found.",
+    },
+    "bf.added": {
+        "uz": ("✅ Eski signal <b>#{sid}</b> qo'shildi: <b>{sym} {side}</b>, kirish {entry}, "
+               "{when}.\n\n⏳ Narx tarixi qayta ko'rib chiqilmoqda (~{mins} daqiqa). "
+               "Tugagach natijani yozaman."),
+        "ru": ("✅ Старый сигнал <b>#{sid}</b> добавлен: <b>{sym} {side}</b>, вход {entry}, "
+               "{when}.\n\n⏳ История цены пересматривается (~{mins} мин). "
+               "По завершении напишу результат."),
+        "en": ("✅ Past signal <b>#{sid}</b> added: <b>{sym} {side}</b>, entry {entry}, "
+               "{when}.\n\n⏳ Replaying price history (~{mins} min). "
+               "I'll message you the result when done."),
+    },
+    "bf.done_open": {
+        "uz": ("📜 Eski signal <b>#{sid} {sym}</b> tarixi ko'rib chiqildi — pozitsiya "
+               "hali OCHIQ, joriy natija <b>{pnl:+.2f}%</b>. Endi oddiy signal kabi kuzatiladi."),
+        "ru": ("📜 История старого сигнала <b>#{sid} {sym}</b> пройдена — позиция "
+               "ещё ОТКРЫТА, текущий результат <b>{pnl:+.2f}%</b>. Дальше отслеживается как обычно."),
+        "en": ("📜 Past signal <b>#{sid} {sym}</b> history replayed — position is "
+               "still OPEN, current result <b>{pnl:+.2f}%</b>. Tracked normally from now on."),
+    },
+    "bf.closed": {
+        "uz": "📜 Eski signal tarixida (kanalga yuborilmadi):",
+        "ru": "📜 В истории старого сигнала (в канал не отправлено):",
+        "en": "📜 In the past signal's history (not posted to the channel):",
+    },
 }
 
 

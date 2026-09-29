@@ -6718,3 +6718,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      keyin "" qilindi. Eski disksiz `Postgres` servisi foydalanuvchi
      so'rovi bilan O'CHIRILDI (28-sentabr, ~06:50 UTC; ~0.6 GB RAM tejaldi).
      Endi loyihada yagona baza — `Postgres-T1tW` (diskli).
+
+197. **Eski (o'tgan sanali) signal qo'shish — `/eski`.**
+     Foydalanuvchi: "bitta eski signalni qo'shish kerak" (TRBUSDT, kirish 13.8,
+     TP 29.01/73.10, SL 12.32, 12-avgust 08:29, "Mamurjon mt" kanali).
+     `/eski JUFTLIK KIRISH STOP TP1 [TP2..] SANA VAQT` (Toshkent vaqti;
+     `2026-08-12 08:29` yoki `12.08.2026 08:29`; LONG/SHORT ixtiyoriy — TP'dan
+     aniqlanadi). Faqat `can_manage`, joriy workspace'ga. Sana o'tmishda
+     (≥10 daqiqa) va ≤180 kun. `db.create_backfill_signal`: ACTIVE,
+     `created_at=opened_at=o'sha vaqt`, `backfill=TRUE`.
+     - `tracker.process`: `backfill` bo'lsa oyna `[start, start+500 daqiqa]` —
+       MEXC uzun oynada oxirgi 500 shamni qaytarib, o'rtadagi tarixni
+       tashlab ketardi. ≈45 s da 8 soat tarix (48 kun ≈ 1 s 45 daq).
+       Bo'sh javobda bo'lak O'TKAZILMAYDI (429 ham bo'sh) — qayta so'raladi.
+     - `poll_job`: `backfill` signal hodisalari guruhga KETMAYDI; yopilsa
+       natija qo'shgan odamga DM ("kanalga yuborilmadi"). Depozit hisobi odatdagidek.
+     - `_finish_backfills` (har poll oxirida): `last_checked_ms` hozirdan
+       ≤10 daq orqada yoki signal yopilgan → `end_backfill` (bosqich joriy
+       foizga — eski foyda uchun bosqich xabari chiqmaydi) + DM "tarix ko'rib
+       chiqildi, joriy natija".
+     - `milestone_job` `backfill` signallarni o'tkazib yuboradi.
+     Sinov: `test_backfill.py` 21/21 (sintetik 48 kunlik tarix: ochiq qolishi
+     +44.93%, tarixda stop −10.7% va sanasi, kanalga 0 xabar, oynalar
+     uzluksiz ≤500 daq); regressiya testlari o'tdi.

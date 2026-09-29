@@ -112,7 +112,14 @@ async def process(sig) -> list[dict]:
     # "bitta chegarasiz shamni o'tkazib yuborish" — bu YETARLI EMAS edi,
     # chunki butun QAYTGAN massiv, faqat birinchi shami emas, eski edi).
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    candles = await provider(sig["market"]).klines(symbol, start_ms + 1, end_ms=now_ms)
+    end_ms = now_ms
+    if sig.get("backfill"):
+        # Eski signal (197): oyna 500 daqiqadan uzun — MEXC endTime berilganda
+        # ham oynaning OXIRIDAGI 500 shamni qaytarishi mumkin, o'rtadagi tarix
+        # o'tkazib yuborilardi. Shu sabab bo'laklab: har siklda keyingi 500
+        # daqiqa (≈45 soniyada 8 soat tarix).
+        end_ms = min(now_ms, start_ms + 500 * 60_000)
+    candles = await provider(sig["market"]).klines(symbol, start_ms + 1, end_ms=end_ms)
     # Oxirgi qaytgan sham hali TO'LIQ YOPILMAGAN bo'lishi mumkin — MEXC
     # (va forex/aksiya provayderlari) joriy shakllanayotgan (hali davom
     # etayotgan) shamni ham qaytaradi, `close_ms`si hozirdan KEYIN bo'lsa
@@ -129,6 +136,11 @@ async def process(sig) -> list[dict]:
     while candles and candles[-1].close_ms > now_ms:
         candles = candles[:-1]
     if not candles:
+        if sig.get("backfill"):
+            # Bo'lakni o'tkazib yubormaymiz (429/uzilish ham bo'sh qaytaradi —
+            # tarix yo'qolardi); keyingi siklda shu joydan qayta so'raladi.
+            log.warning("Eski signal #%s %s: %s dan sham kelmadi — qayta urinamiz",
+                        sig["id"], symbol, start_ms)
         return []
 
     events: list[dict] = []

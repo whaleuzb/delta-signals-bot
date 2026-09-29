@@ -4428,6 +4428,19 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             money_delta = float(closed_pnl) / 100 * float(sig["alloc_amount"])
             await db.apply_deposit_delta(ws["id"], money_delta)
 
+        # Eski signal (197): tarix qayta ko'rib chiqilmoqda — guruhga eski
+        # hodisa xabari ketmaydi; yopilgan bo'lsa natija qo'shgan odamga DM.
+        if sig and sig["backfill"]:
+            if closed_pnl is not None and sig["author_id"]:
+                try:
+                    alang = await user_lang(sig["author_id"])
+                    await ctx.bot.send_message(
+                        sig["author_id"], i18n.t("bf.closed", alang) + "\n" + txt,
+                        parse_mode=ParseMode.HTML)
+                except Exception:
+                    log.warning("Eski signal natijasi yuborilmadi (#%s)", sid)
+            continue
+
         # Signal shu hodisada yopilgan bo'lsa (STOP yoki yakuniy TP) — matn,
         # grafik va ulashish kartasi bitta yo'l orqali yuboriladi
         # (`send_close_result`), qo'lda yopish bilan AYNI.
@@ -4475,6 +4488,40 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                             parse_mode=ParseMode.HTML, reply_markup=kb)
             except Exception:
                 log.exception("TP/SL so'rovi yuborilmadi (#%s)", sid)
+
+    await _finish_backfills(ctx)
+
+
+async def _finish_backfills(ctx) -> None:
+    """Eski signallar (197): tarix hozirgi vaqtga yetgan yoki signal yopilgan
+    bo'lsa — oddiy signalga aylantiriladi. Bosqich joriy foizga qo'yiladi,
+    shunda eski foyda uchun bosqich xabari kanalga ketmaydi."""
+    try:
+        rows = await db.backfill_signals()
+    except Exception:
+        log.exception("Eski signallar o'qilmadi")
+        return
+    now_ms = int(time.time() * 1000)
+    for s in rows:
+        live = s["status"] in ("PENDING", "ACTIVE")
+        if live and (s["last_checked_ms"] or 0) < now_ms - 10 * 60_000:
+            continue   # hali tarix ko'rib chiqilmoqda
+        pnl = None
+        if live:
+            price = await safe_last_price(s["market"], s["symbol"])
+            if price:
+                pnl = tracker.pnl_at(s["side"], float(s["entry"]), price)
+        await db.end_backfill(s["id"], milestone_band(pnl) if pnl is not None else 0)
+        log.info("Eski signal #%s: tarix ko'rib chiqildi (%s)", s["id"], s["status"])
+        if live and pnl is not None and s["author_id"]:
+            try:
+                await ctx.bot.send_message(
+                    s["author_id"],
+                    i18n.t("bf.done_open", await user_lang(s["author_id"]),
+                           sid=s["id"], sym=s["symbol"], pnl=pnl),
+                    parse_mode=ParseMode.HTML)
+            except Exception:
+                log.warning("Eski signal yakuni yuborilmadi (#%s)", s["id"])
 
 
 # ─────────────── Avtomatik kunlik hisobot ───────────────
@@ -4646,7 +4693,8 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Milestone siklida xato (bazadan o'qishda)")
         return
 
-    active = [s for s in rows if s["status"] == "ACTIVE"]
+    # Eski signal (197) tarixi hali ko'rib chiqilayotgan bo'lsa — bosqich yo'q.
+    active = [s for s in rows if s["status"] == "ACTIVE" and not s["backfill"]]
     if not active:
         return
 
@@ -4913,6 +4961,81 @@ async def cmd_qaytar(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await db.apply_deposit_delta(ev["workspace_id"], -money)
     await update.message.reply_text(
         i18n.t("adm.reopen_done", lang, sid=sig_id, sym=html.escape(ev["symbol"])),
+        parse_mode=ParseMode.HTML)
+
+
+def _parse_backfill_time(date_s: str, time_s: str) -> datetime | None:
+    """'2026-08-12' / '12.08.2026' + '08:29' (Toshkent vaqti) -> UTC.
+    O'tmishda (kamida 10 daqiqa oldin) va 180 kundan eski bo'lmasligi kerak."""
+    for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M"):
+        try:
+            local = datetime.strptime(f"{date_s} {time_s}", fmt).replace(tzinfo=stats.TZ)
+            break
+        except ValueError:
+            continue
+    else:
+        return None
+    at = local.astimezone(timezone.utc)
+    now = datetime.now(timezone.utc)
+    if not (now - timedelta(days=180) <= at <= now - timedelta(minutes=10)):
+        return None
+    return at
+
+
+async def cmd_eski(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Eski (o'tgan sanada kirilgan) signalni joriy workspace'ga qo'shish (197).
+    Faqat egasi/super-admin. Kuzatuv haqiqiy 1m tarixni o'sha vaqtdan qayta
+    ko'rib chiqadi (bo'laklab), guruhga eski xabar yubormaydi."""
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not can_manage(uid, ws):
+        await update.message.reply_text(i18n.t("man.no_right", lang))
+        return
+    args = list(ctx.args or [])
+    side = None
+    for a in list(args):
+        if a.upper() in ("LONG", "SHORT"):
+            side = a.upper()
+            args.remove(a)
+    if len(args) < 6:
+        await update.message.reply_text(i18n.t("bf.usage", lang), parse_mode=ParseMode.HTML)
+        return
+    raw_sym, date_s, time_s = args[0], args[-2], args[-1]
+    nums = [_parse_price(x) for x in args[1:-2]]
+    if any(n is None or n <= 0 for n in nums) or len(nums) < 3:
+        await update.message.reply_text(i18n.t("bf.usage", lang), parse_mode=ParseMode.HTML)
+        return
+    entry, sl, tps = nums[0], nums[1], nums[2:]
+    side = side or ("LONG" if tps[0] > entry else "SHORT")
+    ok = (sl < entry and all(t > entry for t in tps)) if side == "LONG" else \
+         (sl > entry and all(t < entry for t in tps))
+    if not ok:
+        await update.message.reply_text(i18n.t("bf.bad_levels", lang))
+        return
+    at = _parse_backfill_time(date_s, time_s)
+    if at is None:
+        await update.message.reply_text(i18n.t("bf.bad_date", lang), parse_mode=ParseMode.HTML)
+        return
+    sym, market = await resolve_symbol([raw_sym])
+    if not sym:
+        await update.message.reply_text(
+            i18n.t("bf.not_found", lang, sym=html.escape(raw_sym)), parse_mode=ParseMode.HTML)
+        return
+    tps = sorted(tps, reverse=(side == "SHORT"))
+    sid = await db.create_backfill_signal(ws["id"], {
+        "symbol": sym, "side": side, "entry": entry, "sl": sl, "tps": tps,
+        "author_id": uid, "market": market}, at)
+    minutes = (datetime.now(timezone.utc) - at).total_seconds() / 60
+    eta = max(1, round(minutes / 500 * config.POLL_SECONDS / 60))
+    log.info("Eski signal #%s qo'shildi: ws#%s %s %s %s @ %s (uid=%s)",
+             sid, ws["id"], sym, side, entry, at.isoformat(), uid)
+    await update.message.reply_text(
+        i18n.t("bf.added", lang, sid=sid, sym=html.escape(sym), side=side,
+               entry=fmt_price(entry),
+               when=at.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M"), mins=eta),
         parse_mode=ParseMode.HTML)
 
 
@@ -8263,6 +8386,7 @@ def main() -> None:
     # (oddiy foydalanuvchi menyusida ko'rinmasin).
     app.add_handler(CommandHandler("tuzat", cmd_tuzat))
     app.add_handler(CommandHandler("qaytar", cmd_qaytar))
+    app.add_handler(CommandHandler("eski", cmd_eski))
     app.add_handler(CommandHandler("karta", cmd_karta))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))

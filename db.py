@@ -493,6 +493,9 @@ CREATE INDEX IF NOT EXISTS idx_sadds_sig ON signal_adds(signal_id, status);
 -- Turnir savdosiga qo'shimcha kirish shu ulushda turnir summasini ham
 -- oshiradi; `amount_first` — boshlang'ich summa (nisbat shundan).
 ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS amount_first NUMERIC;
+-- Eski (o'tgan sanali) signal (197): tarix jimgina qayta ko'rib chiqilmoqda —
+-- hodisa/bosqich xabarlari guruhga ketmaydi; hozirgi vaqtga yetgach FALSE.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS backfill BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -995,6 +998,33 @@ async def create_signal(workspace_id: int, d: dict) -> int:
             d.get("market", "crypto"), entry_mode, status, opened_at,
             d.get("chart_tf"),
         )
+
+
+async def create_backfill_signal(workspace_id: int, d: dict, opened_at: datetime) -> int:
+    """O'tgan sanada bozor narxida kirilgan signal (197). `created_at` va
+    `opened_at` — o'sha vaqt; `last_checked_ms` bo'sh, shuning uchun kuzatuv
+    tarixni `opened_at`dan boshlab (1m shamlar) qayta ko'rib chiqadi."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO signals (workspace_id, symbol, side, entry, sl, sl_initial, tps, "
+            "author_id, market, entry_mode, status, created_at, opened_at, backfill) "
+            "VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,'market','ACTIVE',$9,$9,TRUE) RETURNING id",
+            workspace_id, d["symbol"], d["side"], _d(d["entry"]), _d(d["sl"]),
+            [_d(t) for t in d["tps"]], d.get("author_id"), d.get("market", "crypto"),
+            opened_at)
+
+
+async def backfill_signals() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT * FROM signals WHERE backfill ORDER BY id")
+
+
+async def end_backfill(sig_id: int, milestone: int = 0) -> None:
+    """Qayta ko'rib chiqish tugadi: endi oddiy signal. `milestone` — joriy
+    bosqich, shunda bosqich xabari darhol (eski foyda uchun) chiqmaydi."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET backfill=FALSE, milestone_pct=$2 WHERE id=$1",
+                        sig_id, milestone)
 
 
 async def copy_signal(sig_id: int, target_ws_id: int) -> int | None:
