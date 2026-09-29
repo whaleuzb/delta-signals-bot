@@ -6738,6 +6738,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        foizga — eski foyda uchun bosqich xabari chiqmaydi) + DM "tarix ko'rib
        chiqildi, joriy natija".
      - `milestone_job` `backfill` signallarni o'tkazib yuboradi.
-     Sinov: `test_backfill.py` 21/21 (sintetik 48 kunlik tarix: ochiq qolishi
+     - Summa: `20000$` yoki `$20000` tokeni → `set_signal_allocation(sid,
+       summa, joriy depozit)`; depozit belgilanmagan bo'lsa rad. Tarixda
+       yopilsa depozit farqi odatdagidek qo'llanadi.
+     Sinov: `test_backfill.py` 25/25 (sintetik 48 kunlik tarix: ochiq qolishi
      +44.93%, tarixda stop −10.7% va sanasi, kanalga 0 xabar, oynalar
      uzluksiz ≤500 daq); regressiya testlari o'tdi.

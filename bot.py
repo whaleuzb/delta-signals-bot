@@ -4996,10 +4996,22 @@ async def cmd_eski(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     args = list(ctx.args or [])
     side = None
+    amount = None
     for a in list(args):
         if a.upper() in ("LONG", "SHORT"):
             side = a.upper()
             args.remove(a)
+        elif "$" in a:
+            # Depozitdan ajratilgan summa: `20000$` yoki `$20000`.
+            amount = _parse_price(a.replace("$", ""))
+            if amount is None or amount <= 0:
+                await update.message.reply_text(i18n.t("bf.usage", lang),
+                                                parse_mode=ParseMode.HTML)
+                return
+            args.remove(a)
+    if amount is not None and ws["deposit"] is None:
+        await update.message.reply_text(i18n.t("bf.no_deposit", lang))
+        return
     if len(args) < 6:
         await update.message.reply_text(i18n.t("bf.usage", lang), parse_mode=ParseMode.HTML)
         return
@@ -5028,6 +5040,8 @@ async def cmd_eski(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     sid = await db.create_backfill_signal(ws["id"], {
         "symbol": sym, "side": side, "entry": entry, "sl": sl, "tps": tps,
         "author_id": uid, "market": market}, at)
+    if amount is not None:
+        await db.set_signal_allocation(sid, amount, float(ws["deposit"]))
     minutes = (datetime.now(timezone.utc) - at).total_seconds() / 60
     eta = max(1, round(minutes / 500 * config.POLL_SECONDS / 60))
     log.info("Eski signal #%s qo'shildi: ws#%s %s %s %s @ %s (uid=%s)",
@@ -5035,7 +5049,8 @@ async def cmd_eski(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         i18n.t("bf.added", lang, sid=sid, sym=html.escape(sym), side=side,
                entry=fmt_price(entry),
-               when=at.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M"), mins=eta),
+               when=at.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M"), mins=eta)
+        + (i18n.t("bf.amount", lang, amt=amount) if amount is not None else ""),
         parse_mode=ParseMode.HTML)
 
 

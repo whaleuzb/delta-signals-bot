@@ -3620,6 +3620,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "Masalan: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
                "Vaqt — Toshkent vaqti; kirish shu vaqtdagi bozor narxida deb olinadi. "
                "Yo'nalish TP'dan aniqlanadi (xohlasangiz LONG/SHORT yozing). "
+               "Depozitdan summa: <code>20000$</code> qo'shing. "
                "Bot haqiqiy narx tarixini qayta ko'rib chiqadi — kanalga eski "
                "xabarlar ketmaydi, tugagach sizga yozadi."),
         "ru": ("📜 <b>Добавить старый сигнал</b> (в текущую группу/канал/журнал)\n\n"
@@ -3627,6 +3628,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "Например: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
                "Время — ташкентское; вход по рыночной цене в это время. "
                "Направление определяется по TP (можно указать LONG/SHORT). "
+               "Сумма из депозита: добавьте <code>20000$</code>. "
                "Бот заново пройдёт реальную историю цены — старые сообщения в канал "
                "не отправляются, по завершении бот напишет вам."),
         "en": ("📜 <b>Add a past signal</b> (to the current group/channel/journal)\n\n"
@@ -3634,6 +3636,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "Example: <code>/eski TRBUSDT 13.8 12.32 29.01 73.10 2026-08-12 08:29</code>\n\n"
                "Time is Tashkent time; entry is taken at market at that moment. "
                "Direction is inferred from TP (or write LONG/SHORT). "
+               "Amount from the deposit: add <code>20000$</code>. "
                "The bot replays the real price history — no old messages are posted "
                "to the channel; it will message you when done."),
     },
@@ -3646,6 +3649,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "❌ Narxlar mos emas: LONG'da STOP < KIRISH < TP, SHORT'da aksincha.",
         "ru": "❌ Цены не сходятся: для LONG СТОП < ВХОД < TP, для SHORT наоборот.",
         "en": "❌ Levels don't fit: for LONG STOP < ENTRY < TP, for SHORT the reverse.",
+    },
+    "bf.no_deposit": {
+        "uz": "❌ Summa ajratish uchun avval depozitni belgilang (menyu → Depozit).",
+        "ru": "❌ Чтобы выделить сумму, сначала задайте депозит (меню → Депозит).",
+        "en": "❌ Set the deposit first to allocate an amount (menu → Deposit).",
+    },
+    "bf.amount": {
+        "uz": "\n💰 Ajratilgan summa: <b>{amt:,.0f}$</b>.",
+        "ru": "\n💰 Выделенная сумма: <b>{amt:,.0f}$</b>.",
+        "en": "\n💰 Allocated amount: <b>{amt:,.0f}$</b>.",
     },
     "bf.not_found": {
         "uz": "❌ <b>{sym}</b> juftligi topilmadi.",
