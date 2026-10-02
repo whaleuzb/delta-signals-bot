@@ -6759,3 +6759,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      endi `tracker.provider` (bitta qoida). Karta "FUTURES" deb ko'rsatadi.
      ⚠️ API formati sandboxdan tekshirib bo'lmadi (domen yopiq) — hujjat
      bo'yicha; prodda log bilan tasdiqlanadi. Sinov: `test_futures.py` 12/12.
+
+199. **Hajm portlashi postlari o'chirildi (`SURGE_ENABLED`).**
+     Foydalanuvchi "龙虾USDT — savdo hajmi keskin oshdi" postini ko'rib:
+     "savdo hajmi oshishini olib tashlamaganmiding?" — avval olib
+     tashlanmagan edi (yozuv yo'q); variantlardan "1 — butunlay o'chirish"ni
+     tanladi. `config.SURGE_ENABLED` (standart "0"): o'chiq bo'lsa
+     `volume_snapshot_job`, `surge_scan_job` va `whale_scan_job` (kit
+     xabarlari faqat portlash nomzodlarida ishlardi) jadvalga QO'YILMAYDI;
+     `housekeeping(drop_volume=True)` `volume_snapshots`ni bo'shatadi.
+     MACD, yangiliklar, listing, likvidatsiya, iqtisodiy taqvim o'zgarmadi.
+     Qayta yoqish: Railway botda `SURGE_ENABLED=1` (tarix 1–2 kunda yig'iladi).

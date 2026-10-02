@@ -114,6 +114,10 @@ ECON_RESULT_LOOKBACK_MINUTES = int(os.getenv("ECON_RESULT_LOOKBACK_MINUTES", "18
 # CryptoPanic — tanga bo'yicha yangilik qidirish. Bo'sh bo'lsa qidiruv
 # o'chadi, lekin portlash SIGNALI o'zi baribir postlanadi (sababsiz).
 CRYPTOPANIC_TOKEN = os.getenv("CRYPTOPANIC_TOKEN", "")
+# 199: foydalanuvchi so'rovi bilan STANDART O'CHIQ ("savdo hajmi oshishini
+# olib tashla"). O'chiq bo'lsa hajm surati, portlash skaneri va unga bog'liq
+# kit (whale) xabarlari ishlamaydi. Qayta yoqish: Railway'da SURGE_ENABLED=1.
+SURGE_ENABLED = os.getenv("SURGE_ENABLED", "0") == "1"
 # Oxirgi hajm bazaviy o'rtachadan necha marta katta bo'lsa "portlash".
 # 3 -> 2.2: foydalanuvchi "kanalda ko'proq xabar kelishi" so'ragach
 # yumshatildi — ko'proq signal, ozroq "kuchlilik" kafolati (tabiiy savdo).

@@ -1905,8 +1905,10 @@ async def compact_volume_snapshots(exclude_hours: float) -> int:
     return n
 
 
-async def housekeeping() -> int:
+async def housekeeping(drop_volume: bool = False) -> int:
     """Kunlik tozalash (195), bot jarayonidan chaqiriladi.
+    - `drop_volume` (199): hajm portlashi o'chiq — `volume_snapshots` kerak
+      emas, bo'shatiladi (qayta yoqilsa 1–2 kunda o'zi qayta yig'iladi).
     - `news_events.profile_data` (hajm profili, katta JSON) faqat jonli oyna
       (~20 daqiqa) va shu vaqtdagi kit xabari uchun kerak — 3 kundan eski
       qatorlarda bo'shatiladi (xabarning o'zi, natija va dedup qoladi).
@@ -1919,6 +1921,9 @@ async def housekeeping() -> int:
         r = await c.execute(
             "UPDATE news_events SET profile_data=NULL "
             "WHERE profile_data IS NOT NULL AND event_at < now() - interval '3 days'")
+        if drop_volume and await c.fetchval("SELECT EXISTS (SELECT 1 FROM volume_snapshots)"):
+            await c.execute("TRUNCATE volume_snapshots")
+            log.info("Hajm portlashi o'chiq — volume_snapshots bo'shatildi")
     return int(r.split()[-1])
 
 

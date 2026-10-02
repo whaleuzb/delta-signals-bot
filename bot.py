@@ -7414,7 +7414,7 @@ async def volume_snapshot_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def housekeeping_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Kunlik baza tozalash (195) — `db.housekeeping` izohiga qarang."""
     try:
-        n = await db.housekeeping()
+        n = await db.housekeeping(drop_volume=not config.SURGE_ENABLED)
         if n:
             log.info("Tozalash: %s ta eski hajm profili bo'shatildi", n)
     except Exception:
@@ -8544,17 +8544,19 @@ def main() -> None:
     app.job_queue.run_repeating(econ_job, interval=60, first=20)
     # Hajm portlashi: hajm suratini SURGE_SNAPSHOT_HOURS soatda bir (bazaga
     # tarix yig'ish), nomzodlarni esa SURGE_SCAN_SECONDS'da bir tekshiradi.
-    app.job_queue.run_repeating(volume_snapshot_job,
-                                interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
-    app.job_queue.run_repeating(surge_scan_job,
-                                interval=config.SURGE_SCAN_SECONDS, first=120)
+    # Kit (whale) faolligi faqat portlash nomzodlarida — u ham shu bayroqqa
+    # bog'liq. 199: standart O'CHIQ (`config.SURGE_ENABLED`).
+    if config.SURGE_ENABLED:
+        app.job_queue.run_repeating(volume_snapshot_job,
+                                    interval=config.SURGE_SNAPSHOT_HOURS * 3600, first=30)
+        app.job_queue.run_repeating(surge_scan_job,
+                                    interval=config.SURGE_SCAN_SECONDS, first=120)
+        app.job_queue.run_repeating(whale_scan_job,
+                                    interval=config.WHALE_SCAN_SECONDS, first=100)
     # MACD kesishmasi — job tez-tez uyg'onadi, lekin YANGI sham yopilmagan
     # bo'lsa hech qanday so'rov yubormaydi (macd_scan_job izohiga qarang).
     app.job_queue.run_repeating(macd_scan_job,
                                 interval=config.MACD_SCAN_SECONDS, first=150)
-    # Kit (whale) faolligi — faqat portlash nomzodlarida (WHALE_SCAN_SECONDS).
-    app.job_queue.run_repeating(whale_scan_job,
-                                interval=config.WHALE_SCAN_SECONDS, first=100)
     # Yirik likvidatsiyalar: Coinalyze 5 daqiqalik ustunlarga mos interval
     # (COINALYZE_API_KEY bo'sh bo'lsa job o'zi hech narsa qilmaydi).
     app.job_queue.run_repeating(liquidation_scan_job, interval=300, first=150)
