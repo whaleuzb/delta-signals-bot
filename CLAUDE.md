@@ -6770,3 +6770,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `housekeeping(drop_volume=True)` `volume_snapshots`ni bo'shatadi.
      MACD, yangiliklar, listing, likvidatsiya, iqtisodiy taqvim o'zgarmadi.
      Qayta yoqish: Railway botda `SURGE_ENABLED=1` (tarix 1–2 kunda yig'iladi).
+
+200. **Eski signal #489 (TRB) to'xtab qoldi — 1m tarix yo'q.**
+     `/eski` bilan #489 qo'shildi (29-sentabr, ws#290 "Mamurjon mt", 20000$),
+     lekin 3 kun davomida har siklda "1786505340000 dan sham kelmadi":
+     MEXC fyuchers 48 kun oldingi Min1 oynasi uchun 200 + bo'sh massiv
+     qaytargan (xato logi yo'q). Tuzatish: `backfill` bo'lsa oyna navbat bilan
+     1m → 15m → 1h shamlar bilan so'raladi (har biri 500 sham); teginish
+     baribir low/high'dan. Hozirgi vaqtga yaqinlashganda yana 1m.
+     `futures.klines` bo'sh javobni (10 daqiqada bir) logga yozadi — haqiqiy
+     sabab prodda ko'rinsin. Sinov: `test_backfill.py` 28/28.

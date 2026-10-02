@@ -100,7 +100,18 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
         out.append(Candle(open_ms, float(o[i]), float(h[i]), float(lo[i]), float(c[i]),
                           open_ms + dur - 1, float(vol[i]) if i < len(vol) else 0.0))
     out.sort(key=lambda x: x.open_ms)
+    if not out:
+        # Tashxis (#489): bo'sh javob nimaligini ko'rish uchun — 10 daqiqada
+        # bir marta (har 45 soniyada log to'lmasin).
+        key = (symbol, interval)
+        if time.time() - _empty_logged.get(key, 0) > 600:
+            _empty_logged[key] = time.time()
+            log.warning("MEXC fyuchers %s %s [%s..%s]: bo'sh javob: %s",
+                        symbol, interval, params["start"], params["end"], str(body)[:300])
     return out[:limit]
+
+
+_empty_logged: dict[tuple[str, str], float] = {}
 
 
 async def last_price(symbol: str, fresh: bool = False) -> float | None:

@@ -116,14 +116,26 @@ async def process(sig) -> list[dict]:
     # "bitta chegarasiz shamni o'tkazib yuborish" — bu YETARLI EMAS edi,
     # chunki butun QAYTGAN massiv, faqat birinchi shami emas, eski edi).
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    end_ms = now_ms
+    prov = provider(sig["market"])
     if sig.get("backfill"):
         # Eski signal (197): oyna 500 daqiqadan uzun — MEXC endTime berilganda
         # ham oynaning OXIRIDAGI 500 shamni qaytarishi mumkin, o'rtadagi tarix
         # o'tkazib yuborilardi. Shu sabab bo'laklab: har siklda keyingi 500
-        # daqiqa (≈45 soniyada 8 soat tarix).
-        end_ms = min(now_ms, start_ms + 500 * 60_000)
-    candles = await provider(sig["market"]).klines(symbol, start_ms + 1, end_ms=end_ms)
+        # sham. 1m tarix shuncha orqaga saqlanmagan bo'lishi mumkin (#489,
+        # MEXC fyuchers 48 kun oldin uchun bo'sh qaytardi) — shunda o'sha
+        # oyna 15m, keyin 1h shamlar bilan (teginish baribir low/high'dan
+        # aniqlanadi; bir shamda ham TP, ham SL bo'lsa — odatdagi `ambiguous`).
+        candles = []
+        for tf, dur in (("1m", 60_000), ("15m", 900_000), ("1h", 3_600_000)):
+            candles = await prov.klines(symbol, start_ms + 1, tf=tf,
+                                        end_ms=min(now_ms, start_ms + 500 * dur))
+            if candles:
+                if tf != "1m":
+                    log.info("Eski signal #%s %s: 1m yo'q, %s shamlar ishlatildi",
+                             sig["id"], symbol, tf)
+                break
+    else:
+        candles = await prov.klines(symbol, start_ms + 1, end_ms=now_ms)
     # Oxirgi qaytgan sham hali TO'LIQ YOPILMAGAN bo'lishi mumkin — MEXC
     # (va forex/aksiya provayderlari) joriy shakllanayotgan (hali davom
     # etayotgan) shamni ham qaytaradi, `close_ms`si hozirdan KEYIN bo'lsa
