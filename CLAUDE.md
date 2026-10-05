@@ -6875,3 +6875,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        XOM bayt — 155-band). Tanlov sozlamada eslab qolinadi (`ctheme`/`cfmt`).
      - Sinov: delta-prop `test_share_card` (o'lchamlar, mavzular, begona/
        xarid qatori 404); bu tomonda 151 ta holat.
+     - **Moon va Blue Eye mavzulari** (foydalanuvchi rasmlari): to'liq fon
+       rasmi (`object-fit: cover` + mavzuga xos `focus`), matn chapdagi
+       qoraytirilgan qismda. Sayt (`terminal.js`) va server (`sharecard.py`)
+       bir xil; botda mavzu tugmalari ikki qatorda (3 + 2). Yangi mavzu
+       qo'shilsa `DF_THEMES` VA `on_df` naqshidagi ro'yxat ikkalasi ham
+       yangilansin (sinov aynan shuni ushladi).

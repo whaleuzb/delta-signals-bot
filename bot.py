@@ -4209,16 +4209,18 @@ def df_equity_png(data: dict, lang: str) -> io.BytesIO | None:
     return buf
 
 
-DF_THEMES = ("classic", "sherdor", "emerald")
+DF_THEMES = ("classic", "sherdor", "emerald", "moon", "blueeye")
 DF_FMTS = ("post", "story")
 
 
 def df_card_kb(lang: str, aid: int, tid: int, theme: str, fmt: str) -> InlineKeyboardMarkup:
     """Karta ostida — saytdagi kabi mavzu va format tanlash."""
-    names = {"classic": "Classic", "sherdor": "Sherdor", "emerald": "Emerald"}
+    names = {"classic": "Classic", "sherdor": "Sherdor", "emerald": "Emerald",
+             "moon": "Moon", "blueeye": "Blue Eye"}
+    btns = [InlineKeyboardButton(("✅ " if th == theme else "") + names[th],
+                                 callback_data=f"df:ct:{aid}:{tid}:{th}:{fmt}") for th in DF_THEMES]
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(("✅ " if th == theme else "") + names[th],
-                              callback_data=f"df:ct:{aid}:{tid}:{th}:{fmt}") for th in DF_THEMES],
+        btns[:3], btns[3:],
         [InlineKeyboardButton(("✅ " if f == fmt else "") + i18n.t(f"df.fmt_{f}", lang),
                               callback_data=f"df:ct:{aid}:{tid}:{theme}:{f}") for f in DF_FMTS],
         [InlineKeyboardButton(i18n.t("df.btn_journal", lang), callback_data=f"df:j:{aid}:0")],
@@ -9233,7 +9235,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(
         on_df, pattern=(r"^df:(home|l|set|sa|sc|st:\d+|eq:\d+|j:\d+:\d+|c:\d+:\d+|a:\d+|b:\d+|B:\d+"
                         r"|x:\d+:\d+|m:\d+:\d+|sm:\d+|sp:\d|wa:\d+:\d+|wk:\d+|wt:\d+:[ml]"
-                        r"|ct:\d+:\d+:(classic|sherdor|emerald):(post|story)|wy:\d+:" + DF_SYM + r"|p:\d+:" + DF_SYM
+                        r"|ct:\d+:\d+:(classic|sherdor|emerald|moon|blueeye):(post|story)|wy:\d+:" + DF_SYM + r"|p:\d+:" + DF_SYM
                         + r"|[sS]:\d+:" + DF_SYM + r":" + DF_PCT + r")$")))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
