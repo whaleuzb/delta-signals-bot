@@ -401,6 +401,10 @@ async def send_workspace_switcher(update: Update, ctx: ContextTypes.DEFAULT_TYPE
     if not any(w["is_channel"] for w in owned):
         rows.append([InlineKeyboardButton(i18n.t("ws.btn_add_channel", lang),
                                            callback_data="onboard:channel")])
+    # Dip Funded — joyga bog'liq emas (odamning o'z hisoblari), shuning uchun
+    # joy tanlanmasdan ham ko'rinsin: /start ko'pincha aynan shu ekranni ochadi.
+    if dipfunded.enabled() and update.effective_chat.type == "private":
+        rows.append([InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home")])
     if back:
         rows.append(back_row(lang))
     kb = InlineKeyboardMarkup(rows)
@@ -418,7 +422,8 @@ def onboard_kb(lang: str | None = None) -> InlineKeyboardMarkup:
                               callback_data="onboard:group")],
         [InlineKeyboardButton(i18n.t("onb.btn_channel", lang),
                               callback_data="onboard:channel")],
-    ])
+    ] + ([[InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home")]]
+         if dipfunded.enabled() else []))
 
 
 def add_to_chat_url(bot_username: str | None, kind: str) -> str:
