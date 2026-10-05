@@ -6857,3 +6857,21 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        ortiqcha summa, limit tahriri, SL/TP foizda, sozlamalar, statistika,
        jurnal, equity va karta PNG, barcha callback'lar naqshga mos va ≤64
        bayt, guruhda rad, buyruqlar ro'yxati). `test_tracker.py` o'tdi.
+
+203. **Dip Funded PnL kartasi — saytdagi bilan AYNAN bir xil, Dip Funded
+     serverida chiziladi.** Foydalanuvchi: "Trade Controller'dagi Dip Funded
+     hisobi PnL kartasi saytdagi PnL kartadagidek bo'lsin". 202-banddagi
+     `card.pnl_card` (Trade Controller brendi) o'rniga:
+     - delta-prop `sharecard.py` — saytdagi `terminal.js` `drawShare`ning
+       Pillow nusxasi (Classic/Sherdor/Emerald, post 1080×1350 / story
+       1080×1920, to'r fon, suv belgisi logotip, yo'lbars — zararda kulrang +
+       "BUY THE DIP", referal havola, Onest shrifti). `/api/tc/accounts/<id>/
+       card/<trade_id>?theme=&fmt=` PNG qaytaradi. Dizayn BITTA joyda turishi
+       uchun bot uni o'zi chizmaydi — `terminal.js`dagi karta o'zgarsa,
+       `sharecard.py` ham moslanadi.
+     - Bu tomonda `dipfunded.card()`; jurnaldagi "🖼" (`df:c`) kartani
+       yuboradi, ostida mavzu va format tugmalari (`df:ct:<aid>:<tid>:<mavzu>:
+       <format>`) — o'sha xabarning rasmi almashtiriladi (`edit_message_media`,
+       XOM bayt — 155-band). Tanlov sozlamada eslab qolinadi (`ctheme`/`cfmt`).
+     - Sinov: delta-prop `test_share_card` (o'lchamlar, mavzular, begona/
+       xarid qatori 404); bu tomonda 151 ta holat.

@@ -3791,6 +3791,8 @@ STRINGS.update({
     "df.btn_new_trade": {"uz": "➕ Yangi savdo", "ru": "➕ Новая сделка", "en": "➕ New trade"},
     "df.btn_stats": {"uz": "📊 Statistika", "ru": "📊 Статистика", "en": "📊 Statistics"},
     "df.btn_journal": {"uz": "📒 Jurnal", "ru": "📒 Журнал", "en": "📒 Journal"},
+    "df.fmt_post": {"uz": "Post", "ru": "Пост", "en": "Post"},
+    "df.fmt_story": {"uz": "Story", "ru": "Сторис", "en": "Story"},
     "df.btn_equity": {"uz": "📈 Equity grafigi", "ru": "📈 График equity", "en": "📈 Equity chart"},
     "df.st_title": {"uz": "📊 <b>Statistika — {name}</b> · #{id}", "ru": "📊 <b>Статистика — {name}</b> · #{id}",
                     "en": "📊 <b>Statistics — {name}</b> · #{id}"},

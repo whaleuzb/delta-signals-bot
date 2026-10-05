@@ -3959,7 +3959,9 @@ async def df_settings(uid: int) -> dict:
         data = {}
     sell = data.get("sell", 0)
     return {"main": data.get("main"), "amount": data.get("amount"),
-            "sell": sell if isinstance(sell, int) and 0 <= sell < len(DF_SELL_PRESETS) else 0}
+            "sell": sell if isinstance(sell, int) and 0 <= sell < len(DF_SELL_PRESETS) else 0,
+            "ctheme": data.get("ctheme") if data.get("ctheme") in DF_THEMES else "classic",
+            "cfmt": data.get("cfmt") if data.get("cfmt") in DF_FMTS else "post"}
 
 
 async def df_save_settings(uid: int, **changes) -> dict:
@@ -4207,22 +4209,20 @@ def df_equity_png(data: dict, lang: str) -> io.BytesIO | None:
     return buf
 
 
-def df_card_png(data: dict, tid: int, lang: str) -> io.BytesIO | None:
-    t = next((x for x in data.get("trades") or [] if x["id"] == tid), None)
-    if t is None:
-        return None
-    try:
-        closed = datetime.strptime(t["time"], "%Y-%m-%d %H:%M:%S").replace(
-            tzinfo=timezone.utc).astimezone(stats.TZ)
-    except ValueError:
-        closed = datetime.now(stats.TZ)
-    code = data.get("referral_code")
-    qr = dipfunded.site_url(f"/?ref={code}" if code else "/")
-    return card.pnl_card(symbol=f"{t['symbol']}USDT", side="LONG", entry=t["entry"],
-                         exit_price=t["exit"], pnl_pct=t["pnl_pct"], r_multiple=None,
-                         closed_at=closed, username=data.get("username"),
-                         ws_name=f"Dip Funded · {_df_name(data['account'])}", logo=None,
-                         qr_url=qr, qr_caption="dipfunded.com", qr_code=code, lang=lang)
+DF_THEMES = ("classic", "sherdor", "emerald")
+DF_FMTS = ("post", "story")
+
+
+def df_card_kb(lang: str, aid: int, tid: int, theme: str, fmt: str) -> InlineKeyboardMarkup:
+    """Karta ostida — saytdagi kabi mavzu va format tanlash."""
+    names = {"classic": "Classic", "sherdor": "Sherdor", "emerald": "Emerald"}
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(("✅ " if th == theme else "") + names[th],
+                              callback_data=f"df:ct:{aid}:{tid}:{th}:{fmt}") for th in DF_THEMES],
+        [InlineKeyboardButton(("✅ " if f == fmt else "") + i18n.t(f"df.fmt_{f}", lang),
+                              callback_data=f"df:ct:{aid}:{tid}:{theme}:{f}") for f in DF_FMTS],
+        [InlineKeyboardButton(i18n.t("df.btn_journal", lang), callback_data=f"df:j:{aid}:0")],
+    ])
 
 
 # ── Yangi savdo sehrgari: juftlik → turi → (limit narxi) → summa → SL → TP → tasdiq ──
@@ -4549,14 +4549,29 @@ async def on_df(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             offset = int(parts[3])
             data = await dipfunded.stats(uid, aid, limit=DF_JOURNAL_PAGE, offset=offset)
             text, kb = df_journal_view(data, lang, offset)
-        elif act in ("eq", "c"):
-            data = await dipfunded.stats(uid, aid, limit=100)
-            buf = (df_equity_png(data, lang) if act == "eq"
-                   else df_card_png(data, int(parts[3]), lang))
+        elif act == "eq":
+            buf = df_equity_png(await dipfunded.stats(uid, aid, limit=1), lang)
             if buf is None:
                 await q.message.reply_text(i18n.t("df.st_empty", lang))
             else:
                 await q.message.reply_photo(buf, reply_markup=_df_back_kb(lang, aid))
+            return
+        elif act in ("c", "ct"):
+            # PnL kartasi — saytdagi bilan aynan bir xil: Dip Funded serveri chizadi.
+            tid = int(parts[3])
+            if act == "ct":
+                theme, fmt = parts[4], parts[5]
+                await df_save_settings(uid, ctheme=theme, cfmt=fmt)
+            else:
+                theme, fmt = s["ctheme"], s["cfmt"]
+            async with busy(ctx.bot, q.message.chat.id):
+                png = await dipfunded.card(uid, aid, tid, theme, fmt)
+            kb = df_card_kb(lang, aid, tid, theme, fmt)
+            if act == "ct" and getattr(q.message, "photo", None):
+                # ⚠️ XOM bayt, oldindan o'ralgan InputFile EMAS (155-band).
+                await q.edit_message_media(InputMediaPhoto(png, filename="pnl.png"), reply_markup=kb)
+            else:
+                await q.message.reply_photo(png, filename="pnl.png", reply_markup=kb)
             return
         elif act == "set":
             try:
@@ -9218,7 +9233,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(
         on_df, pattern=(r"^df:(home|l|set|sa|sc|st:\d+|eq:\d+|j:\d+:\d+|c:\d+:\d+|a:\d+|b:\d+|B:\d+"
                         r"|x:\d+:\d+|m:\d+:\d+|sm:\d+|sp:\d|wa:\d+:\d+|wk:\d+|wt:\d+:[ml]"
-                        r"|wy:\d+:" + DF_SYM + r"|p:\d+:" + DF_SYM
+                        r"|ct:\d+:\d+:(classic|sherdor|emerald):(post|story)|wy:\d+:" + DF_SYM + r"|p:\d+:" + DF_SYM
                         + r"|[sS]:\d+:" + DF_SYM + r":" + DF_PCT + r")$")))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))

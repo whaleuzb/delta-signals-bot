@@ -129,6 +129,25 @@ async def modify(tg_id: int, acc_id: int, order_id: int, changes: dict) -> dict:
     return await _req("POST", f"/accounts/{acc_id}/modify", tg_id, body)
 
 
+async def card(tg_id: int, acc_id: int, trade_id: int, theme: str = "classic",
+               fmt: str = "post") -> bytes:
+    """Yopilgan savdoning PnL kartasi — saytdagi bilan bir xil (Dip Funded
+    serverida chiziladi: delta-prop `sharecard.py`). PNG baytlari."""
+    if not enabled():
+        raise Unavailable("DIPFUNDED_API_KEY sozlanmagan")
+    url = f"{config.DIPFUNDED_URL}/api/tc/accounts/{acc_id}/card/{trade_id}"
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.get(url, params={"tg_id": tg_id, "theme": theme, "fmt": fmt},
+                            headers={"X-Api-Key": config.DIPFUNDED_API_KEY})
+    except httpx.HTTPError as e:
+        raise Unavailable(f"tarmoq xatosi: {type(e).__name__}") from e
+    if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/png"):
+        return r.content
+    _result(r)  # xato javobi — NotLinked / ApiError / Unavailable
+    raise Unavailable(f"HTTP {r.status_code}")
+
+
 async def stats(tg_id: int, acc_id: int, limit: int = 20, offset: int = 0) -> dict:
     if not enabled():
         raise Unavailable("DIPFUNDED_API_KEY sozlanmagan")
