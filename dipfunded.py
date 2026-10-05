@@ -61,6 +61,10 @@ async def _req(method: str, path: str, tg_id: int, body: dict | None = None) -> 
                 r = await c.post(url, json={**(body or {}), "tg_id": tg_id}, headers=headers)
     except httpx.HTTPError as e:
         raise Unavailable(f"tarmoq xatosi: {type(e).__name__}") from e
+    return _result(r)
+
+
+def _result(r: httpx.Response) -> dict:
     try:
         data = r.json()
     except ValueError:
@@ -116,6 +120,28 @@ async def cancel(tg_id: int, acc_id: int, order_id: int) -> dict:
     return await _req("POST", f"/accounts/{acc_id}/cancel", tg_id, {"order_id": order_id})
 
 
+async def modify(tg_id: int, acc_id: int, order_id: int, changes: dict) -> dict:
+    """Limit buyurtma: {"limit": narx, "sl": narx | None, "tp": ...}."""
+    body: dict = {"order_id": order_id}
+    for k in ("limit", "sl", "tp"):
+        if k in changes:
+            body[k] = None if changes[k] is None else str(changes[k])
+    return await _req("POST", f"/accounts/{acc_id}/modify", tg_id, body)
+
+
+async def stats(tg_id: int, acc_id: int, limit: int = 20, offset: int = 0) -> dict:
+    if not enabled():
+        raise Unavailable("DIPFUNDED_API_KEY sozlanmagan")
+    url = f"{config.DIPFUNDED_URL}/api/tc/accounts/{acc_id}/stats"
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(url, params={"tg_id": tg_id, "limit": limit, "offset": offset},
+                            headers={"X-Api-Key": config.DIPFUNDED_API_KEY})
+    except httpx.HTTPError as e:
+        raise Unavailable(f"tarmoq xatosi: {type(e).__name__}") from e
+    return _result(r)
+
+
 # ─────────────────────────── Matnni o'qish ───────────────────────────
 
 def _num(raw: str) -> float | None:
@@ -127,53 +153,48 @@ def _num(raw: str) -> float | None:
     return v if v > 0 and v == v and v != float("inf") else None
 
 
-def _symbol(raw: str) -> str | None:
+def symbol(raw: str) -> str | None:
     s = raw.strip().upper().lstrip("#$").replace("/", "").replace("_", "").replace("-", "")
     if s.endswith("USDT") and len(s) > 4:
         s = s[:-4]
     return s if s.isalnum() and 1 <= len(s) <= 12 else None
 
 
-def parse_buy(text: str) -> dict | None:
-    """"BTC 500" — market; "BTC 500 limit 58000 sl 55000 tp 70000".
-    Qaytaradi: {symbol, amount, limit?, sl?, tp?} yoki None."""
-    tokens = text.split()
-    if len(tokens) < 2:
-        return None
-    symbol, amount = _symbol(tokens[0]), _num(tokens[1])
-    if not symbol or amount is None:
-        return None
-    out = {"symbol": symbol, "amount": amount}
-    rest = tokens[2:]
-    if len(rest) % 2:
-        return None
-    keys = {"limit": "limit", "l": "limit", "lmt": "limit", "sl": "sl", "stop": "sl",
-            "tp": "tp", "take": "tp"}
-    for k, v in zip(rest[::2], rest[1::2]):
-        key = keys.get(k.lower().rstrip(":"))
-        num = _num(v)
-        if key is None or num is None or key in out:
+def level(raw: str, kind: str, ref: float | None = None) -> float | None:
+    """Bitta daraja: aniq narx yoki `ref`ga nisbatan foiz.
+    SL uchun "3%" / "-3%" -> ref × 0.97; TP uchun "5%" / "+5%" -> ref × 1.05.
+    (Spot, faqat long — SL doim pastda, TP doim yuqorida.)"""
+    raw = raw.strip()
+    if raw.endswith("%"):
+        if not ref:
             return None
-        out[key] = num
-    return out
+        num = _num(raw[:-1].lstrip("+-"))
+        if num is None or num >= 100:
+            return None
+        return ref * (1 - num / 100) if kind == "sl" else ref * (1 + num / 100)
+    return _num(raw)
 
 
-def parse_protect(text: str) -> dict | None:
-    """"sl 58000 tp 70000"; "-" yoki "0" — olib tashlash ("sl -").
-    Qaytaradi: {"sl": float|None, "tp": ...} (faqat berilgan kalitlar)."""
+def parse_protect(text: str, ref: float | None = None, allow_limit: bool = False) -> dict | None:
+    """"sl 58000 tp 70000"; "sl -3% tp 5%" (`ref`ga nisbatan); "-" yoki "0" —
+    olib tashlash ("sl -"). `allow_limit` — limit buyurtmani tahrirlashda
+    "limit 2750" ham. Qaytaradi: {"sl": float|None, ...} (faqat berilganlar)."""
     tokens = text.split()
     if not tokens or len(tokens) % 2:
         return None
     keys = {"sl": "sl", "stop": "sl", "tp": "tp", "take": "tp"}
+    if allow_limit:
+        keys.update({"limit": "limit", "l": "limit", "lmt": "limit"})
     out: dict = {}
     for k, v in zip(tokens[::2], tokens[1::2]):
         key = keys.get(k.lower().rstrip(":"))
         if key is None or key in out:
             return None
-        if v.strip() in ("-", "0", "—", "off"):
+        if key != "limit" and v.strip() in ("-", "0", "—", "off"):
             out[key] = None
             continue
-        num = _num(v)
+        base = out.get("limit") or ref
+        num = _num(v) if key == "limit" else level(v, key, base)
         if num is None:
             return None
         out[key] = num

@@ -6816,3 +6816,44 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        yo'q); bu tomonda 49 ta holat (matn o'qish, `httpx.MockTransport`
        bilan so'rov shakli va xatolar, UI oqimi, callback naqshlari va
        64 bayt, guruhda rad, menyu tugmasi, i18n). `test_tracker.py` o'tdi.
+
+202. **Dip Funded: statistika/jurnal, yangi savdo sehrgari, limitni tahrirlash,
+     sozlamalar, ko'p tilli buyruqlar menyusi.** Foydalanuvchi: "Bot ichidagi
+     menyu va sozlamalar Dip Funded uchun ham chiqsin" — tanlagani: statistika
+     va jurnal, buyruqlar menyusi, Dip Funded sozlamalari, "yangi signal
+     kiritish, TP/SL va limitlar joylashtirish".
+     - **Dip Funded API** (delta-prop `tcapi.py`): `/stats` — yopilgan savdolar
+       (har bir sotuv), winrate, profit factor, o'rtacha foyda/zarar, eng
+       yaxshi/yomon, komissiya, juftliklar kesimi, balans egri chizig'i,
+       sahifalangan jurnal (`limit`/`offset`). Kirish narxi bazada yo'q, lekin
+       aniq tiklanadi: `o'rtacha = narx − (realized + komissiya) / miqdor`.
+       `/modify` — limit narxi va SL/TP. Holat javobida barcha juftliklar
+       narxi (`prices`) — sehrgar tekshiruvlari shu bilan oldindan qilinadi.
+     - **Yangi savdo sehrgari** (`df:b` → `DF_PENDING[uid]`): juftlik (tugma
+       yoki matn) → bozor/limit → limit narxi (joriydan past) → summa
+       (standart summa + bo'sh pulning 10/25/50%) → SL → TP (ikkalasi
+       o'tkazib yuborilishi mumkin) → xulosa → `df:B`. SL/TP narx yoki
+       KIRISH narxiga nisbatan foiz (`-3%`, `6%`, `dipfunded.level`).
+       Tajribali odam birinchi qadamda bitta qatorda yozishi mumkin:
+       `BTC 500 limit 58000 sl -3% tp 6%`. Xatoda qadam o'zgarmaydi va sababi
+       aytiladi. `df:B` qoralamani BIR MARTA oladi (ikki bosish = bitta xarid).
+     - **Limit tahriri** `df:m:<aid>:<oid>` → `limit 2750 sl 2600 tp -`
+       (foiz yangi limit narxiga nisbatan). Pozitsiya SL/TP'sida foiz JORIY
+       narxga nisbatan (`DF_PRICES` — oxirgi ko'rilgan narxlar).
+     - **Statistika/jurnal**: `df:st` matn, `df:eq` equity PNG (ikki panel,
+       `stats` ranglari), `df:j:<aid>:<offset>` 8 tadan sahifalangan jurnal
+       (🛑/🎯/✋/⛔ — yopilish turi), `df:c` — `card.pnl_card` natija kartasi,
+       QR Dip Funded taklif havolasi (`/?ref=<kod>`).
+     - **Sozlamalar** `df:set` (bot_settings, kalit `dfset:<uid>`, JSON):
+       asosiy hisob ("💼 Dip Funded" va `/dipfunded` darhol shu hisobni
+       ochadi; hisob topilmasa avtomatik tozalanadi), standart summa, tez
+       sotish foizlari (`DF_SELL_PRESETS`). `df:home` — aqlli kirish, `df:l` —
+       har doim ro'yxat.
+     - **Buyruqlar menyusi** endi `i18n.BOT_COMMANDS` dan, uchala tilda
+       (`set_my_commands(language_code=None/ru/en)`), `/dipfunded` bilan
+       (kalit sozlanmagan bo'lsa ro'yxatda yo'q).
+     - Sinov: delta-prop `test_tcapi.py` (10 ta); bu tomonda 145 ta holat
+       (foiz o'qish, sehrgar barcha qadamlari va xatolari, bir qatorli kiritish,
+       ortiqcha summa, limit tahriri, SL/TP foizda, sozlamalar, statistika,
+       jurnal, equity va karta PNG, barcha callback'lar naqshga mos va ≤64
+       bayt, guruhda rad, buyruqlar ro'yxati). `test_tracker.py` o'tdi.
