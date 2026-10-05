@@ -66,6 +66,12 @@ WEB_URL = os.getenv("WEB_URL", "https://web-production-addc3.up.railway.app").rs
 PAYMEMBERS_URL = os.getenv("PAYMEMBERS_URL", "https://www.paymembers.net").rstrip("/")
 PAYMEMBERS_API_KEY = os.getenv("PAYMEMBERS_API_KEY", "")
 
+# Dip Funded (whaleuzb/delta-prop) — challenge hisoblarini bot ichidan
+# boshqarish (`dipfunded.py`). Kalit Dip Funded'dagi TC_API_KEY bilan bir
+# xil. Bo'sh bo'lsa menyuda "Dip Funded" tugmasi umuman chiqmaydi.
+DIPFUNDED_URL = os.getenv("DIPFUNDED_URL", "https://dipfunded.com").rstrip("/")
+DIPFUNDED_API_KEY = os.getenv("DIPFUNDED_API_KEY", "")
+
 GUIDE_URL = os.getenv(
     "GUIDE_URL",
     "https://telegra.ph/Trade-Controller--guruh-ulash-va-signal-kiritish-08-21")

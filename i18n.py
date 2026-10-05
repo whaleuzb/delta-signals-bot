@@ -3692,6 +3692,125 @@ STRINGS: dict[str, dict[str, str]] = {
 }
 
 
+# --- Dip Funded (dipfunded.com) hisoblari — `dipfunded.py`, bot.py "Dip Funded" bo'limi ---
+STRINGS.update({
+    "menu.dipfunded": {"uz": "💼 Dip Funded", "ru": "💼 Dip Funded", "en": "💼 Dip Funded"},
+    "df.title": {"uz": "💼 <b>Dip Funded — hisoblaringiz</b>",
+                 "ru": "💼 <b>Dip Funded — ваши счета</b>",
+                 "en": "💼 <b>Dip Funded — your accounts</b>"},
+    "df.no_accounts": {"uz": "Hali challenge hisobingiz yo'q. Uni dipfunded.com saytida sotib olishingiz mumkin.",
+                       "ru": "У вас пока нет челлендж-счетов. Купить его можно на dipfunded.com.",
+                       "en": "You have no challenge accounts yet. You can buy one at dipfunded.com."},
+    "df.st_active": {"uz": "Faol · {n}-bosqich", "ru": "Активен · этап {n}", "en": "Active · phase {n}"},
+    "df.st_funded": {"uz": "Dip Trader (funded)", "ru": "Dip Trader (funded)", "en": "Dip Trader (funded)"},
+    "df.st_passed": {"uz": "Bosqich o'tildi", "ru": "Этап пройден", "en": "Phase passed"},
+    "df.st_failed": {"uz": "Yopilgan", "ru": "Закрыт", "en": "Closed"},
+    "df.equity_short": {"uz": "Equity ${eq} ({pct}%)", "ru": "Equity ${eq} ({pct}%)", "en": "Equity ${eq} ({pct}%)"},
+    "df.equity": {"uz": "💰 Equity: <b>${eq}</b> (natija {pnl}$)",
+                  "ru": "💰 Equity: <b>${eq}</b> (результат {pnl}$)",
+                  "en": "💰 Equity: <b>${eq}</b> (P&L {pnl}$)"},
+    "df.balance": {"uz": "🏦 Balans: ${bal} · bo'sh: ${free}",
+                   "ru": "🏦 Баланс: ${bal} · свободно: ${free}",
+                   "en": "🏦 Balance: ${bal} · free: ${free}"},
+    "df.daily": {"uz": "📉 Kunlik limitgacha: ${left} ({used}% ishlatilgan)",
+                 "ru": "📉 До дневного лимита: ${left} (использовано {used}%)",
+                 "en": "📉 To daily limit: ${left} ({used}% used)"},
+    "df.maxdd": {"uz": "🛑 Maks. zarargacha: ${left} ({used}% ishlatilgan)",
+                 "ru": "🛑 До макс. просадки: ${left} (использовано {used}%)",
+                 "en": "🛑 To max loss: ${left} ({used}% used)"},
+    "df.target": {"uz": "🎯 Maqsad ${amt}: {pct}%", "ru": "🎯 Цель ${amt}: {pct}%", "en": "🎯 Target ${amt}: {pct}%"},
+    "df.days": {"uz": "📅 Savdo kunlari: {done} / {min}", "ru": "📅 Торговые дни: {done} / {min}",
+                "en": "📅 Trading days: {done} / {min}"},
+    "df.positions": {"uz": "📦 <b>Pozitsiyalar ({n})</b>", "ru": "📦 <b>Позиции ({n})</b>",
+                     "en": "📦 <b>Positions ({n})</b>"},
+    "df.none": {"uz": "— yo'q", "ru": "— нет", "en": "— none"},
+    "df.orders": {"uz": "⏳ <b>Limit buyurtmalar ({n})</b>", "ru": "⏳ <b>Лимитные ордера ({n})</b>",
+                  "en": "⏳ <b>Limit orders ({n})</b>"},
+    "df.btn_cancel_order": {"uz": "❌ #{id} {sym} bekor qilish", "ru": "❌ Отменить #{id} {sym}",
+                            "en": "❌ Cancel #{id} {sym}"},
+    "df.btn_buy": {"uz": "➕ Sotib olish", "ru": "➕ Купить", "en": "➕ Buy"},
+    "df.btn_refresh": {"uz": "🔄 Yangilash", "ru": "🔄 Обновить", "en": "🔄 Refresh"},
+    "df.btn_terminal": {"uz": "🖥 Terminal", "ru": "🖥 Терминал", "en": "🖥 Terminal"},
+    "df.btn_accounts": {"uz": "◀️ Hisoblar", "ru": "◀️ Счета", "en": "◀️ Accounts"},
+    "df.btn_site": {"uz": "🌐 dipfunded.com", "ru": "🌐 dipfunded.com", "en": "🌐 dipfunded.com"},
+    "df.btn_link": {"uz": "🔗 Telegram'ni ulash", "ru": "🔗 Подключить Telegram", "en": "🔗 Connect Telegram"},
+    "df.btn_check": {"uz": "🔄 Tekshirish", "ru": "🔄 Проверить", "en": "🔄 Check"},
+    "df.btn_retry": {"uz": "🔄 Qayta urinish", "ru": "🔄 Повторить", "en": "🔄 Try again"},
+    "df.btn_confirm": {"uz": "✅ Tasdiqlash", "ru": "✅ Подтвердить", "en": "✅ Confirm"},
+    "df.btn_edit": {"uz": "✏️ O'zgartirish", "ru": "✏️ Изменить", "en": "✏️ Edit"},
+    "df.btn_yes_sell": {"uz": "✅ Ha, sotish", "ru": "✅ Да, продать", "en": "✅ Yes, sell"},
+    "df.not_linked": {
+        "uz": ("🔗 <b>Telegram'ingiz Dip Funded'ga ulanmagan.</b>\n\n"
+               "1) Pastdagi «Telegram'ni ulash» tugmasini bosing va dipfunded.com'ga kiring.\n"
+               "2) Dip Funded boti ochiladi — <b>Start</b> bosing.\n"
+               "3) Shu yerga qaytib «🔄 Tekshirish»ni bosing.\n\n"
+               "Muhim: ulashda AYNAN shu Telegram akkauntidan foydalaning."),
+        "ru": ("🔗 <b>Ваш Telegram не подключён к Dip Funded.</b>\n\n"
+               "1) Нажмите «Подключить Telegram» и войдите на dipfunded.com.\n"
+               "2) Откроется бот Dip Funded — нажмите <b>Start</b>.\n"
+               "3) Вернитесь сюда и нажмите «🔄 Проверить».\n\n"
+               "Важно: подключайте ИМЕННО этот аккаунт Telegram."),
+        "en": ("🔗 <b>Your Telegram is not connected to Dip Funded.</b>\n\n"
+               "1) Tap «Connect Telegram» and log in at dipfunded.com.\n"
+               "2) The Dip Funded bot opens — tap <b>Start</b>.\n"
+               "3) Come back here and tap «🔄 Check».\n\n"
+               "Important: connect THIS Telegram account."),
+    },
+    "df.profile": {"uz": "📝 Dip Funded'da profilingiz to'liq emas. Saytda profilni to'ldiring, keyin «🔄 Tekshirish»ni bosing.",
+                   "ru": "📝 Профиль на Dip Funded не заполнен. Заполните его на сайте и нажмите «🔄 Проверить».",
+                   "en": "📝 Your Dip Funded profile is incomplete. Complete it on the site, then tap «🔄 Check»."},
+    "df.unavailable": {"uz": "⚠️ Dip Funded hozir javob bermayapti. Birozdan keyin qayta urinib ko'ring.",
+                       "ru": "⚠️ Dip Funded сейчас не отвечает. Попробуйте чуть позже.",
+                       "en": "⚠️ Dip Funded is not responding right now. Please try again shortly."},
+    "df.err_generic": {"uz": "Amal bajarilmadi.", "ru": "Действие не выполнено.", "en": "The action failed."},
+    "df.private_only": {"uz": "Dip Funded hisoblari faqat bot bilan shaxsiy chatda ochiladi.",
+                        "ru": "Счета Dip Funded открываются только в личном чате с ботом.",
+                        "en": "Dip Funded accounts open only in a private chat with the bot."},
+    "df.sell_confirm": {"uz": "<b>{sym}</b> pozitsiyasining {pct}% qismi bozor narxida sotilsinmi?",
+                        "ru": "Продать {pct}% позиции <b>{sym}</b> по рыночной цене?",
+                        "en": "Sell {pct}% of the <b>{sym}</b> position at market price?"},
+    "df.buy_prompt": {
+        "uz": ("➕ <b>Sotib olish</b>\n\nJuftlik va summani (USDT) yozing:\n"
+               "<code>BTC 500</code> — bozor narxida\n"
+               "<code>ETH 300 limit 2800</code> — buy limit\n"
+               "Ixtiyoriy: <code>sl 55000 tp 70000</code>\n\n"
+               "Masalan: <code>BTC 500 sl 58000 tp 66000</code>"),
+        "ru": ("➕ <b>Покупка</b>\n\nНапишите пару и сумму (USDT):\n"
+               "<code>BTC 500</code> — по рынку\n"
+               "<code>ETH 300 limit 2800</code> — buy limit\n"
+               "Необязательно: <code>sl 55000 tp 70000</code>\n\n"
+               "Например: <code>BTC 500 sl 58000 tp 66000</code>"),
+        "en": ("➕ <b>Buy</b>\n\nSend the pair and amount (USDT):\n"
+               "<code>BTC 500</code> — at market\n"
+               "<code>ETH 300 limit 2800</code> — buy limit\n"
+               "Optional: <code>sl 55000 tp 70000</code>\n\n"
+               "Example: <code>BTC 500 sl 58000 tp 66000</code>"),
+    },
+    "df.buy_bad": {"uz": "Tushunmadim. Namuna: <code>BTC 500</code> yoki <code>ETH 300 limit 2800 sl 2600</code>",
+                   "ru": "Не понял. Пример: <code>BTC 500</code> или <code>ETH 300 limit 2800 sl 2600</code>",
+                   "en": "Couldn't read that. Example: <code>BTC 500</code> or <code>ETH 300 limit 2800 sl 2600</code>"},
+    "df.confirm_market": {"uz": "🟢 <b>{sym}</b> — ${amt} bozor narxida sotib olinsinmi?",
+                          "ru": "🟢 Купить <b>{sym}</b> на ${amt} по рынку?",
+                          "en": "🟢 Buy <b>{sym}</b> for ${amt} at market?"},
+    "df.confirm_limit": {"uz": "⏳ <b>{sym}</b> — ${amt}, buy limit {limit} qo'yilsinmi?",
+                         "ru": "⏳ Выставить buy limit <b>{sym}</b> на ${amt} по {limit}?",
+                         "en": "⏳ Place a <b>{sym}</b> buy limit for ${amt} at {limit}?"},
+    "df.expired": {"uz": "Bu so'rov eskirgan — qaytadan kiriting.", "ru": "Запрос устарел — введите заново.",
+                   "en": "This request has expired — please enter it again."},
+    "df.prot_prompt": {
+        "uz": ("🛡 <b>{sym}</b> uchun SL/TP yozing:\n<code>sl 58000 tp 70000</code>\n"
+               "Faqat bittasi ham mumkin: <code>sl 58000</code>\nOlib tashlash: <code>tp -</code>"),
+        "ru": ("🛡 Напишите SL/TP для <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
+               "Можно только один: <code>sl 58000</code>\nУбрать: <code>tp -</code>"),
+        "en": ("🛡 Send SL/TP for <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
+               "Just one is fine: <code>sl 58000</code>\nRemove: <code>tp -</code>"),
+    },
+    "df.prot_bad": {"uz": "Tushunmadim. Namuna: <code>sl 58000 tp 70000</code> yoki <code>sl -</code>",
+                    "ru": "Не понял. Пример: <code>sl 58000 tp 70000</code> или <code>sl -</code>",
+                    "en": "Couldn't read that. Example: <code>sl 58000 tp 70000</code> or <code>sl -</code>"},
+})
+
+
 def t(key: str, lang: str | None = None, **kwargs) -> str:
     """Tarjima. Kalit yoki tarjima topilmasa — o'zbekchaga, u ham
     bo'lmasa kalitning o'ziga qaytadi (ekran hech qachon bo'sh

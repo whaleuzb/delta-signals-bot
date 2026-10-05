@@ -6780,3 +6780,39 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      baribir low/high'dan. Hozirgi vaqtga yaqinlashganda yana 1m.
      `futures.klines` bo'sh javobni (10 daqiqada bir) logga yozadi — haqiqiy
      sabab prodda ko'rinsin. Sinov: `test_backfill.py` 28/28.
+
+201. **Dip Funded hisoblari bot ichida (`dipfunded.py`, "💼 Dip Funded").**
+     Foydalanuvchi: "tradecontrbot ga ham ulaylik. Hisobni boshqarish
+     imkoniyati va bot ichidagi imkoniyatlar." Dip Funded (whaleuzb/delta-prop,
+     dipfunded.com) — egasining spot prop-firma sayti.
+     - **Dip Funded tomonda** `tcapi.py` (`/api/tc/*`): `X-Api-Key` =
+       `TC_API_KEY` (bo'sh bo'lsa API 404). Foydalanuvchi `tg_id` bo'yicha
+       topiladi — `dp_users.telegram_chat_id`, ya'ni Telegram'ini Dip Funded
+       botida `/start <token>` bilan ULAGAN odam (shaxsiy chatda chat id =
+       user id). Shu sabab bu botda alohida ulash qadami YO'Q va begona
+       hisobga yetib bo'lmaydi. Savdo mantig'i saytdagi terminal bilan aynan
+       bir xil (`trading.py`, hisob qatori qulflanadi, avval `tick`).
+       Xato matnlari foydalanuvchining SAYT tilida keladi.
+     - **Bu tomonda** `config.DIPFUNDED_URL` (standart https://dipfunded.com)
+       va `DIPFUNDED_API_KEY` (Dip Funded'dagi `TC_API_KEY` bilan bir xil).
+       Kalit bo'sh bo'lsa tugma ham chiqmaydi. Xatolar uch xil (paymembers
+       andozasi): `NotLinked` (ulanmagan / profil to'liq emas — ulash
+       yo'riqnomasi va saytga tugma), `ApiError` (amal rad etildi, matn
+       escape bilan), `Unavailable` (tarmoq/5xx/kalit).
+     - **UI** (faqat SHAXSIY chatda — hisob va pul guruhda ko'rinmasin;
+       guruhda tugma yo'q, callback bosilsa alert): bosh menyuda
+       "💼 Dip Funded" va `/dipfunded`. `df:home` — hisoblar; `df:a:<id>` —
+       equity, balans, bo'sh pul, kunlik/maks. zarargacha qolgan, maqsad,
+       savdo kunlari, pozitsiyalar (kirish → narx, foyda $/%, SL/TP) va limit
+       buyurtmalar. Har pozitsiyada "✂️ 50%", "🔒 100%" (`df:s` → tasdiq
+       `df:S`), "🛡 SL/TP" (`df:p` → matn `sl 58000 tp 70000`, `tp -` olib
+       tashlaydi); limitda "❌ bekor" (`df:x`); "➕ Sotib olish" (`df:b` →
+       matn `BTC 500` / `ETH 300 limit 2800 sl 2600 tp 3300` → xulosa →
+       `df:B`). Xarid tasdig'i `DF_PENDING`dan BIR MARTA olinadi — ikki marta
+       bosish ikki xarid qilmaydi. `AWAITING_DF`/`DF_PENDING` "◀️ Ortga",
+       bosh menyu va `/bekor`da tozalanadi (`clear_manage_waits`).
+     - Sinov: Dip Funded tomonda `tests/test_tcapi.py` (8 ta: kalit, ulanmagan,
+       to'liq oqim, tarjima qilingan xatolar, begona hisob, yopiq hisob, narx
+       yo'q); bu tomonda 49 ta holat (matn o'qish, `httpx.MockTransport`
+       bilan so'rov shakli va xatolar, UI oqimi, callback naqshlari va
+       64 bayt, guruhda rad, menyu tugmasi, i18n). `test_tracker.py` o'tdi.
