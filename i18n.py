@@ -3728,7 +3728,6 @@ STRINGS.update({
                   "en": "⏳ <b>Limit orders ({n})</b>"},
     "df.btn_cancel_order": {"uz": "❌ #{id} {sym} bekor qilish", "ru": "❌ Отменить #{id} {sym}",
                             "en": "❌ Cancel #{id} {sym}"},
-    "df.btn_buy": {"uz": "➕ Sotib olish", "ru": "➕ Купить", "en": "➕ Buy"},
     "df.btn_refresh": {"uz": "🔄 Yangilash", "ru": "🔄 Обновить", "en": "🔄 Refresh"},
     "df.btn_terminal": {"uz": "🖥 Terminal", "ru": "🖥 Терминал", "en": "🖥 Terminal"},
     "df.btn_accounts": {"uz": "◀️ Hisoblar", "ru": "◀️ Счета", "en": "◀️ Accounts"},
@@ -3769,23 +3768,6 @@ STRINGS.update({
     "df.sell_confirm": {"uz": "<b>{sym}</b> pozitsiyasining {pct}% qismi bozor narxida sotilsinmi?",
                         "ru": "Продать {pct}% позиции <b>{sym}</b> по рыночной цене?",
                         "en": "Sell {pct}% of the <b>{sym}</b> position at market price?"},
-    "df.buy_prompt": {
-        "uz": ("➕ <b>Sotib olish</b>\n\nJuftlik va summani (USDT) yozing:\n"
-               "<code>BTC 500</code> — bozor narxida\n"
-               "<code>ETH 300 limit 2800</code> — buy limit\n"
-               "Ixtiyoriy: <code>sl 55000 tp 70000</code>\n\n"
-               "Masalan: <code>BTC 500 sl 58000 tp 66000</code>"),
-        "ru": ("➕ <b>Покупка</b>\n\nНапишите пару и сумму (USDT):\n"
-               "<code>BTC 500</code> — по рынку\n"
-               "<code>ETH 300 limit 2800</code> — buy limit\n"
-               "Необязательно: <code>sl 55000 tp 70000</code>\n\n"
-               "Например: <code>BTC 500 sl 58000 tp 66000</code>"),
-        "en": ("➕ <b>Buy</b>\n\nSend the pair and amount (USDT):\n"
-               "<code>BTC 500</code> — at market\n"
-               "<code>ETH 300 limit 2800</code> — buy limit\n"
-               "Optional: <code>sl 55000 tp 70000</code>\n\n"
-               "Example: <code>BTC 500 sl 58000 tp 66000</code>"),
-    },
     "df.buy_bad": {"uz": "Tushunmadim. Namuna: <code>BTC 500</code> yoki <code>ETH 300 limit 2800 sl 2600</code>",
                    "ru": "Не понял. Пример: <code>BTC 500</code> или <code>ETH 300 limit 2800 sl 2600</code>",
                    "en": "Couldn't read that. Example: <code>BTC 500</code> or <code>ETH 300 limit 2800 sl 2600</code>"},
@@ -3797,18 +3779,173 @@ STRINGS.update({
                          "en": "⏳ Place a <b>{sym}</b> buy limit for ${amt} at {limit}?"},
     "df.expired": {"uz": "Bu so'rov eskirgan — qaytadan kiriting.", "ru": "Запрос устарел — введите заново.",
                    "en": "This request has expired — please enter it again."},
-    "df.prot_prompt": {
-        "uz": ("🛡 <b>{sym}</b> uchun SL/TP yozing:\n<code>sl 58000 tp 70000</code>\n"
-               "Faqat bittasi ham mumkin: <code>sl 58000</code>\nOlib tashlash: <code>tp -</code>"),
-        "ru": ("🛡 Напишите SL/TP для <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
-               "Можно только один: <code>sl 58000</code>\nУбрать: <code>tp -</code>"),
-        "en": ("🛡 Send SL/TP for <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
-               "Just one is fine: <code>sl 58000</code>\nRemove: <code>tp -</code>"),
-    },
     "df.prot_bad": {"uz": "Tushunmadim. Namuna: <code>sl 58000 tp 70000</code> yoki <code>sl -</code>",
                     "ru": "Не понял. Пример: <code>sl 58000 tp 70000</code> или <code>sl -</code>",
                     "en": "Couldn't read that. Example: <code>sl 58000 tp 70000</code> or <code>sl -</code>"},
 })
+
+STRINGS.update({
+    "df.btn_settings": {"uz": "⚙️ Sozlamalar", "ru": "⚙️ Настройки", "en": "⚙️ Settings"},
+    "df.btn_prot": {"uz": "🛡 {sym} SL/TP", "ru": "🛡 {sym} SL/TP", "en": "🛡 {sym} SL/TP"},
+    "df.btn_edit_order": {"uz": "✏️ #{id}", "ru": "✏️ #{id}", "en": "✏️ #{id}"},
+    "df.btn_new_trade": {"uz": "➕ Yangi savdo", "ru": "➕ Новая сделка", "en": "➕ New trade"},
+    "df.btn_stats": {"uz": "📊 Statistika", "ru": "📊 Статистика", "en": "📊 Statistics"},
+    "df.btn_journal": {"uz": "📒 Jurnal", "ru": "📒 Журнал", "en": "📒 Journal"},
+    "df.fmt_post": {"uz": "Post", "ru": "Пост", "en": "Post"},
+    "df.fmt_story": {"uz": "Story", "ru": "Сторис", "en": "Story"},
+    "df.btn_equity": {"uz": "📈 Equity grafigi", "ru": "📈 График equity", "en": "📈 Equity chart"},
+    "df.st_title": {"uz": "📊 <b>Statistika — {name}</b> · #{id}", "ru": "📊 <b>Статистика — {name}</b> · #{id}",
+                    "en": "📊 <b>Statistics — {name}</b> · #{id}"},
+    "df.st_empty": {"uz": "Hali yopilgan savdo yo'q.", "ru": "Закрытых сделок пока нет.",
+                    "en": "No closed trades yet."},
+    "df.st_trades": {"uz": "Savdolar: <b>{n}</b> (✅ {w} / ❌ {l}) · Winrate: <b>{wr}%</b>",
+                     "ru": "Сделки: <b>{n}</b> (✅ {w} / ❌ {l}) · Winrate: <b>{wr}%</b>",
+                     "en": "Trades: <b>{n}</b> (✅ {w} / ❌ {l}) · Win rate: <b>{wr}%</b>"},
+    "df.st_pnl": {"uz": "💰 Natija: <b>{pnl}$</b> (boshlang'ich hisobga nisbatan {pct}%)",
+                  "ru": "💰 Результат: <b>{pnl}$</b> ({pct}% от начального счёта)",
+                  "en": "💰 P&L: <b>{pnl}$</b> ({pct}% of the starting balance)"},
+    "df.st_avg": {"uz": "O'rt. foyda: {w}$ · O'rt. zarar: {l}$", "ru": "Ср. прибыль: {w}$ · Ср. убыток: {l}$",
+                  "en": "Avg win: {w}$ · Avg loss: {l}$"},
+    "df.st_pf": {"uz": "Profit factor: <b>{pf}</b>", "ru": "Profit factor: <b>{pf}</b>", "en": "Profit factor: <b>{pf}</b>"},
+    "df.st_best": {"uz": "🏅 Eng yaxshi: {sym} {pnl}$ ({pct}%)", "ru": "🏅 Лучшая: {sym} {pnl}$ ({pct}%)",
+                   "en": "🏅 Best: {sym} {pnl}$ ({pct}%)"},
+    "df.st_worst": {"uz": "🔻 Eng yomon: {sym} {pnl}$ ({pct}%)", "ru": "🔻 Худшая: {sym} {pnl}$ ({pct}%)",
+                    "en": "🔻 Worst: {sym} {pnl}$ ({pct}%)"},
+    "df.st_fees": {"uz": "Komissiyalar: ${v}", "ru": "Комиссии: ${v}", "en": "Fees: ${v}"},
+    "df.st_pairs": {"uz": "<b>Juftliklar</b> (savdo · winrate · natija):",
+                    "ru": "<b>Пары</b> (сделки · winrate · результат):",
+                    "en": "<b>Pairs</b> (trades · win rate · P&L):"},
+    "df.j_title": {"uz": "📒 <b>Jurnal — {name}</b> · #{id}", "ru": "📒 <b>Журнал — {name}</b> · #{id}",
+                   "en": "📒 <b>Journal — {name}</b> · #{id}"},
+    "df.j_hint": {"uz": "{a}–{b} / {n}. 🖼 — natija kartasi. 🛑 stop · 🎯 take · ✋ qo'lda · ⛔ limit buzilishi",
+                  "ru": "{a}–{b} / {n}. 🖼 — карточка результата. 🛑 стоп · 🎯 тейк · ✋ вручную · ⛔ нарушение лимита",
+                  "en": "{a}–{b} / {n}. 🖼 — result card. 🛑 stop · 🎯 take · ✋ manual · ⛔ limit breach"},
+    "df.eq_x": {"uz": "Savdo tartibi", "ru": "Порядок сделок", "en": "Trade #"},
+    "df.eq_sub": {"uz": "Balans: ${bal} ({pct}%)", "ru": "Баланс: ${bal} ({pct}%)", "en": "Balance: ${bal} ({pct}%)"},
+    "df.btn_skip": {"uz": "⏭ O'tkazib yuborish", "ru": "⏭ Пропустить", "en": "⏭ Skip"},
+    "df.btn_cancel_wiz": {"uz": "✖️ Bekor qilish", "ru": "✖️ Отмена", "en": "✖️ Cancel"},
+    "df.btn_market": {"uz": "🟢 Bozor narxida", "ru": "🟢 По рынку", "en": "🟢 Market"},
+    "df.btn_limit": {"uz": "⏳ Buy limit", "ru": "⏳ Buy limit", "en": "⏳ Buy limit"},
+    "df.w_sym": {
+        "uz": ("➕ <b>Yangi savdo — 1-qadam</b>\n\nJuftlikni tanlang yoki yozing (masalan <code>BTC</code>).\n\n"
+               "Bir qatorda ham bo'ladi: <code>BTC 500 limit 58000 sl -3% tp 6%</code>"),
+        "ru": ("➕ <b>Новая сделка — шаг 1</b>\n\nВыберите или напишите пару (например <code>BTC</code>).\n\n"
+               "Можно одной строкой: <code>BTC 500 limit 58000 sl -3% tp 6%</code>"),
+        "en": ("➕ <b>New trade — step 1</b>\n\nPick or type a pair (e.g. <code>BTC</code>).\n\n"
+               "One line works too: <code>BTC 500 limit 58000 sl -3% tp 6%</code>"),
+    },
+    "df.w_head": {"uz": "➕ <b>{sym}</b> · joriy narx {px}", "ru": "➕ <b>{sym}</b> · текущая цена {px}",
+                  "en": "➕ <b>{sym}</b> · current price {px}"},
+    "df.w_type": {"uz": "Qanday kirasiz?", "ru": "Как входим?", "en": "How do you want to enter?"},
+    "df.w_limit": {"uz": "Buy limit narxini yozing (joriy narxdan past, {px} dan kichik):",
+                   "ru": "Напишите цену buy limit (ниже текущей, меньше {px}):",
+                   "en": "Send the buy limit price (below the current {px}):"},
+    "df.w_amt": {"uz": "Summa (USDT) — tanlang yoki yozing. Bo'sh: ${free}",
+                 "ru": "Сумма (USDT) — выберите или напишите. Свободно: ${free}",
+                 "en": "Amount (USDT) — pick or type. Free: ${free}"},
+    "df.w_sl": {"uz": "🛑 Stop loss: narx yoki foiz (<code>-3%</code>). Kirish: {entry}",
+                "ru": "🛑 Стоп-лосс: цена или процент (<code>-3%</code>). Вход: {entry}",
+                "en": "🛑 Stop loss: price or percent (<code>-3%</code>). Entry: {entry}"},
+    "df.w_tp": {"uz": "🎯 Take profit: narx yoki foiz (<code>6%</code>). Kirish: {entry}",
+                "ru": "🎯 Тейк-профит: цена или процент (<code>6%</code>). Вход: {entry}",
+                "en": "🎯 Take profit: price or percent (<code>6%</code>). Entry: {entry}"},
+    "df.w_bad_sym": {"uz": "Bunday juftlik Dip Funded'da yo'q. Ro'yxatdan tanlang yoki qayta yozing.",
+                     "ru": "Такой пары нет на Dip Funded. Выберите из списка или напишите снова.",
+                     "en": "That pair isn't available on Dip Funded. Pick one from the list or type again."},
+    "df.w_bad_num": {"uz": "Raqamni tushunmadim, qayta yozing.", "ru": "Не понял число, напишите ещё раз.",
+                     "en": "Couldn't read the number, try again."},
+    "df.w_limit_high": {"uz": "Buy limit joriy narxdan ({px}) past bo'lishi kerak.",
+                        "ru": "Buy limit должен быть ниже текущей цены ({px}).",
+                        "en": "A buy limit must be below the current price ({px})."},
+    "df.w_min": {"uz": "Minimal summa — 10 USDT.", "ru": "Минимальная сумма — 10 USDT.", "en": "The minimum is 10 USDT."},
+    "df.w_over": {"uz": "Bo'sh mablag'dan ko'p. Bo'sh: ${free}", "ru": "Больше свободных средств. Свободно: ${free}",
+                  "en": "More than the free balance. Free: ${free}"},
+    "df.w_sl_high": {"uz": "Stop kirish narxidan ({entry}) past bo'lishi kerak.",
+                     "ru": "Стоп должен быть ниже цены входа ({entry}).",
+                     "en": "The stop must be below the entry ({entry})."},
+    "df.w_tp_low": {"uz": "Take profit kirish narxidan ({entry}) yuqori bo'lishi kerak.",
+                    "ru": "Тейк-профит должен быть выше цены входа ({entry}).",
+                    "en": "The take profit must be above the entry ({entry})."},
+    "df.set_title": {
+        "uz": ("⚙️ <b>Dip Funded sozlamalari</b>\n\n⭐ Asosiy hisob: <b>{main}</b>\n"
+               "   «💼 Dip Funded» darhol shu hisobni ochadi.\n"
+               "💵 Standart summa: <b>{amt}</b>\n   Yangi savdoda birinchi tugma bo'lib chiqadi.\n"
+               "✂️ Tez sotish: <b>{sell}</b>"),
+        "ru": ("⚙️ <b>Настройки Dip Funded</b>\n\n⭐ Основной счёт: <b>{main}</b>\n"
+               "   «💼 Dip Funded» сразу открывает этот счёт.\n"
+               "💵 Сумма по умолчанию: <b>{amt}</b>\n   Первая кнопка в новой сделке.\n"
+               "✂️ Быстрая продажа: <b>{sell}</b>"),
+        "en": ("⚙️ <b>Dip Funded settings</b>\n\n⭐ Main account: <b>{main}</b>\n"
+               "   «💼 Dip Funded» opens this account directly.\n"
+               "💵 Default amount: <b>{amt}</b>\n   Shown first in a new trade.\n"
+               "✂️ Quick sell: <b>{sell}</b>"),
+    },
+    "df.btn_main_clear": {"uz": "⭐ Asosiy hisobni olib tashlash", "ru": "⭐ Убрать основной счёт",
+                          "en": "⭐ Clear main account"},
+    "df.btn_set_amt": {"uz": "💵 Standart summani belgilash", "ru": "💵 Задать сумму по умолчанию",
+                       "en": "💵 Set default amount"},
+    "df.btn_amt_clear": {"uz": "🗑 Olib tashlash", "ru": "🗑 Убрать", "en": "🗑 Clear"},
+    "df.set_amt_prompt": {"uz": "Standart summani yozing (USDT, kamida 10):",
+                          "ru": "Напишите сумму по умолчанию (USDT, от 10):",
+                          "en": "Send the default amount (USDT, at least 10):"},
+    "df.mod_prompt": {
+        "uz": ("✏️ <b>#{id}</b> limit buyurtmasini o'zgartirish:\n<code>limit 2750 sl 2600 tp 3300</code>\n"
+               "Faqat keraklisini yozing. Olib tashlash: <code>sl -</code>. Foiz ham bo'ladi: <code>sl -3%</code>"),
+        "ru": ("✏️ Изменить лимитный ордер <b>#{id}</b>:\n<code>limit 2750 sl 2600 tp 3300</code>\n"
+               "Только нужное. Убрать: <code>sl -</code>. Можно в процентах: <code>sl -3%</code>"),
+        "en": ("✏️ Edit limit order <b>#{id}</b>:\n<code>limit 2750 sl 2600 tp 3300</code>\n"
+               "Only what you need. Remove: <code>sl -</code>. Percent works: <code>sl -3%</code>"),
+    },
+    "df.mod_bad": {"uz": "Tushunmadim. Namuna: <code>limit 2750 sl 2600</code>",
+                   "ru": "Не понял. Пример: <code>limit 2750 sl 2600</code>",
+                   "en": "Couldn't read that. Example: <code>limit 2750 sl 2600</code>"},
+    "df.prot_prompt": {
+        "uz": ("🛡 <b>{sym}</b> uchun SL/TP yozing:\n<code>sl 58000 tp 70000</code>\n"
+               "Foizda (joriy narxga nisbatan): <code>sl -3% tp 6%</code>\nOlib tashlash: <code>tp -</code>"),
+        "ru": ("🛡 Напишите SL/TP для <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
+               "В процентах (от текущей цены): <code>sl -3% tp 6%</code>\nУбрать: <code>tp -</code>"),
+        "en": ("🛡 Send SL/TP for <b>{sym}</b>:\n<code>sl 58000 tp 70000</code>\n"
+               "In percent (of the current price): <code>sl -3% tp 6%</code>\nRemove: <code>tp -</code>"),
+    },
+})
+
+
+# --- Telegram "Menu" (/) ro'yxati — set_my_commands, har til uchun alohida ---
+BOT_COMMANDS: list[tuple[str, dict[str, str]]] = [
+    ("start", {"uz": "Bosh menyu", "ru": "Главное меню", "en": "Main menu"}),
+    ("dipfunded", {"uz": "Dip Funded hisoblari", "ru": "Счета Dip Funded", "en": "Dip Funded accounts"}),
+    ("new", {"uz": "Yangi signal (sehrgar)", "ru": "Новый сигнал (мастер)", "en": "New signal (wizard)"}),
+    ("stats", {"uz": "Statistika", "ru": "Статистика", "en": "Statistics"}),
+    ("symbols", {"uz": "Juftliklar", "ru": "Пары", "en": "Pairs"}),
+    ("open", {"uz": "Ochiq signallar", "ru": "Открытые сигналы", "en": "Open signals"}),
+    ("equity", {"uz": "Equity grafigi", "ru": "График equity", "en": "Equity chart"}),
+    ("pdf", {"uz": "Statistikani PDF hisobot sifatida olish", "ru": "Статистика в виде PDF-отчёта",
+             "en": "Statistics as a PDF report"}),
+    ("yordam", {"uz": "Yo'riqnoma: guruh ulash, signal kiritish",
+                "ru": "Инструкция: подключение группы, ввод сигнала",
+                "en": "Guide: connecting a group, entering signals"}),
+    ("month", {"uz": "Oylik natijalar", "ru": "Результаты за месяц", "en": "Monthly results"}),
+    ("year", {"uz": "Yillik natijalar", "ru": "Результаты за год", "en": "Yearly results"}),
+    ("depozit", {"uz": "Depozitni ko'rish/belgilash", "ru": "Посмотреть/задать депозит",
+                 "en": "View/set the deposit"}),
+    ("cancel", {"uz": "Signalni bekor qilish (masalan: /cancel 12)",
+                "ru": "Отменить сигнал (например: /cancel 12)", "en": "Cancel a signal (e.g. /cancel 12)"}),
+    ("setup", {"uz": "Guruhni ro'yxatdan o'tkazish (faqat guruhda)",
+               "ru": "Зарегистрировать группу (только в группе)", "en": "Register a group (in the group only)"}),
+    ("top", {"uz": "Eng yaxshi guruhlar reytingi", "ru": "Рейтинг лучших групп", "en": "Top groups ranking"}),
+    ("public", {"uz": "Guruhni /top reytingida ko'rsatish (admin)", "ru": "Показать группу в /top (админ)",
+                "en": "Show the group in /top (admin)"}),
+    ("havola", {"uz": "Guruhga qo'shilish tugmasi (admin)", "ru": "Кнопка вступления в группу (админ)",
+                "en": "Group join button (admin)"}),
+    ("taklif", {"uz": "Do'stlaringizni taklif qilish havolasi", "ru": "Ссылка для приглашения друзей",
+                "en": "Invite friends link"}),
+    ("sahifa", {"uz": "Guruhning ochiq natijalar sahifasi", "ru": "Публичная страница результатов группы",
+                "en": "The group's public results page"}),
+    ("hisobot", {"uz": "Avtomatik kunlik hisobot (guruh admini)", "ru": "Автоматический дневной отчёт (админ группы)",
+                 "en": "Automatic daily report (group admin)"}),
+    ("bekor", {"uz": "Joriy amalni bekor qilish", "ru": "Отменить текущее действие", "en": "Cancel the current action"}),
+    ("til", {"uz": "Til / Язык / Language", "ru": "Til / Язык / Language", "en": "Til / Язык / Language"}),
+]
 
 
 def t(key: str, lang: str | None = None, **kwargs) -> str:

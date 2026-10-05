@@ -3904,10 +3904,16 @@ def _tourney_page_kb(lang: str | None) -> list:
 # id'si bilan Dip Funded'da topiladi — Telegram'ini o'sha saytda ulagan
 # bo'lishi shart, boshqa ulash qadami yo'q.
 
-AWAITING_DF: dict[int, tuple] = {}   # uid -> ("buy", acc_id) | ("prot", acc_id, symbol)
-DF_PENDING: dict[int, dict] = {}     # uid -> tasdiqlanishi kutilayotgan xarid
+AWAITING_DF: dict[int, tuple] = {}   # uid -> ("w", aid) sehrgar | ("prot", aid, sym) | ("mod", aid, oid) | ("samt",)
+DF_PENDING: dict[int, dict] = {}     # uid -> yangi savdo qoralamasi (sehrgar)
+DF_PRICES: dict[int, dict] = {}      # uid -> oxirgi ko'rilgan narxlar (sehrgar tekshiruvlari uchun)
 DF_STATUS = {"active": "🟢", "funded": "🏆", "passed": "✅", "failed": "⛔"}
 DF_SYM = r"[A-Z0-9]{1,12}"
+DF_PCT = r"(25|33|50|66|75|100)"
+# Pozitsiyani tez sotish tugmalari — sozlamada tanlanadi.
+DF_SELL_PRESETS = [(50, 100), (25, 50, 100), (33, 66, 100), (25, 50, 75, 100)]
+DF_JOURNAL_PAGE = 8
+DF_KIND = {"stop_loss": "🛑", "take_profit": "🎯", "liquidation": "⛔", "manual": "✋"}
 
 
 def _df_money(v) -> str:
@@ -3923,6 +3929,15 @@ def _df_px(v) -> str:
     return f"{v:.8f}".rstrip("0").rstrip(".")
 
 
+def _df_time(raw: str) -> str:
+    """Dip Funded vaqti UTC ('%Y-%m-%d %H:%M:%S') -> mahalliy 'dd.mm HH:MM'."""
+    try:
+        dt = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return str(raw or "")
+    return dt.astimezone(stats.TZ).strftime("%d.%m %H:%M")
+
+
 def _df_status(a: dict, lang: str) -> str:
     if a["status"] == "active":
         return i18n.t("df.st_active", lang, n=a["phase"])
@@ -3931,6 +3946,29 @@ def _df_status(a: dict, lang: str) -> str:
 
 def _df_name(a: dict) -> str:
     return f"{a['program']} ${int(a['size']):,}"
+
+
+# ── Sozlamalar (bot_settings jadvalida, kalit "dfset:<uid>") ──
+
+async def df_settings(uid: int) -> dict:
+    try:
+        raw = await db.get_setting(f"dfset:{uid}")
+        data = json.loads(raw) if raw else {}
+    except Exception:
+        log.warning("Dip Funded sozlamasi o'qilmadi (%s)", uid, exc_info=True)
+        data = {}
+    sell = data.get("sell", 0)
+    return {"main": data.get("main"), "amount": data.get("amount"),
+            "sell": sell if isinstance(sell, int) and 0 <= sell < len(DF_SELL_PRESETS) else 0,
+            "ctheme": data.get("ctheme") if data.get("ctheme") in DF_THEMES else "classic",
+            "cfmt": data.get("cfmt") if data.get("cfmt") in DF_FMTS else "post"}
+
+
+async def df_save_settings(uid: int, **changes) -> dict:
+    cur = await df_settings(uid)
+    cur.update(changes)
+    await db.set_setting(f"dfset:{uid}", json.dumps(cur))
+    return cur
 
 
 def df_not_linked_view(code: str, lang: str):
@@ -3942,33 +3980,35 @@ def df_not_linked_view(code: str, lang: str):
         url = dipfunded.site_url("/account/telegram/link")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(i18n.t("df.btn_link", lang), url=url)],
-        [InlineKeyboardButton(i18n.t("df.btn_check", lang), callback_data="df:home")],
+        [InlineKeyboardButton(i18n.t("df.btn_check", lang), callback_data="df:l")],
         back_row(lang)])
     return text, kb
 
 
-def df_accounts_view(data: dict, lang: str):
+def df_accounts_view(data: dict, lang: str, main: int | None = None):
     accs = data.get("accounts") or []
     blocks = [i18n.t("df.title", lang)]
     rows = []
     if not accs:
         blocks.append(i18n.t("df.no_accounts", lang))
     for a in accs:
-        line = f"{DF_STATUS.get(a['status'], '•')} <b>{html.escape(_df_name(a))}</b> · #{a['id']}"
+        star = " ⭐" if a["id"] == main else ""
+        line = f"{DF_STATUS.get(a['status'], '•')} <b>{html.escape(_df_name(a))}</b> · #{a['id']}{star}"
         line += "\n   " + _df_status(a, lang)
         if "equity" in a:
             line += "\n   " + i18n.t("df.equity_short", lang, eq=_df_money(a["equity"]),
                                      pct=f"{a.get('pnl_pct', 0):+.2f}")
         blocks.append(line)
-        rows.append([InlineKeyboardButton(f"#{a['id']} · {_df_name(a)}",
+        rows.append([InlineKeyboardButton(f"#{a['id']} · {_df_name(a)}{star}",
                                           callback_data=f"df:a:{a['id']}")])
-    rows.append([InlineKeyboardButton(i18n.t("df.btn_site", lang),
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_settings", lang), callback_data="df:set"),
+                 InlineKeyboardButton(i18n.t("df.btn_site", lang),
                                       url=dipfunded.site_url("/account/"))])
     rows.append(back_row(lang))
     return "\n\n".join(blocks), InlineKeyboardMarkup(rows)
 
 
-def df_account_view(data: dict, lang: str, notice: str | None = None):
+def df_account_view(data: dict, lang: str, notice: str | None = None, sell: int = 0):
     acc, st = data["account"], data["state"]
     aid = acc["id"]
     lines = []
@@ -3995,6 +4035,7 @@ def df_account_view(data: dict, lang: str, notice: str | None = None):
     lines.append(i18n.t("df.positions", lang, n=len(positions)))
     if not positions:
         lines.append(i18n.t("df.none", lang))
+    pcts = DF_SELL_PRESETS[sell if 0 <= sell < len(DF_SELL_PRESETS) else 0]
     for p in positions:
         sym = p["symbol"]
         mark = "📈" if p["upnl"] >= 0 else "📉"
@@ -4008,11 +4049,11 @@ def df_account_view(data: dict, lang: str, notice: str | None = None):
         lines.append(f"   {mark} {p['upnl']:+,.2f}$ ({p['upnl_pct']:+.2f}%)"
                      + (" · " + " · ".join(prot) if prot else ""))
         if acc["tradable"]:
-            rows.append([
-                InlineKeyboardButton(f"✂️ {sym} 50%", callback_data=f"df:s:{aid}:{sym}:50"),
-                InlineKeyboardButton(f"🔒 {sym} 100%", callback_data=f"df:s:{aid}:{sym}:100"),
-                InlineKeyboardButton(f"🛡 {sym} SL/TP", callback_data=f"df:p:{aid}:{sym}"),
-            ])
+            btns = [InlineKeyboardButton(f"{'🔒' if pc == 100 else '✂️'} {sym} {pc}%",
+                                         callback_data=f"df:s:{aid}:{sym}:{pc}") for pc in pcts]
+            rows.append(btns)
+            rows.append([InlineKeyboardButton(i18n.t("df.btn_prot", lang, sym=sym),
+                                              callback_data=f"df:p:{aid}:{sym}")])
     if orders:
         lines.append("")
         lines.append(i18n.t("df.orders", lang, n=len(orders)))
@@ -4024,14 +4065,19 @@ def df_account_view(data: dict, lang: str, notice: str | None = None):
             prot.append(f"TP {_df_px(o['tp'])}")
         lines.append(f"#{o['id']} <b>{html.escape(o['symbol'])}</b> ≤ {_df_px(o['limit'])} · "
                      f"${_df_money(o['amount'])}" + (" · " + " · ".join(prot) if prot else ""))
-        rows.append([InlineKeyboardButton(i18n.t("df.btn_cancel_order", lang, id=o["id"], sym=o["symbol"]),
-                                          callback_data=f"df:x:{aid}:{o['id']}")])
+        rows.append([
+            InlineKeyboardButton(i18n.t("df.btn_edit_order", lang, id=o["id"]),
+                                 callback_data=f"df:m:{aid}:{o['id']}"),
+            InlineKeyboardButton(i18n.t("df.btn_cancel_order", lang, id=o["id"], sym=o["symbol"]),
+                                 callback_data=f"df:x:{aid}:{o['id']}")])
     if acc["tradable"]:
-        rows.append([InlineKeyboardButton(i18n.t("df.btn_buy", lang), callback_data=f"df:b:{aid}")])
+        rows.append([InlineKeyboardButton(i18n.t("df.btn_new_trade", lang), callback_data=f"df:b:{aid}")])
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_stats", lang), callback_data=f"df:st:{aid}"),
+                 InlineKeyboardButton(i18n.t("df.btn_journal", lang), callback_data=f"df:j:{aid}:0")])
     rows.append([InlineKeyboardButton(i18n.t("df.btn_refresh", lang), callback_data=f"df:a:{aid}"),
                  InlineKeyboardButton(i18n.t("df.btn_terminal", lang),
                                       url=dipfunded.site_url(f"/account/trade/{aid}"))])
-    rows.append([InlineKeyboardButton(i18n.t("df.btn_accounts", lang), callback_data="df:home")])
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_accounts", lang), callback_data="df:l")])
     text = "\n".join(lines)
     if len(text) > 3900:
         text = text[:3900] + "\n…"
@@ -4039,7 +4085,7 @@ def df_account_view(data: dict, lang: str, notice: str | None = None):
 
 
 def _df_back_kb(lang: str, aid: int | None) -> InlineKeyboardMarkup:
-    cb = f"df:a:{aid}" if aid else "df:home"
+    cb = f"df:a:{aid}" if aid else "df:l"
     return InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=cb)]])
 
 
@@ -4052,23 +4098,353 @@ def df_error_view(exc: Exception, lang: str, aid: int | None):
     log.warning("Dip Funded javob bermadi: %s", exc)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(i18n.t("df.btn_retry", lang),
-                              callback_data=f"df:a:{aid}" if aid else "df:home")],
+                              callback_data=f"df:a:{aid}" if aid else "df:l")],
         back_row(lang)])
     return i18n.t("df.unavailable", lang), kb
+
+
+# ── Statistika, jurnal, karta ──
+
+def df_stats_view(data: dict, lang: str):
+    acc, sm = data["account"], data["summary"]
+    aid = acc["id"]
+    lines = [i18n.t("df.st_title", lang, name=html.escape(_df_name(acc)), id=aid), ""]
+    if not sm["trades"]:
+        lines.append(i18n.t("df.st_empty", lang))
+    else:
+        lines.append(i18n.t("df.st_trades", lang, n=sm["trades"], w=sm["wins"], l=sm["losses"],
+                            wr=f"{sm['winrate']:.1f}"))
+        lines.append(i18n.t("df.st_pnl", lang, pnl=f"{sm['pnl']:+,.2f}", pct=f"{sm['pnl_pct']:+.2f}"))
+        lines.append(i18n.t("df.st_avg", lang, w=f"{sm['avg_win']:+,.2f}", l=f"{sm['avg_loss']:+,.2f}"))
+        pf = sm.get("profit_factor")
+        lines.append(i18n.t("df.st_pf", lang, pf=f"{pf:.2f}" if pf is not None else "∞"))
+        for key, t in (("df.st_best", sm.get("best")), ("df.st_worst", sm.get("worst"))):
+            if t:
+                lines.append(i18n.t(key, lang, sym=html.escape(t["symbol"]), pnl=f"{t['pnl']:+,.2f}",
+                                    pct=f"{t['pnl_pct']:+.2f}"))
+        lines.append(i18n.t("df.st_fees", lang, v=_df_money(sm["fees"])))
+        if data.get("by_symbol"):
+            lines += ["", i18n.t("df.st_pairs", lang)]
+            for b in data["by_symbol"][:8]:
+                wr = b["wins"] / b["n"] * 100 if b["n"] else 0
+                lines.append(f"• <b>{html.escape(b['symbol'])}</b> — {b['n']} · {wr:.0f}% · {b['pnl']:+,.2f}$")
+    rows = []
+    if sm["trades"]:
+        rows.append([InlineKeyboardButton(i18n.t("df.btn_equity", lang), callback_data=f"df:eq:{aid}"),
+                     InlineKeyboardButton(i18n.t("df.btn_journal", lang), callback_data=f"df:j:{aid}:0")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=f"df:a:{aid}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def df_journal_view(data: dict, lang: str, offset: int):
+    acc = data["account"]
+    aid = acc["id"]
+    total = data.get("total", 0)
+    lines = [i18n.t("df.j_title", lang, name=html.escape(_df_name(acc)), id=aid), ""]
+    rows, cards = [], []
+    if not data["trades"]:
+        lines.append(i18n.t("df.st_empty", lang))
+    for t in data["trades"]:
+        mark = "✅" if t["pnl"] > 0 else "❌"
+        lines.append(f"{mark} <b>{html.escape(t['symbol'])}</b> {DF_KIND.get(t['kind'], '')} · "
+                     f"{_df_px(t['entry'])} → {_df_px(t['exit'])}")
+        lines.append(f"   {t['pnl']:+,.2f}$ ({t['pnl_pct']:+.2f}%) · {_df_time(t['time'])} · #{t['id']}")
+        cards.append(InlineKeyboardButton(f"🖼 #{t['id']}", callback_data=f"df:c:{aid}:{t['id']}"))
+    for i in range(0, len(cards), 4):
+        rows.append(cards[i:i + 4])
+    nav = []
+    if offset > 0:
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"df:j:{aid}:{max(0, offset - DF_JOURNAL_PAGE)}"))
+    if offset + DF_JOURNAL_PAGE < total:
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"df:j:{aid}:{offset + DF_JOURNAL_PAGE}"))
+    if nav:
+        rows.append(nav)
+    if total:
+        lines += ["", i18n.t("df.j_hint", lang, a=offset + 1, b=min(offset + DF_JOURNAL_PAGE, total), n=total)]
+    rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=f"df:a:{aid}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def df_equity_png(data: dict, lang: str) -> io.BytesIO | None:
+    """Balans egri chizig'i (yuqorida) va har bir savdo natijasi (pastda) —
+    `stats.equity_chart` bilan bir xil uslub: ikki panel, twinx YO'Q."""
+    curve = data.get("curve") or []
+    if not curve:
+        return None
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    start = float(data["starting"])
+    bal = [start] + [float(c[1]) for c in curve]
+    deltas = [bal[i + 1] - bal[i] for i in range(len(curve))]
+    xs = list(range(len(bal)))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6.2), sharex=True,
+                                   gridspec_kw={"height_ratios": [3, 1.3]}, facecolor=stats.BG)
+    for ax in (ax1, ax2):
+        ax.set_facecolor(stats.BG)
+        ax.grid(color=stats.GRID, linewidth=0.6)
+        ax.tick_params(colors=stats.TXT, labelsize=9)
+        for sp in ax.spines.values():
+            sp.set_color(stats.GRID)
+    color = stats.GREEN if bal[-1] >= start else stats.RED
+    ax1.plot(xs, bal, color=color, linewidth=2)
+    ax1.fill_between(xs, start, bal, color=color, alpha=0.12)
+    ax1.axhline(start, color=stats.TXT, linestyle="--", linewidth=0.8)
+    ax2.bar(range(1, len(bal)), deltas, width=0.6 if len(deltas) > 3 else 0.3,
+            color=[stats.GREEN if d >= 0 else stats.RED for d in deltas])
+    from matplotlib.ticker import MaxNLocator
+    ax2.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax2.axhline(0, color=stats.TXT, linewidth=0.6)
+    ax2.set_xlabel(i18n.t("df.eq_x", lang), color=stats.TXT)
+    acc = data["account"]
+    pct = (bal[-1] - start) / start * 100 if start else 0
+    fig.suptitle(f"Dip Funded · {_df_name(acc)} · #{acc['id']}", color="#E6E8EB", fontsize=13)
+    fig.text(0.5, 0.905, i18n.t("df.eq_sub", lang, bal=_df_money(bal[-1]), pct=f"{pct:+.2f}"),
+             ha="center", color=stats.TXT, fontsize=10)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, facecolor=stats.BG)
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+DF_THEMES = ("classic", "sherdor", "emerald", "moon", "blueeye")
+DF_FMTS = ("post", "story")
+
+
+def df_card_kb(lang: str, aid: int, tid: int, theme: str, fmt: str) -> InlineKeyboardMarkup:
+    """Karta ostida — saytdagi kabi mavzu va format tanlash."""
+    names = {"classic": "Classic", "sherdor": "Sherdor", "emerald": "Emerald",
+             "moon": "Moon", "blueeye": "Blue Eye"}
+    btns = [InlineKeyboardButton(("✅ " if th == theme else "") + names[th],
+                                 callback_data=f"df:ct:{aid}:{tid}:{th}:{fmt}") for th in DF_THEMES]
+    return InlineKeyboardMarkup([
+        btns[:3], btns[3:],
+        [InlineKeyboardButton(("✅ " if f == fmt else "") + i18n.t(f"df.fmt_{f}", lang),
+                              callback_data=f"df:ct:{aid}:{tid}:{theme}:{f}") for f in DF_FMTS],
+        [InlineKeyboardButton(i18n.t("df.btn_journal", lang), callback_data=f"df:j:{aid}:0")],
+    ])
+
+
+# ── Yangi savdo sehrgari: juftlik → turi → (limit narxi) → summa → SL → TP → tasdiq ──
+
+def _df_wiz_kb(lang: str, aid: int, extra: list | None = None, skip: bool = False):
+    rows = list(extra or [])
+    if skip:
+        rows.append([InlineKeyboardButton(i18n.t("df.btn_skip", lang), callback_data=f"df:wk:{aid}")])
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_cancel_wiz", lang), callback_data=f"df:a:{aid}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _df_entry(d: dict) -> float | None:
+    return d.get("limit") or d.get("price")
+
+
+async def df_wiz_step(uid: int, lang: str):
+    """Qoralamaning joriy qadami uchun (matn, tugmalar)."""
+    d = DF_PENDING[uid]
+    aid, step = d["acc"], d["step"]
+    if step == "sym":
+        prices = DF_PRICES.get(uid) or {}
+        syms = list(prices)[:12]
+        btns = [InlineKeyboardButton(s, callback_data=f"df:wy:{aid}:{s}") for s in syms]
+        extra = [btns[i:i + 4] for i in range(0, len(btns), 4)]
+        AWAITING_DF[uid] = ("w", aid)
+        return i18n.t("df.w_sym", lang), _df_wiz_kb(lang, aid, extra)
+    head = i18n.t("df.w_head", lang, sym=html.escape(d["symbol"]), px=_df_px(d["price"]))
+    if step == "type":
+        AWAITING_DF.pop(uid, None)
+        extra = [[InlineKeyboardButton(i18n.t("df.btn_market", lang), callback_data=f"df:wt:{aid}:m"),
+                  InlineKeyboardButton(i18n.t("df.btn_limit", lang), callback_data=f"df:wt:{aid}:l")]]
+        return head + "\n\n" + i18n.t("df.w_type", lang), _df_wiz_kb(lang, aid, extra)
+    AWAITING_DF[uid] = ("w", aid)
+    if step == "limit":
+        return head + "\n\n" + i18n.t("df.w_limit", lang, px=_df_px(d["price"])), _df_wiz_kb(lang, aid)
+    if step == "amt":
+        free = d.get("free") or 0
+        s = await df_settings(uid)
+        opts = []
+        if s.get("amount"):
+            opts.append(float(s["amount"]))
+        for frac in (0.1, 0.25, 0.5):
+            v = int(free * frac)
+            if v >= 10 and v not in opts:
+                opts.append(v)
+        btns = [InlineKeyboardButton(f"${v:,.0f}", callback_data=f"df:wa:{aid}:{int(v)}")
+                for v in opts if v <= free]
+        extra = [btns] if btns else []
+        return (head + "\n\n" + i18n.t("df.w_amt", lang, free=_df_money(free)),
+                _df_wiz_kb(lang, aid, extra))
+    entry = _df_entry(d)
+    if step == "sl":
+        return (head + "\n\n" + i18n.t("df.w_sl", lang, entry=_df_px(entry)),
+                _df_wiz_kb(lang, aid, skip=True))
+    if step == "tp":
+        return (head + "\n\n" + i18n.t("df.w_tp", lang, entry=_df_px(entry)),
+                _df_wiz_kb(lang, aid, skip=True))
+    AWAITING_DF.pop(uid, None)
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("df.btn_confirm", lang), callback_data=f"df:B:{aid}")],
+        [InlineKeyboardButton(i18n.t("df.btn_edit", lang), callback_data=f"df:b:{aid}"),
+         InlineKeyboardButton(i18n.t("df.btn_cancel_wiz", lang), callback_data=f"df:a:{aid}")]])
+    return df_buy_summary(d, lang), kb
+
+
+def _df_next(d: dict) -> None:
+    order = ["sym", "type", "limit", "amt", "sl", "tp", "confirm"]
+    i = order.index(d["step"]) + 1
+    if order[i] == "limit" and d.get("type") != "l":
+        i += 1
+    d["step"] = order[i]
+
+
+def df_wiz_apply(uid: int, text: str, lang: str) -> str | None:
+    """Matnli qadam. Xato bo'lsa — xato matni (qadam o'zgarmaydi)."""
+    d = DF_PENDING[uid]
+    step = d["step"]
+    prices = DF_PRICES.get(uid) or {}
+    if step == "sym":
+        # Tajribali odam bitta qatorda yozsa ("BTC 500 limit 58000 sl -3%") — darhol xulosaga.
+        sym = dipfunded.symbol(text.split()[0]) if text.split() else None
+        if not sym or sym not in prices:
+            return i18n.t("df.w_bad_sym", lang)
+        d.update(symbol=sym, price=prices[sym])
+        if len(text.split()) > 1:
+            full = _df_parse_line(text, prices[sym])
+            if full is None:
+                return i18n.t("df.buy_bad", lang)
+            d.update(full, type="l" if full.get("limit") else "m", step="confirm")
+            err = _df_check(d, lang)
+            if err:
+                d["step"] = "sym"
+                return err
+            return None
+        d["step"] = "type"
+        return None
+    if step == "limit":
+        v = dipfunded.level(text, "limit")
+        if v is None:
+            return i18n.t("df.w_bad_num", lang)
+        if v >= d["price"]:
+            return i18n.t("df.w_limit_high", lang, px=_df_px(d["price"]))
+        d["limit"] = v
+    elif step == "amt":
+        v = dipfunded.level(text.lstrip("$"), "amt")
+        if v is None:
+            return i18n.t("df.w_bad_num", lang)
+        if v < 10:
+            return i18n.t("df.w_min", lang)
+        if d.get("free") is not None and v > d["free"]:
+            return i18n.t("df.w_over", lang, free=_df_money(d["free"]))
+        d["amount"] = v
+    elif step in ("sl", "tp"):
+        entry = _df_entry(d)
+        v = dipfunded.level(text, step, entry)
+        if v is None:
+            return i18n.t("df.w_bad_num", lang)
+        if step == "sl" and v >= entry:
+            return i18n.t("df.w_sl_high", lang, entry=_df_px(entry))
+        if step == "tp" and v <= entry:
+            return i18n.t("df.w_tp_low", lang, entry=_df_px(entry))
+        d[step] = v
+    else:
+        return None
+    _df_next(d)
+    return None
+
+
+def _df_parse_line(text: str, price: float) -> dict | None:
+    """"BTC 500 limit 58000 sl -3% tp 5%" — foizlar kirish narxiga nisbatan."""
+    tokens = text.split()
+    if len(tokens) < 2:
+        return None
+    amount = dipfunded.level(tokens[1].lstrip("$"), "amt")
+    if amount is None:
+        return None
+    rest = " ".join(tokens[2:])
+    out = {"amount": amount}
+    if rest:
+        lv = dipfunded.parse_protect(rest, ref=price, allow_limit=True)
+        if lv is None or any(v is None for v in lv.values()):
+            return None
+        out.update(lv)
+    return out
+
+
+def _df_check(d: dict, lang: str) -> str | None:
+    entry = _df_entry(d)
+    if d.get("limit") and d["limit"] >= d["price"]:
+        return i18n.t("df.w_limit_high", lang, px=_df_px(d["price"]))
+    if d["amount"] < 10:
+        return i18n.t("df.w_min", lang)
+    if d.get("free") is not None and d["amount"] > d["free"]:
+        return i18n.t("df.w_over", lang, free=_df_money(d["free"]))
+    if d.get("sl") and d["sl"] >= entry:
+        return i18n.t("df.w_sl_high", lang, entry=_df_px(entry))
+    if d.get("tp") and d["tp"] <= entry:
+        return i18n.t("df.w_tp_low", lang, entry=_df_px(entry))
+    return None
 
 
 def df_buy_summary(p: dict, lang: str) -> str:
     key = "df.confirm_limit" if p.get("limit") else "df.confirm_market"
     text = i18n.t(key, lang, sym=html.escape(p["symbol"]), amt=_df_money(p["amount"]),
                   limit=_df_px(p["limit"]) if p.get("limit") else "")
+    entry = _df_entry(p)
     extra = []
     if p.get("sl"):
-        extra.append(f"SL {_df_px(p['sl'])}")
+        pct = (p["sl"] / entry - 1) * 100 if entry else 0
+        extra.append(f"SL {_df_px(p['sl'])} ({pct:+.2f}%)")
     if p.get("tp"):
-        extra.append(f"TP {_df_px(p['tp'])}")
+        pct = (p["tp"] / entry - 1) * 100 if entry else 0
+        extra.append(f"TP {_df_px(p['tp'])} ({pct:+.2f}%)")
     if extra:
         text += "\n" + " · ".join(extra)
     return text
+
+
+# ── Sozlamalar ekrani ──
+
+async def df_settings_view(uid: int, lang: str, accounts: list | None):
+    s = await df_settings(uid)
+    main_name = "—"
+    rows = []
+    for a in accounts or []:
+        if a["id"] == s["main"]:
+            main_name = f"#{a['id']} · {_df_name(a)}"
+    text = i18n.t("df.set_title", lang, main=html.escape(main_name),
+                  amt=f"${float(s['amount']):,.0f}" if s.get("amount") else "—",
+                  sell=" / ".join(f"{p}%" for p in DF_SELL_PRESETS[s["sell"]]))
+    for a in accounts or []:
+        if a["status"] in ("active", "funded"):
+            mark = "⭐ " if a["id"] == s["main"] else ""
+            rows.append([InlineKeyboardButton(f"{mark}#{a['id']} · {_df_name(a)}",
+                                              callback_data=f"df:sm:{a['id']}")])
+    if s["main"]:
+        rows.append([InlineKeyboardButton(i18n.t("df.btn_main_clear", lang), callback_data="df:sm:0")])
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_set_amt", lang), callback_data="df:sa")])
+    rows.append([InlineKeyboardButton(
+        ("✅ " if i == s["sell"] else "") + "/".join(str(p) for p in pre) + "%",
+        callback_data=f"df:sp:{i}") for i, pre in enumerate(DF_SELL_PRESETS)])
+    rows.append([InlineKeyboardButton(i18n.t("df.btn_accounts", lang), callback_data="df:l")])
+    return text, InlineKeyboardMarkup(rows)
+
+
+# ── Kirish nuqtalari ──
+
+async def _df_open(uid: int, lang: str):
+    """"💼 Dip Funded" va /dipfunded: asosiy hisob tanlangan bo'lsa — o'sha,
+    aks holda hisoblar ro'yxati."""
+    s = await df_settings(uid)
+    if s["main"]:
+        try:
+            data = await dipfunded.account(uid, int(s["main"]))
+            DF_PRICES[uid] = data.get("prices") or {}
+            return df_account_view(data, lang, sell=s["sell"])
+        except dipfunded.ApiError:
+            await df_save_settings(uid, main=None)  # hisob endi yo'q — ro'yxatga
+    return df_accounts_view(await dipfunded.accounts(uid), lang, s["main"])
 
 
 async def cmd_dipfunded(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -4078,7 +4454,7 @@ async def cmd_dipfunded(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     AWAITING_DF.pop(uid, None)
     try:
-        text, kb = df_accounts_view(await dipfunded.accounts(uid), lang)
+        text, kb = await _df_open(uid, lang)
     except (dipfunded.NotLinked, dipfunded.ApiError, dipfunded.Unavailable) as e:
         text, kb = df_error_view(e, lang, None)
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb,
@@ -4098,13 +4474,19 @@ async def on_df(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await q.answer()
     parts = q.data.split(":")
     act = parts[1]
-    aid = int(parts[2]) if len(parts) > 2 else None
-    AWAITING_DF.pop(uid, None)
+    aid = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() and act not in ("sp",) else None
+    if act not in ("wy", "wt", "wa", "wk"):
+        AWAITING_DF.pop(uid, None)
     try:
+        s = await df_settings(uid)
         if act == "home":
-            text, kb = df_accounts_view(await dipfunded.accounts(uid), lang)
+            text, kb = await _df_open(uid, lang)
+        elif act == "l":
+            text, kb = df_accounts_view(await dipfunded.accounts(uid), lang, s["main"])
         elif act == "a":
-            text, kb = df_account_view(await dipfunded.account(uid, aid), lang)
+            data = await dipfunded.account(uid, aid)
+            DF_PRICES[uid] = data.get("prices") or {}
+            text, kb = df_account_view(data, lang, sell=s["sell"])
         elif act == "s":
             sym, pct = parts[3], parts[4]
             text = i18n.t("df.sell_confirm", lang, sym=html.escape(sym), pct=pct)
@@ -4116,17 +4498,45 @@ async def on_df(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             sym, pct = parts[3], int(parts[4])
             data = await dipfunded.sell(uid, aid, sym, 1.0 if pct >= 100 else pct / 100)
             log.info("Dip Funded: %s #%s %s %s%% sotdi", uid, aid, sym, pct)
-            text, kb = df_account_view(data, lang, data.get("message"))
+            text, kb = df_account_view(data, lang, data.get("message"), s["sell"])
         elif act == "x":
             data = await dipfunded.cancel(uid, aid, int(parts[3]))
-            text, kb = df_account_view(data, lang, data.get("message"))
+            text, kb = df_account_view(data, lang, data.get("message"), s["sell"])
+        elif act == "m":
+            AWAITING_DF[uid] = ("mod", aid, int(parts[3]))
+            text, kb = i18n.t("df.mod_prompt", lang, id=parts[3]), _df_back_kb(lang, aid)
+        elif act == "p":
+            sym = parts[3]
+            AWAITING_DF[uid] = ("prot", aid, sym)
+            text = i18n.t("df.prot_prompt", lang, sym=html.escape(sym))
+            kb = _df_back_kb(lang, aid)
         elif act == "b":
-            DF_PENDING.pop(uid, None)
-            AWAITING_DF[uid] = ("buy", aid)
-            text, kb = i18n.t("df.buy_prompt", lang), _df_back_kb(lang, aid)
+            data = await dipfunded.account(uid, aid)
+            DF_PRICES[uid] = data.get("prices") or {}
+            DF_PENDING[uid] = {"acc": aid, "step": "sym", "free": data["state"]["available"]}
+            text, kb = await df_wiz_step(uid, lang)
+        elif act in ("wy", "wt", "wa", "wk"):
+            d = DF_PENDING.get(uid)
+            if not d or d["acc"] != aid:
+                text, kb = i18n.t("df.expired", lang), _df_back_kb(lang, aid)
+            else:
+                err = None
+                if act == "wy" and d["step"] == "sym":
+                    err = df_wiz_apply(uid, parts[3], lang)
+                elif act == "wt" and d["step"] == "type":
+                    d["type"] = parts[3]
+                    _df_next(d)
+                elif act == "wa" and d["step"] == "amt":
+                    err = df_wiz_apply(uid, parts[3], lang)
+                elif act == "wk" and d["step"] in ("sl", "tp"):
+                    d.pop(d["step"], None)
+                    _df_next(d)
+                text, kb = await df_wiz_step(uid, lang)
+                if err:
+                    text = "⚠️ " + err + "\n\n" + text
         elif act == "B":
             pend = DF_PENDING.pop(uid, None)
-            if not pend or pend["acc"] != aid:
+            if not pend or pend["acc"] != aid or pend.get("step") != "confirm":
                 text, kb = i18n.t("df.expired", lang), _df_back_kb(lang, aid)
             else:
                 data = await dipfunded.buy(uid, aid, pend["symbol"], pend["amount"],
@@ -4134,12 +4544,58 @@ async def on_df(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                            tp=pend.get("tp"))
                 log.info("Dip Funded: %s #%s %s $%s xarid (limit=%s)", uid, aid,
                          pend["symbol"], pend["amount"], pend.get("limit"))
-                text, kb = df_account_view(data, lang, data.get("message"))
-        elif act == "p":
-            sym = parts[3]
-            AWAITING_DF[uid] = ("prot", aid, sym)
-            text = i18n.t("df.prot_prompt", lang, sym=html.escape(sym))
-            kb = _df_back_kb(lang, aid)
+                text, kb = df_account_view(data, lang, data.get("message"), s["sell"])
+        elif act == "st":
+            text, kb = df_stats_view(await dipfunded.stats(uid, aid, limit=1), lang)
+        elif act == "j":
+            offset = int(parts[3])
+            data = await dipfunded.stats(uid, aid, limit=DF_JOURNAL_PAGE, offset=offset)
+            text, kb = df_journal_view(data, lang, offset)
+        elif act == "eq":
+            buf = df_equity_png(await dipfunded.stats(uid, aid, limit=1), lang)
+            if buf is None:
+                await q.message.reply_text(i18n.t("df.st_empty", lang))
+            else:
+                await q.message.reply_photo(buf, reply_markup=_df_back_kb(lang, aid))
+            return
+        elif act in ("c", "ct"):
+            # PnL kartasi — saytdagi bilan aynan bir xil: Dip Funded serveri chizadi.
+            tid = int(parts[3])
+            if act == "ct":
+                theme, fmt = parts[4], parts[5]
+                await df_save_settings(uid, ctheme=theme, cfmt=fmt)
+            else:
+                theme, fmt = s["ctheme"], s["cfmt"]
+            async with busy(ctx.bot, q.message.chat.id):
+                png = await dipfunded.card(uid, aid, tid, theme, fmt)
+            kb = df_card_kb(lang, aid, tid, theme, fmt)
+            if act == "ct" and getattr(q.message, "photo", None):
+                # ⚠️ XOM bayt, oldindan o'ralgan InputFile EMAS (155-band).
+                await q.edit_message_media(InputMediaPhoto(png, filename="pnl.png"), reply_markup=kb)
+            else:
+                await q.message.reply_photo(png, filename="pnl.png", reply_markup=kb)
+            return
+        elif act == "set":
+            try:
+                accs = (await dipfunded.accounts(uid)).get("accounts")
+            except dipfunded.Unavailable:
+                accs = None
+            text, kb = await df_settings_view(uid, lang, accs)
+        elif act == "sm":
+            await df_save_settings(uid, main=int(parts[2]) or None)
+            text, kb = await df_settings_view(uid, lang, (await dipfunded.accounts(uid)).get("accounts"))
+        elif act == "sp":
+            await df_save_settings(uid, sell=int(parts[2]))
+            text, kb = await df_settings_view(uid, lang, (await dipfunded.accounts(uid)).get("accounts"))
+        elif act == "sa":
+            AWAITING_DF[uid] = ("samt",)
+            text = i18n.t("df.set_amt_prompt", lang)
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("df.btn_amt_clear", lang),
+                                                             callback_data="df:sc")],
+                                       [InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="df:set")]])
+        elif act == "sc":
+            await df_save_settings(uid, amount=None)
+            text, kb = await df_settings_view(uid, lang, (await dipfunded.accounts(uid)).get("accounts"))
         else:
             return
     except (dipfunded.NotLinked, dipfunded.ApiError, dipfunded.Unavailable) as e:
@@ -4148,43 +4604,67 @@ async def on_df(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_df_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Xarid ("BTC 500 …") yoki SL/TP matni. Qayta ishlansa — True."""
+    """Dip Funded matnli qadamlari. Qayta ishlansa — True."""
     uid = update.effective_user.id
     wait = AWAITING_DF.get(uid)
     if not wait or update.effective_chat.type != "private":
         return False
     msg = update.effective_message
-    text = msg.text or ""
+    text = (msg.text or "").strip()
     lang = await user_lang(uid)
-    aid = wait[1]
-    if wait[0] == "buy":
-        p = dipfunded.parse_buy(text)
-        if p is None:
-            await msg.reply_text(i18n.t("df.buy_bad", lang), parse_mode=ParseMode.HTML,
-                                 reply_markup=_df_back_kb(lang, aid))
+    kind = wait[0]
+
+    async def reply(t, kb):
+        await msg.reply_text(t, parse_mode=ParseMode.HTML, reply_markup=kb,
+                             disable_web_page_preview=True)
+
+    if kind == "samt":
+        v = dipfunded.level(text.lstrip("$"), "amt")
+        if v is None or v < 10:
+            await reply(i18n.t("df.w_min", lang), None)
             return True
         AWAITING_DF.pop(uid, None)
-        DF_PENDING[uid] = {"acc": aid, **p}
-        kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton(i18n.t("df.btn_confirm", lang), callback_data=f"df:B:{aid}")],
-            [InlineKeyboardButton(i18n.t("df.btn_edit", lang), callback_data=f"df:b:{aid}"),
-             InlineKeyboardButton(i18n.t("menu.back", lang), callback_data=f"df:a:{aid}")]])
-        await msg.reply_text(df_buy_summary(p, lang), parse_mode=ParseMode.HTML, reply_markup=kb)
+        await df_save_settings(uid, amount=v)
+        try:
+            accs = (await dipfunded.accounts(uid)).get("accounts")
+        except (dipfunded.NotLinked, dipfunded.ApiError, dipfunded.Unavailable):
+            accs = None
+        await reply(*(await df_settings_view(uid, lang, accs)))
         return True
-    sym = wait[2]
-    p = dipfunded.parse_protect(text)
+
+    aid = wait[1]
+    if kind == "w":
+        d = DF_PENDING.get(uid)
+        if not d or d["acc"] != aid:
+            AWAITING_DF.pop(uid, None)
+            return False
+        err = df_wiz_apply(uid, text, lang)
+        t, kb = await df_wiz_step(uid, lang)
+        await reply(("⚠️ " + err + "\n\n" + t) if err else t, kb)
+        return True
+
+    prices = DF_PRICES.get(uid) or {}
+    if kind == "prot":
+        sym = wait[2]
+        p = dipfunded.parse_protect(text, ref=prices.get(sym))
+        bad = "df.prot_bad"
+    else:
+        p = dipfunded.parse_protect(text, allow_limit=True)
+        bad = "df.mod_bad"
     if p is None:
-        await msg.reply_text(i18n.t("df.prot_bad", lang), parse_mode=ParseMode.HTML,
-                             reply_markup=_df_back_kb(lang, aid))
+        await reply(i18n.t(bad, lang), _df_back_kb(lang, aid))
         return True
     AWAITING_DF.pop(uid, None)
+    s = await df_settings(uid)
     try:
-        data = await dipfunded.protect(uid, aid, sym, p)
-        text, kb = df_account_view(data, lang, data.get("message"))
+        if kind == "prot":
+            data = await dipfunded.protect(uid, aid, wait[2], p)
+        else:
+            data = await dipfunded.modify(uid, aid, wait[2], p)
+        t, kb = df_account_view(data, lang, data.get("message"), s["sell"])
     except (dipfunded.NotLinked, dipfunded.ApiError, dipfunded.Unavailable) as e:
-        text, kb = df_error_view(e, lang, aid)
-    await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb,
-                         disable_web_page_preview=True)
+        t, kb = df_error_view(e, lang, aid)
+    await reply(t, kb)
     return True
 
 
@@ -8634,29 +9114,15 @@ async def post_init(app: Application) -> None:
                 log.warning("Ko'chirish natijasi adminga yuborilmadi (%s)", admin)
     await tournament.load_active()
     await _run_one_time_fixes()
-    await app.bot.set_my_commands([
-        ("start", "Bosh menyu"),
-        ("new", "Yangi signal (sehrgar)"),
-        ("stats", "Statistika"),
-        ("symbols", "Juftliklar"),
-        ("open", "Ochiq signallar"),
-        ("equity", "Equity grafigi"),
-        ("pdf", "Statistikani PDF hisobot sifatida olish"),
-        ("yordam", "Yo'riqnoma: guruh ulash, signal kiritish"),
-        ("month", "Oylik natijalar"),
-        ("year", "Yillik natijalar"),
-        ("depozit", "Depozitni ko'rish/belgilash"),
-        ("cancel", "Signalni bekor qilish (masalan: /cancel 12)"),
-        ("setup", "Guruhni ro'yxatdan o'tkazish (faqat guruhda)"),
-        ("top", "Eng yaxshi guruhlar reytingi"),
-        ("public", "Guruhni /top reytingida ko'rsatish (admin)"),
-        ("havola", "Guruhning taklif havolasini belgilash (admin)"),
-        ("taklif", "Do'stlaringizni taklif qilish havolasi"),
-        ("sahifa", "Guruhning ochiq natijalar sahifasi"),
-        ("hisobot", "Avtomatik kunlik hisobot (guruh admini)"),
-        ("bekor", "Joriy amalni bekor qilish"),
-        ("til", "Til / Язык / Language"),
-    ])
+    # Uchala tilda: Telegram foydalanuvchi ilovasining tiliga qarab
+    # ro'yxatni o'zi tanlaydi; boshqa tillarda — o'zbekcha (standart).
+    for code in (None, "ru", "en"):
+        cmds = [(c, d[code or "uz"]) for c, d in i18n.BOT_COMMANDS
+                if c != "dipfunded" or dipfunded.enabled()]
+        try:
+            await app.bot.set_my_commands(cmds, language_code=code)
+        except Exception:
+            log.warning("Buyruqlar ro'yxati o'rnatilmadi (%s)", code, exc_info=True)
     # Avvalgi ishga tushirishda /tg_login bilan allaqachon login qilingan
     # bo'lsa (sessiya Postgres'da saqlangan) — qayta login talab qilinmasdan
     # darhol tinglashni boshlaydi.
@@ -8767,8 +9233,10 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_membersig_toggle, pattern=r"^membersig:"))
     app.add_handler(CallbackQueryHandler(show_menu, pattern=r"^menu(:back)?$"))
     app.add_handler(CallbackQueryHandler(
-        on_df, pattern=(r"^df:(home|a:\d+|b:\d+|B:\d+|x:\d+:\d+|p:\d+:" + DF_SYM
-                        + r"|[sS]:\d+:" + DF_SYM + r":(50|100))$")))
+        on_df, pattern=(r"^df:(home|l|set|sa|sc|st:\d+|eq:\d+|j:\d+:\d+|c:\d+:\d+|a:\d+|b:\d+|B:\d+"
+                        r"|x:\d+:\d+|m:\d+:\d+|sm:\d+|sp:\d|wa:\d+:\d+|wk:\d+|wt:\d+:[ml]"
+                        r"|ct:\d+:\d+:(classic|sherdor|emerald|moon|blueeye):(post|story)|wy:\d+:" + DF_SYM + r"|p:\d+:" + DF_SYM
+                        + r"|[sS]:\d+:" + DF_SYM + r":" + DF_PCT + r")$")))
     app.add_handler(CallbackQueryHandler(on_switch, pattern=r"^switch$"))
     app.add_handler(CallbackQueryHandler(on_workspace_pick, pattern=r"^ws:"))
     app.add_handler(CallbackQueryHandler(on_onboard, pattern=r"^onboard:"))
