@@ -8667,6 +8667,11 @@ async def post_shutdown(app: Application) -> None:
 
 
 async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    # Allaqachon ochiq bo'limning tugmasini qayta bosish (masalan
+    # statistikadagi "Barchasi") — Telegram "message is not modified" deydi.
+    # Bu xato emas: ekran allaqachon to'g'ri, odamga xato xabari kerak emas.
+    if isinstance(ctx.error, BadRequest) and "not modified" in str(ctx.error).lower():
+        return
     log.exception("Ishlov berishda xato", exc_info=ctx.error)
     if isinstance(update, Update) and update.effective_message:
         try:
