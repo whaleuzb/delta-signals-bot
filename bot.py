@@ -297,12 +297,13 @@ async def gate(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if not user or user.is_bot:
         return
+    chat = update.effective_chat
     try:
-        await db.upsert_user(user.id, user.username, user.first_name)
+        await db.upsert_user(user.id, user.username, user.first_name,
+                             private=bool(chat and chat.type == "private"))
     except Exception:
         log.exception("Foydalanuvchini yozib bo'lmadi (uid=%s)", user.id)
 
-    chat = update.effective_chat
     if not chat or chat.type != "private" or is_admin(user.id):
         return
     q = update.callback_query
@@ -6902,7 +6903,7 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     d = ctx.job.data
     admin_id, from_chat, msg_id = d["admin"], d["from_chat"], d["msg_id"]
     targets = await db.broadcast_targets()
-    sent = blocked = failed = 0
+    sent = blocked = unreach = failed = 0
 
     for uid in targets:
         try:
@@ -6913,6 +6914,15 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             # broadcast'da bekorga urinilmaydi.
             blocked += 1
             await db.mark_blocked(uid)
+        except BadRequest as e:
+            if "chat not found" in str(e).lower():
+                # Botga /start bosmagan (faqat guruhda ko'rilgan) — Telegram
+                # bunday odamga bot yozishiga ruxsat bermaydi (201).
+                unreach += 1
+                await db.mark_unreachable(uid)
+            else:
+                failed += 1
+                log.warning("Broadcast xatosi (uid=%s): %s", uid, e)
         except RetryAfter as e:
             # Flood-limit: kutamiz va SHU odamga qayta urinamiz (tashlab
             # ketmaymiz — aks holda xabar unga yetmay qolardi).
@@ -6932,8 +6942,8 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         alang = await user_lang(admin_id)
         await ctx.bot.send_message(
             admin_id,
-            i18n.t("adm.bc_done", alang, sent=sent, blocked=blocked, failed=failed,
-                   total=len(targets)),
+            i18n.t("adm.bc_done", alang, sent=sent, blocked=blocked, unreach=unreach,
+                   failed=failed, total=len(targets)),
             parse_mode=ParseMode.HTML, reply_markup=admin_back_kb(alang))
     except Exception:
         log.exception("Broadcast hisoboti yuborilmadi")

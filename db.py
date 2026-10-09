@@ -222,6 +222,12 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAUL
 -- qilinadi va keyingi yuborishlarda o'tkazib yuboriladi (bekorga so'rov
 -- yubormaslik uchun). Odam qaytib kelsa upsert_user() uni FALSE ga qaytaradi.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE;
+-- Botga SHAXSIY yozish mumkinmi (201). Odam faqat guruhda ko'rinsa (botga
+-- /start bosmagan) Telegram "Chat not found" qaytaradi — broadcast'da xato
+-- bo'lib sanalardi. TRUE — shaxsiy chatda ko'rilgan; FALSE — faqat guruhda
+-- ko'rilgan yoki broadcast "Chat not found" bergan; NULL — eski yozuv, noma'lum
+-- (keyingi broadcast bir marta urinadi va aniqlaydi).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS dm_ok BOOLEAN;
 
 -- Hisobdan chiqarilgan signal. Xato kiritilgan (yoki takroriy) signalni
 -- O'CHIRMAY statistikadan olib tashlash uchun. Ataylab o'chirish emas:
@@ -736,14 +742,26 @@ async def list_pending_public() -> list[asyncpg.Record]:
 
 # ─────────────────── Foydalanuvchilar va majburiy obuna ───────────────────
 
-async def upsert_user(user_id: int, username: str | None, first_name: str | None) -> None:
+async def upsert_user(user_id: int, username: str | None, first_name: str | None,
+                      private: bool = True) -> None:
+    """`private` — update shaxsiy chatdan keldimi (201). Faqat shunda odam
+    botga yoza oladi deb belgilanadi va blokdan chiqarilgan hisoblanadi;
+    guruhdagi faollik `blocked`/`dm_ok`ga tegmaydi (bloklagan odam guruhda
+    yozsa, broadcast ro'yxatiga qaytib kirmasin)."""
     async with pool().acquire() as c:
-        await c.execute(
-            "INSERT INTO users (user_id, username, first_name) VALUES ($1,$2,$3) "
-            "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), "
-            "username = EXCLUDED.username, first_name = EXCLUDED.first_name, "
-            "blocked = FALSE",
-            user_id, username, first_name)
+        if private:
+            await c.execute(
+                "INSERT INTO users (user_id, username, first_name, dm_ok) VALUES ($1,$2,$3,TRUE) "
+                "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), "
+                "username = EXCLUDED.username, first_name = EXCLUDED.first_name, "
+                "blocked = FALSE, dm_ok = TRUE",
+                user_id, username, first_name)
+        else:
+            await c.execute(
+                "INSERT INTO users (user_id, username, first_name, dm_ok) VALUES ($1,$2,$3,FALSE) "
+                "ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), "
+                "username = EXCLUDED.username, first_name = EXCLUDED.first_name",
+                user_id, username, first_name)
 
 
 async def user_stats() -> asyncpg.Record:
@@ -848,16 +866,24 @@ async def admin_user_detail(user_id: int) -> dict:
 
 
 async def broadcast_targets() -> list[int]:
-    """Broadcast uchun user_id ro'yxati — bloklaganlar chiqarib tashlangan."""
+    """Broadcast uchun user_id ro'yxati — bloklaganlar va botga shaxsiy yozib
+    bo'lmaydiganlar (`dm_ok = FALSE`, 201) chiqarib tashlangan."""
     async with pool().acquire() as c:
         rows = await c.fetch(
-            "SELECT user_id FROM users WHERE NOT blocked ORDER BY user_id")
+            "SELECT user_id FROM users WHERE NOT blocked AND dm_ok IS NOT FALSE "
+            "ORDER BY user_id")
     return [r["user_id"] for r in rows]
 
 
 async def mark_blocked(user_id: int) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE users SET blocked = TRUE WHERE user_id=$1", user_id)
+
+
+async def mark_unreachable(user_id: int) -> None:
+    """Broadcast "Chat not found" — odam botga /start bosmagan (201)."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE users SET dm_ok = FALSE WHERE user_id=$1", user_id)
 
 
 async def list_required_channels() -> list[asyncpg.Record]:

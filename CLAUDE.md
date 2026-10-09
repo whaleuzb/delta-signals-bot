@@ -6881,3 +6881,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        bir xil; botda mavzu tugmalari ikki qatorda (3 + 2). Yangi mavzu
        qo'shilsa `DF_THEMES` VA `on_df` naqshidagi ro'yxat ikkalasi ham
        yangilansin (sinov aynan shuni ushladi).
+
+201. **Broadcast: "Xato: 743" — botga /start bosmaganlar.**
+     Hisobot: yuborildi 675, bloklagan 99, xato 743 (jami 1517). Logda
+     hammasi `BadRequest: Chat not found`. Sabab: `gate` HAR update'da (guruh
+     xabarlari, guruhga qo'shilish ham) `upsert_user` qilardi — botga hech
+     qachon shaxsiy yozmagan guruh a'zolari `users`ga tushib, broadcast'da
+     xato bo'lardi. Qo'shimcha xato: guruhdagi faollik `blocked=FALSE`
+     qilib, bloklaganlarni ro'yxatga qaytarardi.
+     - `users.dm_ok` (NULL noma'lum / TRUE shaxsiy chatda ko'rilgan / FALSE
+       faqat guruhda yoki "Chat not found"). `upsert_user(private=...)`:
+       faqat shaxsiy chat `dm_ok=TRUE, blocked=FALSE` qiladi; guruhda yangi
+       odam `dm_ok=FALSE` bilan yoziladi, mavjudlarning bayroqlariga tegilmaydi.
+     - `broadcast_targets`: `NOT blocked AND dm_ok IS NOT FALSE`.
+     - `run_broadcast`: "Chat not found" → `mark_unreachable` va hisobotda
+       alohida "📭 Botni ishga tushirmagan"; qolgan BadRequest — "Boshqa xato".
+     Eski 743 kishi (NULL) keyingi broadcast'da bir marta urinilib belgilanadi.
+     Sinov: `test_broadcast.py` 6/6.

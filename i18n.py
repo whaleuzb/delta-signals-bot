@@ -3147,11 +3147,17 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "adm.bc_done": {
         "uz": ("📣 <b>Broadcast tugadi</b>\n\n✅ Yuborildi: <b>{sent}</b>\n"
-               "🚫 Bloklaganlar: {blocked}\n⚠️ Xato: {failed}\n\nJami: {total}"),
+               "🚫 Bloklaganlar: {blocked}\n"
+               "📭 Botni ishga tushirmagan (faqat guruhda): {unreach}\n"
+               "⚠️ Boshqa xato: {failed}\n\nJami: {total}"),
         "ru": ("📣 <b>Рассылка завершена</b>\n\n✅ Отправлено: <b>{sent}</b>\n"
-               "🚫 Заблокировали: {blocked}\n⚠️ Ошибок: {failed}\n\nВсего: {total}"),
+               "🚫 Заблокировали: {blocked}\n"
+               "📭 Не запускали бота (только в группе): {unreach}\n"
+               "⚠️ Другие ошибки: {failed}\n\nВсего: {total}"),
         "en": ("📣 <b>Broadcast finished</b>\n\n✅ Sent: <b>{sent}</b>\n"
-               "🚫 Blocked the bot: {blocked}\n⚠️ Errors: {failed}\n\nTotal: {total}"),
+               "🚫 Blocked the bot: {blocked}\n"
+               "📭 Never started the bot (group only): {unreach}\n"
+               "⚠️ Other errors: {failed}\n\nTotal: {total}"),
     },
     "adm.pdf_making": {
         "uz": "📄 Tayyorlanmoqda…", "ru": "📄 Готовлю…", "en": "📄 Preparing…",
