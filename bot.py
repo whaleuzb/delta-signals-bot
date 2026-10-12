@@ -6436,15 +6436,18 @@ def admin_home_kb(lang: str | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(i18n.t("adm.btn_stats", lang), callback_data="adm:stats"),
          InlineKeyboardButton(i18n.t("adm.btn_refs", lang), callback_data="adm:refs")],
-        [InlineKeyboardButton(i18n.t("adm.btn_groups", lang), callback_data="adm:groups"),
-         InlineKeyboardButton(i18n.t("adm.btn_users", lang), callback_data="adm:users:0")],
-        [InlineKeyboardButton(i18n.t("adm.btn_channels", lang), callback_data="adm:ch"),
-         InlineKeyboardButton(i18n.t("adm.btn_pending", lang), callback_data="adm:pend")],
-        [InlineKeyboardButton(i18n.t("adm.btn_hashtags", lang), callback_data="adm:mth"),
-         InlineKeyboardButton(i18n.t("adm.btn_tourney", lang), callback_data="adm:tour")],
-        [InlineKeyboardButton(i18n.t("adm.btn_broadcast", lang), callback_data="adm:bc")],
+        # Guruhlar va signal kanallari ALOHIDA (203) — avval bitta aralash ro'yxat edi.
+        [InlineKeyboardButton(i18n.t("adm.btn_groups", lang), callback_data="adm:groups:g"),
+         InlineKeyboardButton(i18n.t("adm.btn_sig_channels", lang), callback_data="adm:groups:c")],
+        [InlineKeyboardButton(i18n.t("adm.btn_users", lang), callback_data="adm:users:0"),
+         InlineKeyboardButton(i18n.t("adm.btn_channels", lang), callback_data="adm:ch")],
+        [InlineKeyboardButton(i18n.t("adm.btn_pending", lang), callback_data="adm:pend"),
+         InlineKeyboardButton(i18n.t("adm.btn_hashtags", lang), callback_data="adm:mth")],
+        [InlineKeyboardButton(i18n.t("adm.btn_tourney", lang), callback_data="adm:tour"),
+         InlineKeyboardButton(i18n.t("adm.btn_broadcast", lang), callback_data="adm:bc")],
         [InlineKeyboardButton(i18n.t("adm.btn_pdf_groups", lang), callback_data="adm:pdfg"),
-         InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu")],
+         InlineKeyboardButton(i18n.t("adm.btn_pdf_channels", lang), callback_data="adm:pdfc")],
+        [InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu")],
     ])
 
 
@@ -6477,12 +6480,21 @@ async def group_health(bot, ws, lang: str | None = None) -> tuple[str, str]:
         return "✅", i18n.t("adm.h_ok", lang)
 
 
-async def _admin_groups_view(bot, lang: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
-    rows = await db.admin_list_groups()
-    if not rows:
-        return i18n.t("adm.groups_none", lang), admin_back_kb(lang)
+def _kind_rows(rows, kind: str):
+    """`kind`: 'g' — guruhlar, 'c' — signal kanallari (203)."""
+    return [r for r in rows if bool(r["is_channel"]) == (kind == "c")]
 
-    lines = [i18n.t("adm.groups_head", lang), ""]
+
+async def _admin_groups_view(bot, lang: str | None = None,
+                             kind: str = "g") -> tuple[str, InlineKeyboardMarkup]:
+    rows = _kind_rows(await db.admin_list_groups(), kind)
+    ch = kind == "c"
+    if not rows:
+        return i18n.t("adm.channels_none" if ch else "adm.groups_none", lang), admin_back_kb(lang)
+
+    active = sum(1 for r in rows if not r["archived"])
+    lines = [i18n.t("adm.channels_head" if ch else "adm.groups_head", lang)
+             + i18n.t("adm.kind_count", lang, n=active, a=len(rows) - active), ""]
     kb = []
     for ws in rows:
         icon, _ = await group_health(bot, ws, lang)
@@ -6505,16 +6517,17 @@ async def _admin_group_card(bot, wid: int,
     if not ws:
         return i18n.t("adm.not_found", lang), admin_back_kb(lang)
     icon, health = await group_health(bot, ws, lang)
+    kind = "c" if ws["is_channel"] else "g"
     owner = _who(ws["owner_username"], ws["owner_name"], ws["owner_id"])
     dep = f"{float(ws['deposit']):,.2f}" if ws["deposit"] is not None else "—"
     pub = i18n.t("adm.pub_ranked" if ws["public"] and ws["public_approved"]
                  else "adm.pub_waiting" if ws["public"] else "adm.pub_hidden", lang)
     txt = (
-        f"{icon} <b>{html.escape(ws['name'])}</b>\n\n"
+        f"{icon} {'📢' if kind == 'c' else '👥'} <b>{html.escape(ws['name'])}</b>\n\n"
         f"{i18n.t('adm.card_state', lang)}: <b>{health}</b>\n"
         f"{i18n.t('adm.card_owner', lang)}: {html.escape(owner)} "
         f"(<code>{ws['owner_id']}</code>)\n"
-        f"Chat ID: <code>{ws['group_chat_id']}</code>\n"
+        f"Chat ID: <code>{ws['group_chat_id'] or ws['detached_chat_id']}</code>\n"
         f"{i18n.t('adm.card_signals', lang)}: <b>{ws['n_signals']}</b> "
         f"({i18n.t('adm.card_closed_n', lang, n=ws['n_closed'])})\n"
         f"{i18n.t('adm.card_viewers', lang)}: {ws['n_viewers']}\n"
@@ -6529,7 +6542,8 @@ async def _admin_group_card(bot, wid: int,
         [InlineKeyboardButton(i18n.t("adm.btn_recheck", lang),
                               callback_data=f"adm:grp:{wid}")],
         [InlineKeyboardButton(act[0], callback_data=act[1])],
-        [InlineKeyboardButton(i18n.t("adm.back_groups", lang), callback_data="adm:groups")],
+        [InlineKeyboardButton(i18n.t("adm.back_channels" if kind == "c" else "adm.back_groups", lang),
+                              callback_data=f"adm:groups:{kind}")],
     ])
     return txt, kb
 
@@ -6635,7 +6649,7 @@ async def _admin_stats_text(lang: str | None = None) -> str:
     p = await db.platform_stats()
     return i18n.t(
         "adm.stats", lang, u_total=u["total"], new1=u["new_1d"], new7=u["new_7d"],
-        act1=u["act_1d"], act7=u["act_7d"], groups=p["groups"],
+        act1=u["act_1d"], act7=u["act_7d"], groups=p["groups"], channels=p["channels"],
         personals=p["personals"], viewers=p["viewers"], pub_ok=p["public_ok"],
         pub_req=p["public_req"], s_all=p["signals_all"], s_open=p["signals_open"],
         s_closed=p["signals_closed"])
@@ -6766,9 +6780,11 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await request_public_approval(ctx, ws["id"])
 
     # ── Guruhlar ──
-    elif action == "groups":
-        await q.edit_message_text(i18n.t("adm.checking_groups", lang))
-        txt, kb = await _admin_groups_view(ctx.bot, lang)
+    elif action == "groups" or action.startswith("groups:"):
+        kind = "c" if action == "groups:c" else "g"
+        await q.edit_message_text(i18n.t("adm.checking_channels" if kind == "c"
+                                         else "adm.checking_groups", lang))
+        txt, kb = await _admin_groups_view(ctx.bot, lang, kind)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith("grp:"):
         txt, kb = await _admin_group_card(ctx.bot, int(action.split(":", 1)[1]), lang)
@@ -6850,18 +6866,20 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
     # ── PDF eksport ──
-    elif action in ("pdfg", "pdfu"):
+    elif action in ("pdfg", "pdfc", "pdfu"):
         await q.message.reply_text(i18n.t("adm.pdf_making", lang))
-        if action == "pdfg":
-            buf, fname = await _admin_groups_pdf(ctx.bot, lang)
+        if action in ("pdfg", "pdfc"):
+            buf, fname = await _admin_groups_pdf(ctx.bot, lang, "c" if action == "pdfc" else "g")
         else:
             buf, fname = await _admin_users_pdf(lang)
         await q.message.reply_document(InputFile(buf, fname), reply_markup=back)
 
 
-async def _admin_groups_pdf(bot, lang: str | None = None) -> tuple[io.BytesIO, str]:
-    rows = await db.admin_list_groups()
-    header = (f"{i18n.t('adm.pdfg_col_group', lang):<26}"
+async def _admin_groups_pdf(bot, lang: str | None = None,
+                            kind: str = "g") -> tuple[io.BytesIO, str]:
+    rows = _kind_rows(await db.admin_list_groups(), kind)
+    ch = kind == "c"
+    header = (f"{i18n.t('adm.pdfc_col_channel' if ch else 'adm.pdfg_col_group', lang):<26}"
               f"{i18n.t('adm.pdfg_col_sig', lang):>8}"
               f"{i18n.t('adm.pdfg_col_closed', lang):>10}"
               f"{i18n.t('adm.pdfg_col_view', lang):>9}  "
@@ -6887,9 +6905,10 @@ async def _admin_groups_pdf(bot, lang: str | None = None) -> tuple[io.BytesIO, s
             f"{ws['name'][:26]:<26}{ws['n_signals']:>8}{ws['n_closed']:>10}"
             f"{ws['n_viewers']:>9}  {state:<16}", col))
     buf = stats.pdf_table_report(
-        i18n.t("adm.pdfg_title", lang),
-        i18n.t("adm.pdfg_sub", lang, n=len(rows), bad=n_bad), header, lines)
-    return buf, f"guruhlar-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
+        i18n.t("adm.pdfc_title" if ch else "adm.pdfg_title", lang),
+        i18n.t("adm.pdfc_sub" if ch else "adm.pdfg_sub", lang, n=len(rows), bad=n_bad),
+        header, lines)
+    return buf, f"{'kanallar' if ch else 'guruhlar'}-{datetime.now(stats.TZ):%Y-%m-%d}.pdf"
 
 
 async def _admin_users_pdf(lang: str | None = None) -> tuple[io.BytesIO, str]:

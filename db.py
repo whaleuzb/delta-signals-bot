@@ -799,7 +799,10 @@ async def platform_stats() -> asyncpg.Record:
     async with pool().acquire() as c:
         return await c.fetchrow(f"""
             SELECT
-              (SELECT COUNT(*) FROM workspaces WHERE type='group')                  AS groups,
+              (SELECT COUNT(*) FROM workspaces
+                 WHERE type='group' AND NOT is_channel AND NOT archived)            AS groups,
+              (SELECT COUNT(*) FROM workspaces
+                 WHERE type='group' AND is_channel AND NOT archived)                AS channels,
               (SELECT COUNT(*) FROM workspaces WHERE type='personal')               AS personals,
               (SELECT COUNT(*) FROM workspaces WHERE type='group' AND public)       AS public_req,
               (SELECT COUNT(*) FROM workspaces
@@ -826,7 +829,7 @@ async def admin_list_groups() -> list[asyncpg.Record]:
             FROM workspaces w
             LEFT JOIN users u ON u.user_id = w.owner_id
             WHERE w.type = 'group'
-            ORDER BY w.archived, w.id
+            ORDER BY w.is_channel, w.archived, w.id
         """)
 
 

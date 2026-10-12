@@ -6921,3 +6921,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        (chat boshqa joyda/egada faol guruh) alert `adm.unarch_conflict`.
      - `resolve_workspace`: keshdagi tanlov arxivlangan bo'lsa tashlanadi.
      Sinov: `test_detach.py` 16/16; regressiya testlari o'tdi.
+
+203. **Admin panel: guruhlar va signal kanallari alohida.**
+     Foydalanuvchi: "kanallarni alohida va guruhlarni alohida kuzatish — hozir
+     hammasi aralash". `admin_home_kb`: "👥 Guruhlar" (`adm:groups:g`) va
+     "📢 Kanallar" (`adm:groups:c`); PDF ham alohida (`adm:pdfg` / `adm:pdfc`).
+     Majburiy obuna tugmasi 🔐 ga o'zgardi (📢 bilan adashmasin). Eski
+     `adm:groups` callback'i guruhlarni ochadi (eski xabarlar uchun).
+     `_kind_rows(rows, kind)` filtri; sarlavhada "faol N, arxivda M"; karta
+     📢/👥 belgisi va o'z ro'yxatiga qaytadi; uzilgan (202) workspace'da
+     `detached_chat_id` ko'rsatiladi. Statistika: "Guruhlar • Kanallar •
+     Shaxsiy" (faqat faol). `admin_list_groups` endi `is_channel` bo'yicha
+     saralanadi. Sinov: `test_admin_split.py` 12/12.

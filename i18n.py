@@ -2791,8 +2791,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "🙍 Foydalanuvchilar", "ru": "🙍 Пользователи", "en": "🙍 Users",
     },
     "adm.btn_channels": {
-        "uz": "📢 Majburiy obuna", "ru": "📢 Обязательная подписка",
-        "en": "📢 Required subscription",
+        "uz": "🔐 Majburiy obuna", "ru": "🔐 Обязательная подписка",
+        "en": "🔐 Required subscription",
     },
     "adm.btn_pending": {
         "uz": "🛡 Tasdiqlar", "ru": "🛡 Заявки", "en": "🛡 Approvals",
@@ -2844,6 +2844,36 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "👥 <b>Ulangan guruhlar</b>", "ru": "👥 <b>Подключённые группы</b>",
         "en": "👥 <b>Connected groups</b>",
     },
+    # ── Signal kanallari alohida (203) ──
+    "adm.btn_sig_channels": {"uz": "📢 Kanallar", "ru": "📢 Каналы", "en": "📢 Channels"},
+    "adm.btn_pdf_channels": {"uz": "📄 Kanallar PDF", "ru": "📄 PDF по каналам",
+                             "en": "📄 Channels PDF"},
+    "adm.channels_none": {
+        "uz": "📢 Hali birorta kanal ulanmagan.", "ru": "📢 Пока не подключён ни один канал.",
+        "en": "📢 No channel is connected yet.",
+    },
+    "adm.channels_head": {
+        "uz": "📢 <b>Ulangan kanallar</b>", "ru": "📢 <b>Подключённые каналы</b>",
+        "en": "📢 <b>Connected channels</b>",
+    },
+    "adm.kind_count": {
+        "uz": " — faol {n}, arxivda {a}", "ru": " — активных {n}, в архиве {a}",
+        "en": " — {n} active, {a} archived",
+    },
+    "adm.back_channels": {"uz": "◀️ Kanallar", "ru": "◀️ Каналы", "en": "◀️ Channels"},
+    "adm.checking_channels": {
+        "uz": "📢 Kanallar holati tekshirilmoqda…", "ru": "📢 Проверяю состояние каналов…",
+        "en": "📢 Checking the channels…",
+    },
+    "adm.pdfc_title": {
+        "uz": "Ulangan kanallar", "ru": "Подключённые каналы", "en": "Connected channels",
+    },
+    "adm.pdfc_sub": {
+        "uz": "Jami {n} ta kanal · {bad} tasida muammo",
+        "ru": "Всего каналов: {n} · с проблемами: {bad}",
+        "en": "{n} channels in total · {bad} with problems",
+    },
+    "adm.pdfc_col_channel": {"uz": "Kanal", "ru": "Канал", "en": "Channel"},
     "adm.groups_row": {
         "uz": "{n_sig} signal, {n_view} kuzatuvchi",
         "ru": "{n_sig} сигналов, {n_view} наблюдателей",
@@ -2965,7 +2995,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "Yangi: {new1} (24s)  •  {new7} (7 kun)\n"
                "Faol: {act1} (24s)  •  {act7} (7 kun)\n\n"
                "<b>Workspace'lar</b>\n"
-               "Guruhlar: <b>{groups}</b>  •  Shaxsiy: <b>{personals}</b>\n"
+               "Guruhlar: <b>{groups}</b>  •  Kanallar: <b>{channels}</b>  •  Shaxsiy: <b>{personals}</b>\n"
                "Guruh kuzatuvchilari: {viewers}\n"
                "Reytingda: {pub_ok} ta (so'rov: {pub_req})\n\n"
                "<b>Signallar</b>\nJami: <b>{s_all}</b>\n"
@@ -2975,7 +3005,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "Новых: {new1} (24ч)  •  {new7} (7 дней)\n"
                "Активных: {act1} (24ч)  •  {act7} (7 дней)\n\n"
                "<b>Рабочие пространства</b>\n"
-               "Групп: <b>{groups}</b>  •  Личных: <b>{personals}</b>\n"
+               "Групп: <b>{groups}</b>  •  Каналов: <b>{channels}</b>  •  Личных: <b>{personals}</b>\n"
                "Наблюдателей групп: {viewers}\n"
                "В рейтинге: {pub_ok} (заявок: {pub_req})\n\n"
                "<b>Сигналы</b>\nВсего: <b>{s_all}</b>\n"
@@ -2985,7 +3015,7 @@ STRINGS: dict[str, dict[str, str]] = {
                "New: {new1} (24h)  •  {new7} (7 days)\n"
                "Active: {act1} (24h)  •  {act7} (7 days)\n\n"
                "<b>Workspaces</b>\n"
-               "Groups: <b>{groups}</b>  •  Personal: <b>{personals}</b>\n"
+               "Groups: <b>{groups}</b>  •  Channels: <b>{channels}</b>  •  Personal: <b>{personals}</b>\n"
                "Group watchers: {viewers}\n"
                "In the ranking: {pub_ok} (requests: {pub_req})\n\n"
                "<b>Signals</b>\nTotal: <b>{s_all}</b>\n"
