@@ -6898,3 +6898,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        alohida "📭 Botni ishga tushirmagan"; qolgan BadRequest — "Boshqa xato".
      Eski 743 kishi (NULL) keyingi broadcast'da bir marta urinilib belgilanadi.
      Sinov: `test_broadcast.py` 6/6.
+
+202. **Guruh/kanal egasi uni botdan uzishi (tarix saqlanadi).**
+     Foydalanuvchi: "guruh egalariga o'z guruhlarini bot imkoniyatlaridan
+     o'chirish imkoniyatini qo'shaylik"; savolga javob: "Uzish, tarix
+     saqlansin" (butunlay o'chirish EMAS).
+     - Menyu (egasi, guruh/kanal): "🔌 Guruhni/Kanalni botdan uzish" →
+       `wsdet:<wid>` tasdiq ekrani (oqibatlar + "tarix o'chmaydi") →
+       `wsdetok:<wid>`. Ruxsat `_owned_ws_from_cb` (egasi/super-admin).
+     - `db.detach_workspace`: `archived=TRUE`, `public/public_approved=FALSE`,
+       `pm_bot=NULL`, `detached_chat_id=group_chat_id`, `group_chat_id=NULL`
+       (UNIQUE bo'shaydi). Bot `leave_chat`; joriy tanlov tozalanadi.
+       Ochiq signallar jim kuzatiladi (`send_close_result`/poll chat ID'siz
+       guruhga yubormaydi), natija tarixga yoziladi.
+     - Egalik cheklovi endi `idx_ws_owner_kind_live ... WHERE NOT archived`
+       (eski `idx_ws_owner_kind` DROP) — uzgach ega boshqa guruh ulay oladi.
+       `get_group_workspace_by_owner`/`get_owned_group_workspaces` faqat faol.
+     - `create_group_workspace`: shu ega shu chatni avval uzgan bo'lsa ESKI
+       workspace tiklanadi (signallar, statistika, depozit qaytadi); boshqa
+       odam ulasa — yangi workspace.
+     - Admin "arxivdan chiqarish" `detached_chat_id`ni qaytaradi; to'qnashuvda
+       (chat boshqa joyda/egada faol guruh) alert `adm.unarch_conflict`.
+     - `resolve_workspace`: keshdagi tanlov arxivlangan bo'lsa tashlanadi.
+     Sinov: `test_detach.py` 16/16; regressiya testlari o'tdi.

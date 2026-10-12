@@ -186,8 +186,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_signal_copy
 -- berardi (foydalanuvchi aynan shunga urildi). Endi `is_channel` ham
 -- kalitga kiradi: bitta odam bitta guruh VA bitta kanal boshqaradi.
 ALTER TABLE workspaces DROP CONSTRAINT IF EXISTS workspaces_owner_id_type_key;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_owner_kind
-    ON workspaces(owner_id, type, is_channel);
+-- Egalik cheklovi (idx_ws_owner_kind_live) — `archived` ustunidan keyin, pastda.
 
 -- Ochiq pozitsiya +5%/-5% qadamlarda joriy foizni bosib o'tganda bildirishnoma
 -- yuborilishi uchun oxirgi xabar qilingan bosqich (ishorali, 5 ga karrali:
@@ -217,6 +216,15 @@ END $$;
 -- olmaydi. Ataylab O'CHIRISH emas — signal tarixi saqlanib qoladi va admin
 -- xohlasa qaytara oladi (bot guruhdan chiqarib yuborilgan holatlar uchun).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+-- 202: egasi guruhini botdan UZISHI (tarix saqlanadi). Uzilganda chat ID shu
+-- ustunga ko'chadi va `group_chat_id` bo'shaydi — o'sha guruh qayta ulansa
+-- (shu egasi tomonidan) eski workspace tiklanadi, statistika qaytadi.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS detached_chat_id BIGINT;
+-- Egalik cheklovi faqat FAOL workspace'larga: uzgach ega boshqa guruh ulay
+-- oladi (eski, umumiy indeks bunga yo'l qo'ymasdi).
+DROP INDEX IF EXISTS idx_ws_owner_kind;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_owner_kind_live
+    ON workspaces(owner_id, type, is_channel) WHERE NOT archived;
 
 -- Botni bloklagan foydalanuvchi. Broadcast Forbidden xatosini olganda TRUE
 -- qilinadi va keyingi yuborishlarda o'tkazib yuboriladi (bekorga so'rov
@@ -524,7 +532,17 @@ def pool() -> asyncpg.Pool:
 async def create_group_workspace(owner_id: int, chat_id: int, name: str,
                                   topic_id: int | None = None,
                                   is_channel: bool = False) -> int:
+    """Shu ega shu chatni avval botdan uzgan bo'lsa (202) — eski workspace
+    tiklanadi (signallar, statistika, depozit qaytadi); aks holda yangisi."""
     async with pool().acquire() as c:
+        wid = await c.fetchval(
+            "UPDATE workspaces SET group_chat_id=$2, detached_chat_id=NULL, archived=FALSE, "
+            "name=$3, group_topic_id=$4 WHERE id = (SELECT id FROM workspaces "
+            "WHERE owner_id=$1 AND detached_chat_id=$2 AND type='group' AND archived "
+            "ORDER BY id DESC LIMIT 1) RETURNING id",
+            owner_id, chat_id, name, topic_id)
+        if wid:
+            return wid
         return await c.fetchval(
             "INSERT INTO workspaces (type, owner_id, group_chat_id, group_topic_id, "
             "name, is_channel) VALUES ('group', $1, $2, $3, $4, $5) RETURNING id",
@@ -573,7 +591,7 @@ async def get_group_workspace_by_owner(owner_id: int,
     bilan tekshiriladi: bitta odam bitta GURUH va bitta KANAL boshqara
     oladi (ilgari umuman bittasi edi). `None` bo'lsa birinchi topilgani,
     guruhga ustunlik berib."""
-    q = "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1"
+    q = "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1 AND NOT archived"
     args = [owner_id]
     if is_channel is not None:
         q += " AND is_channel=$2"
@@ -625,7 +643,7 @@ async def get_owned_group_workspaces(owner_id: int) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch(
             "SELECT * FROM workspaces WHERE type='group' AND owner_id=$1 "
-            "ORDER BY is_channel, id", owner_id)
+            "AND NOT archived ORDER BY is_channel, id", owner_id)
 
 
 async def list_group_workspaces() -> list[asyncpg.Record]:
@@ -813,9 +831,30 @@ async def admin_list_groups() -> list[asyncpg.Record]:
 
 
 async def set_archived(workspace_id: int, archived: bool) -> None:
+    """Admin arxivi. Qaytarishda egasi uzgan guruhning chat ID'si ham
+    tiklanadi (202). Chat boshqa workspace'ga ulangan yoki egada shu turdagi
+    faol guruh bo'lsa — UniqueViolation (chaqiruvchi ushlaydi)."""
     async with pool().acquire() as c:
-        await c.execute("UPDATE workspaces SET archived=$2 WHERE id=$1",
-                        workspace_id, archived)
+        if archived:
+            await c.execute("UPDATE workspaces SET archived=TRUE WHERE id=$1", workspace_id)
+        else:
+            await c.execute(
+                "UPDATE workspaces SET archived=FALSE, "
+                "group_chat_id=COALESCE(group_chat_id, detached_chat_id), "
+                "detached_chat_id=NULL WHERE id=$1", workspace_id)
+
+
+async def detach_workspace(workspace_id: int) -> int | None:
+    """Egasi guruh/kanalini botdan UZADI (202): arxivlanadi, reytingdan va
+    Pay Members havolasidan chiqadi, chat ID `detached_chat_id`ga o'tadi
+    (shu chat boshqa workspace'ga erkin ulanishi mumkin). Signallar tarixi
+    o'zgarmaydi. Qaytaradi: uzilgan chat ID (bot undan chiqishi uchun)."""
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "UPDATE workspaces SET archived=TRUE, public=FALSE, public_approved=FALSE, "
+            "pm_bot=NULL, detached_chat_id=COALESCE(group_chat_id, detached_chat_id), "
+            "group_chat_id=NULL WHERE id=$1 AND type='group' AND NOT archived "
+            "RETURNING detached_chat_id", workspace_id)
 
 
 async def admin_list_users(limit: int = 50, offset: int = 0) -> list[asyncpg.Record]:

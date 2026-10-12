@@ -3619,6 +3619,72 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🌐 Язык",
         "en": "🌐 Language",
     },
+    # ── Guruh/kanalni botdan uzish (202) ──
+    "dt.btn_group": {"uz": "🔌 Guruhni botdan uzish", "ru": "🔌 Отключить группу от бота",
+                     "en": "🔌 Disconnect group from the bot"},
+    "dt.btn_channel": {"uz": "🔌 Kanalni botdan uzish", "ru": "🔌 Отключить канал от бота",
+                       "en": "🔌 Disconnect channel from the bot"},
+    "dt.btn_yes": {"uz": "✅ Ha, uzish", "ru": "✅ Да, отключить", "en": "✅ Yes, disconnect"},
+    "dt.confirm_group": {
+        "uz": ("🔌 <b>{name}</b> guruhini botdan uzasizmi?\n\n"
+               "• Bot guruhdan chiqadi, guruhga signal va natija xabarlari ketmaydi\n"
+               "• Guruh /top reytingidan, ommaviy sahifadan va a'zolar ro'yxatidan olinadi\n"
+               "• Shundan keyin boshqa guruh ulay olasiz\n\n"
+               "📁 Signallar tarixi va statistika O'CHMAYDI — shu guruhga botni qayta "
+               "qo'shib /setup qilsangiz, hammasi qaytadi."),
+        "ru": ("🔌 Отключить группу <b>{name}</b> от бота?\n\n"
+               "• Бот выйдет из группы, сигналы и результаты туда больше не пойдут\n"
+               "• Группа исчезнет из /top, публичной страницы и списка участников\n"
+               "• После этого можно подключить другую группу\n\n"
+               "📁 История сигналов и статистика НЕ удаляются — добавьте бота в эту "
+               "группу снова и сделайте /setup, всё вернётся."),
+        "en": ("🔌 Disconnect the group <b>{name}</b> from the bot?\n\n"
+               "• The bot leaves the group; no more signals or results are posted there\n"
+               "• The group is removed from /top, the public page and the members list\n"
+               "• You can connect another group afterwards\n\n"
+               "📁 Signal history and stats are NOT deleted — add the bot back to this "
+               "group and run /setup to restore everything."),
+    },
+    "dt.confirm_channel": {
+        "uz": ("🔌 <b>{name}</b> kanalini botdan uzasizmi?\n\n"
+               "• Bot kanaldan chiqadi, kanalga signal va natija xabarlari ketmaydi\n"
+               "• Kanal /top reytingidan va ommaviy sahifadan olinadi\n"
+               "• Shundan keyin boshqa kanal ulay olasiz\n\n"
+               "📁 Signallar tarixi va statistika O'CHMAYDI — botni shu kanalga qayta "
+               "admin qilsangiz, hammasi qaytadi."),
+        "ru": ("🔌 Отключить канал <b>{name}</b> от бота?\n\n"
+               "• Бот выйдет из канала, сигналы и результаты туда больше не пойдут\n"
+               "• Канал исчезнет из /top и публичной страницы\n"
+               "• После этого можно подключить другой канал\n\n"
+               "📁 История сигналов и статистика НЕ удаляются — снова сделайте бота "
+               "админом этого канала, и всё вернётся."),
+        "en": ("🔌 Disconnect the channel <b>{name}</b> from the bot?\n\n"
+               "• The bot leaves the channel; no more signals or results are posted there\n"
+               "• The channel is removed from /top and the public page\n"
+               "• You can connect another channel afterwards\n\n"
+               "📁 Signal history and stats are NOT deleted — make the bot an admin of "
+               "this channel again to restore everything."),
+    },
+    "dt.done": {
+        "uz": "✅ <b>{name}</b> botdan uzildi. Tarix saqlab qolindi.",
+        "ru": "✅ <b>{name}</b> отключён от бота. История сохранена.",
+        "en": "✅ <b>{name}</b> has been disconnected. History is kept.",
+    },
+    "dt.not_left": {
+        "uz": "ℹ️ Bot chatdan o'zi chiqa olmadi (ehtimol allaqachon chiqarilgan) — kerak bo'lsa uni qo'lda olib tashlang.",
+        "ru": "ℹ️ Бот не смог выйти из чата сам (возможно, его уже удалили) — при необходимости удалите его вручную.",
+        "en": "ℹ️ The bot couldn't leave the chat itself (maybe it was already removed) — remove it manually if needed.",
+    },
+    "dt.already": {
+        "uz": "Bu guruh/kanal allaqachon botdan uzilgan.",
+        "ru": "Эта группа/канал уже отключены от бота.",
+        "en": "This group/channel is already disconnected.",
+    },
+    "adm.unarch_conflict": {
+        "uz": "Qaytarib bo'lmadi: bu chat boshqa joyga ulangan yoki egasida shu turdagi faol guruh/kanal bor.",
+        "ru": "Не удалось вернуть: этот чат подключён в другом месте или у владельца уже есть активная группа/канал этого типа.",
+        "en": "Can't restore: the chat is connected elsewhere or the owner already has an active group/channel of this type.",
+    },
     # ── Eski (o'tgan sanali) signal — /eski (197) ──
     "bf.usage": {
         "uz": ("📜 <b>Eski signal qo'shish</b> (joriy guruh/kanal/jurnalga)\n\n"

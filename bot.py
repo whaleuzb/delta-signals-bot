@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
+import asyncpg
 from PIL import Image
 
 from telegram import (
@@ -354,8 +355,10 @@ async def resolve_workspace(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     cached_id = ctx.user_data.get("workspace_id")
     if cached_id:
         ws = await db.get_workspace(cached_id)
-        if ws:
+        if ws and not ws["archived"]:
             return ws
+        # Egasi uzgan/arxivlangan guruh (202) — tanlov eskirgan.
+        ctx.user_data.pop("workspace_id", None)
 
     owned = await db.get_owned_group_workspaces(uid)
     personal = await db.get_personal_workspace(uid)
@@ -870,6 +873,10 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         # Ochiq kanal/guruhga kerak emas: tugma ommaviy manzilga o'zi chiqadi.
         if ws["type"] == "group":
             rows.append(top_menu_row(ws, lang))
+            # Egasi guruh/kanalini botdan uzishi (202) — tasdiq ekrani bilan.
+            rows.append([InlineKeyboardButton(
+                i18n.t("dt.btn_channel" if ws["is_channel"] else "dt.btn_group", lang),
+                callback_data=f"wsdet:{ws['id']}")])
         # Shaxsiy jurnalda — faqat admin turnirni BOSHLAGAN bo'lsa (185).
         if ws["type"] == "personal" and tournament.ACTIVE:
             rows.append([InlineKeyboardButton(i18n.t("menu.tourney", lang),
@@ -6098,6 +6105,52 @@ async def _owned_ws_from_cb(q) -> "tuple[asyncpg.Record | None, str | None]":
     return ws, lang
 
 
+async def on_detach(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """"🔌 Guruhni botdan uzish" (202): avval nima bo'lishini tushuntiruvchi
+    tasdiq ekrani, `wsdetok:` bosilgandagina uziladi."""
+    q = update.callback_query
+    await q.answer()
+    ws, lang = await _owned_ws_from_cb(q)
+    if not ws:
+        return
+    if ws["archived"]:
+        await _edit_or_reply(q, i18n.t("dt.already", lang), back_kb(lang), html_mode=False)
+        return
+    ok = "wsdetok:" + str(ws["id"])
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("dt.btn_yes", lang), callback_data=ok)],
+        back_row(lang)])
+    await _edit_or_reply(
+        q, i18n.t("dt.confirm_channel" if ws["is_channel"] else "dt.confirm_group", lang,
+                  name=html.escape(ws["name"])), kb)
+
+
+async def on_detach_ok(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    ws, lang = await _owned_ws_from_cb(q)
+    if not ws:
+        return
+    chat_id = await db.detach_workspace(ws["id"])
+    if chat_id is None:      # allaqachon uzilgan (ikki marta bosildi)
+        await _edit_or_reply(q, i18n.t("dt.already", lang), menu_back_kb(lang), html_mode=False)
+        return
+    log.info("Workspace #%s (%s) egasi tomonidan uzildi (uid=%s, chat=%s)",
+             ws["id"], ws["name"], q.from_user.id, chat_id)
+    left = True
+    try:
+        await ctx.bot.leave_chat(chat_id)
+    except Exception:
+        left = False         # bot allaqachon chiqarilgan bo'lishi mumkin
+        log.info("Bot #%s chatidan chiqa olmadi (%s)", ws["id"], chat_id)
+    if ctx.user_data.get("workspace_id") == ws["id"]:
+        ctx.user_data.pop("workspace_id", None)
+    await _edit_or_reply(
+        q, i18n.t("dt.done", lang, name=html.escape(ws["name"]))
+        + ("" if left else "\n\n" + i18n.t("dt.not_left", lang)),
+        menu_back_kb(lang))
+
+
 async def on_top_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """"🏆 Topga chiqarish" (183). Reytingda bo'lmasa — bitta bosishda
     chiqaradi (so'rov moderatorga). Reytingda bo'lsa — holat ekrani."""
@@ -6722,7 +6775,13 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
     elif action.startswith(("arch:", "unarch:")):
         wid = int(action.split(":", 1)[1])
-        await db.set_archived(wid, action.startswith("arch:"))
+        try:
+            await db.set_archived(wid, action.startswith("arch:"))
+        except asyncpg.UniqueViolationError:
+            # Egasi uzgan guruh (202) boshqa workspace'ga ulangan yoki egada
+            # shu turdagi faol guruh bor — qaytarib bo'lmaydi.
+            await q.answer(i18n.t("adm.unarch_conflict", lang), show_alert=True)
+            return
         txt, kb = await _admin_group_card(ctx.bot, wid, lang)
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
 
@@ -9255,6 +9314,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_public_decision, pattern=r"^(pubok|pubno):"))
     app.add_handler(CallbackQueryHandler(on_public_review_extra, pattern=r"^(pubjoin|pubusr):\d+$"))
     app.add_handler(CallbackQueryHandler(on_top_button, pattern=r"^top:(st|off):-?\d+$"))
+    app.add_handler(CallbackQueryHandler(on_detach, pattern=r"^wsdet:\d+$"))
+    app.add_handler(CallbackQueryHandler(on_detach_ok, pattern=r"^wsdetok:\d+$"))
     app.add_handler(CallbackQueryHandler(
         on_tourney, pattern=r"^tr:(menu|join|skip:\d+|amt:\d+:\d+(\.\d+)?)$"))
     app.add_handler(CallbackQueryHandler(on_join_button, pattern=r"^jl:(set|off):-?\d+$"))
