@@ -15,15 +15,7 @@ import io
 import logging
 from datetime import datetime, timezone
 
-import matplotlib
-matplotlib.use("Agg")
-# Formula tahlili ($...$) O'CHIQ (191): guruh nomi va username rasmlarga
-# tushadi; "$\x$" kabi nom matplotlib'ni ParseFatalException bilan yiqitardi
-# (grafik, karta, PDF eksport yo'qolardi), "1,000$ … 2,000$" esa formula
-# bo'lib buzilardi. Loyihada formulalar ataylab ishlatilmaydi.
-matplotlib.rcParams["text.parse_math"] = False
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from lazymp import patches, plt  # matplotlib birinchi grafikda yuklanadi
 
 import exchange
 import tracker
@@ -140,7 +132,7 @@ def _draw_candles(ax, candles, hi: float, lo: float) -> None:
         ax.plot([i, i], [c.low, c.high], color=col, lw=0.9, zorder=2, solid_capstyle="round")
         body_lo, body_hi = (c.open, c.close) if up else (c.close, c.open)
         h = max(body_hi - body_lo, (hi - lo) * 0.0015)
-        ax.add_patch(Rectangle((i - width / 2, body_lo), width, h, facecolor=col,
+        ax.add_patch(patches.Rectangle((i - width / 2, body_lo), width, h, facecolor=col,
                                 edgecolor=col, lw=0, zorder=3))
 
 

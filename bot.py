@@ -4179,9 +4179,7 @@ def df_equity_png(data: dict, lang: str) -> io.BytesIO | None:
     curve = data.get("curve") or []
     if not curve:
         return None
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from lazymp import plt  # Agg + parse_math=False — boshqa grafiklar bilan bir xil sozlama
     start = float(data["starting"])
     bal = [start] + [float(c[1]) for c in curve]
     deltas = [bal[i + 1] - bal[i] for i in range(len(curve))]

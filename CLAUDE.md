@@ -31,6 +31,7 @@ ajratish mumkin, lekin hozirgi hajmda kerak emas.
 | `stats.py` | hisobotlar, equity curve + drawdown, `/symbols` uchun ochiq pozitsiyalarning joriy (live) foizi |
 | `bot.py` | handlerlar, asosiy menyu, signal kiritish sehrgari (wizard), tasdiqlash oqimi, guruhga e'lonlar |
 | `test_tracker.py` | sintetik shamlarda dvigatel testi (baza/internet kerak emas) |
+| `lazymp.py` | matplotlib'ni birinchi grafikda yuklaydi (`plt`, `ticker`, `patches`, `lines` proksilari; Agg + `text.parse_math=False`) — bot ishga tushganda ~35 MB xotira tejaladi. Grafik kodida `import matplotlib.pyplot` o'rniga `from lazymp import plt` |
 
 Signal hayot sikli:
 `PENDING → ACTIVE → TP | SL | BREAKEVEN` (yoki `EXPIRED` / `CANCELLED`)
