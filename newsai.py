@@ -57,7 +57,18 @@ SEC_PHRASES = {
                          "8-K hisobot topshirdi"),
 }
 
-SEC_HEAD_RE = re.compile(r'^(?P<company>.+?) filed a (?P<form>\S+) mentioning "(?P<kw>[^"]+)"')
+SEC_HEAD_RE = re.compile(r'^(?P<company>.+?) filed a (?P<form>\S+) mentioning "(?P<kw>[^"]+)"'
+                         r'(?: \[items (?P<items>[\d.,]+)\])?')
+# 8-K rasmiy turlari (204) — postda nima bo'lgani aniq yozilsin.
+SEC_ITEMS_UZ = {
+    "1.01": "yirik bitim tuzildi (Item 1.01)",
+    "2.01": "aktiv sotib olish/sotish yakunlandi (Item 2.01)",
+    "1.03": "bankrotlik (Item 1.03)",
+    "2.04": "qarz muddatidan oldin talab qilindi (Item 2.04)",
+    "2.06": "aktivlar qadrsizlandi (Item 2.06)",
+    "3.01": "birjadan chiqarish bildirishnomasi (Item 3.01)",
+    "4.02": "avvalgi hisobotlarga endi tayanib bo'lmaydi (Item 4.02)",
+}
 # EDGAR display_names: "Tesla, Inc.  (TSLA)  (CIK 0001318605)" — bir nechta
 # klass bo'lsa "(BRK-A, BRK-B)".
 SEC_TICKER_RE = re.compile(r"\(([A-Z][A-Z0-9.\-]{0,9})(?:,\s*[A-Z0-9.\-]+)*\)")
@@ -95,10 +106,12 @@ async def _sec(headline: str) -> dict | None:
         return {"is_market_moving": False, "translation_uz": "", "insight_uz": "",
                 "symbol_hint": None}
     insight, desc = phrase
+    kinds = [SEC_ITEMS_UZ[i] for i in (m.group("items") or "").split(",") if i in SEC_ITEMS_UZ]
+    extra = ("\nHujjat turi: " + "; ".join(kinds) + ".") if kinds else ""
     return {
         "is_market_moving": True,
         "insight_uz": f"{ticker}: {insight}",
-        "translation_uz": f"{name} ({ticker}) SEC'ga {desc}.",
+        "translation_uz": f"{name} ({ticker}) SEC'ga {desc}.{extra}",
         "symbol_hint": ticker,
     }
 

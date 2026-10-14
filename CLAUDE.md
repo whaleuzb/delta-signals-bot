@@ -6956,3 +6956,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - `anthropic` paketi, `ANTHROPIC_API_KEY`, `NEWS_MODEL` olib tashlandi.
      Sinov: scratchpad `t_newsai.py` 12/12; `test_tracker.py` o'tdi.
 
+
+204. **SEC aksiya postlari: 8-K Item filtri.**
+     "📰 WSO: qo'shilish bitimini e'lon qildi" posti tushunarsiz edi: bot
+     8-K matnida "merger agreement" iborasi BIRORTA joyda uchrasa postlardi
+     (ilova, eski bitimga havola ham) va matn shablon edi. Endi
+     `news.SEC_KEYWORD_ITEMS`: aksiya kalit so'zi faqat EFTS `_source.items`
+     mos kelsa olinadi (merger/acquire → 1.01/2.01, chapter 11 → 1.03,
+     delisting → 3.01, restatement/material weakness → 4.02, event of
+     default → 2.04, going concern → 1.03/2.06/4.02). Kripto kalit so'zlari
+     filtrsiz (avvalgidek). Sarlavhaga " [items 1.01]" qo'shiladi,
+     `newsai._sec` postga "Hujjat turi: yirik bitim tuzildi (Item 1.01)"
+     yozadi. ⚠️ `items` maydoni sandboxdan tekshirilmadi (efts yopiq): u
+     bo'lmasa aksiya hujjatlari O'TKAZILADI va bir marta WARNING logi
+     (maydonlar ro'yxati bilan). Sinov: `test_sec_items.py` 6/6.

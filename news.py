@@ -55,7 +55,24 @@ SEC_STOCK_KEYWORDS = [
     "event of default",
 ]
 
+# 204: matnda ibora UCHRASHI yetarli emas edi — "merger agreement" ko'p
+# 8-K'larda yo'l-yo'lakay (ilova, eski bitimga havola, rahbar shartnomasi)
+# tilga olinadi va kanalga tushunarsiz "WSO: qo'shilish bitimi" postlari
+# chiqardi. Endi aksiya hujjati faqat SEC bergan rasmiy 8-K TURI (Item)
+# shu voqeaga mos bo'lsa olinadi.
+SEC_KEYWORD_ITEMS = {
+    "merger agreement": {"1.01", "2.01"},
+    "definitive agreement to acquire": {"1.01", "2.01"},
+    "chapter 11": {"1.03"},
+    "going concern": {"1.03", "2.06", "4.02"},
+    "notice of delisting": {"3.01"},
+    "restatement of previously issued financial statements": {"4.02"},
+    "material weakness in internal control": {"4.02"},
+    "event of default": {"2.04"},
+}
+
 SEC_KEYWORDS = SEC_CRYPTO_KEYWORDS + SEC_STOCK_KEYWORDS
+_items_missing_logged = False
 SEC_FORMS = "8-K"   # eng "yangilik"ga o'xshash forma turi — favqulodda voqealar
 
 
@@ -88,6 +105,25 @@ async def sec_scan(since: datetime) -> list[dict]:
                 adsh = src.get("adsh")           # accession number — dedup kaliti
                 if not adsh:
                     continue
+                need = SEC_KEYWORD_ITEMS.get(kw)
+                items = [str(i) for i in (src.get("items") or [])]
+                matched: list[str] = []
+                if need is not None:
+                    if "items" not in src:
+                        # Format kutilganidek bo'lmasa — shovqin postlamaymiz,
+                        # logda ko'rinadi (sandboxdan tekshirib bo'lmadi).
+                        global _items_missing_logged
+                        if not _items_missing_logged:
+                            _items_missing_logged = True
+                            log.warning("SEC: javobda 'items' maydoni yo'q — aksiya "
+                                        "hujjatlari o'tkazib yuboriladi (maydonlar: %s)",
+                                        sorted(src.keys()))
+                        continue
+                    matched = sorted(set(items) & need)
+                    if not matched:
+                        log.info("SEC: %s %r — 8-K turi %s mos emas, o'tkazildi",
+                                 adsh, kw, items)
+                        continue
                 names = src.get("display_names") or []
                 company = names[0] if names else "Noma'lum kompaniya"
                 file_date = src.get("file_date")
@@ -109,7 +145,8 @@ async def sec_scan(since: datetime) -> list[dict]:
                     "symbol": None,
                     "market": None,
                     "headline_en": f"{company} filed a {src.get('form', SEC_FORMS)} "
-                                   f"mentioning \"{kw}\"",
+                                   f"mentioning \"{kw}\""
+                                   + (f" [items {','.join(matched)}]" if matched else ""),
                     "body_en": f"Company: {company}. Filed: {file_date}. "
                                f"Matched keyword: {kw}.",
                     "event_at": event_at,
