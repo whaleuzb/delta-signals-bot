@@ -17,12 +17,6 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # --- Kim signal qo'sha oladi ---
 ADMIN_IDS = _ids(os.getenv("ADMIN_IDS", "1101182189"))
 
-# --- Claude (yangiliklarni tarjima/tahlil qilish uchun). Bo'sh bo'lsa o'chadi ---
-# ESLATMA: rasmdan (grafik skrinshotidan) darajalarni avtomatik o'qish
-# funksiyasi OLIB TASHLANDI — har bir rasm pullik model chaqiruvi edi.
-# Kalit endi faqat News Trade AI (newsai.py) uchun ishlatiladi.
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-
 # --- Narx manbasi: MEXC Spot (Binance Futures AQSH IP'larini 451 bilan bloklagani uchun
 #     almashtirildi; MEXC'da kichik altcoinlar ham ko'proq bor) ---
 EXCHANGE_BASE = os.getenv("EXCHANGE_BASE", "https://api.mexc.com")
@@ -92,8 +86,6 @@ def guide_url(lang: str | None = None) -> str:
 #     grafik bilan alohida kanalga joylaydigan funksiya. NEWS_CHANNEL_ID
 #     bo'sh bo'lsa butun funksiya o'chiq (news_scan_job hech narsa qilmaydi) ---
 NEWS_CHANNEL_ID = os.getenv("NEWS_CHANNEL_ID", "")
-# Matn-yangilikni tahlil qilish (tarjima/xulosa/filtr) uchun model.
-NEWS_MODEL = os.getenv("NEWS_MODEL", "claude-opus-5")
 # Jonli yangilanish: har necha soniyada narx qayta tekshiriladi va bir
 # nechta hodisa parallel bo'lganda barchasi uchun umumiy minimal oraliq
 # (Telegram "flood control"ga urilmaslik uchun — bot.py'dagi _live_update
