@@ -18,7 +18,8 @@ import logging
 import os
 from datetime import datetime
 
-import matplotlib
+import importlib.util
+
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
@@ -44,7 +45,7 @@ LOSS = "#FF5F5F"
 # Shriftlar matplotlib g'ildiragi ichidan olinadi — ular Railway konteynerida
 # HAR DOIM bor (matplotlib allaqachon talab qilinadi). Tizim shriftlariga
 # tayanib bo'lmaydi: konteynerda ular bo'lmasligi mumkin.
-_FONT_DIR = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
+_FONT_DIR = os.path.join(os.path.dirname(importlib.util.find_spec("matplotlib").origin), "mpl-data", "fonts", "ttf")
 _REG = os.path.join(_FONT_DIR, "DejaVuSans.ttf")
 _BOLD = os.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf")
 

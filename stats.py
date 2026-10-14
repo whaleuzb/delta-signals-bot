@@ -4,16 +4,7 @@ import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-import matplotlib
-matplotlib.use("Agg")
-# Formula tahlili ($...$) O'CHIQ (191): guruh nomi va username rasmlarga
-# tushadi; "$\x$" kabi nom matplotlib'ni ParseFatalException bilan yiqitardi
-# (grafik, karta, PDF eksport yo'qolardi), "1,000$ … 2,000$" esa formula
-# bo'lib buzilardi. Loyihada formulalar ataylab ishlatilmaydi.
-matplotlib.rcParams["text.parse_math"] = False
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from matplotlib.lines import Line2D
+from lazymp import lines as mlines, plt, ticker as mticker  # matplotlib birinchi grafikda yuklanadi
 
 import config
 import db
@@ -440,11 +431,11 @@ async def equity_chart(workspace_id: int, deposit=None,
         axd.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=20))
 
     leg = axb.legend(handles=[
-        Line2D([0], [0], color=line_col, lw=2.8, marker="o", markerfacecolor=BG,
+        mlines.Line2D([0], [0], color=line_col, lw=2.8, marker="o", markerfacecolor=BG,
                markeredgewidth=2, label=i18n.t("rep.eq_leg_line", lang)),
-        Line2D([0], [0], color=GREEN, lw=9, alpha=0.75,
+        mlines.Line2D([0], [0], color=GREEN, lw=9, alpha=0.75,
                label=i18n.t("rep.eq_leg_win", lang)),
-        Line2D([0], [0], color=RED, lw=9, alpha=0.75,
+        mlines.Line2D([0], [0], color=RED, lw=9, alpha=0.75,
                label=i18n.t("rep.eq_leg_loss", lang)),
     ], loc="upper left", fontsize=10.5, facecolor=BG, edgecolor=GRID, framealpha=0.9)
     for t in leg.get_texts():
