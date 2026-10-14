@@ -6970,3 +6970,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      yozadi. ⚠️ `items` maydoni sandboxdan tekshirilmadi (efts yopiq): u
      bo'lmasa aksiya hujjatlari O'TKAZILADI va bir marta WARNING logi
      (maydonlar ro'yxati bilan). Sinov: `test_sec_items.py` 6/6.
+
+205. **SEC aksiya postlari o'chirildi.** Foydalanuvchi (204 dan keyin ham):
+     "kerak emas ekan, juda ko'p kelyapti". `news.SEC_KEYWORDS` endi faqat
+     `SEC_CRYPTO_KEYWORDS`; `SEC_STOCK_KEYWORDS`/`SEC_KEYWORD_ITEMS` kodda
+     qoldi (qayta yoqish — ro'yxatga qo'shish).

@@ -71,7 +71,10 @@ SEC_KEYWORD_ITEMS = {
     "event of default": {"2.04"},
 }
 
-SEC_KEYWORDS = SEC_CRYPTO_KEYWORDS + SEC_STOCK_KEYWORDS
+# 205: foydalanuvchi — aksiya bo'yicha SEC postlari "kerak emas, juda ko'p
+# kelyapti". Faqat kripto kalit so'zlari qidiriladi; aksiya ro'yxati va
+# Item filtri (204) qayta yoqish uchun kodda qoldirildi.
+SEC_KEYWORDS = list(SEC_CRYPTO_KEYWORDS)
 _items_missing_logged = False
 SEC_FORMS = "8-K"   # eng "yangilik"ga o'xshash forma turi — favqulodda voqealar
 
