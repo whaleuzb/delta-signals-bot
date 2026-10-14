@@ -15,8 +15,8 @@ baribir `.get()` bilan himoyalangan (kelajakda yana o'zgarishi mumkin).
 
 Notice sarlavhasi ko'pincha KOREYS tilida keladi — buni bu yerda TARJIMA
 QILISHGA urinilmaydi: xom sarlavha to'g'ridan-to'g'ri `newsai.analyze()`ga
-beriladi (Claude ko'p tilli — tarjima/tahlil/tiker-taxminni o'zi
-bajaradi), xuddi SEC hujjatlari qanday ishlansa shunday.
+beriladi — u yerda tiker qavsdan olinadi, tarjima `translate.to_uz()`
+orqali (LLM yo'q).
 
 Bundan tashqari `binance_scan()` — Binance yangi listinglari, pastga
 qarang."""
@@ -57,7 +57,7 @@ async def upbit_scan(since: datetime) -> list[dict]:
     Natija: `{source, external_key, symbol, market, headline_en, body_en,
     event_at, source_url}` — `news.sec_scan()` bilan bir xil shakl,
     `bot.py`ning umumiy quvuriga o'zgarishsiz qo'shiladi. `symbol` doim
-    `None` — tiker `newsai.analyze()` bosqichida taxmin qilinadi."""
+    `None` — tiker `newsai.analyze()` bosqichida aniqlanadi."""
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=HEADERS) as client:
             r = await client.get(ANNOUNCEMENTS_URL, params={

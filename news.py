@@ -65,8 +65,8 @@ async def sec_scan(since: datetime) -> list[dict]:
 
     Natija: `{external_key, symbol, market, headline_en, body_en, event_at,
     source_url}`. `symbol` doim `None` — hujjat matnida qaysi tiker
-    nazarda tutilgani `newsai.analyze()` bosqichida (LLM orqali) taxmin
-    qilinadi, bu yerda faqat kompaniya nomi bor."""
+    nazarda tutilgani `newsai.analyze()` bosqichida (`display_names`dagi
+    tiker bo'yicha) aniqlanadi, bu yerda faqat kompaniya nomi bor."""
     out: list[dict] = []
     async with httpx.AsyncClient(headers=SEC_HEADERS, timeout=15.0) as client:
         for kw in SEC_KEYWORDS:

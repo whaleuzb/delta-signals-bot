@@ -38,7 +38,7 @@ async def fetch_week() -> list[dict]:
 
     Xato bo'lsa (manba javob bermadi, format o'zgardi) — bo'sh ro'yxat,
     hech qachon istisno tashlamaydi. Natija: `{title, when (tz-aware
-    datetime), forecast, previous, actual}`. `actual` — hodisa hali
+    datetime), forecast, previous, actual, impact}`. `actual` — hodisa hali
     e'lon qilinmagan bo'lsa bo'sh satr (manba shu haftalik faylni
     natija chiqqach TO'LDIRIB qo'yadi, alohida so'rov shart emas)."""
     try:
@@ -72,6 +72,7 @@ async def fetch_week() -> list[dict]:
             "forecast": item.get("forecast") or "",
             "previous": item.get("previous") or "",
             "actual": item.get("actual") or "",
+            "impact": item.get("impact") or "",
         })
     return out
 

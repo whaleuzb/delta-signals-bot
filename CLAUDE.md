@@ -4,8 +4,7 @@ Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasi
 yurituvchi bot. Delta Community uchun.
 
 **Stack:** Python 3.11+ · python-telegram-bot 21 · asyncpg + Railway PostgreSQL ·
-MEXC Spot public API (kripto) · Twelve Data (forex, ixtiyoriy) · matplotlib ·
-Claude vision (ixtiyoriy)
+MEXC Spot public API (kripto) · Twelve Data (forex, ixtiyoriy) · matplotlib
 
 > Avval Binance USDⓈ-M Futures ishlatilgan, lekin Railway serveri joylashgan
 > hududni Binance 451 (huquqiy sabab) bilan bloklagani uchun MEXC Spot'ga
@@ -903,7 +902,7 @@ Schema `db.init()` da avtomatik yaratiladi.
 ## Env o'zgaruvchilar
 
 `BOT_TOKEN` · `DATABASE_URL` · `ADMIN_IDS` — majburiy.
-`ANTHROPIC_API_KEY` — bo'sh bo'lsa vision jim o'chadi, bot ishlayveradi.
+`ANTHROPIC_API_KEY` endi YO'Q — LLM umuman ishlatilmaydi (204-band).
 `TWELVE_DATA_API_KEY` — bo'sh bo'lsa forex jim o'chadi, kripto ishlayveradi (#14).
 `CHANNEL_ID`/`CHANNEL_TOPIC_ID` endi YO'Q — har bir guruh o'zini `/setup` bilan
 ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
@@ -6934,3 +6933,26 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `detached_chat_id` ko'rsatiladi. Statistika: "Guruhlar • Kanallar •
      Shaxsiy" (faqat faol). `admin_list_groups` endi `is_channel` bo'yicha
      saralanadi. Sinov: `test_admin_split.py` 12/12.
+
+204. **News Trade AI Anthropic'siz (LLM yo'q).** Foydalanuvchi: "Antropic
+     api kerakmas" — kalit yaroqsiz bo'lib (401), SEC/Upbit yangiliklari va
+     iqtisodiy natija postlari to'xtab qolgan edi. `newsai.py` qoida va
+     lug'at bilan qayta yozildi; `analyze()`/`econ_result()` interfeysi
+     o'zgarmadi, `bot.py`ga tegilmadi.
+     - **SEC**: tiker `display_names`dagi qavsdan ("Tesla, Inc. (TSLA)
+       (CIK …)", sinflarda birinchisi, "BRK-A" → "BRK.A"). Tiker yo'q =
+       postlanmaydi (avval Claude saralardi; endi birjada savdo qilinmaydigan
+       kompaniya o'tib ketmaydi). Xulosa/tavsif — kalit so'z lug'ati
+       (`SEC_PHRASES`, `news.SEC_KEYWORDS` bilan bir xil).
+     - **Upbit**: tiker sarlavhadagi "(BTC)" qavsdan (KRW/BTC/USDT bozor
+       belgilari emas); "거래지원 종료"/"상장폐지" → delisting; "유의"/
+       "점검"/"이벤트" → postlanmaydi. Matn — shablon + `translate.to_uz()`
+       (bepul tarjimon; yiqilsa faqat shablon).
+     - **Iqtisodiy natija**: `econcalendar.title_uz()` lug'ati bilan aynan
+       avvalgi formatdagi xabar. Foiz/o'zgarish ko'rsatkichlarida (m/m, q/q,
+       y/y) ishora qo'shiladi. Postlanadi: "High" — har doim, "Medium" —
+       natija kutilganidan farq qilsa (`fetch_week()` endi `impact`ni ham
+       qaytaradi).
+     - `anthropic` paketi, `ANTHROPIC_API_KEY`, `NEWS_MODEL` olib tashlandi.
+     Sinov: scratchpad `t_newsai.py` 12/12; `test_tracker.py` o'tdi.
+

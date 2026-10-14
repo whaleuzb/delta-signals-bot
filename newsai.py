@@ -1,179 +1,221 @@
 """Yangilik matnini tahlil qilish — o'zbekchaga tarjima, qisqa xulosa,
 "bu bozorni haqiqatan qimirlatadimi" filtri va qaysi tiker nazarda
-tutilganini taxmin qilish.
+tutilganini topish.
 
-Claude client + structured output andozasi (avval `vision.py` ham shunday
-edi, u rasm o'qish bilan birga olib tashlandi) — bu yerda faqat MATN."""
-import json
+LLM (Claude) ATAYLAB YO'Q. Foydalanuvchi: "Antropic api kerakmas" — kalit
+yaroqsiz bo'lib kanal jim qolgan edi, endi hammasi pulsiz va kalitsiz:
+  - tiker — manba matnidan (SEC `display_names` dagi "(MSTR)", Upbit
+    sarlavhasidagi "Bitcoin(BTC)") qoida bilan olinadi;
+  - filtr — tiker topilmasa yoki e'lon listing/delisting emas bo'lsa
+    "muhim emas" (avval Claude qilgan saralashning qoidaviy o'rni);
+  - xulosa — shablon (kalit so'z -> o'zbekcha ibora lug'ati);
+  - tarjima — `translate.to_uz()` (Azure/MyMemory/Google, bepul), u
+    ham yiqilsa shablon matni;
+  - iqtisodiy natija — `econcalendar.title_uz()` lug'ati bilan ANIQ
+    formatdagi xabar.
+Chaqiruvchilar (`bot.py`) uchun interfeys o'zgarmagan: `analyze()` va
+`econ_result()` avvalgidek dict yoki `None` qaytaradi."""
 import logging
+import re
+from datetime import datetime
 
-import config
+import econcalendar
+import translate
 
 log = logging.getLogger("newsai")
 
-try:
-    from anthropic import AsyncAnthropic
-    _client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY) if config.ANTHROPIC_API_KEY else None
-except ImportError:  # anthropic o'rnatilmagan bo'lsa bot baribir ishlaydi
-    _client = None
-
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "is_market_moving": {
-            "type": "boolean",
-            "description": "Bu yangilik narxga sezilarli ta'sir qilish "
-                           "ehtimoli yuqorimi? Oddiy, kundalik hujjat "
-                           "(masalan har chorakdagi rutin hisobot) bo'lsa false.",
-        },
-        "translation_uz": {
-            "type": "string",
-            "description": "Sarlavha va asosiy mazmunning o'zbekcha tarjimasi, "
-                           "1-2 jumla.",
-        },
-        "insight_uz": {
-            "type": "string",
-            "description": "Juda qisqa (5-8 so'z) o'zbekcha xulosa/sarlavha, "
-                           "diqqatni tortadigan uslubda. Masalan: "
-                           "\"SEC yirik tergov boshladi\".",
-        },
-        "symbol_hint": {
-            "type": ["string", "null"],
-            "description": "Matnda tilga olingan kompaniya/tokenning birja "
-                           "tikeri, agar aniq bo'lsa (masalan MSTR, BTC). "
-                           "Aniq bo'lmasa null.",
-        },
-    },
-    "required": ["is_market_moving", "translation_uz", "insight_uz", "symbol_hint"],
-    "additionalProperties": False,
+# --- SEC 8-K: kalit so'z -> (xulosa, tavsif) ---
+SEC_PHRASES = {
+    "cryptocurrency": ("kriptovalyuta bo'yicha muhim hujjat",
+                       "kriptovalyutaga oid voqea haqida 8-K hisobot topshirdi"),
+    "digital asset": ("raqamli aktivlar bo'yicha hujjat",
+                      "raqamli aktivlarga oid voqea haqida 8-K hisobot topshirdi"),
+    "digital assets": ("raqamli aktivlar bo'yicha hujjat",
+                       "raqamli aktivlarga oid voqea haqida 8-K hisobot topshirdi"),
+    "merger agreement": ("qo'shilish bitimini e'lon qildi",
+                         "qo'shilish (merger) bitimi haqida 8-K hisobot topshirdi"),
+    "definitive agreement to acquire": ("yirik xarid bitimi",
+                                        "boshqa kompaniyani sotib olish bo'yicha yakuniy "
+                                        "bitim haqida 8-K hisobot topshirdi"),
+    "chapter 11": ("bankrotlik (Chapter 11)",
+                   "Chapter 11 bo'yicha bankrotlik jarayoni haqida 8-K hisobot topshirdi"),
+    "going concern": ("faoliyat davomiyligi xavf ostida",
+                      "faoliyatini davom ettira olishiga shubha (going concern) "
+                      "haqida 8-K hisobot topshirdi"),
+    "notice of delisting": ("birjadan chiqarish ogohlantirishi",
+                            "birjadan chiqarib tashlash bildirishnomasi haqida "
+                            "8-K hisobot topshirdi"),
+    "restatement of previously issued financial statements": (
+        "hisobotlar qayta ko'rib chiqiladi",
+        "avval e'lon qilingan moliyaviy hisobotlarni qayta ko'rib chiqishi haqida "
+        "8-K hisobot topshirdi"),
+    "material weakness in internal control": (
+        "ichki nazoratda jiddiy kamchilik",
+        "ichki nazoratdagi jiddiy kamchilik haqida 8-K hisobot topshirdi"),
+    "event of default": ("qarz majburiyati buzildi",
+                         "qarz majburiyatini bajarmaslik (event of default) haqida "
+                         "8-K hisobot topshirdi"),
 }
 
-PROMPT = """Quyida moliyaviy/kripto yangilik matni berilgan (SEC hujjati,
-birja e'loni yoki shunga o'xshash rasmiy manba).
+SEC_HEAD_RE = re.compile(r'^(?P<company>.+?) filed a (?P<form>\S+) mentioning "(?P<kw>[^"]+)"')
+# EDGAR display_names: "Tesla, Inc.  (TSLA)  (CIK 0001318605)" — bir nechta
+# klass bo'lsa "(BRK-A, BRK-B)".
+SEC_TICKER_RE = re.compile(r"\(([A-Z][A-Z0-9.\-]{0,9})(?:,\s*[A-Z0-9.\-]+)*\)")
+SEC_CIK_RE = re.compile(r"\s*\(CIK \d+\)")
 
-Vazifang:
-1. Bu yangilik bozorga (aktiv narxiga) SEZILARLI ta'sir qilish ehtimoli
-   bormi, yoki bu oddiy/rutin hujjatmi? Rutin bo'lsa is_market_moving=false.
-2. Sarlavha va matnni O'ZBEK tiliga tarjima qil (1-2 jumla, aniq va qisqa).
-3. Diqqatni tortadigan juda qisqa xulosa yoz (5-8 so'z, o'zbekcha).
-4. Matnda qaysi kompaniya/token nazarda tutilganini top va uning ODATDA
-   ishlatiladigan birja tikerini yoz (masalan "MicroStrategy" -> "MSTR",
-   "Bitcoin" -> "BTC"). Ishonchli bo'lmasa null qoldir — taxmin qilib
-   noto'g'ri tiker yozishdan ko'ra shunisi yaxshi."""
-
-
-ECON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "is_market_moving": {
-            "type": "boolean",
-            "description": "Bu ko'rsatkich(lar) narxga sezilarli ta'sir "
-                           "qilish ehtimoli yuqori bo'lgan darajada "
-                           "muhimmi? Arzimas/rutin bo'lsa false.",
-        },
-        "message_uz": {
-            "type": "string",
-            "description": "To'liq formatlangan o'zbekcha xabar matni, "
-                           "quyidagi PROMPT'dagi ANIQ namunaga mos.",
-        },
-    },
-    "required": ["is_market_moving", "message_uz"],
-    "additionalProperties": False,
-}
-
-ECON_PROMPT = """Quyida AQSHning bir vaqtda (bitta relizda) e'lon qilingan
-makroiqtisodiy ko'rsatkich(lar)i berilgan — har biri sarlavha, kutilgan
-(forecast), oldingi (previous) va haqiqiy natija (actual) bilan. Ko'pincha
-bitta hodisaning oylik va yillik versiyasi (yoki "core" varianti) bir vaqtda
-chiqadi — ular BITTA xabarda birlashtiriladi.
-
-Vazifang — quyidagi ANIQ FORMATDA (misoldagek, boshqa hech narsa qo'shmasdan)
-o'zbekcha xabar matni yoz:
-
-❗️🇺🇸 #aqsh #<mavzuga oid 1-2 ta teg, O'ZBEK tilida kichik harf bilan> #iqtisodiyot #hisobot
-AQSh - <KATEGORIYA NOMI KATTA HARFLARDA, o'zbekcha> - <KO'RSATKICH NOMI KATTA HARFLARDA, o'zbekcha> (<hisobot davri oyi, event sanasidan bir oy oldin, o'zbekcha qisqa nom, masalan "iyul">):
-
-<davr nomi kichik harf bilan, masalan "oylik" yoki "yil davomida"> = <ishora bilan foiz> (kutilgan <ishora bilan foiz> / oldingi ko'rsatkich <ishora bilan foiz>)
-
-(har bir ko'rsatkich uchun yuqoridagi qatordan, orasida bo'sh qator bilan)
-
-MISOL (aynan shu uslubda, lekin mazmuni har xil ko'rsatkich uchun moslashtiriladi):
-❗️🇺🇸 #aqsh #inflyatsiya #iqtisodiyot #hisobot
-AQSh - INFLYATSIYA - PCE NARX INDEKSASI (iyul):
-
-oylik = +0.2% (kutilgan +0.1% / oldingi ko'rsatkich -0.1%)
-yil davomida = +3.7% (kutilgan +3.6% / oldingi ko'rsatkich +3.7%)
-
-asosiy PCE = +3.3% yil davomida (kutilgan +3.3% / oldingi ko'rsatkich +3.3%)
-
-Qoidalar:
-- Foiz/sondan oldin har doim ishora (+ yoki -) bo'lsin.
-- `actual` bo'sh bo'lgan ko'rsatkichni butunlay tashlab ket.
-- Barcha `actual` bo'sh bo'lsa — message_uz'ni bo'sh satr qoldir va
-  is_market_moving=false qo'y.
-- Teglarni ko'rsatkich mazmuniga qarab tanla (masalan inflyatsiya, ishsizlik,
-  stavka, yaim, sanoat, chakana_savdo, mehnat_bozori).
-- BUTUN xabar — sarlavha, teglar, izohlar — FAQAT o'zbek tilida bo'lsin;
-  ruscha yoki inglizcha bironta so'z ham qolmasin.
-- Bu odatiy/kam ta'sirli ko'rsatkich bo'lsa is_market_moving=false qo'y
-  (lekin message_uz baribir to'g'ri formatlangan holda yoz)."""
+# --- Upbit ---
+# "비트코인(BTC)", "Sapien(SAPIEN)" — qavs ichida bitta katta harfli tiker.
+COIN_RE = re.compile(r"\(([A-Z0-9]{2,12})\)")
+MARKET_WORDS = {"KRW", "BTC", "USDT"}  # "(KRW, BTC, USDT 마켓)" — tiker emas
+DELIST_WORDS = ("거래지원 종료", "상장폐지", "termination", "delist")
+NOISE_WORDS = ("유의", "점검", "이벤트", "caution", "maintenance", "event")
 
 
-async def econ_result(events: list[dict]) -> dict | None:
-    """`events` — bir xil vaqtda (`when`) chiqqan, `actual`si to'ldirilgan
-    iqtisodiy ko'rsatkichlar ro'yxati. `None` — Claude ulanmagan yoki xato
-    bo'lsa (chaqiruvchi hech narsa postlamasligi kerak)."""
-    if _client is None:
+def _sec_ticker(company: str) -> str | None:
+    m = SEC_TICKER_RE.search(SEC_CIK_RE.sub("", company))
+    return m.group(1).replace("-", ".") if m else None
+
+
+def _sec_company(company: str) -> str:
+    name = SEC_CIK_RE.sub("", company)
+    return re.sub(r"\s*\([^)]*\)\s*$", "", name).strip() or company
+
+
+async def _sec(headline: str) -> dict | None:
+    m = SEC_HEAD_RE.match(headline)
+    if not m:
         return None
-    lines = []
-    for e in events:
-        lines.append(f"- {e['title']}: forecast={e.get('forecast') or 'N/A'}, "
-                     f"previous={e.get('previous') or 'N/A'}, "
-                     f"actual={e.get('actual') or 'N/A'}")
-    when = events[0]["when"] if events else None
-    text = (f"{ECON_PROMPT}\n\nHODISA SANASI: {when}\n\nKO'RSATKICHLAR:\n" +
-           "\n".join(lines))
-    try:
-        msg = await _client.messages.create(
-            model=config.NEWS_MODEL,
-            max_tokens=1024,
-            output_config={"format": {"type": "json_schema", "schema": ECON_SCHEMA}},
-            messages=[{"role": "user", "content": [{"type": "text", "text": text}]}],
-        )
-    except Exception:
-        log.exception("Iqtisodiy natija tahlili xato")
-        return None
-    for block in msg.content:
-        if block.type == "text":
-            try:
-                return json.loads(block.text)
-            except (json.JSONDecodeError, TypeError):
-                log.warning("Iqtisodiy natija javobi JSON emas: %r", block.text)
-                return None
-    return None
+    kw = m.group("kw").lower()
+    phrase = SEC_PHRASES.get(kw)
+    ticker = _sec_ticker(m.group("company"))
+    name = _sec_company(m.group("company"))
+    if phrase is None or ticker is None:
+        # Tiker yo'q = birjada savdo qilinmaydigan (yoki aniqlab bo'lmaydigan)
+        # kompaniya — grafik ham, savdo tugmasi ham bo'lmaydi, postlamaymiz.
+        return {"is_market_moving": False, "translation_uz": "", "insight_uz": "",
+                "symbol_hint": None}
+    insight, desc = phrase
+    return {
+        "is_market_moving": True,
+        "insight_uz": f"{ticker}: {insight}",
+        "translation_uz": f"{name} ({ticker}) SEC'ga {desc}.",
+        "symbol_hint": ticker,
+    }
+
+
+async def _upbit(title: str) -> dict:
+    low = title.lower()
+    coins = [c for c in COIN_RE.findall(title) if c not in MARKET_WORDS]
+    delist = any(w in low for w in DELIST_WORDS)
+    # `listings.upbit_scan()` allaqachon LISTING_KEYWORDS bilan saralagan
+    # ("디지털 자산 추가" kabi e'lonlar ham shu yerga keladi) — bu yerda
+    # faqat tiker borligi va shovqin (ogohlantirish/texnik ish) tekshiriladi.
+    if not coins or any(w in low for w in NOISE_WORDS):
+        return {"is_market_moving": False, "translation_uz": "", "insight_uz": "",
+                "symbol_hint": None}
+    coin = coins[0]
+    others = f" (+{len(coins) - 1} ta boshqa)" if len(coins) > 1 else ""
+    if delist:
+        insight = f"Upbit {coin} savdosini to'xtatadi"
+        fallback = f"Upbit birjasi {coin}{others} savdosini qo'llab-quvvatlashni tugatishini e'lon qildi."
+    else:
+        insight = f"Upbit'da yangi listing: {coin}"
+        fallback = f"Upbit birjasi {coin}{others} uchun savdo boshlanishini e'lon qildi."
+    src = "en" if title.isascii() else "ko"
+    tr = await translate.to_uz(title, source=src)
+    return {
+        "is_market_moving": True,
+        "insight_uz": insight,
+        "translation_uz": f"{fallback}\n{tr}" if tr and tr != title else fallback,
+        "symbol_hint": coin,
+    }
 
 
 async def analyze(headline_en: str, body_en: str) -> dict | None:
-    """`None` — Claude ulanmagan yoki xato bo'lsa (chaqiruvchi shunda hech
-    narsa postlamasligi kerak, aks holda tarjimasiz/tahlilsiz xabar ketardi)."""
-    if _client is None:
-        return None
-    text = f"{PROMPT}\n\nSARLAVHA: {headline_en}\n\nMATN: {body_en}"
+    """`None` — matnni tanib bo'lmadi (chaqiruvchi postlamaydi).
+    `is_market_moving=False` — tanildi, lekin kanalga arzimaydi."""
     try:
-        msg = await _client.messages.create(
-            model=config.NEWS_MODEL,
-            max_tokens=1024,
-            output_config={"format": {"type": "json_schema", "schema": SCHEMA}},
-            messages=[{"role": "user", "content": [{"type": "text", "text": text}]}],
-        )
+        if SEC_HEAD_RE.match(headline_en or ""):
+            return await _sec(headline_en)
+        return await _upbit(headline_en or "")
     except Exception:
         log.exception("Yangilik tahlili xato")
         return None
-    for block in msg.content:
-        if block.type == "text":
-            try:
-                return json.loads(block.text)
-            except (json.JSONDecodeError, TypeError):
-                log.warning("Yangilik tahlili javobi JSON emas: %r", block.text)
-                return None
-    return None
+
+
+# --- Iqtisodiy taqvim natijasi ---
+UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul",
+             "avgust", "sentyabr", "oktyabr", "noyabr", "dekabr"]
+
+# (kalit so'z, teg, kategoriya) — birinchi mos kelgani olinadi.
+ECON_TOPICS = [
+    (("cpi", "ppi", "pce", "inflation"), "inflyatsiya", "INFLYATSIYA"),
+    (("federal funds", "fomc", "fed "), "stavka", "FOIZ STAVKASI"),
+    (("unemployment", "employment", "payroll", "earnings", "jolts"),
+     "mehnat_bozori", "MEHNAT BOZORI"),
+    (("gdp",), "yaim", "YAIM"),
+    (("retail",), "chakana_savdo", "CHAKANA SAVDO"),
+    (("pmi", "manufacturing", "industrial", "durable", "factory", "capacity"),
+     "sanoat", "SANOAT"),
+    (("home", "housing", "building"), "uy_joy", "UY-JOY BOZORI"),
+    (("consumer", "personal"), "istemol", "ISTE'MOL"),
+    (("oil", "gas"), "energetika", "ENERGETIKA"),
+]
+CHANGE_RE = re.compile(r"\b(m/m|q/q|y/y)\s*$", re.I)
+NUM_RE = re.compile(r"^-?\d")
+
+
+def _signed(value: str, change: bool) -> str:
+    v = (value or "").strip()
+    if not v:
+        return "—"
+    if change and NUM_RE.match(v) and not v.startswith("-"):
+        return "+" + v
+    return v
+
+
+def _topic(title: str) -> tuple[str, str]:
+    low = title.lower()
+    for words, tag, cat in ECON_TOPICS:
+        if any(w in low for w in words):
+            return tag, cat
+    return "makro", "MAKROIQTISODIYOT"
+
+
+def _moving(e: dict) -> bool:
+    """"High" — har doim; "Medium" — faqat natija kutilganidan farq qilsa."""
+    if str(e.get("impact", "")).lower() == "high":
+        return True
+    return (e.get("actual") or "").strip() != (e.get("forecast") or "").strip()
+
+
+def econ_message(events: list[dict]) -> str:
+    done = [e for e in events if (e.get("actual") or "").strip()]
+    if not done:
+        return ""
+    tag, cat = _topic(done[0]["title"])
+    when: datetime = done[0]["when"]
+    month = UZ_MONTHS[(when.month - 2) % 12]
+    head = econcalendar.title_uz(done[0]["title"])
+    head = CHANGE_RE.sub("", head).replace("(oylik)", "").replace(
+        "(choraklik)", "").replace("(yillik)", "").strip()
+    lines = [f"❗️🇺🇸 #aqsh #{tag} #iqtisodiyot #hisobot",
+             f"AQSh - {cat} - {head.upper()} ({month}):", ""]
+    for e in done:
+        change = bool(CHANGE_RE.search(e["title"]))
+        lines.append(f"{econcalendar.title_uz(e['title'])} = {_signed(e['actual'], change)} "
+                     f"(kutilgan {_signed(e.get('forecast'), change)} / "
+                     f"oldingi ko'rsatkich {_signed(e.get('previous'), change)})")
+    return "\n".join(lines)
+
+
+async def econ_result(events: list[dict]) -> dict | None:
+    """`events` — bir vaqtda chiqqan, `actual`si to'ldirilgan ko'rsatkichlar."""
+    try:
+        msg = econ_message(events)
+    except Exception:
+        log.exception("Iqtisodiy natija xabari yasalmadi")
+        return None
+    done = [e for e in events if (e.get("actual") or "").strip()]
+    return {"is_market_moving": bool(msg) and any(_moving(e) for e in done),
+            "message_uz": msg}
