@@ -121,7 +121,7 @@ async def sec_scan(since: datetime) -> list[dict]:
                         continue
                     matched = sorted(set(items) & need)
                     if not matched:
-                        log.info("SEC: %s %r — 8-K turi %s mos emas, o'tkazildi",
+                        log.debug("SEC: %s %r — 8-K turi %s mos emas, o'tkazildi",
                                  adsh, kw, items)
                         continue
                 names = src.get("display_names") or []
