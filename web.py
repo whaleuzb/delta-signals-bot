@@ -1035,9 +1035,11 @@ async def group_page(request):
         except Exception:
             log.warning("Ochiq pozitsiya narxi olinmadi (#%s)", r["id"], exc_info=True)
             price = None
-        if price is None:
-            continue
-        p = tracker.pnl_at(r["side"], float(r["entry"]), price)
+        # Narx olinmasa ham pozitsiya ro'yxatdan TUSHIB QOLMAYDI (#489):
+        # foiz o'rnida "—" chiqadi, savdo esa ko'rinib turadi.
+        p = (tracker.pnl_at(r["side"], float(r["entry"]), price)
+             if price is not None else 0.0)
+        pnl_txt = f"{p:+.2f}%" if price is not None else "—"
         since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
                  if r["opened_at"] else "—")
         # Kanalda kartochka YOPILGAN savdolarniki bilan bir xil shaklda:
@@ -1054,7 +1056,7 @@ async def group_page(request):
             f"<div class='open {_cls(p)}-edge'>"
             f"<div class='ometa'><div class='oname'>{name}</div>"
             f"<div class='osub'>{sub}</div></div>"
-            f"<div class='opnl {_cls(p)}'>{p:+.2f}%</div></div>")
+            f"<div class='opnl {_cls(p)}'>{pnl_txt}</div></div>")
 
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
     # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni

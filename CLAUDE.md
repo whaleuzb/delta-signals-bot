@@ -6975,3 +6975,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      "kerak emas ekan, juda ko'p kelyapti". `news.SEC_KEYWORDS` endi faqat
      `SEC_CRYPTO_KEYWORDS`; `SEC_STOCK_KEYWORDS`/`SEC_KEYWORD_ITEMS` kodda
      qoldi (qayta yoqish — ro'yxatga qo'shish).
+206. **Mini App: narx olinmasa ochiq pozitsiya yo'qolmaydi.** #489 TRBUSDT
+     (fyuchers) "Hozir ochiq" ro'yxatidan g'oyib bo'ldi: MEXC fyuchers
+     ticker vaqti-vaqti bilan 403 / 510 ("Requests are too frequent")
+     qaytaradi, `futures.last_price` jimgina None berardi, `web.py` esa
+     None'da kartani `continue` bilan tashlab yuborardi. Endi:
+     `last_price` xatoda oxirgi ma'lum narxni (1 soatgacha) qaytaradi va
+     10 daqiqada bir log yozadi; tarmoq xatosi ham ushlanadi. `web.py`
+     narx bo'lmasa ham kartani ko'rsatadi, foiz o'rnida "—".

@@ -115,22 +115,45 @@ _empty_logged: dict[tuple[str, str], float] = {}
 
 
 async def last_price(symbol: str, fresh: bool = False) -> float | None:
-    if not fresh:
-        hit = _price_cache.get(symbol)
-        if hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
-            return hit[1]
-    r = await _client.get("/api/v1/contract/ticker", params={"symbol": api_symbol(symbol)})
-    if r.status_code != 200:
-        return None
-    d = r.json().get("data") or {}
-    if isinstance(d, list):
-        d = d[0] if d else {}
-    p = d.get("lastPrice")
-    if p is None:
-        return None
-    price = float(p)
-    _price_cache[symbol] = (time.monotonic(), price)
-    return price
+    """Joriy narx. MEXC fyuchers vaqti-vaqti bilan 403 yoki 510 ("Requests
+    are too frequent") qaytaradi — shunda oxirgi ma'lum narx (1 soatgacha)
+    qaytariladi: aks holda Mini App ochiq pozitsiyani ro'yxatdan jimgina
+    tushirib qoldirardi (#489 TRBUSDT)."""
+    hit = _price_cache.get(symbol)
+    if not fresh and hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
+        return hit[1]
+    price = None
+    why = ""
+    try:
+        r = await _client.get("/api/v1/contract/ticker",
+                              params={"symbol": api_symbol(symbol)})
+        if r.status_code != 200:
+            why = f"HTTP {r.status_code}"
+        else:
+            body = r.json()
+            d = body.get("data") or {}
+            if isinstance(d, list):
+                d = d[0] if d else {}
+            p = d.get("lastPrice") if isinstance(d, dict) else None
+            if p is None:
+                why = str(body)[:200]
+            else:
+                price = float(p)
+    except httpx.HTTPError as ex:
+        why = type(ex).__name__
+    if price is not None:
+        _price_cache[symbol] = (time.monotonic(), price)
+        return price
+    if time.time() - _price_fail_logged.get(symbol, 0) > 600:
+        _price_fail_logged[symbol] = time.time()
+        log.warning("MEXC fyuchers narxi olinmadi (%s): %s", symbol, why)
+    if hit and (time.monotonic() - hit[0]) < _PRICE_STALE:
+        return hit[1]
+    return None
+
+
+_price_fail_logged: dict[str, float] = {}
+_PRICE_STALE = 3600.0
 
 
 async def close() -> None:
