@@ -6983,3 +6983,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `last_price` xatoda oxirgi ma'lum narxni (1 soatgacha) qaytaradi va
      10 daqiqada bir log yozadi; tarmoq xatosi ham ushlanadi. `web.py`
      narx bo'lmasa ham kartani ko'rsatadi, foiz o'rnida "—".
+207. **SEC postlari butunlay o'chirildi.** Foydalanuvchi "USB: raqamli
+     aktivlar bo'yicha hujjat" kabi postlarni (bank 8-K'sida "digital
+     asset" so'zi) kerak emas dedi. `news.SEC_KEYWORDS = []` — `sec_scan`
+     hech narsa qidirmaydi; kalit so'z ro'yxatlari kodda qoldi. Kanalda
+     endi faqat listing/delisting (Upbit va boshqalar) yangiliklari.

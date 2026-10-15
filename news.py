@@ -74,7 +74,10 @@ SEC_KEYWORD_ITEMS = {
 # 205: foydalanuvchi — aksiya bo'yicha SEC postlari "kerak emas, juda ko'p
 # kelyapti". Faqat kripto kalit so'zlari qidiriladi; aksiya ro'yxati va
 # Item filtri (204) qayta yoqish uchun kodda qoldirildi.
-SEC_KEYWORDS = list(SEC_CRYPTO_KEYWORDS)
+# 207: kripto bo'yicha SEC postlari ham o'chirildi — ular asosan oddiy
+# kompaniyalarning (bank va h.k.) "raqamli aktivlar" so'zi tilga olingan
+# 8-K hisobotlari, kanal uchun foydasiz. Qayta yoqish — ro'yxatni to'ldirish.
+SEC_KEYWORDS: list[str] = []
 _items_missing_logged = False
 SEC_FORMS = "8-K"   # eng "yangilik"ga o'xshash forma turi — favqulodda voqealar
 
