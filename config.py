@@ -116,6 +116,9 @@ CRYPTOPANIC_TOKEN = os.getenv("CRYPTOPANIC_TOKEN", "")
 # olib tashla"). O'chiq bo'lsa hajm surati, portlash skaneri va unga bog'liq
 # kit (whale) xabarlari ishlamaydi. Qayta yoqish: Railway'da SURGE_ENABLED=1.
 SURGE_ENABLED = os.getenv("SURGE_ENABLED", "0") == "1"
+# 208: ommaviy KANAL /top va Mini App reytingiga faqat shuncha obunachidan
+# keyin chiqadi (guruhlarga taalluqli emas). Son `member_count_job`da yangilanadi.
+TOP_CHANNEL_MIN_MEMBERS = int(os.getenv("TOP_CHANNEL_MIN_MEMBERS", "100"))
 # Oxirgi hajm bazaviy o'rtachadan necha marta katta bo'lsa "portlash".
 # 3 -> 2.2: foydalanuvchi "kanalda ko'proq xabar kelishi" so'ragach
 # yumshatildi — ko'proq signal, ozroq "kuchlilik" kafolati (tabiiy savdo).

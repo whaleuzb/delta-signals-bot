@@ -510,6 +510,9 @@ ALTER TABLE tournament_trades ADD COLUMN IF NOT EXISTS amount_first NUMERIC;
 -- Eski (o'tgan sanali) signal (197): tarix jimgina qayta ko'rib chiqilmoqda —
 -- hodisa/bosqich xabarlari guruhga ketmaydi; hozirgi vaqtga yetgach FALSE.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS backfill BOOLEAN NOT NULL DEFAULT FALSE;
+-- 208: kanal obunachilari soni (reyting darvozasi uchun) va o'lchangan vaqt.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count INT;
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count_at TIMESTAMPTZ;
 """
 
 
@@ -1286,6 +1289,31 @@ async def admin_list_signals(workspace_id: int, symbol: str | None = None,
         return await c.fetch(q, *params)
 
 
+def _top_gate(alias: str = "") -> str:
+    """Ommaviy reyting darvozasi (208): KANAL kamida
+    `config.TOP_CHANNEL_MIN_MEMBERS` obunachiga ega bo'lishi shart. Son hali
+    o'lchanmagan (NULL) kanal ham o'tmaydi. Guruhlarga taalluqli emas."""
+    a = f"{alias}." if alias else ""
+    return (f"(NOT {a}is_channel OR COALESCE({a}member_count, 0) >= "
+            f"{int(config.TOP_CHANNEL_MIN_MEMBERS)})")
+
+
+async def set_member_count(workspace_id: int, n: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET member_count=$2, member_count_at=now() "
+                        "WHERE id=$1", workspace_id, n)
+
+
+async def member_count_targets() -> list[asyncpg.Record]:
+    """Obunachi soni yangilanadigan kanallar: reytingga chiqishni so'ragan
+    (`public`), arxivlanmagan."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, group_chat_id FROM workspaces WHERE type='group' "
+            "AND is_channel AND public AND NOT archived AND group_chat_id IS NOT NULL "
+            "ORDER BY member_count_at NULLS FIRST")
+
+
 async def public_workspace(workspace_id: int) -> asyncpg.Record | None:
     """Ochiq veb sahifada ko'rsatish MUMKIN bo'lgan workspace.
 
@@ -1296,7 +1324,8 @@ async def public_workspace(workspace_id: int) -> asyncpg.Record | None:
     async with pool().acquire() as c:
         return await c.fetchrow(
             "SELECT * FROM workspaces WHERE id=$1 AND type='group' "
-            "AND public = TRUE AND public_approved = TRUE AND NOT archived",
+            "AND public = TRUE AND public_approved = TRUE AND NOT archived "
+            f"AND {_top_gate()}",
             workspace_id)
 
 
@@ -1325,7 +1354,7 @@ async def public_workspaces() -> list[asyncpg.Record]:
     LEFT JOIN signals s ON s.workspace_id = w.id
          AND s.status IN {CLOSED} AND NOT s.excluded
     WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
-      AND NOT w.archived
+      AND NOT w.archived AND {_top_gate('w')}
     GROUP BY w.id, w.name, w.invite_link, w.deposit, w.logo, w.is_channel, w.username
     ORDER BY last_closed DESC NULLS LAST
     """
@@ -1364,7 +1393,8 @@ async def public_logo(workspace_id: int) -> bytes | None:
     async with pool().acquire() as c:
         return await c.fetchval(
             "SELECT logo FROM workspaces WHERE id=$1 AND type='group' "
-            "AND public = TRUE AND public_approved = TRUE AND NOT archived",
+            "AND public = TRUE AND public_approved = TRUE AND NOT archived "
+            f"AND {_top_gate()}",
             workspace_id)
 
 
@@ -1398,7 +1428,7 @@ async def public_signal(sig_id: int) -> asyncpg.Record | None:
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE s.id = $1 AND NOT s.excluded AND s.status IN {CLOSED}
       AND w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
-      AND NOT w.archived
+      AND NOT w.archived AND {_top_gate('w')}
     """
     async with pool().acquire() as c:
         return await c.fetchrow(q, sig_id)
@@ -1706,7 +1736,8 @@ async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
-      AND NOT w.archived AND s.status IN {CLOSED} AND NOT s.excluded
+      AND NOT w.archived AND {_top_gate('w')}
+      AND s.status IN {CLOSED} AND NOT s.excluded
       AND s.closed_at >= $1 AND s.closed_at < $2
     GROUP BY w.id, w.name, w.username, w.pm_bot
     ORDER BY sum_pct DESC

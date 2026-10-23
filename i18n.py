@@ -1922,6 +1922,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "✅ Ваша группа теперь видна в рейтинге /top.",
         "en": "✅ Your group now shows in the /top ranking.",
     },
+    "pub.ch_min": {
+        "uz": ("🚫 Kanal reytingga faqat kamida <b>{min}</b> ta obunachi bo'lganda "
+               "chiqadi. Hozir: <b>{n}</b>."),
+        "ru": ("🚫 Канал попадает в рейтинг только при наличии минимум <b>{min}</b> "
+               "подписчиков. Сейчас: <b>{n}</b>."),
+        "en": ("🚫 A channel can join the ranking only with at least <b>{min}</b> "
+               "subscribers. Now: <b>{n}</b>."),
+    },
+    "pub.ch_hidden": {
+        "uz": ("⚠️ Reytingda ko'rinmayapti: kanalda kamida {min} ta obunachi "
+               "bo'lishi kerak (hozir {n}). Yetganda o'zi qaytadi."),
+        "ru": ("⚠️ Не отображается в рейтинге: нужно минимум {min} подписчиков "
+               "(сейчас {n}). Вернётся автоматически."),
+        "en": ("⚠️ Hidden from the ranking: a channel needs at least {min} "
+               "subscribers (now {n}). It returns automatically."),
+    },
     "pub.requested": {
         "uz": ("⏳ So'rov yuborildi. Guruhingiz moderator tasdig'idan keyin "
                "<code>/top</code> reytingida ko'rinadi."),

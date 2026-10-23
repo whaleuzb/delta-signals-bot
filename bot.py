@@ -701,7 +701,41 @@ def web_page_url(ws) -> str | None:
         return None
     if not (ws["public"] and ws["public_approved"] and not ws["archived"]):
         return None
+    if not channel_top_ok(ws):
+        return None
     return f"{config.WEB_URL}/g/{ws['id']}"
+
+
+def channel_top_ok(ws) -> bool:
+    """208: kanal reytingga faqat `TOP_CHANNEL_MIN_MEMBERS` obunachidan keyin
+    chiqadi — `db._top_gate()` bilan AYNI shart (Python tomonda)."""
+    return (not ws.get("is_channel")
+            or (ws.get("member_count") or 0) >= config.TOP_CHANNEL_MIN_MEMBERS)
+
+
+async def refresh_member_count(bot, ws_id: int, chat_id) -> int | None:
+    """Telegram'dan obunachilar sonini olib bazaga yozadi (208). Xatoda
+    None — eski qiymat o'zgarmaydi."""
+    try:
+        n = await bot.get_chat_member_count(chat_id)
+    except Exception as ex:
+        log.warning("Obunachilar soni olinmadi (ws=%s): %s", ws_id, type(ex).__name__)
+        return None
+    await db.set_member_count(ws_id, n)
+    return n
+
+
+async def member_count_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reytingga chiqishni so'ragan kanallarning obunachilar sonini
+    yangilaydi (6 soatda): 100 dan tushsa reytingdan yashirinadi, yetsa
+    qaytadi (208)."""
+    try:
+        rows = await db.member_count_targets()
+    except Exception:
+        log.exception("Obunachi soni siklida xato (bazadan o'qishda)")
+        return
+    for r in rows:
+        await refresh_member_count(ctx.bot, r["id"], r["group_chat_id"])
 
 
 def referral_link(token, bot_username: str | None) -> str | None:
@@ -6059,6 +6093,14 @@ async def public_enable(ctx, ws, lang: str | None) -> str:
     """Reytingga chiqarish — /public on va "🏆 Topga chiqarish" tugmasi
     uchun BITTA joy. Avval tasdiqlangan bo'lsa darhol ko'rinadi, aks
     holda moderatorga so'rov ketadi."""
+    if ws["is_channel"]:
+        # 208: qat'iy qoida — kamida N obunachi. Son shu yerning o'zida
+        # yangilanadi; Telegram javob bermasa bazadagi oxirgi qiymat.
+        n = await refresh_member_count(ctx.bot, ws["id"], ws["group_chat_id"])
+        if n is None:
+            n = ws.get("member_count") or 0
+        if n < config.TOP_CHANNEL_MIN_MEMBERS:
+            return i18n.t("pub.ch_min", lang, n=n, min=config.TOP_CHANNEL_MIN_MEMBERS)
     await db.set_public(ws["id"], True)
     if ws["public_approved"]:
         return i18n.t("pub.on_done", lang)
@@ -6071,6 +6113,9 @@ def top_status_view(ws, lang: str | None) -> tuple[str, InlineKeyboardMarkup]:
     wid = ws["id"]
     state = i18n.t("pub.state_on" if ws["public_approved"] else "pub.state_wait", lang)
     lines = [i18n.t("top.status", lang, name=html.escape(ws["name"]), state=state)]
+    if not channel_top_ok(ws):
+        lines.append(i18n.t("pub.ch_hidden", lang, n=ws.get("member_count") or 0,
+                            min=config.TOP_CHANNEL_MIN_MEMBERS))
     rows = []
     if ws["username"]:
         lines.append(i18n.t("top.join_public", lang, u=ws["username"]))
@@ -9399,6 +9444,7 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)

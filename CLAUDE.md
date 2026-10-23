@@ -6988,3 +6988,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      asset" so'zi) kerak emas dedi. `news.SEC_KEYWORDS = []` — `sec_scan`
      hech narsa qidirmaydi; kalit so'z ro'yxatlari kodda qoldi. Kanalda
      endi faqat listing/delisting (Upbit va boshqalar) yangiliklari.
+208. **Kanallar reytingga kamida 100 obunachi bilan.** Foydalanuvchi:
+     "ommaviy kanallarni topga chiqarish uchun qat'iy qoida — kamida 100
+     odam". `config.TOP_CHANNEL_MIN_MEMBERS` (env, standart 100);
+     `workspaces.member_count/member_count_at`. `db._top_gate()` barcha
+     ommaviy darvozalarga qo'shildi (public_workspace(s), public_logo,
+     public_signal, top_workspaces); Python tomonda `bot.channel_top_ok`
+     (web_page_url, top_status_view ogohlantirishi). `public_enable` kanal
+     uchun sonni Telegram'dan oladi va 100 dan kam bo'lsa so'rovni
+     moderatorga yubormaydi (`pub.ch_min`). `member_count_job` 6 soatda
+     public kanallar sonini yangilaydi — tushsa yashirinadi, yetsa qaytadi.
+     Son o'lchanmagan (NULL) kanal ham ko'rinmaydi. Guruhlarga taalluqli emas.
