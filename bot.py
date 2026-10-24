@@ -7004,12 +7004,19 @@ BROADCAST_PER_SEC = 20
 _BC_DELAY = 1.0 / BROADCAST_PER_SEC
 
 
+async def _bc_breakdown(lang: str | None) -> str:
+    """212: jami foydalanuvchilardan nechtasiga yozib bo'lmasligi va nega."""
+    b = await db.broadcast_breakdown()
+    return i18n.t("adm.bc_breakdown", lang, total=b["total"], ok=b["ok"],
+                  blocked=b["blocked"], nodm=b["nodm"])
+
+
 async def _admin_broadcast_prompt(q, lang: str | None = None) -> None:
     AWAITING_BROADCAST[q.from_user.id] = True
     PENDING_BROADCAST.pop(q.from_user.id, None)
     n = len(await db.broadcast_targets())
     await q.edit_message_text(
-        i18n.t("adm.bc_prompt", lang, n=n),
+        i18n.t("adm.bc_prompt", lang, n=n) + "\n\n" + await _bc_breakdown(lang),
         parse_mode=ParseMode.HTML, reply_markup=admin_back_kb(lang))
 
 
@@ -7026,7 +7033,8 @@ async def handle_broadcast_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE)
     PENDING_BROADCAST[uid] = (msg.chat_id, msg.message_id)
     n = len(await db.broadcast_targets())
     await msg.reply_text(
-        i18n.t("adm.bc_confirm", lang, n=n, sec=max(1, round(n * _BC_DELAY))),
+        i18n.t("adm.bc_confirm", lang, n=n, sec=max(1, round(n * _BC_DELAY)))
+        + "\n\n" + await _bc_breakdown(lang),
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(i18n.t("adm.bc_yes", lang), callback_data="adm:bcgo")],

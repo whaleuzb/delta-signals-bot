@@ -925,6 +925,17 @@ async def broadcast_targets() -> list[int]:
     return [r["user_id"] for r in rows]
 
 
+async def broadcast_breakdown() -> asyncpg.Record:
+    """212: nega hammaga emas — foydalanuvchilar taqsimoti."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT COUNT(*) AS total, "
+            "COUNT(*) FILTER (WHERE blocked) AS blocked, "
+            "COUNT(*) FILTER (WHERE NOT blocked AND dm_ok IS FALSE) AS nodm, "
+            "COUNT(*) FILTER (WHERE NOT blocked AND dm_ok IS NOT FALSE) AS ok "
+            "FROM users")
+
+
 async def mark_blocked(user_id: int) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE users SET blocked = TRUE WHERE user_id=$1", user_id)

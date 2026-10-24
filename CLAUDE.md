@@ -7033,3 +7033,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      super-adminga (min ADMIN_IDS) yuboriladi va o'sha xabar oddiy
      `run_broadcast` bilan hammaga nusxalanadi, oxirida adminga hisobot.
      Keyingi e'lon uchun: yangi fayllar + yangi `ANNOUNCE_KEY`.
+212. **Broadcast: nega hammaga emas — taqsimot.** Foydalanuvchi: "2061 ta
+     foydalanuvchi, nega 680 taga yuboryapti?" Sabab: `broadcast_targets`
+     bloklaganlarni va `dm_ok = FALSE` (botga /start bosmagan, faqat guruhda
+     ko'rilgan — Telegram bot ularga birinchi yoza olmaydi, 201) larni
+     chiqaradi. `db.broadcast_breakdown()` + `adm.bc_breakdown` — tarqatish
+     so'rovi va tasdiqlash xabarida jami/yozish mumkin/bloklagan/yozmagan.

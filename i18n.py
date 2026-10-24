@@ -3167,6 +3167,23 @@ STRINGS: dict[str, dict[str, str]] = {
                "anything. It is delivered exactly as you sent it.\n\n"
                "Send /bekor to cancel."),
     },
+    "adm.bc_breakdown": {
+        "uz": ("👥 Jami foydalanuvchilar: <b>{total}</b>\n"
+               "✉️ Yozish mumkin: <b>{ok}</b>\n"
+               "🚫 Botni bloklagan: {blocked}\n"
+               "👀 Botga /start bosmagan (faqat guruhda ko'rilgan): {nodm}\n"
+               "<i>Telegram bot /start bosmagan odamga birinchi bo'lib yoza olmaydi.</i>"),
+        "ru": ("👥 Всего пользователей: <b>{total}</b>\n"
+               "✉️ Можно написать: <b>{ok}</b>\n"
+               "🚫 Заблокировали бота: {blocked}\n"
+               "👀 Не нажимали /start (видны только в группе): {nodm}\n"
+               "<i>Telegram не позволяет боту писать первым тем, кто не нажал /start.</i>"),
+        "en": ("👥 Total users: <b>{total}</b>\n"
+               "✉️ Reachable: <b>{ok}</b>\n"
+               "🚫 Blocked the bot: {blocked}\n"
+               "👀 Never pressed /start (seen in groups only): {nodm}\n"
+               "<i>Telegram does not let a bot message someone who never pressed /start.</i>"),
+    },
     "adm.bc_confirm": {
         "uz": ("⬆️ Shu xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n"
                "Taxminiy vaqt: ~{sec} soniya.\n\nTasdiqlaysizmi?"),
