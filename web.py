@@ -511,13 +511,17 @@ def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
 
 
-def post_url(ws, msg_id) -> str | None:
-    """Kanaldagi post havolasi (209). Faqat KANAL uchun: guruhda ochiq
-    savdo a'zolarniki va yashirin. @nik bo'lsa t.me/<nik>/<id>, aks holda
-    yopiq kanal havolasi t.me/c/<id>/<id> (faqat obunachilar uchun ochiladi)."""
-    if not msg_id or not ws["is_channel"]:
+def post_url(ws, msg_id, members_only: bool = False) -> str | None:
+    """Kanal/guruhdagi post havolasi (209, 210). @nik bo'lsa
+    t.me/<nik>/<id>, aks holda t.me/c/<id>/<id> — bu faqat a'zolar
+    uchun ochiladi. `members_only` — havola faqat a'zolarga ochilishi
+    SHART (guruhdagi OCHIQ savdo: juftlik a'zolarning haqqi), shuning
+    uchun @nikli ommaviy guruhda bunday havola berilmaydi."""
+    if not msg_id:
         return None
     if ws["username"]:
+        if members_only:
+            return None
         return f"https://t.me/{ws['username']}/{int(msg_id)}"
     cid = str(ws["group_chat_id"] or "")
     if cid.startswith("-100"):
@@ -1085,10 +1089,12 @@ async def group_page(request):
         else:
             name = e(i18n.t("w.position_n", lang, i=i))
             sub = e(i18n.t("w.since", lang, d=since))
-        # 209: kanalda karta bosilsa — signal e'lon qilingan postga.
+        # 209/210: karta bosilsa — signal e'lon qilingan postga (kanal va guruh).
         opens += _card(
             f"open {_cls(p)}-edge",
-            post_url(ws, r["group_msg_id"]) if open_public else None,
+            # Guruhda (210) — faqat a'zolar ochadigan havola: begona odam
+            # postni ko'ra olmaydi, juftlik yashirinligicha qoladi.
+            post_url(ws, r["group_msg_id"], members_only=not open_public),
             f"<div class='ometa'><div class='oname'>{name}</div>"
             f"<div class='osub'>{sub}</div></div>"
             f"<div class='opnl {_cls(p)}'>{pnl_txt}</div>")
@@ -1139,7 +1145,7 @@ async def group_page(request):
             # ajratilgan.
             when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
             exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
-            # 209: kanalda karta bosilsa — natija posti (yo'q bo'lsa signal posti).
+            # 209/210: karta bosilsa — natija posti (yo'q bo'lsa signal posti).
             out += _card(
                 f"trade {_cls(p)}-edge",
                 post_url(ws, r["result_msg_id"] or r["group_msg_id"]),

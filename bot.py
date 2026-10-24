@@ -50,6 +50,7 @@ import newsai
 import stocks
 import parsing
 import paymembers
+import resultlink
 import dipfunded
 import tournament
 import stats
@@ -723,6 +724,14 @@ async def refresh_member_count(bot, ws_id: int, chat_id) -> int | None:
         return None
     await db.set_member_count(ws_id, n)
     return n
+
+
+async def result_link_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """210: eski yopilgan savdolarning natija postini topadi (`resultlink`)."""
+    try:
+        await resultlink.run(ctx.bot)
+    except Exception:
+        log.exception("Natija posti qidiruvida xato")
 
 
 async def member_count_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -9452,6 +9461,7 @@ def main() -> None:
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
+    app.job_queue.run_repeating(result_link_job, interval=60, first=180)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)

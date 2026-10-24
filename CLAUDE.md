@@ -7009,3 +7009,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (eski savdolarda) `group_msg_id`. Karta `<a class='... plink'>`, ko'rinish
      o'zgarmaydi. TG_SCRIPT t.me havolalarini `openTelegramLink` bilan
      Telegram ichida ochadi. Guruh sahifasida havola yo'q (ochiq savdo yashirin).
+210. **Eski natija postlari + yopiq guruhlarda ham havola.** Foydalanuvchi:
+     "eski yopilgan signallarda ham natija postiga olib borsin, yopiq
+     guruhlarga ham amal qilsin".
+     - `web.post_url(ws, msg_id, members_only)` endi guruhda ham ishlaydi.
+       Yopilgan savdo — har doim; OCHIQ savdo guruhda faqat `t.me/c/...`
+       (a'zolar ochadi), @nikli ommaviy guruhda ochiq savdoga havola YO'Q
+       (juftlik yashirin qolsin).
+     - `resultlink.py` + `result_link_job` (har daqiqa, 4 signal): Bot API'da
+       tarix o'qish yo'q, shuning uchun xabar super-admin DM'ga (min ADMIN_IDS)
+       jimgina forward qilinib o'qiladi va darhol o'chiriladi. Ikkilik
+       qidiruv (id vaqt bo'yicha o'sadi) bilan `closed_at - 3 daq` topiladi,
+       keyingi 60 xabardan "#<id> <juftlik>" bor OXIRGISI (rasmli ustun) —
+       natija posti. Yuqori chegara (`hi`) — closed_at'dan 1 soat keyingi
+       ma'lum post id'si; yo'q bo'lsa signal kutadi. `signals.result_msg_tried`
+       — qidirildi. Kontent himoyalangan chat (12 ta ketma-ket rad, birorta
+       muvaffaqiyatsiz) tashlab qo'yiladi; birorta forward o'tmasa (admin
+       botni bloklagan) hech narsa "topilmadi" deb belgilanmaydi.

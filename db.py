@@ -516,6 +516,8 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count_at TIMESTAMPTZ;
 -- 209: natija (yopilish) xabarining id'si — kanal sahifasidagi yopilgan
 -- savdo kartasi shu postga olib boradi (yo'q bo'lsa signal postiga).
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_id BIGINT;
+-- 210: eski savdo uchun natija posti qidirildi (topilgan-topilmaganidan qat'i nazar).
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_tried BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -1156,6 +1158,44 @@ async def set_tp_sl(sig_id: int, sl: float, tps: list[float]) -> None:
 async def set_result_msg(sig_id: int, msg_id: int) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET result_msg_id=$2 WHERE id=$1", sig_id, msg_id)
+
+
+async def set_result_found(sig_id: int, msg_id: int | None) -> None:
+    """210: eski savdo natija posti qidiruvi tugadi (msg_id None — topilmadi)."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET result_msg_tried=TRUE, "
+                        "result_msg_id=COALESCE($2, result_msg_id) WHERE id=$1",
+                        sig_id, msg_id)
+
+
+async def result_link_targets(limit: int = 4) -> list[asyncpg.Record]:
+    """210: natija posti noma'lum eski yopilgan savdolar — faqat ochiq
+    sahifasi bor workspace'larda. `hi` — closed_at'dan kamida 1 soat keyin
+    yuborilgani aniq ma'lum post id'si (yuqori chegara); u yo'q savdo
+    hozircha olinmaydi."""
+    q = f"""
+    SELECT * FROM (
+      SELECT s.id, s.symbol, s.closed_at, s.group_msg_id, w.group_chat_id,
+             LEAST(
+               (SELECT MIN(o.group_msg_id) FROM signals o
+                 WHERE o.workspace_id = s.workspace_id AND o.group_msg_id IS NOT NULL
+                   AND o.created_at > s.closed_at + interval '1 hour'),
+               (SELECT MIN(o.result_msg_id) FROM signals o
+                 WHERE o.workspace_id = s.workspace_id AND o.result_msg_id IS NOT NULL
+                   AND o.closed_at > s.closed_at + interval '1 hour')) AS hi
+      FROM signals s JOIN workspaces w ON w.id = s.workspace_id
+      WHERE s.result_msg_id IS NULL AND NOT s.result_msg_tried
+        AND s.status IN {CLOSED} AND s.closed_at IS NOT NULL
+        AND s.group_msg_id IS NOT NULL AND NOT s.excluded
+        AND w.type = 'group' AND w.group_chat_id IS NOT NULL
+        AND w.public AND w.public_approved AND NOT w.archived
+    ) t
+    WHERE hi IS NOT NULL AND hi > group_msg_id
+    ORDER BY closed_at DESC
+    LIMIT $1
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q, limit)
 
 
 async def set_group_msg(sig_id: int, msg_id: int) -> None:
