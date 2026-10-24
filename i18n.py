@@ -2771,6 +2771,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "w.since": {
         "uz": "{d} dan beri", "ru": "с {d}", "en": "since {d}",
     },
+    "w.open_note_member": {
+        "uz": "Siz guruh a'zosisiz — juftlik nomlari faqat sizga ko'rinadi.",
+        "ru": "Вы участник группы — названия пар видны только вам.",
+        "en": "You are a group member — pair names are visible only to you.",
+    },
     "w.open_note": {
         "uz": ("Juftlik nomi ko'rsatilmaydi — ochiq savdo guruh a'zolari uchun. "
                "Foiz joriy bozor narxidan hisoblanadi."),

@@ -7039,3 +7039,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ko'rilgan — Telegram bot ularga birinchi yoza olmaydi, 201) larni
      chiqaradi. `db.broadcast_breakdown()` + `adm.bc_breakdown` — tarqatish
      so'rovi va tasdiqlash xabarida jami/yozish mumkin/bloklagan/yozmagan.
+213. **Yopiq guruh a'zosiga ochiq savdolarda juftlik nomi.** Foydalanuvchi:
+     "yopiq guruh a'zolari uchun Position 01 o'rniga aktiv nomlari
+     ko'rinsin". Sahifa (kesh) hammaga bir xil — "Pozitsiya N". Mini App
+     ichida `member_reveal_js` Telegram initData'ni `POST /g/<id>/open`ga
+     yuboradi; `verify_init_data` (HMAC, kalit HMAC("WebAppData", BOT_TOKEN),
+     24 soat) + `is_member` (egasi/super-admin yoki jonli getChatMember:
+     creator/administrator/member/restricted+is_member; 5 daq kesh, xato
+     keshlanmaydi) o'tsa `open_cards(reveal=True)` HTML'i qaytadi (no-store)
+     va JS kartalarni almashtiradi. `open_cards()` group_page'dan ajratildi.
+     ⚠️ Veb servisda `BOT_TOKEN` o'zgaruvchisi bo'lishi SHART — bo'lmasa
+     endpoint 503 va sahifa avvalgidek (yashirin). embed (iframe) rejimida
+     ishlamaydi (u yerda Telegram skripti yo'q).

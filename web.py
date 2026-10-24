@@ -14,15 +14,22 @@ Xavfsizlik:
     to'xtamaydi.
 """
 import asyncio
+import hashlib
+import hmac
 import html
+import json
 import logging
 import os
 import time
 from datetime import datetime
+from urllib.parse import parse_qsl
+
+import httpx
 
 from aiohttp import web
 
 import chart
+import config
 import db
 import i18n
 import paymembers
@@ -1004,6 +1011,141 @@ async def stats_json(request):
     return web.json_response(cached, headers=JSON_HEADERS)
 
 
+async def open_cards(ws, lang: str | None, reveal: bool) -> str:
+    """"Hozir ochiq" kartalari. `reveal` — juftlik nomi ko'rsatiladi
+    (kanalda hammaga; yopiq guruhda faqat tasdiqlangan a'zoga — 213)."""
+    live = [r for r in await db.live_signals(ws["id"]) if r["status"] == "ACTIVE"]
+    opens = ""
+    for i, r in enumerate(live, 1):
+        try:
+            price = await tracker.provider(r["market"]).last_price(r["symbol"])
+        except Exception:
+            log.warning("Ochiq pozitsiya narxi olinmadi (#%s)", r["id"], exc_info=True)
+            price = None
+        # Narx olinmasa ham pozitsiya ro'yxatdan TUSHIB QOLMAYDI (#489):
+        # foiz o'rnida "—" chiqadi, savdo esa ko'rinib turadi.
+        p = (tracker.pnl_at(r["side"], float(r["entry"]), price)
+             if price is not None else 0.0)
+        pnl_txt = f"{p:+.2f}%" if price is not None else "—"
+        since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
+                 if r["opened_at"] else "—")
+        # Kanalda kartochka YOPILGAN savdolarniki bilan bir xil shaklda:
+        # tiker + yo'nalish nishoni, ostida kirish narxi va sana.
+        if reveal:
+            side_cls = "b-long" if r["side"] == "LONG" else "b-short"
+            name = (f"{e(r['symbol'])} "
+                    f"<span class='badge {side_cls}'>{e(r['side'])}</span>")
+            sub = f"{fmt_price(r['entry'])} · {e(i18n.t('w.since', lang, d=since))}"
+        else:
+            name = e(i18n.t("w.position_n", lang, i=i))
+            sub = e(i18n.t("w.since", lang, d=since))
+        # 209/210: karta bosilsa — signal e'lon qilingan postga (kanal va guruh).
+        opens += _card(
+            f"open {_cls(p)}-edge",
+            # Guruhda (210) — faqat a'zolar ochadigan havola: begona odam
+            # postni ko'ra olmaydi, juftlik yashirinligicha qoladi.
+            post_url(ws, r["group_msg_id"], members_only=not ws["is_channel"]),
+            f"<div class='ometa'><div class='oname'>{name}</div>"
+            f"<div class='osub'>{sub}</div></div>"
+            f"<div class='opnl {_cls(p)}'>{pnl_txt}</div>")
+    return opens
+
+
+def member_reveal_js(ws_id: int, lang: str | None) -> str:
+    """213: Mini App ichida ochilgan bo'lsa — Telegram imzolagan initData
+    serverga yuboriladi; odam guruh a'zosi bo'lsa "Pozitsiya N" o'rniga
+    juftlik nomlari keladi. Sahifaning o'zi (kesh) hammaga bir xil qoladi."""
+    lg = json.dumps(i18n.normalize(lang))
+    return (
+        "<script>(function(){var tg=window.Telegram&&window.Telegram.WebApp;"
+        "if(!tg||!tg.initData)return;var box=document.getElementById('opens');"
+        "if(!box)return;"
+        f"fetch('/g/{int(ws_id)}/open',{{method:'POST',"
+        "headers:{'Content-Type':'application/json'},"
+        f"body:JSON.stringify({{initData:tg.initData,lang:{lg}}})}})"
+        ".then(function(r){return r.ok?r.json():null})"
+        ".then(function(d){if(!d||!d.html)return;box.innerHTML=d.html;"
+        "var n=document.getElementById('opennote');if(n)n.textContent=d.note||''})"
+        ".catch(function(){})})();</script>")
+
+
+INIT_MAX_AGE = 24 * 3600
+_member_cache: dict[tuple[int, int], tuple[float, bool]] = {}
+MEMBER_TTL = 300.0
+
+
+def verify_init_data(init_data: str, token: str | None = None) -> int | None:
+    """Telegram Mini App initData imzosi (HMAC-SHA256, kalit
+    HMAC("WebAppData", BOT_TOKEN)). To'g'ri va 24 soatdan yangi bo'lsa —
+    foydalanuvchi id'si."""
+    token = token if token is not None else config.BOT_TOKEN
+    if not token or not init_data:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+    except ValueError:
+        return None
+    got = pairs.pop("hash", "")
+    check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+    secret = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
+    want = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+    if not got or not hmac.compare_digest(want, got):
+        return None
+    try:
+        if time.time() - int(pairs.get("auth_date", "0")) > INIT_MAX_AGE:
+            return None
+        return int(json.loads(pairs.get("user", "{}"))["id"])
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+async def is_member(ws, uid: int) -> bool:
+    """Egasi, super-admin yoki guruhning JONLI a'zosi (getChatMember)."""
+    if uid == ws["owner_id"] or uid in config.ADMIN_IDS:
+        return True
+    key = (ws["id"], uid)
+    hit = _member_cache.get(key)
+    if hit and time.monotonic() - hit[0] < MEMBER_TTL:
+        return hit[1]
+    ok = False
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"https://api.telegram.org/bot{config.BOT_TOKEN}/getChatMember",
+                            params={"chat_id": ws["group_chat_id"], "user_id": uid})
+        res = r.json().get("result") or {}
+        st = res.get("status")
+        ok = st in ("creator", "administrator", "member") or (
+            st == "restricted" and bool(res.get("is_member")))
+    except Exception:
+        log.warning("A'zolik tekshirilmadi (ws=%s)", ws["id"], exc_info=True)
+        return False          # xatoni keshlamaymiz
+    _member_cache[key] = (time.monotonic(), ok)
+    return ok
+
+
+async def open_reveal(request):
+    """POST /g/<id>/open — a'zo uchun juftlik nomlari bilan ochiq savdolar."""
+    ws = await db.public_workspace(int(request.match_info["wid"]))
+    if not ws or ws["is_channel"] or not ws["group_chat_id"]:
+        raise web.HTTPNotFound()
+    if not config.BOT_TOKEN:
+        raise web.HTTPServiceUnavailable()
+    try:
+        body = await request.json()
+    except Exception:
+        raise web.HTTPBadRequest()
+    uid = verify_init_data(str(body.get("initData") or ""))
+    if uid is None:
+        raise web.HTTPForbidden()
+    if not await is_member(ws, uid):
+        raise web.HTTPForbidden()
+    lang = i18n.normalize(body.get("lang"))
+    return web.json_response(
+        {"html": await open_cards(ws, lang, reveal=True),
+         "note": i18n.t("w.open_note_member", lang)},
+        headers=NO_CACHE)
+
+
 async def group_page(request):
     ws_id = int(request.match_info["wid"])
     bot = request.app["bot_username"]
@@ -1064,40 +1206,7 @@ async def group_page(request):
     #
     # PENDING'lar chiqmaydi: ular hali ochilmagan, joriy foizi ham yo'q.
     open_public = bool(ws["is_channel"])
-    live = [r for r in await db.live_signals(ws_id) if r["status"] == "ACTIVE"]
-    opens = ""
-    for i, r in enumerate(live, 1):
-        try:
-            price = await tracker.provider(r["market"]).last_price(r["symbol"])
-        except Exception:
-            log.warning("Ochiq pozitsiya narxi olinmadi (#%s)", r["id"], exc_info=True)
-            price = None
-        # Narx olinmasa ham pozitsiya ro'yxatdan TUSHIB QOLMAYDI (#489):
-        # foiz o'rnida "—" chiqadi, savdo esa ko'rinib turadi.
-        p = (tracker.pnl_at(r["side"], float(r["entry"]), price)
-             if price is not None else 0.0)
-        pnl_txt = f"{p:+.2f}%" if price is not None else "—"
-        since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
-                 if r["opened_at"] else "—")
-        # Kanalda kartochka YOPILGAN savdolarniki bilan bir xil shaklda:
-        # tiker + yo'nalish nishoni, ostida kirish narxi va sana.
-        if open_public:
-            side_cls = "b-long" if r["side"] == "LONG" else "b-short"
-            name = (f"{e(r['symbol'])} "
-                    f"<span class='badge {side_cls}'>{e(r['side'])}</span>")
-            sub = f"{fmt_price(r['entry'])} · {e(i18n.t('w.since', lang, d=since))}"
-        else:
-            name = e(i18n.t("w.position_n", lang, i=i))
-            sub = e(i18n.t("w.since", lang, d=since))
-        # 209/210: karta bosilsa — signal e'lon qilingan postga (kanal va guruh).
-        opens += _card(
-            f"open {_cls(p)}-edge",
-            # Guruhda (210) — faqat a'zolar ochadigan havola: begona odam
-            # postni ko'ra olmaydi, juftlik yashirinligicha qoladi.
-            post_url(ws, r["group_msg_id"], members_only=not open_public),
-            f"<div class='ometa'><div class='oname'>{name}</div>"
-            f"<div class='osub'>{sub}</div></div>"
-            f"<div class='opnl {_cls(p)}'>{pnl_txt}</div>")
+    opens = await open_cards(ws, lang, reveal=open_public)
 
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
     # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni
@@ -1230,9 +1339,11 @@ async def group_page(request):
         + section(i18n.t("w.monthly_h2", lang),
                   f"<th>{e(i18n.t('w.col_month', lang))}</th><th>{c_trades}</th>"
                   f"<th>{c_wr}</th><th>{c_res}</th>", mon_rows)
-        + (f"<h2>{e(i18n.t('w.open_h2', lang))}</h2><div class='trades'>{opens}</div>"
+        + (f"<h2>{e(i18n.t('w.open_h2', lang))}</h2>"
+           f"<div class='trades' id='opens'>{opens}</div>"
            + ("" if open_public
-              else f"<div class='note'>{e(i18n.t('w.open_note', lang))}</div>")
+              else f"<div class='note' id='opennote'>{e(i18n.t('w.open_note', lang))}</div>"
+                   + member_reveal_js(ws_id, lang))
            if opens else "")
         + (f"<h2>{e(i18n.t('w.recent_h2', lang))}</h2>{trades}"
            if trades else "")
@@ -1341,6 +1452,7 @@ def build_app() -> web.Application:
         web.get("/", index),
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", group_page),
+        web.post(r"/g/{wid:\d+}/open", open_reveal),
         web.get("/t", tourney_page),
         web.get(r"/t/{tid:\d+}", tourney_page),
         web.get(r"/g/{wid:\d+}/stats.json", stats_json),
