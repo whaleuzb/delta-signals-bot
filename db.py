@@ -513,6 +513,9 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS backfill BOOLEAN NOT NULL DEFAULT F
 -- 208: kanal obunachilari soni (reyting darvozasi uchun) va o'lchangan vaqt.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count INT;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count_at TIMESTAMPTZ;
+-- 209: natija (yopilish) xabarining id'si — kanal sahifasidagi yopilgan
+-- savdo kartasi shu postga olib boradi (yo'q bo'lsa signal postiga).
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_id BIGINT;
 """
 
 
@@ -1150,6 +1153,11 @@ async def set_tp_sl(sig_id: int, sl: float, tps: list[float]) -> None:
         )
 
 
+async def set_result_msg(sig_id: int, msg_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET result_msg_id=$2 WHERE id=$1", sig_id, msg_id)
+
+
 async def set_group_msg(sig_id: int, msg_id: int) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET group_msg_id=$2 WHERE id=$1", sig_id, msg_id)
@@ -1449,7 +1457,7 @@ async def closed_for_months(workspace_id: int, limit: int = 600) -> list[asyncpg
     oylar to'liq bo'ladi."""
     q = f"""
     SELECT id, symbol, side, entry, exit_price, pnl_pct, r_multiple,
-           status, opened_at, closed_at
+           status, opened_at, closed_at, group_msg_id, result_msg_id
     FROM signals
     WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
           AND closed_at IS NOT NULL

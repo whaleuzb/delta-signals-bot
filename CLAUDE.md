@@ -6999,3 +6999,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      moderatorga yubormaydi (`pub.ch_min`). `member_count_job` 6 soatda
      public kanallar sonini yangilaydi — tushsa yashirinadi, yetsa qaytadi.
      Son o'lchanmagan (NULL) kanal ham ko'rinmaydi. Guruhlarga taalluqli emas.
+209. **Kanal sahifasida karta -> kanal posti.** Foydalanuvchi: ommaviy
+     kanallarda ochiq/yopilgan signal ustiga bosilsa kanalga o'tib holatini
+     ko'rish mumkin bo'lsin — yopiqda natija, ochiqda berilgan post.
+     `signals.result_msg_id` (yangi): `send_close_result` natija xabari
+     id'sini saqlaydi (albomda birinchi rasm). `web.post_url(ws, msg_id)` —
+     faqat KANAL: @nik bo'lsa `t.me/<nik>/<id>`, aks holda `t.me/c/<id>/<id>`.
+     Ochiq karta -> `group_msg_id`, yopilgan -> `result_msg_id` yoki
+     (eski savdolarda) `group_msg_id`. Karta `<a class='... plink'>`, ko'rinish
+     o'zgarmaydi. TG_SCRIPT t.me havolalarini `openTelegramLink` bilan
+     Telegram ichida ochadi. Guruh sahifasida havola yo'q (ochiq savdo yashirin).

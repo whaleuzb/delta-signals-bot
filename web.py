@@ -338,6 +338,9 @@ tbody tr:hover{background:#ffffff06}
       box-shadow:0 8px 26px rgba(218,221,226,.14)}
 .note{margin-top:26px;color:var(--faint);font-size:13px}
 /* oxirgi savdolar — grafikli kartalar */
+/* 209: kanalda karta kanal postiga havola — ko'rinishi o'zgarmaydi */
+a.plink{color:inherit;text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+a.plink:active{opacity:.85}
 .trades{display:flex;flex-direction:column;gap:9px}
 /* Fon SHAFFOF EMAS: ichidagi kichik grafik ham aynan shu rangda
    chiziladi (chart.CARD_BG), shunda rasm chegarasi ko'rinmaydi. */
@@ -469,6 +472,14 @@ TG_SCRIPT = """
     }
   }
   applyTop();
+  // 209: t.me havolalari Mini App ichida Telegram'ning o'zida ochilsin
+  // (aks holda tashqi brauzer chiqardi).
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest && ev.target.closest('a[href^="https://t.me/"]');
+    if (!a || !tg.openTelegramLink) return;
+    ev.preventDefault();
+    try { tg.openTelegramLink(a.href); } catch (e) { window.open(a.href, '_blank'); }
+  });
   // Insetlar oyna o'zgarganda (kengaytirish, aylantirish) yangilanadi.
   ['safeAreaChanged', 'contentSafeAreaChanged', 'viewportChanged'].forEach(function (ev) {
     try { tg.onEvent && tg.onEvent(ev, applyTop); } catch (e) {}
@@ -498,6 +509,28 @@ def page(title: str, body: str, bot: str | None, embed: bool = False,
 
 def _cls(v: float) -> str:
     return "pos" if v > 0 else ("neg" if v < 0 else "")
+
+
+def post_url(ws, msg_id) -> str | None:
+    """Kanaldagi post havolasi (209). Faqat KANAL uchun: guruhda ochiq
+    savdo a'zolarniki va yashirin. @nik bo'lsa t.me/<nik>/<id>, aks holda
+    yopiq kanal havolasi t.me/c/<id>/<id> (faqat obunachilar uchun ochiladi)."""
+    if not msg_id or not ws["is_channel"]:
+        return None
+    if ws["username"]:
+        return f"https://t.me/{ws['username']}/{int(msg_id)}"
+    cid = str(ws["group_chat_id"] or "")
+    if cid.startswith("-100"):
+        return f"https://t.me/c/{cid[4:]}/{int(msg_id)}"
+    return None
+
+
+def _card(cls: str, url: str | None, inner: str) -> str:
+    """Karta: post havolasi bo'lsa butun karta bosiladigan <a>."""
+    if url:
+        return (f"<a class='{cls} plink' href='{e(url)}' target='_blank' "
+                f"rel='noopener'>{inner}</a>")
+    return f"<div class='{cls}'>{inner}</div>"
 
 
 def keep(path: str, request, lang: str | None = None) -> str:
@@ -1052,11 +1085,13 @@ async def group_page(request):
         else:
             name = e(i18n.t("w.position_n", lang, i=i))
             sub = e(i18n.t("w.since", lang, d=since))
-        opens += (
-            f"<div class='open {_cls(p)}-edge'>"
+        # 209: kanalda karta bosilsa — signal e'lon qilingan postga.
+        opens += _card(
+            f"open {_cls(p)}-edge",
+            post_url(ws, r["group_msg_id"]) if open_public else None,
             f"<div class='ometa'><div class='oname'>{name}</div>"
             f"<div class='osub'>{sub}</div></div>"
-            f"<div class='opnl {_cls(p)}'>{pnl_txt}</div></div>")
+            f"<div class='opnl {_cls(p)}'>{pnl_txt}</div>")
 
     # Oxirgi savdolar — jadval emas, har biri kichik grafigi bilan karta.
     # Grafik `loading=lazy`: ekranga chiqmagani umuman yuklanmaydi, ya'ni
@@ -1104,15 +1139,17 @@ async def group_page(request):
             # ajratilgan.
             when = f"{r['closed_at'].astimezone(stats.TZ):%d.%m}" if r["closed_at"] else "—"
             exit_txt = (fmt_price(r["exit_price"]) if r["exit_price"] is not None else "—")
-            out += (
-                f"<div class='trade {_cls(p)}-edge'>"
+            # 209: kanalda karta bosilsa — natija posti (yo'q bo'lsa signal posti).
+            out += _card(
+                f"trade {_cls(p)}-edge",
+                post_url(ws, r["result_msg_id"] or r["group_msg_id"]),
                 f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
                 f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
                 f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
                 f" · {e(when)}</div></div>"
                 f"<img class='tmini' src='/s/{r['id']}/mini.png?v={MINI_V}' loading='lazy' "
                 f"alt='' onerror=\"this.remove()\">"
-                f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div></div>")
+                f"<div class='tpnl {_cls(p)}'>{p:+.2f}%</div>")
         return out
 
     # Tab uchun CSS qoidalari SERVERDA yasaladi: oylar soni o'zgaruvchan,

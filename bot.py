@@ -862,22 +862,29 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
     if thread_id is not None:
         kw["message_thread_id"] = thread_id
 
+    msg = None
     try:
         if album:
             try:
-                await ctx.bot.send_media_group(chat_id, album, **kw)
-                return
+                msgs = await ctx.bot.send_media_group(chat_id, album, **kw)
+                msg = msgs[0] if msgs else None
             except Exception:
                 log.warning("Albom yuborilmadi (#%s), bitta rasmga o'tamiz", sid,
                             exc_info=True)
-        if single:
+        if msg is None and single:
             single.seek(0)
-            await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
-                                      caption=txt, parse_mode=ParseMode.HTML, **kw)
-        else:
-            await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
+            msg = await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
+                                            caption=txt, parse_mode=ParseMode.HTML, **kw)
+        elif msg is None:
+            msg = await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
     except Exception:
         log.exception("Natija xabari yuborilmadi (#%s)", sid)
+    # 209: kanal sahifasidagi yopilgan savdo kartasi shu postga olib boradi.
+    if msg is not None and ws["type"] == "group":
+        try:
+            await db.set_result_msg(sid, msg.message_id)
+        except Exception:
+            log.warning("Natija xabari id'si saqlanmadi (#%s)", sid, exc_info=True)
 
 
 def main_menu_kb(uid: int, ws, private: bool = True,
