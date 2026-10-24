@@ -1,0 +1,12 @@
+🆕 Trade Controller — yangilanish
+
+👆 Signal kartasini bosing — postga o'ting!
+Mini App'dagi savdolar endi kanal yoki guruhdagi postga olib boradi:
+
+🟢 Ochiq savdo — signal e'lon qilingan postga
+✅ Yopilgan savdo — natija postiga (eski savdolar ham)
+🔐 Yopiq guruhlarda post faqat a'zolarga ochiladi
+
+📢 Reytingda yangi qoida: kanallar /top reytingiga faqat kamida 100 ta obunachi bilan chiqadi.
+
+Natijalarni o'z ko'zingiz bilan tekshiring — har bir savdo o'z postiga bog'langan.

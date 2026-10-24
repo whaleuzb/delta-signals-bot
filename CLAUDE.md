@@ -7026,3 +7026,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        — qidirildi. Kontent himoyalangan chat (12 ta ketma-ket rad, birorta
        muvaffaqiyatsiz) tashlab qo'yiladi; birorta forward o'tmasa (admin
        botni bloklagan) hech narsa "topilmadi" deb belgilanmaydi.
+211. **Bir martalik yangilanish e'loni (broadcast).** Foydalanuvchi:
+     "hamma foydalanuvchilarga yubor". `announce/2026-10-postlink.png|txt`;
+     `bot.announce_job` (ishga tushgandan 60 s keyin): `settings`dagi
+     `ANNOUNCE_KEY` bo'lmasa — avval bayroq qo'yiladi, so'ng rasm+matn
+     super-adminga (min ADMIN_IDS) yuboriladi va o'sha xabar oddiy
+     `run_broadcast` bilan hammaga nusxalanadi, oxirida adminga hisobot.
+     Keyingi e'lon uchun: yangi fayllar + yangi `ANNOUNCE_KEY`.

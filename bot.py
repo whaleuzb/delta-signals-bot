@@ -9224,6 +9224,31 @@ async def _run_one_time_fixes() -> None:
     await db.set_setting(flag, "done")
 
 
+# 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
+# (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
+# ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
+ANNOUNCE_KEY = "announce_2026_10_postlink"
+_ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
+
+
+async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not config.ADMIN_IDS or await db.get_setting(ANNOUNCE_KEY):
+        return
+    await db.set_setting(ANNOUNCE_KEY, "started")
+    admin = min(config.ADMIN_IDS)
+    try:
+        with open(os.path.join(_ANNOUNCE_DIR, "2026-10-postlink.txt"), encoding="utf-8") as f:
+            caption = f.read().strip()
+        with open(os.path.join(_ANNOUNCE_DIR, "2026-10-postlink.png"), "rb") as f:
+            msg = await ctx.bot.send_photo(admin, f, caption=caption[:1024])
+    except Exception:
+        log.exception("E'lon tayyorlanmadi — broadcast boshlanmadi")
+        return
+    log.info("E'lon broadcast boshlandi (admin=%s, msg=%s)", admin, msg.message_id)
+    ctx.job_queue.run_once(run_broadcast, 3, data={
+        "admin": admin, "from_chat": admin, "msg_id": msg.message_id})
+
+
 async def post_init(app: Application) -> None:
     # Bir martalik baza ko'chirish (196): `MOVE_DB_TO` bo'lsa — hech qanday
     # job/handler ishlamasdan OLDIN eski bazadan yangisiga ko'chiriladi va
@@ -9462,6 +9487,7 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(result_link_job, interval=60, first=180)
+    app.job_queue.run_once(announce_job, 60)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)
