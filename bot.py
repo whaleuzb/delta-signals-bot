@@ -94,7 +94,11 @@ AWAITING_TOURNEY: dict[int, bool] = {}
 AWAITING_ADDLIM: dict[int, int] = {}
 PENDING_ADDLIM: dict[int, tuple[int, list[float]]] = {}
 AWAITING_ADDSIZE: dict[int, tuple[int, str]] = {}
-PENDING_BROADCAST: dict[int, tuple[int, int]] = {}   # admin -> (chat_id, message_id)
+PENDING_BROADCAST: dict[int, tuple[int, list[int]]] = {}   # admin -> (chat_id, [message_id...])
+# 214: albom (media group) qismlari alohida update bo'lib keladi — tarqatish
+# uchun ular shu yerda yig'iladi: admin -> {"gid", "chat", "ids"}.
+BC_ALBUM: dict[int, dict] = {}
+BC_ALBUM_WAIT = 1.5
 # News Trade AI/surge post ostidagi "📝 Jurnalga kiritish" tugmasi orqali
 # kelgan foydalanuvchi: uid -> (symbol, shaxsiy_workspace_id). Tiker
 # allaqachon ma'lum, shuning uchun endi faqat yo'nalish/kirish/TP/SL kutiladi.
@@ -5677,6 +5681,7 @@ async def cmd_bekor(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     AWAITING_TPSL.pop(update.effective_user.id, None)
     AWAITING_BROADCAST.pop(update.effective_user.id, None)
     PENDING_BROADCAST.pop(update.effective_user.id, None)
+    BC_ALBUM.pop(update.effective_user.id, None)
     AWAITING_TALLOC.pop(update.effective_user.id, None)
     DEFER_PERSONAL_ALLOC.pop(update.effective_user.id, None)
     AWAITING_TOURNEY.pop(update.effective_user.id, None)
@@ -6882,10 +6887,10 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not pend:
             await q.edit_message_text(i18n.t("adm.bc_lost", lang), reply_markup=back)
             return
-        from_chat, msg_id = pend
+        from_chat, msg_ids = pend
         ctx.job_queue.run_once(
             run_broadcast, when=0,
-            data={"admin": q.from_user.id, "from_chat": from_chat, "msg_id": msg_id})
+            data={"admin": q.from_user.id, "from_chat": from_chat, "msg_ids": msg_ids})
         await q.edit_message_text(i18n.t("adm.bc_started", lang), reply_markup=back)
 
     # ── Turnir (185) ──
@@ -7026,33 +7031,93 @@ async def handle_broadcast_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE)
     Xabar NUSXALANADI (copy_message) — shuning uchun matn ham, rasm ham,
     formatlash ham o'zgarmasdan boradi va "forwarded from" yozuvi chiqmaydi.
     Tasdiqlash bosqichi ataylab: hammaga yuborilgan xabarni qaytarib
-    bo'lmaydi."""
+    bo'lmaydi.
+
+    ALBOM (214): qismlar alohida keladi — birinchisi yig'ishni boshlaydi,
+    qolganlari `bc_capture` orqali qo'shiladi, oxirgisidan `BC_ALBUM_WAIT`
+    soniya o'tgach tasdiqlash so'raladi."""
     msg = update.effective_message
     uid = update.effective_user.id
+    if msg.media_group_id:
+        BC_ALBUM[uid] = {"gid": msg.media_group_id, "chat": msg.chat_id,
+                         "ids": [msg.message_id]}
+        _bc_album_timer(ctx, uid)
+        return
+    PENDING_BROADCAST[uid] = (msg.chat_id, [msg.message_id])
+    await _bc_ask_confirm(ctx.bot, uid, msg.message_id)
+
+
+def _bc_album_timer(ctx, uid: int) -> None:
+    name = f"bcalbum:{uid}"
+    for j in ctx.job_queue.get_jobs_by_name(name):
+        j.schedule_removal()
+    ctx.job_queue.run_once(_bc_album_ready, BC_ALBUM_WAIT, data=uid, name=name)
+
+
+async def _bc_album_ready(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = ctx.job.data
+    alb = BC_ALBUM.pop(uid, None)
+    if not alb:
+        return
+    ids = sorted(alb["ids"])
+    PENDING_BROADCAST[uid] = (alb["chat"], ids)
+    await _bc_ask_confirm(ctx.bot, uid, ids[0], parts=len(ids))
+
+
+async def _bc_ask_confirm(bot, uid: int, reply_to: int, parts: int = 1) -> None:
     lang = await user_lang(uid)
-    PENDING_BROADCAST[uid] = (msg.chat_id, msg.message_id)
     n = len(await db.broadcast_targets())
-    await msg.reply_text(
-        i18n.t("adm.bc_confirm", lang, n=n, sec=max(1, round(n * _BC_DELAY)))
-        + "\n\n" + await _bc_breakdown(lang),
-        parse_mode=ParseMode.HTML,
+    txt = i18n.t("adm.bc_confirm", lang, n=n, sec=max(1, round(n * _BC_DELAY)))
+    if parts > 1:
+        txt = i18n.t("adm.bc_album", lang, k=parts) + "\n" + txt
+    await bot.send_message(
+        uid, txt + "\n\n" + await _bc_breakdown(lang),
+        parse_mode=ParseMode.HTML, reply_to_message_id=reply_to,
+        allow_sending_without_reply=True,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(i18n.t("adm.bc_yes", lang), callback_data="adm:bcgo")],
             [InlineKeyboardButton(i18n.t("adm.bc_no", lang), callback_data="adm:home")],
         ]))
 
 
+async def bc_capture(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """214: hamma narsadan OLDIN (group=-2) — tarqatish uchun yuborilgan
+    xabarni ushlaydi: albom qismlari, video/hujjat/GIF/ovoz (avval faqat
+    matn va rasm qabul qilinardi). Boshqa holatda hech narsa qilmaydi."""
+    msg = update.effective_message
+    user = update.effective_user
+    if not msg or not user or not is_admin(user.id):
+        return
+    uid = user.id
+    alb = BC_ALBUM.get(uid)
+    if alb and msg.media_group_id and msg.media_group_id == alb["gid"]:
+        alb["ids"].append(msg.message_id)
+        _bc_album_timer(ctx, uid)
+        raise ApplicationHandlerStop
+    if AWAITING_BROADCAST.pop(uid, None):
+        await handle_broadcast_input(update, ctx)
+        raise ApplicationHandlerStop
+
+
 async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Job sifatida ishlaydi — yuborish uzoq davom etsa ham bot javob
     berishda davom etadi."""
     d = ctx.job.data
-    admin_id, from_chat, msg_id = d["admin"], d["from_chat"], d["msg_id"]
+    admin_id, from_chat = d["admin"], d["from_chat"]
+    msg_ids = d.get("msg_ids") or [d["msg_id"]]
     targets = await db.broadcast_targets()
     sent = blocked = unreach = failed = 0
 
+    async def send(uid: int) -> None:
+        # Albom (214) — `copy_messages` qismlarni BITTA albom qilib nusxalaydi.
+        if len(msg_ids) > 1:
+            await ctx.bot.copy_messages(uid, from_chat, msg_ids)
+        else:
+            await ctx.bot.copy_message(uid, from_chat, msg_ids[0])
+
     for uid in targets:
         try:
-            await ctx.bot.copy_message(uid, from_chat, msg_id)
+            await send(uid)
             sent += 1
         except Forbidden:
             # Bot bloklangan yoki chat o'chirilgan — belgilab qo'yamiz, keyingi
@@ -7074,7 +7139,7 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.warning("Broadcast flood-limit: %s s", e.retry_after)
             await asyncio.sleep(e.retry_after + 1)
             try:
-                await ctx.bot.copy_message(uid, from_chat, msg_id)
+                await send(uid)
                 sent += 1
             except Exception:
                 failed += 1
@@ -9345,6 +9410,10 @@ def main() -> None:
 
     # group=-1 — hamma narsadan OLDIN: foydalanuvchini yozadi va majburiy
     # obunani tekshiradi (obuna bo'lmasa ApplicationHandlerStop bilan to'xtatadi).
+    # 214: tarqatish uchun yuborilgan xabar (albom, video, hujjat...) — gate'dan
+    # ham oldin; faqat admin "xabar kutilmoqda" holatida bo'lsa ishlaydi.
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND,
+                                   bc_capture), group=-2)
     app.add_handler(TypeHandler(Update, gate), group=-1)
     app.add_handler(CallbackQueryHandler(on_subcheck, pattern=r"^subcheck$"))
     # Kanal ulash: bot kanalga admin qilinganda Telegram shu yangilanishni

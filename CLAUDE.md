@@ -7051,3 +7051,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ⚠️ Veb servisda `BOT_TOKEN` o'zgaruvchisi bo'lishi SHART — bo'lmasa
      endpoint 503 va sahifa avvalgidek (yashirin). embed (iframe) rejimida
      ishlamaydi (u yerda Telegram skripti yo'q).
+214. **Broadcast: albom (media group) va boshqa media.** Foydalanuvchi:
+     "broadcast albomli postlarni ham yuborsin". Avval faqat birinchi rasm
+     olinardi (qolgan qismlar `on_photo`ga tushardi), video/hujjat umuman
+     qabul qilinmasdi. Endi `bc_capture` (group=-2, gate'dan oldin, faqat
+     admin "xabar kutilmoqda" bo'lsa): albom qismlari `BC_ALBUM`ga
+     yig'iladi, oxirgisidan `BC_ALBUM_WAIT` (1.5 s) keyin `_bc_album_ready`
+     tasdiq so'raydi (`adm.bc_album`). `PENDING_BROADCAST` endi
+     (chat, [id...]); `run_broadcast` 2+ id'da `copy_messages` (albom bitta
+     bo'lib boradi), aks holda `copy_message`; eski `msg_id` kaliti ham
+     qabul qilinadi (211 e'loni).

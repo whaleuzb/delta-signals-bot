@@ -3189,6 +3189,11 @@ STRINGS: dict[str, dict[str, str]] = {
                "👀 Never pressed /start (seen in groups only): {nodm}\n"
                "<i>Telegram does not let a bot message someone who never pressed /start.</i>"),
     },
+    "adm.bc_album": {
+        "uz": "🖼 Albom: <b>{k}</b> ta rasm/video — hammasi bitta post bo'lib boradi.",
+        "ru": "🖼 Альбом: <b>{k}</b> фото/видео — уйдут одним постом.",
+        "en": "🖼 Album: <b>{k}</b> photos/videos — sent as one post.",
+    },
     "adm.bc_confirm": {
         "uz": ("⬆️ Shu xabar <b>{n}</b> ta foydalanuvchiga yuboriladi.\n"
                "Taxminiy vaqt: ~{sec} soniya.\n\nTasdiqlaysizmi?"),
