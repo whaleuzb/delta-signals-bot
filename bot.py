@@ -784,6 +784,26 @@ async def referral_token(uid: int, bot_username: str | None) -> tuple[str | None
     return code, referral_link(code or uid, bot_username)
 
 
+async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
+    """219: guruh/kanal signal posti ostida "from Trade Controller" havolasi
+    — workspace EGASINING taklif havolasi (bot orqali kelganlar uning
+    referali bo'ladi). Shaxsiy jurnalda yo'q. Xabar chegarasidan (caption —
+    1024) oshib ketsa qo'shilmaydi: post yuborilmay qolganidan ko'ra
+    havolasiz ketgani yaxshi."""
+    if ws["type"] != "group":
+        return ""
+    try:
+        _, url = await referral_token(ws["owner_id"], bot.username)
+    except Exception:
+        log.warning("Promo havola yasalmadi (ws=%s)", ws["id"], exc_info=True)
+        return ""
+    if not url:
+        return ""
+    line = f'\n\n⚡ <a href="{html.escape(url)}">from Trade Controller</a>'
+    visible = len(re.sub(r"<[^>]+>", "", body)) + len("\n\n⚡ from Trade Controller")
+    return line if visible <= limit else ""
+
+
 async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None):
     """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
 
@@ -3502,6 +3522,7 @@ async def send_final_preview(target, ctx, token: str) -> None:
     pws = await db.get_workspace(item["workspace_id"])
     if pws:
         caption += await user_author_line(pws, item["user"], lang)
+        caption += await promo_line(ctx.bot, pws, caption, 900)
     if item["warn"]:
         caption += "\n\n" + "\n".join(item["warn"])
     # Guruh tili boshqacha bo'lsa — buni OCHIQ aytamiz. Ko'rik odamning
@@ -3819,6 +3840,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
             ws, q.from_user.id, q.from_user.username, q.from_user.first_name,
             ws_lang(ws))
+        body += await promo_line(ctx.bot, ws, body, 1024 if post_file_id else 4096)
         try:
             if post_file_id:
                 sent = await ctx.bot.send_photo(
@@ -3827,7 +3849,8 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             else:
                 sent = await ctx.bot.send_message(
                     ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
-                    message_thread_id=ws["group_topic_id"])
+                    message_thread_id=ws["group_topic_id"],
+                    disable_web_page_preview=True)
             group_msg_id = sent.message_id
             await db.set_group_msg(sig_id, group_msg_id)
         except Exception:
@@ -5213,6 +5236,7 @@ async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
              "tps": [float(t) for t in sig["tps"]],
              "market": sig["market"], "entry_mode": sig["entry_mode"]}
         body = draft_text(d, new_id, ws_lang(tgt))
+        body += await promo_line(ctx.bot, tgt, body, 1024 if sig["chart_file_id"] else 4096)
         try:
             if sig["chart_file_id"]:
                 sent = await ctx.bot.send_photo(
@@ -5222,7 +5246,8 @@ async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             else:
                 sent = await ctx.bot.send_message(
                     tgt["group_chat_id"], body, parse_mode=ParseMode.HTML,
-                    message_thread_id=tgt["group_topic_id"])
+                    message_thread_id=tgt["group_topic_id"],
+                    disable_web_page_preview=True)
             await db.set_group_msg(new_id, sent.message_id)
         except Exception:
             # Xabar ketmasa ham NUSXA QOLADI: foydalanuvchi savdoni

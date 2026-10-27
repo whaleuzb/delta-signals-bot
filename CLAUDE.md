@@ -7094,3 +7094,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Endi tablar: Turnir (standart ochiq) | Yopiq guruhlar | Ommaviy
      kanallar. Turnir paneli: `df_tour_block(limit=5, more=/t)` + ostida o'z
      turnirimiz (bo'lsa). Tab qatori `max-width:100%; overflow-x:auto`.
+219. **Har bir guruh/kanal signal posti ostida "⚡ from Trade Controller".**
+     Foydalanuvchi: "auditoriyani kuchaytirish — har bir signal tagida
+     from Trade Controller havolasi, har biri referal havolaga bog'lansin".
+     `promo_line(bot, ws, body, limit)` — workspace EGASINING taklif havolasi
+     (`referral_token`, `t.me/<bot>?start=ref_<kod>`): kim bosib botga
+     kirsa egasining referali. Faqat `type=='group'` (guruh va kanal);
+     shaxsiy jurnalda yo'q. Matn chegarasidan (rasm caption 1024, ko'rik 900)
+     oshsa havola qo'shilmaydi — post ketishi muhimroq. Qo'shilgan joylar:
+     yangi signal posti, guruh->kanal nusxasi, yakuniy ko'rik (ko'rinish
+     va'dasi). Matnli postda `disable_web_page_preview=True`.
