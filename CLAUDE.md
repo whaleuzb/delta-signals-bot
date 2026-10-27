@@ -7125,3 +7125,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      xabari o'zgarmagan. `promo_line` matni `sig.promo` — workspace tilida:
      uz "Trade Controller orqali", ru "через Trade Controller",
      en "from Trade Controller".
+222. **Promo havola belgisi 🤖; premium emoji ixtiyoriy.** ⚡ -> 🤖.
+     `config.PROMO_EMOJI_ID` (env, faqat raqam) berilsa
+     `<tg-emoji emoji-id=…>🤖</tg-emoji>`. Telegram bot xabarlarida custom
+     emoji'ni faqat Fragment'da qo'shimcha username sotib olgan botlarga
+     ruxsat beradi — yoqishdan oldin bitta signal bilan sinash kerak
+     (standart: o'chiq, oddiy 🤖).

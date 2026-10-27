@@ -801,7 +801,12 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
         return ""
     # 221: matn workspace tilida (egasi tanlagan: uz/ru/en).
     label = i18n.t("sig.promo", ws_lang(ws))
-    line = f'\n\n⚡ <a href="{html.escape(url)}">{html.escape(label)}</a>'
+    # 222: 🤖. `PROMO_EMOJI_ID` berilsa — premium (custom) emoji; Telegram
+    # uni faqat Fragment'da qo'shimcha username olgan botlarga ko'rsatadi,
+    # aks holda oddiy 🤖 chiqadi (xabar baribir ketadi).
+    icon = (f'<tg-emoji emoji-id="{config.PROMO_EMOJI_ID}">🤖</tg-emoji>'
+            if config.PROMO_EMOJI_ID else "🤖")
+    line = f'\n\n{icon} <a href="{html.escape(url)}">{html.escape(label)}</a>'
     visible = len(re.sub(r"<[^>]+>", "", body)) + len(label) + 4
     return line if visible <= limit else ""
 
