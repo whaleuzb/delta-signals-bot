@@ -211,7 +211,8 @@ tbody tr:hover{background:#ffffff06}
    ishlatilmaydi; radio esa brauzerning o'zida ishlaydi va sahifa
    qayta yuklanmaydi (til tugmalari kabi URL ham o'zgarmaydi). */
 .tabs>input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
-.tabbar{display:inline-flex;gap:4px;padding:4px;margin:0 0 16px;
+.tabbar{display:inline-flex;gap:4px;padding:4px;margin:0 0 16px;max-width:100%;
+        overflow-x:auto;scrollbar-width:none;
         background:rgba(218,221,226,.05);border:1px solid var(--line);
         border-radius:999px}
 .tabbar label{padding:7px 16px;border-radius:999px;font-size:14px;font-weight:600;
@@ -347,6 +348,7 @@ tbody tr:hover{background:#ffffff06}
 .dfnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dfpc{font-weight:600}
 .dfout{opacity:.45}
+.pane-t>.dftour{margin-top:0}
 .dfmore{display:block;margin-top:12px;font-size:14px;font-weight:600}
 .dfempty{margin-top:14px;font-size:13px;color:var(--mut)}
 /* SHAFFOF (shishasimon) tugma — ikkilamchi harakatlar uchun: fon
@@ -928,7 +930,6 @@ async def index(request):
 
     # Turnir tabi (185) — turnir o'tkazilgan bo'lsagina chiqadi: joriy
     # (yoki oxirgi) turnirning TOP-10 i va to'liq sahifaga havola.
-    t_label = t_pane = ""
     try:
         t = await tournament.latest()
         top = await tournament.standings(t["id"], limit=10) if t else []
@@ -936,34 +937,38 @@ async def index(request):
         # Turnir qismidagi xato bosh sahifani (asosiy reyting) yiqitmasin.
         log.exception("Bosh sahifa: turnir o'qilmadi")
         t, top = None, []
+    # 218: "Turnir" tabi BIRINCHI va ochiq holda: tepada Dip Funded turniri
+    # (qatnashish, sovrinlar, top-5), ostida o'z turnirimiz (bo'lsa).
+    own = ""
     if t:
         tdep = float(t["deposit"])
-        t_label = f"<label for='tab-t'>{e(i18n.t('w.tab_tourney', lang))}</label>"
-        t_pane = (
-            "<div class='pane pane-t'>"
-            f"<div class='sub' style='margin-bottom:12px'><b>"
+        own = (
+            f"<div class='sub' style='margin:22px 0 12px'><b>"
             f"{e(i18n.t('w.t_title', lang, id=t['id']))}</b> · {tourney_status(t, lang)}</div>"
             + tourney_table(top, tdep, lang)
             + f"<a class='tmore' href='{e(keep('/t', request, lang))}'>"
-              f"{e(i18n.t('w.t_more', lang))}</a></div>")
+              f"{e(i18n.t('w.t_more', lang))}</a>")
+    try:
+        df = await df_tour_block(lang, limit=5, more=keep("/t", request, lang))
+    except Exception:
+        log.exception("Bosh sahifa: Dip Funded turniri o'qilmadi")
+        df = ""
+    t_pane = f"<div class='pane pane-t'>{df}{own}</div>"
 
-    if rows or t:
-        listing = (
-            "<div class='tabs'>"
-            "<input type='radio' name='wstab' id='tab-g' checked>"
-            "<input type='radio' name='wstab' id='tab-c'>"
-            + ("<input type='radio' name='wstab' id='tab-t'>" if t else "") +
-            "<div class='tabbar'>"
-            f"<label for='tab-g'>{e(i18n.t('w.tab_groups', lang))}</label>"
-            f"<label for='tab-c'>{e(i18n.t('w.tab_channels', lang))}</label>"
-            f"{t_label}"
-            "</div>"
-            f"<div class='pane pane-g'>{pane(groups, 'w.groups_empty')}</div>"
-            f"<div class='pane pane-c'>{pane(channels, 'w.channels_empty')}</div>"
-            f"{t_pane}"
-            "</div>")
-    else:
-        listing = f"<div class='empty'>{e(i18n.t('w.index_empty', lang))}</div>"
+    listing = (
+        "<div class='tabs'>"
+        "<input type='radio' name='wstab' id='tab-t' checked>"
+        "<input type='radio' name='wstab' id='tab-g'>"
+        "<input type='radio' name='wstab' id='tab-c'>"
+        "<div class='tabbar'>"
+        f"<label for='tab-t'>{e(i18n.t('w.tab_tourney_short', lang))}</label>"
+        f"<label for='tab-g'>{e(i18n.t('w.tab_groups', lang))}</label>"
+        f"<label for='tab-c'>{e(i18n.t('w.tab_channels', lang))}</label>"
+        "</div>"
+        f"{t_pane}"
+        f"<div class='pane pane-g'>{pane(groups, 'w.groups_empty')}</div>"
+        f"<div class='pane pane-c'>{pane(channels, 'w.channels_empty')}</div>"
+        "</div>")
 
     # "Botni ochish" faqat sahifa OXIRIDA (join_cta ichida). Avval u tepada
     # ham bor edi — bir sahifada bitta asosiy harakat yetadi, ikkitasi
@@ -973,8 +978,6 @@ async def index(request):
         "<div class='brand'>Trade Controller</div>"
         f"<h1>{e(i18n.t('w.index_h1', lang))}</h1>"
         f"<div class='sub'>{e(i18n.t('w.index_sub', lang))}</div></header>"
-        # 217: Dip Funded turniri — bosh sahifada ham BIRINCHI.
-        + await df_tour_block(lang, limit=5, more=keep("/t", request, lang))
         + f"<h2>{e(i18n.t('w.index_top', lang))}</h2>" + listing
         + (f"<div class='note'>{e(i18n.t('w.index_note', lang))}</div>" if rows else "")
         + join_cta(bot, lang))

@@ -7088,3 +7088,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bo'limda ham birinchida ko'rsat" (Mini App "Public results"). `index()`
      header ostida `df_tour_block(lang, limit=5, more=/t)` — top 5 va
      "To'liq reyting →" (`df.tour_all`) turnir bo'limiga.
+218. **Bosh sahifa: "Turnir" — tablarning BIRINCHISI.** Foydalanuvchi 217
+     dan keyin skrinshot bilan aniqlashtirdi: blok sahifa tepasida emas,
+     "Yopiq guruhlar | Ommaviy kanallar" tab qatorida birinchi bo'lsin.
+     Endi tablar: Turnir (standart ochiq) | Yopiq guruhlar | Ommaviy
+     kanallar. Turnir paneli: `df_tour_block(limit=5, more=/t)` + ostida o'z
+     turnirimiz (bo'lsa). Tab qatori `max-width:100%; overflow-x:auto`.

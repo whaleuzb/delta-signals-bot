@@ -2174,6 +2174,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "df.tour_board_empty": {"uz": "Hali qatnashchilar yo'q — birinchi bo'ling!",
                              "ru": "Участников пока нет — будьте первым!",
                              "en": "No participants yet — be the first!"},
+    "w.tab_tourney_short": {"uz": "Turnir", "ru": "Турнир", "en": "Tournament"},
     "df.tour_all": {"uz": "To'liq reyting", "ru": "Весь рейтинг", "en": "Full leaderboard"},
     "df.tour_btn": {"uz": "Qatnashish", "ru": "Участвовать", "en": "Join"},
     "df.tour_board": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
