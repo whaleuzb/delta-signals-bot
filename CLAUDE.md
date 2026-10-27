@@ -7074,3 +7074,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      - Bot: shaxsiy jurnalda "🏆 Turnir" tugmasi DOIM; `on_tourney` tepada
        `_df_tour_text` + `_df_tour_row` (URL tugma dipfunded.com/tournament),
        o'z turnirimiz faol bo'lsa ostida uning qoidalari/holati.
+216. **Turnir bo'limida Dip Funded reytingi; ortiqcha matn olib tashlandi.**
+     Foydalanuvchi: "reyting ham shu bo'limda ko'rinsin, ortiqcha yozuvlar
+     shart emas — qo'shilish va sovrinlar yetadi". delta-prop'ga
+     `GET /api/tc/tournament` qo'shildi (X-Api-Key, tg_id'siz; joriy turnir,
+     holat, sovrinlar, soni, top-N niqoblangan ism/%/out). TC veb servisida
+     DIPFUNDED_API_KEY YO'Q — shu sabab bot `df_tour_job` (120 s) javobni
+     `bot_settings.df_tour`ga yozadi, veb/bot `dipfunded.cached_tour()` bilan
+     o'qiydi (tugagan turnir nusxasi yoki nusxa yo'q — mahalliy jadval,
+     reytingsiz). Blok: holat nishoni, sarlavha, "Qatnashish", sovrinlar,
+     reyting (div qatorlar — global jadval CSS'i telefonda buzardi).

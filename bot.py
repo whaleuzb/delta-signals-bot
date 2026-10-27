@@ -730,6 +730,19 @@ async def refresh_member_count(bot, ws_id: int, chat_id) -> int | None:
     return n
 
 
+async def df_tour_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """216: Dip Funded turniri reytingini olib bazaga yozadi — veb (kalitsiz)
+    va bot menyusi shu nusxadan o'qiydi. Xatoda eski nusxa qoladi."""
+    if not dipfunded.enabled():
+        return
+    try:
+        data = await dipfunded.fetch_tour(20)
+    except Exception as ex:
+        log.warning("Dip Funded turniri olinmadi: %s", ex)
+        return
+    await db.set_setting(dipfunded.TOUR_KEY, json.dumps(data))
+
+
 async def result_link_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """210: eski yopilgan savdolarning natija postini topadi (`resultlink`)."""
     try:
@@ -3955,18 +3968,22 @@ async def _tourney_me_text(t, p, uid: int, lang: str | None) -> str:
                   trades=p["trades"], wins=p["wins"], free=free)
 
 
-def _df_tour_text(lang: str | None) -> str:
-    """215: Dip Funded turniri — turnir bo'limining tepasida."""
-    st, start, end = dipfunded.tour_window()
-    fmt = lambda d: d.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M")
-    when = (i18n.t("df.tour_live", lang, end=fmt(end)) if st == "live"
-            else i18n.t("df.tour_soon", lang, start=fmt(start)))
-    prizes = "\n".join(f"{m} {i18n.t('df.tour_place', lang, n=i)} — <b>${p:,.0f}</b>"
-                       for i, (m, p) in enumerate(zip("🥇🥈🥉", dipfunded.TOUR_PRIZES), 1))
-    return (f"🏆 <b>{html.escape(i18n.t('df.tour_title', lang))}</b>\n<i>{html.escape(when)}</i>\n\n"
-            f"🎁 {html.escape(i18n.t('df.tour_prizes', lang))}:\n{prizes}\n\n"
-            f"📌 {html.escape(i18n.t('df.tour_rules', lang))}\n\n"
-            f"👉 {html.escape(i18n.t('df.tour_how', lang))}")
+async def _df_tour_text(lang: str | None) -> str:
+    """215/216: Dip Funded turniri — sovrinlar va reyting (top 10)."""
+    d = await dipfunded.cached_tour()
+    fmt = lambda x: x.astimezone(stats.TZ).strftime("%d.%m %H:%M")
+    when = (i18n.t("df.tour_live", lang, end=fmt(d["ends"])) if d["state"] == "live"
+            else i18n.t("df.tour_soon", lang, start=fmt(d["starts"])))
+    prizes = "\n".join(f"{m} {i18n.t('df.tour_place', lang, n=i)} — <b>${int(p):,}</b>"
+                       for i, (m, p) in enumerate(zip("🥇🥈🥉", d["prizes"] or dipfunded.TOUR_PRIZES), 1))
+    txt = (f"🏆 <b>{html.escape(i18n.t('df.tour_title', lang))}</b>\n<i>{html.escape(when)}</i>\n\n"
+           f"{prizes}")
+    if d.get("board"):
+        lines = [f"{r['rank'] or '—'}. {html.escape(r['name'])} — <b>{float(r['pct']):+.2f}%</b>"
+                 for r in d["board"][:10]]
+        txt += (f"\n\n📊 <b>{html.escape(i18n.t('df.tour_board', lang))}</b> · {int(d['count'])}\n"
+                + "\n".join(lines))
+    return txt
 
 
 def _df_tour_row(lang: str | None) -> list:
@@ -4779,7 +4796,7 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     t = await tournament.load_active()
     if not t:
         # 215: o'z turnirimiz yo'q — Dip Funded turniri va "Qatnashish".
-        await _edit_or_reply(q, _df_tour_text(lang),
+        await _edit_or_reply(q, await _df_tour_text(lang),
                              InlineKeyboardMarkup([_df_tour_row(lang), back_row(lang)]))
         return
     ws = await get_ws_or_prompt(update, ctx)
@@ -4799,7 +4816,7 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         kb += _tourney_page_kb(lang)
         kb.append(back_row(lang))
         await _edit_or_reply(
-            q, _df_tour_text(lang) + "\n\n━━━━━━━━━━\n\n"
+            q, await _df_tour_text(lang) + "\n\n━━━━━━━━━━\n\n"
             + i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
                      ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
             InlineKeyboardMarkup(kb))
@@ -9589,6 +9606,7 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(result_link_job, interval=60, first=180)
+    app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).

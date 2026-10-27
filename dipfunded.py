@@ -47,6 +47,48 @@ def tour_url() -> str:
     return site_url("/tournament")
 
 
+TOUR_KEY = "df_tour"     # bot_settings: oxirgi olingan turnir/reyting (JSON)
+
+
+async def fetch_tour(limit: int = 20) -> dict:
+    """216: Dip Funded `/api/tc/tournament` — joriy turnir va reyting."""
+    if not enabled():
+        raise Unavailable("DIPFUNDED_API_KEY sozlanmagan")
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{config.DIPFUNDED_URL}/api/tc/tournament",
+                            params={"limit": limit},
+                            headers={"X-Api-Key": config.DIPFUNDED_API_KEY})
+    except httpx.HTTPError as e:
+        raise Unavailable(f"tarmoq xatosi: {type(e).__name__}") from e
+    if r.status_code != 200:
+        raise Unavailable(f"HTTP {r.status_code}")
+    data = r.json()
+    if not data.get("ok"):
+        raise Unavailable("javob ok emas")
+    return data
+
+
+async def cached_tour() -> dict:
+    """Bot davriy yozib boradigan nusxa (veb servisda Dip Funded kaliti yo'q).
+    Bo'lmasa — mahalliy jadval, reytingsiz."""
+    import json
+    import db
+    try:
+        raw = await db.get_setting(TOUR_KEY)
+        if raw:
+            d = json.loads(raw)
+            d["starts"] = datetime.fromisoformat(d["starts_at"].replace("Z", "+00:00"))
+            d["ends"] = datetime.fromisoformat(d["ends_at"].replace("Z", "+00:00"))
+            if d["ends"] > datetime.now(timezone.utc):
+                return d
+    except Exception:
+        pass
+    st, start, end = tour_window()
+    return {"state": st, "starts": start, "ends": end, "prizes": list(TOUR_PRIZES),
+            "count": 0, "board": None}
+
+
 class Unavailable(Exception):
     """Dip Funded'dan aniq javob olinmadi."""
 
