@@ -347,6 +347,7 @@ tbody tr:hover{background:#ffffff06}
 .dfnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dfpc{font-weight:600}
 .dfout{opacity:.45}
+.dfmore{display:block;margin-top:12px;font-size:14px;font-weight:600}
 .dfempty{margin-top:14px;font-size:13px;color:var(--mut)}
 /* SHAFFOF (shishasimon) tugma — ikkilamchi harakatlar uchun: fon
    ko'rinib turadi, chegara kumush. Asosiy kumush tugma bilan raqobat
@@ -741,7 +742,7 @@ def tourney_status(t, lang: str | None) -> str:
     return e(i18n.t("w.t_done", lang, ends=done))
 
 
-async def df_tour_block(lang: str | None) -> str:
+async def df_tour_block(lang: str | None, limit: int = 20, more: str = "") -> str:
     """215/216: Dip Funded turniri — turnir bo'limining TEPASIDA: "Qatnashish"
     tugmasi, sovrinlar va reyting (bot `df_tour_job` yozgan nusxadan)."""
     d = await dipfunded.cached_tour()
@@ -759,9 +760,12 @@ async def df_tour_block(lang: str | None) -> str:
             f"<div class='dfrow{' dfout' if r['out'] else ''}'><span class='dfrk'>{r['rank'] or '—'}</span>"
             f"<span class='dfnm'>{e(r['name'])}</span>"
             f"<span class='dfpc {_cls(float(r['pct']))}'>{float(r['pct']):+.2f}%</span></div>"
-            for r in d["board"])
+            for r in d["board"][:limit])
+        # Bosh sahifada (217) — qisqa ro'yxat va turnir bo'limiga havola.
+        tail = (f"<a class='dfmore' href='{e(more)}'>{e(i18n.t('df.tour_all', lang))} →</a>"
+                if more and int(d["count"]) > limit else "")
         board = (f"<div class='dfsub'>{e(i18n.t('df.tour_board', lang))} · {int(d['count'])}</div>"
-                 f"<div class='dfboard'>{rows}</div>")
+                 f"<div class='dfboard'>{rows}</div>{tail}")
     elif d.get("board") is not None:
         board = f"<div class='dfempty'>{e(i18n.t('df.tour_board_empty', lang))}</div>"
     return (
@@ -969,6 +973,8 @@ async def index(request):
         "<div class='brand'>Trade Controller</div>"
         f"<h1>{e(i18n.t('w.index_h1', lang))}</h1>"
         f"<div class='sub'>{e(i18n.t('w.index_sub', lang))}</div></header>"
+        # 217: Dip Funded turniri — bosh sahifada ham BIRINCHI.
+        + await df_tour_block(lang, limit=5, more=keep("/t", request, lang))
         + f"<h2>{e(i18n.t('w.index_top', lang))}</h2>" + listing
         + (f"<div class='note'>{e(i18n.t('w.index_note', lang))}</div>" if rows else "")
         + join_cta(bot, lang))

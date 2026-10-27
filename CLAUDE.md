@@ -7084,3 +7084,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      o'qiydi (tugagan turnir nusxasi yoki nusxa yo'q — mahalliy jadval,
      reytingsiz). Blok: holat nishoni, sarlavha, "Qatnashish", sovrinlar,
      reyting (div qatorlar — global jadval CSS'i telefonda buzardi).
+217. **Bosh sahifada ham Dip Funded turniri BIRINCHI.** Foydalanuvchi: "bu
+     bo'limda ham birinchida ko'rsat" (Mini App "Public results"). `index()`
+     header ostida `df_tour_block(lang, limit=5, more=/t)` — top 5 va
+     "To'liq reyting →" (`df.tour_all`) turnir bo'limiga.
