@@ -3218,6 +3218,8 @@ STRINGS: dict[str, dict[str, str]] = {
                "👀 Never pressed /start (seen in groups only): {nodm}\n"
                "<i>Telegram does not let a bot message someone who never pressed /start.</i>"),
     },
+    "sig.promo": {"uz": "Trade Controller orqali", "ru": "через Trade Controller",
+                  "en": "from Trade Controller"},
     "adm.bc_album": {
         "uz": "🖼 Albom: <b>{k}</b> ta rasm/video — hammasi bitta post bo'lib boradi.",
         "ru": "🖼 Альбом: <b>{k}</b> фото/видео — уйдут одним постом.",

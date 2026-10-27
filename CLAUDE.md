@@ -7117,3 +7117,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      eski postlardagi "#N SYM" bo'yicha qidiradi — yangi postlarda
      `result_msg_id` to'g'ridan-to'g'ri saqlanadi (209), shuning uchun
      ziddiyat yo'q.
+221. **Darhol kirishda "pozitsiya ochildi" xabari yo'q; promo havola
+     guruh tilida.** Foydalanuvchi: market (darhol) kirishda signal posti
+     ostidagi alohida "▶️ pozitsiya ochildi" xabari ortiqcha — olib
+     tashlandi (post o'zida "darhol kirilgan" deydi; market signal darrov
+     ACTIVE, tracker OPEN hodisasi bermaydi). Limit signallarda ochilish
+     xabari o'zgarmagan. `promo_line` matni `sig.promo` — workspace tilida:
+     uz "Trade Controller orqali", ru "через Trade Controller",
+     en "from Trade Controller".

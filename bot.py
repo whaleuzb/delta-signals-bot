@@ -799,8 +799,10 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
         return ""
     if not url:
         return ""
-    line = f'\n\n⚡ <a href="{html.escape(url)}">from Trade Controller</a>'
-    visible = len(re.sub(r"<[^>]+>", "", body)) + len("\n\n⚡ from Trade Controller")
+    # 221: matn workspace tilida (egasi tanlagan: uz/ru/en).
+    label = i18n.t("sig.promo", ws_lang(ws))
+    line = f'\n\n⚡ <a href="{html.escape(url)}">{html.escape(label)}</a>'
+    visible = len(re.sub(r"<[^>]+>", "", body)) + len(label) + 4
     return line if visible <= limit else ""
 
 
@@ -3899,17 +3901,10 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Shaxsiy jurnalga yuborib bo'lmadi")
 
-    if entry_mode == "market":
-        chat_id = (ws["group_chat_id"] if ws["type"] == "group" else ws["owner_id"])
-        try:
-            await ctx.bot.send_message(
-                chat_id,
-                pub(ws, tw("ev.open", ws, sid=sig_id, sym=d["symbol"], p=fmt_price(d["entry"]))),
-                parse_mode=ParseMode.HTML, reply_to_message_id=group_msg_id,
-                allow_sending_without_reply=True,
-                message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
-        except Exception:
-            log.exception("Ochilish xabari yuborilmadi")
+    # 221: darhol (market) kirishda alohida "pozitsiya ochildi" xabari
+    # YUBORILMAYDI — signal postining o'zida "darhol kirilgan" deb turibdi,
+    # ikkinchi xabar takror edi (foydalanuvchi so'rovi). Limit signallarda
+    # ochilish xabari avvalgidek kuzatuvdan (poll_job, OPEN hodisasi) keladi.
 
     # Summa FAQAT egasidan so'raladi: depozit egasiniki. Signalni guruh
     # a'zosi bergan bo'lsa (179), unga depozit, band va bo'sh summa
