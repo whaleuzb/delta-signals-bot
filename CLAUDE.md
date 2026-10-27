@@ -7131,3 +7131,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      emoji'ni faqat Fragment'da qo'shimcha username sotib olgan botlarga
      ruxsat beradi — yoqishdan oldin bitta signal bilan sinash kerak
      (standart: o'chiq, oddiy 🤖).
+223. **Premium emoji avtomatik: to'plamdan va sinov bilan.** Foydalanuvchi
+     to'plam yaratdi: t.me/addemoji/t_me_tradecontrbot_by_fStikBot.
+     `config.PROMO_EMOJI_SET` (standart shu nom) — `PROMO_EMOJI_ID` bo'lmasa
+     `promo_emoji_job` (ishga tushgach 15 s) `get_sticker_set` dan birinchi
+     `custom_emoji_id`ni oladi, super-admin DM'iga jim sinov yuborib javobda
+     `custom_emoji` entity qolganini tekshiradi va xabarni o'chiradi. Qolsa —
+     `bot.PROMO_EMOJI` yoqiladi, aks holda oddiy 🤖 (Fragment username yo'q).
+     Natija logda: "Promo emoji …: YOQILDI / Telegram ruxsat bermadi".

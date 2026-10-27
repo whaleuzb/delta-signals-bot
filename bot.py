@@ -784,6 +784,45 @@ async def referral_token(uid: int, bot_username: str | None) -> tuple[str | None
     return code, referral_link(code or uid, bot_username)
 
 
+# 223: premium emoji FAQAT tekshiruvdan o'tsa yoqiladi (`promo_emoji_job`):
+# Telegram custom emoji'ni bot xabarida faqat Fragment username'li botlarga
+# ko'rsatadi — ruxsat yo'q botda signal posti xato bilan ketmay qolmasin.
+PROMO_EMOJI: str | None = None
+
+
+async def promo_emoji_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Emoji id'sini aniqlaydi (env yoki to'plamning birinchisi) va
+    super-admin DM'ida JIM sinov xabari bilan tekshiradi: javobda
+    `custom_emoji` entity qolgan bo'lsa — yoqiladi. Sinov darhol o'chiriladi."""
+    global PROMO_EMOJI
+    eid = config.PROMO_EMOJI_ID
+    if not eid and config.PROMO_EMOJI_SET:
+        try:
+            st = await ctx.bot.get_sticker_set(config.PROMO_EMOJI_SET)
+            eid = next((x.custom_emoji_id for x in st.stickers if x.custom_emoji_id), None)
+        except Exception as ex:
+            log.warning("Promo emoji to'plami o'qilmadi (%s): %s", config.PROMO_EMOJI_SET, ex)
+            return
+    if not eid or not config.ADMIN_IDS:
+        return
+    admin = min(config.ADMIN_IDS)
+    try:
+        m = await ctx.bot.send_message(
+            admin, f'<tg-emoji emoji-id="{eid}">🤖</tg-emoji> test', parse_mode=ParseMode.HTML,
+            disable_notification=True)
+    except Exception as ex:
+        log.warning("Promo emoji sinovi rad etildi (%s): %s — oddiy 🤖", eid, ex)
+        return
+    ok = any(e.type == "custom_emoji" for e in (m.entities or []))
+    try:
+        await ctx.bot.delete_message(admin, m.message_id)
+    except Exception:
+        pass
+    PROMO_EMOJI = eid if ok else None
+    log.info("Promo emoji %s: %s", eid, "YOQILDI" if ok else
+             "Telegram ruxsat bermadi (Fragment username kerak) — oddiy 🤖")
+
+
 async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
     """219: guruh/kanal signal posti ostida "from Trade Controller" havolasi
     — workspace EGASINING taklif havolasi (bot orqali kelganlar uning
@@ -804,8 +843,8 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
     # 222: 🤖. `PROMO_EMOJI_ID` berilsa — premium (custom) emoji; Telegram
     # uni faqat Fragment'da qo'shimcha username olgan botlarga ko'rsatadi,
     # aks holda oddiy 🤖 chiqadi (xabar baribir ketadi).
-    icon = (f'<tg-emoji emoji-id="{config.PROMO_EMOJI_ID}">🤖</tg-emoji>'
-            if config.PROMO_EMOJI_ID else "🤖")
+    icon = (f'<tg-emoji emoji-id="{PROMO_EMOJI}">🤖</tg-emoji>'
+            if PROMO_EMOJI else "🤖")
     line = f'\n\n{icon} <a href="{html.escape(url)}">{html.escape(label)}</a>'
     visible = len(re.sub(r"<[^>]+>", "", body)) + len(label) + 4
     return line if visible <= limit else ""
@@ -9659,6 +9698,7 @@ def main() -> None:
     app.job_queue.run_repeating(result_link_job, interval=60, first=180)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
+    app.job_queue.run_once(promo_emoji_job, 15)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
     app.job_queue.run_repeating(pm_job, interval=6 * 3600, first=300)

@@ -121,6 +121,9 @@ SURGE_ENABLED = os.getenv("SURGE_ENABLED", "0") == "1"
 # 222: signal posti ostidagi "Trade Controller orqali" havolasi uchun premium
 # emoji id'si (bo'sh bo'lsa oddiy 🤖). Faqat raqamlar.
 PROMO_EMOJI_ID = "".join(ch for ch in os.getenv("PROMO_EMOJI_ID", "") if ch.isdigit())
+# 223: ID berilmasa — shu emoji to'plamining birinchi emojisi olinadi
+# (bot ishga tushganda `promo_emoji_job` tekshiradi).
+PROMO_EMOJI_SET = os.getenv("PROMO_EMOJI_SET", "t_me_tradecontrbot_by_fStikBot").strip()
 TOP_CHANNEL_MIN_MEMBERS = int(os.getenv("TOP_CHANNEL_MIN_MEMBERS", "100"))
 # Oxirgi hajm bazaviy o'rtachadan necha marta katta bo'lsa "portlash".
 # 3 -> 2.2: foydalanuvchi "kanalda ko'proq xabar kelishi" so'ragach
