@@ -30,6 +30,7 @@ from aiohttp import web
 
 import chart
 import config
+import dipfunded
 import db
 import i18n
 import paymembers
@@ -326,6 +327,20 @@ tbody tr:hover{background:#ffffff06}
 .btn:hover{text-decoration:none;filter:brightness(1.05);
            box-shadow:0 8px 26px rgba(218,221,226,.18)}
 .btn:active{transform:scale(.955);filter:brightness(.96)}
+/* 215: Dip Funded turniri bloki (turnir bo'limi tepasida) */
+.dftour{margin-top:22px;padding:20px 18px;border-radius:16px;border:1px solid #3a2f6b;
+        background:linear-gradient(150deg,rgba(124,77,255,.20),rgba(23,23,27,.9) 60%)}
+.dfbadge{display:inline-block;font-size:12px;font-weight:600;color:var(--mut);
+         border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.dfbadge.live{color:var(--long);border-color:rgba(46,204,143,.45)}
+.dfh{margin:12px 0 0;font-size:20px}
+.dfjoin{display:block;text-align:center;margin-top:16px;font-size:16px;padding:14px 18px}
+.dfsub{margin-top:18px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.dfprizes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.dfp{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.dfp span{display:block;font-size:12px;color:var(--mut)}
+.dfp b{display:block;margin-top:4px;font-size:17px}
+.dfrules{margin:12px 0 0;font-size:13px;color:var(--mut);line-height:1.5}
 /* SHAFFOF (shishasimon) tugma — ikkilamchi harakatlar uchun: fon
    ko'rinib turadi, chegara kumush. Asosiy kumush tugma bilan raqobat
    qilmaydi, lekin baribir tugma ekanligi ko'rinadi. */
@@ -719,6 +734,32 @@ def tourney_status(t, lang: str | None) -> str:
     return e(i18n.t("w.t_done", lang, ends=done))
 
 
+def df_tour_block(lang: str | None) -> str:
+    """215: Dip Funded turniri — turnir bo'limining TEPASIDA, "Qatnashish"
+    tugmasi bilan (dipfunded.com/tournament)."""
+    st, start, end = dipfunded.tour_window()
+    fmt = lambda d: d.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M")
+    when = (i18n.t("df.tour_live", lang, end=fmt(end)) if st == "live"
+            else i18n.t("df.tour_soon", lang, start=fmt(start)))
+    prizes = "".join(
+        f"<div class='dfp'><span>{e(i18n.t('df.tour_place', lang, n=i))}</span>"
+        f"<b>${p:,.0f}</b></div>"
+        for i, p in enumerate(dipfunded.TOUR_PRIZES, 1))
+    url = e(dipfunded.tour_url())
+    return (
+        "<div class='dftour'>"
+        f"<div class='dfbadge {'live' if st == 'live' else ''}'>{e(when)}</div>"
+        f"<h2 class='dfh'>🏆 {e(i18n.t('df.tour_title', lang))}</h2>"
+        f"<a class='btn dfjoin' href='{url}' target='_blank' rel='noopener'>"
+        f"{e(i18n.t('df.tour_btn', lang))}</a>"
+        f"<div class='dfsub'>{e(i18n.t('df.tour_prizes', lang))}</div>"
+        f"<div class='dfprizes'>{prizes}</div>"
+        f"<p class='dfrules'>{e(i18n.t('df.tour_rules', lang))}</p>"
+        f"<p class='dfrules'>{e(i18n.t('df.tour_how', lang))} "
+        f"<a href='{url}' target='_blank' rel='noopener'>{e(i18n.t('df.tour_board', lang))} →</a></p>"
+        "</div>")
+
+
 def tourney_cta(bot: str | None, live: bool, lang: str | None) -> str:
     """Turnir sahifasi ostidagi chaqiruv. Guruhlar uchun `join_cta` bu yerda
     mos emas ("guruhingizni ulang") — turnirda odam o'zi qatnashadi."""
@@ -746,8 +787,9 @@ async def tourney_page(request):
             f"<div class='brand'><a href='{e(keep('/', request, lang))}'>Trade Controller</a></div>")
     if not t:
         body = (head + f"<h1>{e(i18n.t('w.tab_tourney', lang))}</h1></header>"
-                f"<div class='empty'>{e(i18n.t('w.t_none', lang))}</div>"
-                + tourney_cta(bot, False, lang))
+                # 215: o'z turnirimiz hali yo'q — faqat Dip Funded turniri
+                # ("hozircha turnir o'tkazilmagan" uning yonida chalg'itardi).
+                + df_tour_block(lang))
         html_ = _put(key, page(i18n.t("w.tab_tourney", lang), body, bot, lang=lang))
         return web.Response(text=html_, content_type="text/html", headers=NO_CACHE)
 
@@ -784,6 +826,7 @@ async def tourney_page(request):
         f"<div class='sub'>{tourney_status(t, lang)}</div>"
         f"<div class='tmeta'>{e(i18n.t('w.t_meta', lang, dep=f'{dep:,.0f}', n=len(rows)))}</div>"
         "</header>"
+        + (df_tour_block(lang) if not tid else "") +
         f"<div class='grid' style='margin-top:26px'>{tiles}</div>"
         + tourney_table(rows, dep, lang)
         + opens_html

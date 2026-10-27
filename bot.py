@@ -931,8 +931,9 @@ def main_menu_kb(uid: int, ws, private: bool = True,
             rows.append([InlineKeyboardButton(
                 i18n.t("dt.btn_channel" if ws["is_channel"] else "dt.btn_group", lang),
                 callback_data=f"wsdet:{ws['id']}")])
-        # Shaxsiy jurnalda — faqat admin turnirni BOSHLAGAN bo'lsa (185).
-        if ws["type"] == "personal" and tournament.ACTIVE:
+        # Shaxsiy jurnalda — turnir bo'limi (185). 215: Dip Funded turniri
+        # doim bor, shuning uchun tugma ham doim (o'z turnirimiz bo'lmasa ham).
+        if ws["type"] == "personal":
             rows.append([InlineKeyboardButton(i18n.t("menu.tourney", lang),
                                               callback_data="tr:menu")])
     elif ws["type"] == "group" and not ws["is_channel"] and ws["allow_member_signals"]:
@@ -3954,6 +3955,25 @@ async def _tourney_me_text(t, p, uid: int, lang: str | None) -> str:
                   trades=p["trades"], wins=p["wins"], free=free)
 
 
+def _df_tour_text(lang: str | None) -> str:
+    """215: Dip Funded turniri — turnir bo'limining tepasida."""
+    st, start, end = dipfunded.tour_window()
+    fmt = lambda d: d.astimezone(stats.TZ).strftime("%d.%m.%Y %H:%M")
+    when = (i18n.t("df.tour_live", lang, end=fmt(end)) if st == "live"
+            else i18n.t("df.tour_soon", lang, start=fmt(start)))
+    prizes = "\n".join(f"{m} {i18n.t('df.tour_place', lang, n=i)} — <b>${p:,.0f}</b>"
+                       for i, (m, p) in enumerate(zip("🥇🥈🥉", dipfunded.TOUR_PRIZES), 1))
+    return (f"🏆 <b>{html.escape(i18n.t('df.tour_title', lang))}</b>\n<i>{html.escape(when)}</i>\n\n"
+            f"🎁 {html.escape(i18n.t('df.tour_prizes', lang))}:\n{prizes}\n\n"
+            f"📌 {html.escape(i18n.t('df.tour_rules', lang))}\n\n"
+            f"👉 {html.escape(i18n.t('df.tour_how', lang))}")
+
+
+def _df_tour_row(lang: str | None) -> list:
+    return [InlineKeyboardButton("🏆 " + i18n.t("df.tour_btn", lang) + " — Dip Funded",
+                                 url=dipfunded.tour_url())]
+
+
 def _tourney_page_kb(lang: str | None) -> list:
     if not config.WEB_URL:
         return []
@@ -4758,7 +4778,9 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     t = await tournament.load_active()
     if not t:
-        await _edit_or_reply(q, i18n.t("tr.none", lang), back_kb(lang), html_mode=False)
+        # 215: o'z turnirimiz yo'q — Dip Funded turniri va "Qatnashish".
+        await _edit_or_reply(q, _df_tour_text(lang),
+                             InlineKeyboardMarkup([_df_tour_row(lang), back_row(lang)]))
         return
     ws = await get_ws_or_prompt(update, ctx)
     if not ws:
@@ -4771,18 +4793,21 @@ async def on_tourney(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await tournament.join(t["id"], uid, ws["id"])
     p = await tournament.player(t["id"], uid)
     if p is None:
-        kb = [[InlineKeyboardButton(i18n.t("tr.btn_join", lang), callback_data="tr:join")]]
+        # 215: tepada Dip Funded turniri, ostida o'z turnirimiz.
+        kb = [_df_tour_row(lang),
+              [InlineKeyboardButton(i18n.t("tr.btn_join", lang), callback_data="tr:join")]]
         kb += _tourney_page_kb(lang)
         kb.append(back_row(lang))
         await _edit_or_reply(
-            q, i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
-                      ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
+            q, _df_tour_text(lang) + "\n\n━━━━━━━━━━\n\n"
+            + i18n.t("tr.rules", lang, id=t["id"], dep=float(t["deposit"]),
+                     ends=_tdate(t["ends_at"]), min=tournament.AMOUNT_WINDOW // 60),
             InlineKeyboardMarkup(kb))
         return
     txt = await _tourney_me_text(t, p, uid, lang)
     if action == "join":
         txt = i18n.t("tr.joined", lang) + "\n\n" + txt
-    kb = _tourney_page_kb(lang)
+    kb = [_df_tour_row(lang)] + _tourney_page_kb(lang)
     kb.append(back_row(lang))
     await _edit_or_reply(q, txt, InlineKeyboardMarkup(kb))
 

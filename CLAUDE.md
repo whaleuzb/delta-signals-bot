@@ -7061,3 +7061,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (chat, [id...]); `run_broadcast` 2+ id'da `copy_messages` (albom bitta
      bo'lib boradi), aks holda `copy_message`; eski `msg_id` kaliti ham
      qabul qilinadi (211 e'loni).
+215. **Turnir bo'limida Dip Funded turniri + "Qatnashish".** Foydalanuvchi:
+     "turnir bo'limiga dipfundeddagi turnirni qo'sh, yuqorisida qatnashish
+     tugmasi bo'lsin". Dip Funded'da turnir uchun ochiq API YO'Q — jadval
+     va qoidalar `dipfunded.py`da (delta-prop/tournament.py bilan AYNI:
+     birinchisi 27.10.2026 16:00 UTC, har 14 kun, $10 000 hisob, sovrin
+     100k/50k/25k; u yerda o'zgarsa bu yerda ham o'zgartirish kerak).
+     `dipfunded.tour_window()` — holat/boshlanish/tugash.
+     - Veb `/t`: `df_tour_block()` header ostida (faqat joriy turnir sahifasi,
+       `/t/<id>` da emas); o'z turnirimiz bo'lmasa "hozircha turnir yo'q" va
+       eski CTA endi chiqmaydi.
+     - Bot: shaxsiy jurnalda "🏆 Turnir" tugmasi DOIM; `on_tourney` tepada
+       `_df_tour_text` + `_df_tour_row` (URL tugma dipfunded.com/tournament),
+       o'z turnirimiz faol bo'lsa ostida uning qoidalari/holati.

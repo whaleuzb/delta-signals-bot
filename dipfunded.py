@@ -16,9 +16,35 @@ Uch xil xato ATAYLAB ajratilgan (paymembers.py andozasi):
   * `ApiError`    — amal rad etildi (kod + foydalanuvchi tilidagi matn);
   * `Unavailable` — javob olinmadi (tarmoq, kalit, 5xx).
 """
+from datetime import datetime, timedelta, timezone
+
 import httpx
 
 import config
+
+# ── Dip Funded turniri (215) ──
+# Jadval delta-prop/tournament.py bilan AYNI: birinchisi 27.10.2026 21:00
+# Toshkent (16:00 UTC), keyin har 14 kunda. Sovrinlar va hisob hajmi ham o'sha
+# fayldagi doimiylar. Dip Funded'da turnir uchun ochiq API yo'q — shu sabab
+# bu yerda faqat jadval va qoidalar, reyting dipfunded.com/tournament da.
+TOUR_FIRST = datetime(2026, 10, 27, 16, 0, tzinfo=timezone.utc)
+TOUR_PERIOD = timedelta(days=14)
+TOUR_ACCOUNT = 10_000
+TOUR_PRIZES = (100_000, 50_000, 25_000)
+
+
+def tour_window(now: datetime | None = None) -> tuple[str, datetime, datetime]:
+    """(holat, boshlanish, tugash): holat 'upcoming' yoki 'live'."""
+    now = now or datetime.now(timezone.utc)
+    if now < TOUR_FIRST:
+        return "upcoming", TOUR_FIRST, TOUR_FIRST + TOUR_PERIOD
+    n = (now - TOUR_FIRST) // TOUR_PERIOD
+    start = TOUR_FIRST + n * TOUR_PERIOD
+    return "live", start, start + TOUR_PERIOD
+
+
+def tour_url() -> str:
+    return site_url("/tournament")
 
 
 class Unavailable(Exception):

@@ -2149,6 +2149,30 @@ STRINGS: dict[str, dict[str, str]] = {
     "w.t_tile_players": {"uz": "Qatnashchilar", "ru": "Участники", "en": "Players"},
     "w.t_tile_deposit": {"uz": "Depozit", "ru": "Депозит", "en": "Deposit"},
     "w.t_tile_leader": {"uz": "🥇 Yetakchi", "ru": "🥇 Лидер", "en": "🥇 Leader"},
+    "df.tour_title": {"uz": "Dip Funded turniri — $100\u00a0000 sovrin",
+                      "ru": "Турнир Dip Funded — призы $100\u00a0000",
+                      "en": "Dip Funded tournament — $100,000 in prizes"},
+    "df.tour_live": {"uz": "Davom etmoqda · {end} gacha", "ru": "Идёт · до {end}",
+                     "en": "Live · until {end}"},
+    "df.tour_soon": {"uz": "Start: {start}", "ru": "Старт: {start}", "en": "Starts: {start}"},
+    "df.tour_rules": {
+        "uz": ("Har 2 haftada · $10 000 turnir hisobi · faqat spot, leveraj yo'q · "
+               "kunlik zarar −5%, maksimal −7% · eng yuqori foyda % — g'olib"),
+        "ru": ("Каждые 2 недели · турнирный счёт $10 000 · только спот, без плеча · "
+               "дневной убыток −5%, максимальный −7% · побеждает наибольшая доходность %"),
+        "en": ("Every 2 weeks · $10,000 tournament account · spot only, no leverage · "
+               "daily loss −5%, max −7% · highest profit % wins"),
+    },
+    "df.tour_prizes": {"uz": "Sovrinlar — Dip Trader hisobi", "ru": "Призы — счёт Dip Trader",
+                       "en": "Prizes — Dip Trader account"},
+    "df.tour_place": {"uz": "{n}-o'rin", "ru": "{n}-е место", "en": "#{n}"},
+    "df.tour_how": {
+        "uz": "dipfunded.com da istalgan challenge'ni oling — turnir hisobi kabinetingizda bepul ochiladi.",
+        "ru": "Купите любой challenge на dipfunded.com — турнирный счёт откроется в кабинете бесплатно.",
+        "en": "Get any challenge on dipfunded.com — your tournament account opens for free.",
+    },
+    "df.tour_btn": {"uz": "Qatnashish", "ru": "Участвовать", "en": "Join"},
+    "df.tour_board": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
     "w.t_cta_h3": {"uz": "Turnirda qatnashing", "ru": "Участвуйте в турнире",
                    "en": "Join the tournament"},
     "w.t_cta_next": {
