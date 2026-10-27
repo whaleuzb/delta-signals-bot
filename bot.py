@@ -804,7 +804,8 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
     return line if visible <= limit else ""
 
 
-async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None):
+async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None,
+                         show_id: bool = True):
     """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
 
     Grafik (`chart.signal_chart`) tahlil uchun — unda shamlar, darajalar,
@@ -846,7 +847,7 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
         closed_at=sig["closed_at"].astimezone(stats.TZ),
         username=username, ws_name=ws["name"], logo=logo,
-        qr_url=qr_url, sig_id=sig["id"], market=sig["market"],
+        qr_url=qr_url, sig_id=sig["id"] if show_id else None, market=sig["market"],
         qr_code=code, lang=ws_lang(ws))
 
 
@@ -865,13 +866,16 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
     """
     sid = sig["id"]
     photo = share = None
+    show_id = ws["type"] != "group"      # 220: guruh/kanalda raqam yo'q
+    txt = pub(ws, txt)
     try:
-        photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username)
+        photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username, show_id=show_id)
     except Exception:
         log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
     # Karta grafikdan MUSTAQIL: biri chiqmasa ikkinchisi baribir ketadi.
     try:
-        share = await build_pnl_card(sig, ws, ctx.bot.username, ref_uid=ref_uid)
+        share = await build_pnl_card(sig, ws, ctx.bot.username, ref_uid=ref_uid,
+                                     show_id=show_id)
     except Exception:
         log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
 
@@ -1138,6 +1142,25 @@ def ws_lang(ws) -> str:
         # Eski chaqiruvchida `lang` ustuni bo'lmagan qator kelib qolsa ham
         # xabar YUBORILISHI kerak — o'zbekchaga tushamiz.
         return i18n.DEFAULT_LANG
+
+
+_ID_PATTERNS = (
+    (re.compile(r"\s*<code>#\d+</code>"), ""),
+    (re.compile(r"<b>#\d+</b>\s*"), ""),
+    (re.compile(r"(?<![&\w])#\d+\s+"), ""),
+    (re.compile(r"\s?(?<![&\w])#\d+\b"), ""),
+)
+
+
+def pub(ws, text: str) -> str:
+    """220: guruh/kanalga ketadigan matndan ichki signal raqami (#112)
+    olib tashlanadi — raqam faqat bot ichida (shaxsiy chat, boshqaruv,
+    admin) kerak. `&#39;` kabi HTML belgilariga tegilmaydi."""
+    if not text or ws["type"] != "group":
+        return text
+    for rx, rep in _ID_PATTERNS:
+        text = rx.sub(rep, text)
+    return text
 
 
 def tw(key: str, ws, **kwargs) -> str:
@@ -1906,7 +1929,7 @@ async def notify_group(ctx, ws, sig, text: str) -> None:
     if ws["type"] == "group" and ws["group_chat_id"]:
         try:
             await ctx.bot.send_message(
-                ws["group_chat_id"], text, parse_mode=ParseMode.HTML,
+                ws["group_chat_id"], pub(ws, text), parse_mode=ParseMode.HTML,
                 reply_to_message_id=sig["group_msg_id"],
                 allow_sending_without_reply=True,
                 message_thread_id=ws["group_topic_id"])
@@ -3840,6 +3863,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
             ws, q.from_user.id, q.from_user.username, q.from_user.first_name,
             ws_lang(ws))
+        body = pub(ws, body)
         body += await promo_line(ctx.bot, ws, body, 1024 if post_file_id else 4096)
         try:
             if post_file_id:
@@ -3880,7 +3904,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await ctx.bot.send_message(
                 chat_id,
-                tw("ev.open", ws, sid=sig_id, sym=d["symbol"], p=fmt_price(d["entry"])),
+                pub(ws, tw("ev.open", ws, sid=sig_id, sym=d["symbol"], p=fmt_price(d["entry"]))),
                 parse_mode=ParseMode.HTML, reply_to_message_id=group_msg_id,
                 allow_sending_without_reply=True,
                 message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
@@ -5236,6 +5260,7 @@ async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
              "tps": [float(t) for t in sig["tps"]],
              "market": sig["market"], "entry_mode": sig["entry_mode"]}
         body = draft_text(d, new_id, ws_lang(tgt))
+        body = pub(tgt, body)
         body += await promo_line(ctx.bot, tgt, body, 1024 if sig["chart_file_id"] else 4096)
         try:
             if sig["chart_file_id"]:
@@ -5382,7 +5407,8 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 target = None
             if target is not None:
                 try:
-                    await ctx.bot.send_message(target, txt, parse_mode=ParseMode.HTML, **kw)
+                    await ctx.bot.send_message(target, pub(ws, txt),
+                                                parse_mode=ParseMode.HTML, **kw)
                 except Exception:
                     log.exception("Xabar yuborilmadi")
 
@@ -5532,7 +5558,7 @@ async def digest_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 continue
             await ctx.bot.send_message(
                 ws["group_chat_id"] if ws["type"] == "group" else ws["owner_id"],
-                text, parse_mode=ParseMode.HTML,
+                pub(ws, text), parse_mode=ParseMode.HTML,
                 message_thread_id=ws["group_topic_id"] if ws["type"] == "group" else None)
         except Exception:
             log.exception("Kunlik hisobot yuborilmadi (ws=%s)", ws["id"])
@@ -5665,7 +5691,7 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if ws["type"] == "group" and ws["group_chat_id"]:
             try:
                 await ctx.bot.send_message(
-                    ws["group_chat_id"], txt, parse_mode=ParseMode.HTML,
+                    ws["group_chat_id"], pub(ws, txt), parse_mode=ParseMode.HTML,
                     reply_to_message_id=s["group_msg_id"], allow_sending_without_reply=True,
                     message_thread_id=ws["group_topic_id"])
             except Exception:

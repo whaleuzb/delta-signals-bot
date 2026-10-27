@@ -7104,3 +7104,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      oshsa havola qo'shilmaydi — post ketishi muhimroq. Qo'shilgan joylar:
      yangi signal posti, guruh->kanal nusxasi, yakuniy ko'rik (ko'rinish
      va'dasi). Matnli postda `disable_web_page_preview=True`.
+220. **Guruh/kanal postlarida signal raqami (#112) yo'q.** Foydalanuvchi:
+     "post raqamlari shart emas, faqat menga va bot ichida ko'rinsa
+     yetarli". `pub(ws, text)` — `type=='group'` bo'lsa `<code>#N</code>`,
+     `<b>#N</b>`, `#N ` va qolgan `#N` larni olib tashlaydi (`&#39;` kabi
+     HTML belgilarga tegmaydi). Qo'llangan joylar: yangi signal posti,
+     guruh->kanal nusxasi, market ochilish xabari, `notify_group`, poll_job
+     hodisalari, bosqich (milestone), kunlik hisobot, `send_close_result`
+     (matn + rasmlar: `chart.signal_chart(show_id=False)` sarlavhasi va
+     `build_pnl_card(show_id=False)` kartasi raqamsiz). Shaxsiy jurnal,
+     boshqaruv, DM va admin xabarlarida raqam QOLADI. 210 (`resultlink`)
+     eski postlardagi "#N SYM" bo'yicha qidiradi — yangi postlarda
+     `result_msg_id` to'g'ridan-to'g'ri saqlanadi (209), shuning uchun
+     ziddiyat yo'q.

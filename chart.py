@@ -531,7 +531,8 @@ async def mini_chart(sig) -> io.BytesIO | None:
     return buf
 
 
-async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesIO | None:
+async def signal_chart(sig, ws_name: str, bot_username: str | None,
+                       show_id: bool = True) -> io.BytesIO | None:
     """Yopilgan signal uchun grafik: kirishdan chiqishgacha bo'lgan haqiqiy
     shamlar, darajalar va aniq chiqish nuqtasi. Shamlar topilmasa None —
     chaqiruvchi oddiy matn xabariga qaytadi, hech narsa buzilmaydi."""
@@ -581,7 +582,8 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None) -> io.BytesI
     vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
 
     return _render(
-        candles, header=f"#{sig['id']} {sig['symbol']}", side=sig["side"],
+        candles, header=(f"#{sig['id']} {sig['symbol']}" if show_id else sig["symbol"]),
+        side=sig["side"],
         entry=float(sig["entry"]), sl=float(sig["sl_initial"]),
         tps=[float(x) for x in sig["tps"]], tp_hit=sig["tp_hit"],
         exit_idx=exit_idx, exit_price=exit_price,
