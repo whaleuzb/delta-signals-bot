@@ -823,6 +823,18 @@ async def promo_emoji_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
              "Telegram ruxsat bermadi (Fragment username kerak) — oddiy 🤖")
 
 
+def _promo_emoji_seen(msg, ws) -> None:
+    """224: guruh/kanal postida premium emoji SAQLANDIMI — DM sinovidan
+    o'tgan bo'lsa ham Telegram uni guruh/kanalda olib tashlashi mumkin
+    (Fragment username'siz bot). Natija logga yoziladi."""
+    if not PROMO_EMOJI:
+        return
+    ents = list(getattr(msg, "caption_entities", None) or []) + list(getattr(msg, "entities", None) or [])
+    kept = any(e.type == "custom_emoji" for e in ents)
+    log.info("Promo emoji guruhda (ws=%s, kanal=%s): %s", ws["id"], ws["is_channel"],
+             "saqlandi" if kept else "Telegram olib tashladi")
+
+
 async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
     """219: guruh/kanal signal posti ostida "from Trade Controller" havolasi
     — workspace EGASINING taklif havolasi (bot orqali kelganlar uning
@@ -3923,6 +3935,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                     disable_web_page_preview=True)
             group_msg_id = sent.message_id
             await db.set_group_msg(sig_id, group_msg_id)
+            _promo_emoji_seen(sent, ws)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
 
