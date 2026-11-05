@@ -3269,6 +3269,10 @@ async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz["entry_mode"] = mode
     label = i18n.t("wiz.mode_market" if mode == "market" else "wiz.mode_limit", lang)
     await q.edit_message_text(i18n.t("wiz.mode_picked", lang, label=label))
+    # 231: spot kriptoda yo'nalish so'ralmaydi — doim LONG (spotda short yo'q).
+    if wiz.get("market") == "crypto" and not wiz.get("leverage"):
+        wiz["side"] = "LONG"
+        return await _wiz_after_side(q.message, wiz, lang)
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(i18n.t("side.long", lang), callback_data="wiz_side:LONG"),
          InlineKeyboardButton(i18n.t("side.short", lang), callback_data="wiz_side:SHORT")],
@@ -3288,7 +3292,11 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["side"] = side
     await q.edit_message_text(i18n.t("wiz.side_picked", lang, side=side))
+    return await _wiz_after_side(q.message, wiz, lang)
 
+
+async def _wiz_after_side(message, wiz, lang) -> int:
+    """Yo'nalish ma'lum — kirish narxi bosqichi (market: avtomatik)."""
     if wiz.get("entry_mode") == "market":
         # Oddiy (darhol) rejimida entry QO'LDA SO'RALMAYDI — turli admin
         # "joriy narx"ni turlicha taxmin qilib yozishi (kechikish, xatolik)
@@ -3299,17 +3307,17 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         price = await safe_last_price(wiz["market"], wiz["symbol"], fresh=True)
         if price:
             wiz["entry"] = price
-            await q.message.reply_text(
+            await message.reply_text(
                 i18n.t("wiz.entry_auto", lang, p=fmt_price(price)),
                 parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
             return WIZ_TP
         # Narx olinmadi (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan
         # qo'lda so'raladi, sehrgar to'xtab qolmaydi.
-        await q.message.reply_text(i18n.t("wiz.entry_auto_failed", lang),
+        await message.reply_text(i18n.t("wiz.entry_auto_failed", lang),
                                    reply_markup=wiz_cancel_kb(lang))
         return WIZ_ENTRY
 
-    await q.message.reply_text(i18n.t("wiz.step_entry", lang),
+    await message.reply_text(i18n.t("wiz.step_entry", lang),
                                reply_markup=wiz_cancel_kb(lang))
     return WIZ_ENTRY
 

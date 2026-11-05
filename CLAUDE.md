@@ -7204,3 +7204,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Orqaga — tanlov ekraniga (`_dep_back_kb`). E'lon: `ANNOUNCE_KEY =
      announce_2026_11_futures`, `ANNOUNCE_FILE = 2026-11-futures`
      (announce/*.png|txt) — keyingi e'lon uchun ikkalasini almashtirish.
+231. **Spot kriptoda LONG/SHORT so'rovi yo'q.** Foydalanuvchi: "spotdagi
+     long short so'rovi keraksiz". `wizard_mode`: `market == "crypto"` va
+     leveraj yo'q bo'lsa `side = "LONG"` va to'g'ridan-to'g'ri kirish
+     bosqichi (`_wiz_after_side`). Futures, forex va aksiyada yo'nalish
+     so'raladi (u yerda short bor).
