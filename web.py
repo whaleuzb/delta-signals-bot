@@ -998,7 +998,7 @@ async def index(request):
     return web.Response(text=cached, content_type="text/html", headers=NO_CACHE)
 
 
-async def _group_numbers(ws, lang: str | None = None) -> dict:
+async def _group_numbers(ws, lang: str | None = None, kind: str = "spot") -> dict:
     """Guruhning asosiy raqamlari — HTML sahifa ham, JSON ham SHU yerdan oladi.
 
     Ataylab bitta funksiya: to'lov boti (whale-payment-bot) Mini App'i
@@ -1006,9 +1006,11 @@ async def _group_numbers(ws, lang: str | None = None) -> dict:
     sahifasidagi son bilan AYNAN bir xil bo'lishi shart. Ikki joyda ikki
     marta hisoblansa, ular vaqt o'tib bir-biridan uzilib ketardi."""
     ws_id = ws["id"]
-    s = await db.period_stats(ws_id)
-    rows = await db.equity_series(ws_id)
-    deposit = ws["deposit"]
+    # 227: spot va futures ALOHIDA (futures — foiz leveraj bilan, o'z depoziti).
+    with db.stats_kind(kind):
+        s = await db.period_stats(ws_id)
+        rows = await db.equity_series(ws_id)
+    deposit = ws["fut_deposit"] if kind == "fut" else ws["deposit"]
     total = s["total"] or 0
 
     pnls = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
@@ -1255,6 +1257,14 @@ async def group_page(request):
     tiles_html = "".join(
         f"<div class='tile'><div class='k'>{e(k)}</div>"
         f"<div class='v {c}'>{e(v)}</div></div>" for k, v, c in n["tiles"])
+    # 227: futures natijalari — alohida blok (bo'lsa).
+    nf = await _group_numbers(ws, lang, "fut")
+    fut_html = ""
+    if nf["total"]:
+        fut_html = (f"<h2>⚡ Futures</h2><div class='grid'>"
+                    + "".join(f"<div class='tile'><div class='k'>{e(k)}</div>"
+                              f"<div class='v {c}'>{e(v)}</div></div>" for k, v, c in nf["tiles"])
+                    + "</div>")
 
     # Oylik
     months = await db.monthly_breakdown(ws_id, limit=12)
@@ -1413,7 +1423,7 @@ async def group_page(request):
         f"<div class='htitle'>{big_logo}<h1>{e(ws['name'])}</h1></div>"
         f"{back_link}"
         f"{invite}</header>"
-        f"<div class='grid'>{tiles_html}</div>"
+        f"<div class='grid'>{tiles_html}</div>{fut_html}"
         + (f"<h2>{e(i18n.t('w.equity_h2', lang))}</h2>"
            f"<img class='chart' src='{e(keep(f'/g/{ws_id}/equity.png', request, lang))}' "
            f"alt='Equity' loading='lazy'>"

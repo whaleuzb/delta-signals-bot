@@ -7171,3 +7171,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `free_deposit`/`open_allocated`/`pending_add_usd` futures/spot bo'yicha
      alohida; `apply_deposit_delta(..., futures)`. Hajm = MARJA: risk
      tugmalari `amt/L`, risk puli `amt*dist*L`.
+227. **Statistika spot va futures alohida.** Foydalanuvchi: "statistikani
+     ham alohida qil". `db.STATS_KIND` (ContextVar, standart "spot") +
+     `with db.stats_kind("fut"):` — period_stats, monthly_breakdown,
+     equity_series, top_symbols, report_positions shu bo'yicha filtrlaydi
+     (`_kind_where`) va foizni `pnl_pct * COALESCE(leverage,1)` bilan oladi.
+     ContextVar — har asyncio task'da o'ziniki, boshqa so'rovlarga tegmaydi.
+     - Bot: statistika ekranida "📊 Spot / ⚡ Futures" (`stk:`), tanlov
+       `user_data["st_kind"]`; /stats, juftliklar, equity, PDF shu turda;
+       futures — `fut_deposit` bilan. `stats._open_summary` ham tur bo'yicha.
+     - Veb guruh sahifasi: asosiy plitkalar va oylik — spot; futures savdo
+       bo'lsa "⚡ Futures" plitkalari alohida (`_group_numbers(kind="fut")`).
+       Savdolar ro'yxati (`closed_for_months`) — hammasi, futures nishon bilan.
+     - Kunlik hisobot (digest) va /month, /year buyruqlari — spot.

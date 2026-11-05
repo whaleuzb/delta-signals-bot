@@ -2521,8 +2521,18 @@ def _shift_month(y: int, m: int, delta: int) -> tuple[int, int]:
     return idx // 12, idx % 12 + 1
 
 
+def st_kind(ctx) -> str:
+    """227: odam tanlagan statistika turi — "spot" (standart) yoki "fut"."""
+    return (ctx.user_data or {}).get("st_kind", "spot")
+
+
+def kind_deposit(ws, kind: str):
+    v = ws["fut_deposit"] if kind == "fut" else ws["deposit"]
+    return float(v) if v is not None else None
+
+
 def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None,
-                  lang: str | None = None) -> InlineKeyboardMarkup:
+                  lang: str | None = None, kind: str = "spot") -> InlineKeyboardMarkup:
     now = datetime.now(stats.TZ)
     mon = stats.months(lang)
 
@@ -2554,6 +2564,10 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None,
             nav.append(InlineKeyboardButton(f"{y + 1} ▶", callback_data=f"st:y:{y + 1}"))
         rows.append(nav)
 
+    # 227: Spot ⇄ Futures — statistika alohida.
+    rows.append([
+        InlineKeyboardButton(("• " if kind == "spot" else "") + "📊 Spot", callback_data="stk:spot"),
+        InlineKeyboardButton(("• " if kind == "fut" else "") + "⚡ Futures", callback_data="stk:fut")])
     rows.append([InlineKeyboardButton(i18n.t("st.btn_pdf", lang), callback_data="pdfrep")])
     rows.append(back_row(lang))
     return InlineKeyboardMarkup(rows)
@@ -2574,10 +2588,12 @@ async def send_pdf_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 
     lang = await user_lang(uid)
     note = await msg.reply_text(i18n.t("st.pdf_making", lang))
-    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    kind = st_kind(ctx)
+    deposit = kind_deposit(ws, kind)
     try:
-        buf = await stats.pdf_report(ws["id"], ws["name"], deposit,
-                                     can_manage(uid, ws), lang=lang)
+        with db.stats_kind(kind):
+            buf = await stats.pdf_report(ws["id"], ws["name"] + (" — Futures" if kind == "fut" else ""),
+                                         deposit, can_manage(uid, ws), lang=lang)
     finally:
         try:
             await note.delete()
@@ -2600,8 +2616,16 @@ async def on_pdf_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def stats_view_text(ws, uid: int, mode: str, y: int | None = None,
-                           m: int | None = None, lang: str | None = None) -> str:
-    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+                           m: int | None = None, lang: str | None = None,
+                           kind: str = "spot") -> str:
+    """227: `kind` — "spot" yoki "fut" (futures: o'z depoziti, foiz leveraj bilan)."""
+    with db.stats_kind(kind):
+        txt = await _stats_view_text(ws, uid, mode, y, m, lang, kind_deposit(ws, kind))
+    head = i18n.t("st.kind_fut" if kind == "fut" else "st.kind_spot", lang)
+    return f"{head}\n{txt}"
+
+
+async def _stats_view_text(ws, uid: int, mode: str, y, m, lang, deposit) -> str:
     show_money = can_manage(uid, ws)
     if mode == "m":
         a, b = stats.month_bounds(y, m)
@@ -2631,9 +2655,28 @@ async def on_stats_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     mode = parts[1]
     y = int(parts[2]) if mode in ("m", "y") else None
     m = int(parts[3]) if mode == "m" else None
-    text = await stats_view_text(ws, q.from_user.id, mode, y, m, lang)
+    kind = st_kind(ctx)
+    text = await stats_view_text(ws, q.from_user.id, mode, y, m, lang, kind)
     await q.edit_message_text(text, parse_mode=ParseMode.HTML,
-                               reply_markup=stats_nav_kb(mode, y, m, lang))
+                               reply_markup=stats_nav_kb(mode, y, m, lang, kind))
+
+
+async def on_stats_kind(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """227: "📊 Spot" / "⚡ Futures" — statistika turini almashtiradi."""
+    q = update.callback_query
+    await q.answer()
+    ctx.user_data["st_kind"] = kind = "fut" if q.data.endswith(":fut") else "spot"
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    if not await can_view(ctx.bot, q.from_user.id, ws):
+        text, kb = access_denied(ws, await user_lang(q.from_user.id))
+        await q.edit_message_text(text, reply_markup=kb)
+        return
+    lang = await user_lang(q.from_user.id)
+    text = await stats_view_text(ws, q.from_user.id, "all", lang=lang, kind=kind)
+    await q.edit_message_text(text, parse_mode=ParseMode.HTML,
+                               reply_markup=stats_nav_kb("all", lang=lang, kind=kind))
 
 
 def symbols_nav_kb(y: int | None, m: int | None,
@@ -2657,7 +2700,13 @@ def symbols_nav_kb(y: int | None, m: int | None,
 
 
 async def symbols_view_text(ws_id: int, y: int | None, m: int | None,
-                             lang: str | None = None) -> str:
+                             lang: str | None = None, kind: str = "spot") -> str:
+    with db.stats_kind(kind):
+        return await _symbols_view_text(ws_id, y, m, lang)
+
+
+async def _symbols_view_text(ws_id: int, y: int | None, m: int | None,
+                              lang: str | None = None) -> str:
     if y is None:
         return await stats.symbols_table(ws_id, lang=lang)
     a, b = stats.month_bounds(y, m)
@@ -2678,7 +2727,7 @@ async def on_symbols_nav(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     parts = q.data.split(":")
     y, m = (None, None) if parts[1] == "all" else (int(parts[1]), int(parts[2]))
     lang = await user_lang(q.from_user.id)
-    text = await symbols_view_text(ws["id"], y, m, lang)
+    text = await symbols_view_text(ws["id"], y, m, lang, st_kind(ctx))
     await q.edit_message_text(text, parse_mode=ParseMode.HTML,
                                reply_markup=symbols_nav_kb(y, m, lang))
 
@@ -2738,11 +2787,11 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # Statistika ochiq signallar uchun jonli narx so'raydi — sekin bo'lishi
         # mumkin, shuning uchun "yozmoqda" belgisi ko'rsatiladi.
         async with busy(ctx.bot, q.message.chat_id):
-            text = await stats_view_text(ws, q.from_user.id, "all", lang=lang)
-        await _edit_or_reply(q, text, stats_nav_kb("all", lang=lang))
+            text = await stats_view_text(ws, q.from_user.id, "all", lang=lang, kind=st_kind(ctx))
+        await _edit_or_reply(q, text, stats_nav_kb("all", lang=lang, kind=st_kind(ctx)))
     elif action == "symbols":
         async with busy(ctx.bot, q.message.chat_id):
-            text = await symbols_view_text(ws["id"], None, None, lang)
+            text = await symbols_view_text(ws["id"], None, None, lang, st_kind(ctx))
         await _edit_or_reply(q, text, symbols_nav_kb(None, None, lang))
     elif action == "open":
         async with busy(ctx.bot, q.message.chat_id):
@@ -2759,8 +2808,9 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                       extra=await deposit_extra(ws, lang))
             + "\n\n" + await fut_deposit_block(ws, lang), back_kb(lang))
     elif action == "equity":
-        deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
-        buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
+        deposit = kind_deposit(ws, st_kind(ctx))
+        with db.stats_kind(st_kind(ctx)):
+            buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
         if buf is None:
             await _edit_or_reply(q, i18n.t("eq.too_few", lang), back_kb(lang), html_mode=False)
         else:
@@ -6214,9 +6264,10 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     lang = await user_lang(update.effective_user.id)
     async with busy(ctx.bot, update.effective_chat.id):
-        text = await stats_view_text(ws, update.effective_user.id, "all", lang=lang)
+        text = await stats_view_text(ws, update.effective_user.id, "all", lang=lang,
+                                     kind=st_kind(ctx))
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                     reply_markup=stats_nav_kb("all", lang=lang))
+                                     reply_markup=stats_nav_kb("all", lang=lang, kind=st_kind(ctx)))
 
 
 async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6270,7 +6321,7 @@ async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text, reply_markup=kb)
         return
     lang = await user_lang(update.effective_user.id)
-    text = await symbols_view_text(ws["id"], None, None, lang)
+    text = await symbols_view_text(ws["id"], None, None, lang, st_kind(ctx))
     await update.message.reply_text(text, parse_mode=ParseMode.HTML,
                                      reply_markup=symbols_nav_kb(None, None, lang))
 
@@ -6283,9 +6334,10 @@ async def cmd_equity(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text, kb = access_denied(ws, await user_lang(update.effective_user.id))
         await update.message.reply_text(text, reply_markup=kb)
         return
-    deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
+    deposit = kind_deposit(ws, st_kind(ctx))
     lang = await user_lang(update.effective_user.id)
-    buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
+    with db.stats_kind(st_kind(ctx)):
+        buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
     if buf is None:
         await update.message.reply_text(i18n.t("eq.too_few", lang),
                                          reply_markup=menu_back_kb(lang))
@@ -9852,6 +9904,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_close_cancel, pattern=r"^closeno$"))
     app.add_handler(CallbackQueryHandler(on_symbols_nav, pattern=r"^sym:"))
     app.add_handler(CallbackQueryHandler(on_stats_nav, pattern=r"^st:"))
+    app.add_handler(CallbackQueryHandler(on_stats_kind, pattern=r"^stk:(spot|fut)$"))
     app.add_handler(CallbackQueryHandler(on_pdf_button, pattern=r"^pdfrep$"))
     app.add_handler(CallbackQueryHandler(on_help, pattern=r"^help:"))
 

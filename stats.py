@@ -122,6 +122,10 @@ async def _open_summary(workspace_id: int, deposit, show_money: bool,
     aks holda foydalanuvchi "nega ochiq pozitsiyalar hisobotda yo'q" deb
     chalkashishi mumkin edi."""
     rows = await db.live_signals(workspace_id)
+    # 227: statistika turi bo'yicha (spot / futures) — `db.STATS_KIND`.
+    k = db.STATS_KIND.get()
+    if k != "all":
+        rows = [r for r in rows if ((r["leverage"] or 1) > 1) == (k == "fut")]
     pending = [r for r in rows if r["status"] == "PENDING"]
     active = [r for r in rows if r["status"] == "ACTIVE"]
     if not pending and not active:
@@ -139,7 +143,7 @@ async def _open_summary(workspace_id: int, deposit, show_money: bool,
             price = await _safe_price(r["market"], r["symbol"])
             if price is None:
                 continue
-            pnl = tracker.pnl_at(r["side"], float(r["entry"]), price)
+            pnl = tracker.pnl_at(r["side"], float(r["entry"]), price) * (r["leverage"] or 1)
             live_count += 1
             if deposit and r["alloc_amount"] is not None:
                 live_money += pnl / 100 * float(r["alloc_amount"])

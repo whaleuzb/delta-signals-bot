@@ -7,6 +7,7 @@ Multi-tenant: har bir signal bitta workspace'ga tegishli.
   - type='personal' — shaxsiy jurnal, hech qayerga e'lon qilinmaydi,
                        faqat owner_id o'zi ko'ra oladi.
 """
+import contextvars
 import json
 import logging
 import secrets
@@ -1732,6 +1733,32 @@ async def cancel_signal(sig_id: int, status: str = "CANCELLED") -> bool:
 CLOSED = "('TP','SL','BREAKEVEN')"
 
 
+# 227: statistika turi — "spot" (standart), "fut" yoki "all". Har bir
+# so'rov (asyncio task) o'z qiymatiga ega: bot futures statistikasini
+# `with stats_kind("fut"):` ichida quradi, boshqa so'rovlarga tegmaydi.
+STATS_KIND = contextvars.ContextVar("stats_kind", default="spot")
+
+
+class stats_kind:
+    def __init__(self, kind: str):
+        self.kind = kind
+
+    def __enter__(self):
+        self.tok = STATS_KIND.set(self.kind)
+
+    def __exit__(self, *a):
+        STATS_KIND.reset(self.tok)
+
+
+def _kind_where() -> str:
+    k = STATS_KIND.get()
+    if k == "spot":
+        return " AND COALESCE(leverage, 1) = 1"
+    if k == "fut":
+        return " AND COALESCE(leverage, 1) > 1"
+    return ""
+
+
 async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Record:
     q = f"""
     SELECT
@@ -1739,15 +1766,15 @@ async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Rec
         COUNT(*) FILTER (WHERE pnl_pct > 0)                  AS wins,
         COUNT(*) FILTER (WHERE pnl_pct < 0)                  AS losses,
         COUNT(*) FILTER (WHERE pnl_pct = 0)                  AS be,
-        COALESCE(SUM(pnl_pct), 0)                            AS sum_pct,
-        COALESCE(AVG(pnl_pct) FILTER (WHERE pnl_pct > 0), 0) AS avg_win,
-        COALESCE(AVG(pnl_pct) FILTER (WHERE pnl_pct < 0), 0) AS avg_loss,
+        COALESCE(SUM(pnl_pct * COALESCE(leverage, 1)), 0)                            AS sum_pct,
+        COALESCE(AVG(pnl_pct * COALESCE(leverage, 1)) FILTER (WHERE pnl_pct > 0), 0) AS avg_win,
+        COALESCE(AVG(pnl_pct * COALESCE(leverage, 1)) FILTER (WHERE pnl_pct < 0), 0) AS avg_loss,
         COALESCE(AVG(r_multiple), 0)                         AS avg_r,
         COALESCE(SUM(r_multiple), 0)                         AS sum_r,
-        SUM(pnl_pct / 100 * alloc_amount) FILTER (WHERE alloc_amount IS NOT NULL)
+        SUM(pnl_pct * COALESCE(leverage, 1) / 100 * alloc_amount) FILTER (WHERE alloc_amount IS NOT NULL)
                                                               AS real_pnl_money
     FROM signals
-    WHERE workspace_id = $1 AND status IN {CLOSED} AND NOT excluded
+    WHERE workspace_id = $1 AND status IN {CLOSED} AND NOT excluded{_kind_where()}
       AND ($2::timestamptz IS NULL OR closed_at >= $2)
       AND ($3::timestamptz IS NULL OR closed_at <  $3)
     """
@@ -1760,9 +1787,9 @@ async def monthly_breakdown(workspace_id: int, limit: int = 12) -> list[asyncpg.
     SELECT date_trunc('month', closed_at AT TIME ZONE '{config.TZ}') AS month,
            COUNT(*) AS total,
            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
-           ROUND(COALESCE(SUM(pnl_pct),0), 2) AS sum_pct,
+           ROUND(COALESCE(SUM(pnl_pct * COALESCE(leverage, 1)),0), 2) AS sum_pct,
            ROUND(COALESCE(AVG(r_multiple),0), 2) AS avg_r
-    FROM signals WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
+    FROM signals WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded{_kind_where()}
     GROUP BY 1 ORDER BY 1 DESC LIMIT $2
     """
     async with pool().acquire() as c:
@@ -1777,8 +1804,8 @@ async def report_positions(workspace_id: int) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch(
             "SELECT id, symbol, side, entry, entry_first, exit_price, sl, tps, tp_hit, "
-            "status, created_at, opened_at, closed_at, pnl_pct, r_multiple, alloc_amount "
-            "FROM signals WHERE workspace_id=$1 AND NOT excluded "
+            "status, created_at, opened_at, closed_at, pnl_pct * COALESCE(leverage, 1) AS pnl_pct, r_multiple, alloc_amount, leverage "
+            f"FROM signals WHERE workspace_id=$1 AND NOT excluded{_kind_where()} "
             "AND status IN ('TP','SL','BREAKEVEN','ACTIVE','PENDING') "
             "ORDER BY COALESCE(opened_at, created_at), id", workspace_id)
 
@@ -1789,8 +1816,8 @@ async def equity_series(workspace_id: int, since=None, until=None) -> list[async
     kesib beradi — shu tufayli Kompaund ham tanlangan davrga mos keladi.
     alloc_amount ham qaytariladi — real (pul bilan tortilgan) kompaund uchun."""
     q = f"""
-    SELECT closed_at, pnl_pct, alloc_amount FROM signals
-    WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
+    SELECT closed_at, pnl_pct * COALESCE(leverage, 1) AS pnl_pct, alloc_amount FROM signals
+    WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded{_kind_where()}
       AND ($2::timestamptz IS NULL OR closed_at >= $2)
       AND ($3::timestamptz IS NULL OR closed_at <  $3)
     ORDER BY closed_at
@@ -1805,7 +1832,7 @@ async def top_symbols(workspace_id: int, since=None, until=None,
     since/until berilsa — faqat shu oraliqda YOPILGAN signallar (closed_at bo'yicha).
     Hali ochiq (PENDING/ACTIVE) signal hech qaysi oraliqqa tushmaydi — u yopilgan
     paytidagi oyga avtomatik o'tadi."""
-    where = f"workspace_id = $1 AND status IN {CLOSED} AND NOT excluded"
+    where = f"workspace_id = $1 AND status IN {CLOSED} AND NOT excluded{_kind_where()}"
     params = [workspace_id]
     if since is not None:
         params.append(since)
@@ -1820,7 +1847,7 @@ async def top_symbols(workspace_id: int, since=None, until=None,
     q = f"""
     SELECT symbol, COUNT(*) AS closed,
            COUNT(*) FILTER (WHERE pnl_pct > 0) AS wins,
-           ROUND(COALESCE(SUM(pnl_pct),0), 2) AS sum_pct
+           ROUND(COALESCE(SUM(pnl_pct * COALESCE(leverage, 1)),0), 2) AS sum_pct
     FROM signals WHERE {where}
     GROUP BY symbol ORDER BY sum_pct DESC {limit_sql}
     """
