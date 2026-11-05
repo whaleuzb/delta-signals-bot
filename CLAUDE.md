@@ -7193,3 +7193,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      o'z depoziti, futures leveraj bilan); `/month`, `/year` — futures qismi
      (`_fut_report`) faqat futures savdo bo'lsa. Mini App futures blokida
      "Likvidatsiya" plitkasi.
+229. **Likvidatsiya ulushi (%).** "💥 Likvidatsiya: N ta (X% savdolar)" —
+     X = likvidatsiyalar / shu davrdagi futures yopilgan savdolar.
+     `st.liqs` (stats.summary, digest) va Mini App plitkasi "N (X%)".

@@ -1042,7 +1042,8 @@ async def _group_numbers(ws, lang: str | None = None, kind: str = "spot") -> dic
             (i18n.t("w.tile_winrate", lang), f"{wr:.1f}%", ""),
             (net_label, f"{net:+.2f}%", _cls(net)),
             (i18n.t("w.tile_avg_r", lang), f"{avg_r:+.2f}", _cls(avg_r)),
-        ] + ([(i18n.t("w.tile_liqs", lang), f"{s['liqs']}", "neg")]      # 228
+        ] + ([(i18n.t("w.tile_liqs", lang),      # 228/229: soni va ulushi
+               f"{s['liqs']} ({s['liqs'] / total * 100:.0f}%)", "neg")]
              if kind == "fut" and s["liqs"] else []),
     }
 

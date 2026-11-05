@@ -5777,7 +5777,7 @@ async def _digest_part(ws, kind: str, since, lang) -> list[str] | None:
          i18n.t("dg.winrate", lang, wr=wins / len(pnls) * 100),
          i18n.t("dg.result", lang, icon=icon, label=label, p=total)]
     if s is not None and s["liqs"]:
-        t.append(i18n.t("st.liqs", lang, n=s["liqs"]))
+        t.append(i18n.t("st.liqs", lang, n=s["liqs"], pct=s["liqs"] / s["total"] * 100))
     if syms:
         best = syms[0]
         if float(best["sum_pct"]) > 0:
