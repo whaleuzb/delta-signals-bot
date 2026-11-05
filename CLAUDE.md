@@ -7184,3 +7184,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
        bo'lsa "⚡ Futures" plitkalari alohida (`_group_numbers(kind="fut")`).
        Savdolar ro'yxati (`closed_for_months`) — hammasi, futures nishon bilan.
      - Kunlik hisobot (digest) va /month, /year buyruqlari — spot.
+228. **Digest va oylik/yillik hisobotda futures; likvidatsiyalar.**
+     Foydalanuvchi: "digest va oylik hisobotga ham futures qo'sh.
+     liquidations qo'sh". `signals.liquidated` (tracker likvidatsiya
+     hodisasida `db.mark_liquidated`, qayta ochilganda tozalanadi);
+     `period_stats.liqs`. `stats.summary` — "💥 Likvidatsiya: N ta".
+     `build_digest` = spot + futures bo'limlari (`_digest_part`, har biri
+     o'z depoziti, futures leveraj bilan); `/month`, `/year` — futures qismi
+     (`_fut_report`) faqat futures savdo bo'lsa. Mini App futures blokida
+     "Likvidatsiya" plitkasi.

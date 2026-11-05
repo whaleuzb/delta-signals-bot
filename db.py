@@ -524,6 +524,8 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_tried BOOLEAN NOT NULL D
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS leverage SMALLINT;
 -- 226: futures depoziti — spot depozitidan ALOHIDA (foydalanuvchi so'rovi).
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS fut_deposit NUMERIC;
+-- 228: futures savdo likvidatsiya bilan yopilgan.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS liquidated BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -692,6 +694,11 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
     async with pool().acquire() as c:
         await c.execute(
             "UPDATE workspaces SET deposit=$2 WHERE id=$1", workspace_id, _d(amount))
+
+
+async def mark_liquidated(sig_id: int, value: bool = True) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET liquidated=$2 WHERE id=$1", sig_id, value)
 
 
 async def set_fut_deposit(workspace_id: int, amount: float | None) -> None:
@@ -1771,6 +1778,7 @@ async def period_stats(workspace_id: int, since=None, until=None) -> asyncpg.Rec
         COALESCE(AVG(pnl_pct * COALESCE(leverage, 1)) FILTER (WHERE pnl_pct < 0), 0) AS avg_loss,
         COALESCE(AVG(r_multiple), 0)                         AS avg_r,
         COALESCE(SUM(r_multiple), 0)                         AS sum_r,
+        COUNT(*) FILTER (WHERE liquidated)                   AS liqs,
         SUM(pnl_pct * COALESCE(leverage, 1) / 100 * alloc_amount) FILTER (WHERE alloc_amount IS NOT NULL)
                                                               AS real_pnl_money
     FROM signals

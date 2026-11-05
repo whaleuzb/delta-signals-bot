@@ -200,6 +200,8 @@ async def summary(workspace_id: int, since=None, until=None, title=None,
         t.append(i18n.t("st.signals", lang, n=total, w=s["wins"],
                         l=s["losses"], b=s["be"]))
         t.append(i18n.t("st.winrate", lang, wr=wr))
+        if s["liqs"]:
+            t.append(i18n.t("st.liqs", lang, n=s["liqs"]))   # 228
 
         if weighted:
             real_sum_pct = net_vs_start(sum(weighted))

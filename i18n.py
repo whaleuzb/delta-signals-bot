@@ -3218,6 +3218,9 @@ STRINGS: dict[str, dict[str, str]] = {
                "👀 Never pressed /start (seen in groups only): {nodm}\n"
                "<i>Telegram does not let a bot message someone who never pressed /start.</i>"),
     },
+    "w.tile_liqs": {"uz": "Likvidatsiya", "ru": "Ликвидации", "en": "Liquidations"},
+    "st.liqs": {"uz": "💥 Likvidatsiya: <b>{n}</b> ta", "ru": "💥 Ликвидаций: <b>{n}</b>",
+                "en": "💥 Liquidations: <b>{n}</b>"},
     "st.kind_spot": {"uz": "📊 <b>Spot</b>", "ru": "📊 <b>Спот</b>", "en": "📊 <b>Spot</b>"},
     "st.kind_fut": {"uz": "⚡ <b>Futures</b> (foizlar leveraj bilan)", "ru": "⚡ <b>Фьючерсы</b> (проценты с плечом)",
                     "en": "⚡ <b>Futures</b> (percentages with leverage)"},

@@ -415,6 +415,9 @@ async def process(sig) -> list[dict]:
         # Qator orada o'zgargan — hech narsa yozilmadi, hodisalar ham
         # yuborilmasin (keyingi siklda yangi holat bilan qaytadan).
         return []
+    # 228: likvidatsiya alohida belgilanadi (hisobotlarda "💥 Likvidatsiya").
+    if any(e.get("liq") for e in events):
+        await db.mark_liquidated(sig["id"])
 
     for e in events:
         e["signal_id"] = sig["id"]
@@ -599,6 +602,7 @@ async def reopen_signal(sig_id: int) -> dict | None:
         "last_checked_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
         "ambiguous": False,
     })
+    await db.mark_liquidated(sig_id, False)     # 228: qayta ochildi
     return {"type": "REOPEN", "signal_id": sig_id, "workspace_id": sig["workspace_id"],
             "symbol": sig["symbol"],
             "prev_pnl": float(prev_pnl) if prev_pnl is not None else None,

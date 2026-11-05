@@ -5722,52 +5722,22 @@ async def _finish_backfills(ctx) -> None:
 
 async def build_digest(ws) -> str | None:
     """Bugun YOPILGAN signallar bo'yicha qisqa yakun. Yopilgani bo'lmasa None —
-    guruhga bo'sh post ketmasin (bu spam bo'lib qolardi)."""
+    guruhga bo'sh post ketmasin (bu spam bo'lib qolardi).
+
+    228: spot va futures ALOHIDA bo'limlarda (futures — foiz leveraj bilan,
+    futures depozitiga nisbatan, likvidatsiyalar soni bilan)."""
     now = datetime.now(stats.TZ)
     since = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    rows = await db.equity_series(ws["id"], since, None)
-    if not rows:
-        return None
-
-    deposit = ws["deposit"]
-    pnls = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
-    if not pnls:
-        return None
-    wins = sum(1 for p in pnls if p > 0)
-    losses = sum(1 for p in pnls if p < 0)
-    be = len(pnls) - wins - losses
-
-    # /stats bilan AYNI hisob: depozit belgilangan bo'lsa har savdo o'z
-    # pozitsiya hajmiga qarab tortiladi, aks holda sof foizlar yig'indisi.
-    weighted = None
-    if deposit:
-        weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
-                    for r in rows
-                    if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
-    total = sum(weighted) if weighted else sum(pnls)
-    # Kun yakuni GURUHGA ketadi — til workspace'niki (ws_lang), odamning
-    # shaxsiy tili emas.
     lang = ws_lang(ws)
-    label = i18n.t("dg.label_dep" if weighted else "dg.label_sum", lang)
-
-    icon = "🟢" if total > 0 else ("🔴" if total < 0 else "⚪")
-    wr = wins / len(pnls) * 100
-    t = [i18n.t("dg.head", lang, d=f"{now:%d.%m.%Y}"), "",
-         i18n.t("dg.closed", lang, n=len(pnls), w=wins, l=losses,
-                be=(f" / {be}⚪" if be else "")),
-         i18n.t("dg.winrate", lang, wr=wr),
-         i18n.t("dg.result", lang, icon=icon, label=label, p=total)]
-
-    syms = await db.top_symbols(ws["id"], since, None)
-    if syms:
-        best = syms[0]
-        if float(best["sum_pct"]) > 0:
-            t.append(i18n.t("dg.best", lang, sym=html.escape(best["symbol"]),
-                            p=float(best["sum_pct"])))
-        worst = syms[-1]
-        if float(worst["sum_pct"]) < 0 and worst["symbol"] != best["symbol"]:
-            t.append(i18n.t("dg.worst", lang, sym=html.escape(worst["symbol"]),
-                            p=float(worst["sum_pct"])))
+    spot = await _digest_part(ws, "spot", since, lang)
+    fut = await _digest_part(ws, "fut", since, lang)
+    if spot is None and fut is None:
+        return None
+    t = [i18n.t("dg.head", lang, d=f"{now:%d.%m.%Y}")]
+    if spot:
+        t += [""] + ([i18n.t("st.kind_spot", lang)] if fut else []) + spot
+    if fut:
+        t += ["", i18n.t("st.kind_fut", lang)] + fut
 
     live = await db.live_signals(ws["id"])
     if live:
@@ -5777,6 +5747,47 @@ async def build_digest(ws) -> str | None:
                 ([i18n.t("dg.pending_n", lang, n=pend)] if pend else [])
         t += ["", "⏳ " + ", ".join(parts)]
     return "\n".join(t)
+
+
+async def _digest_part(ws, kind: str, since, lang) -> list[str] | None:
+    """Bitta tur (spot/futures) bo'yicha kun yakuni qatorlari; savdo bo'lmasa None."""
+    with db.stats_kind(kind):
+        rows = await db.equity_series(ws["id"], since, None)
+        syms = await db.top_symbols(ws["id"], since, None) if rows else []
+        s = await db.period_stats(ws["id"], since, None) if rows else None
+    pnls = [float(r["pnl_pct"]) for r in rows if r["pnl_pct"] is not None]
+    if not pnls:
+        return None
+    wins = sum(1 for p in pnls if p > 0)
+    losses = sum(1 for p in pnls if p < 0)
+    be = len(pnls) - wins - losses
+    deposit = kind_deposit(ws, kind)
+    # /stats bilan AYNI hisob: depozit belgilangan bo'lsa har savdo o'z
+    # pozitsiya hajmiga qarab tortiladi, aks holda sof foizlar yig'indisi.
+    weighted = None
+    if deposit:
+        weighted = [float(r["pnl_pct"]) * float(r["alloc_amount"]) / float(deposit)
+                    for r in rows
+                    if r["pnl_pct"] is not None and r["alloc_amount"] is not None]
+    total = sum(weighted) if weighted else sum(pnls)
+    label = i18n.t("dg.label_dep" if weighted else "dg.label_sum", lang)
+    icon = "🟢" if total > 0 else ("🔴" if total < 0 else "⚪")
+    t = [i18n.t("dg.closed", lang, n=len(pnls), w=wins, l=losses,
+                be=(f" / {be}⚪" if be else "")),
+         i18n.t("dg.winrate", lang, wr=wins / len(pnls) * 100),
+         i18n.t("dg.result", lang, icon=icon, label=label, p=total)]
+    if s is not None and s["liqs"]:
+        t.append(i18n.t("st.liqs", lang, n=s["liqs"]))
+    if syms:
+        best = syms[0]
+        if float(best["sum_pct"]) > 0:
+            t.append(i18n.t("dg.best", lang, sym=html.escape(best["symbol"]),
+                            p=float(best["sum_pct"])))
+        worst = syms[-1]
+        if float(worst["sum_pct"]) < 0 and worst["symbol"] != best["symbol"]:
+            t.append(i18n.t("dg.worst", lang, sym=html.escape(worst["symbol"]),
+                            p=float(worst["sum_pct"])))
+    return t
 
 
 async def digest_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6284,12 +6295,26 @@ async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     show_money = can_manage(uid, ws)
     a, b = stats.month_bounds(now.year, now.month)
-    cur = await stats.summary(ws["id"], a, b,
-                               f"{stats.months(lang)[now.month - 1]} {now.year}",
+    title = f"{stats.months(lang)[now.month - 1]} {now.year}"
+    cur = await stats.summary(ws["id"], a, b, title,
                                deposit=deposit, show_money=show_money, lang=lang)
-    await update.message.reply_text(
-        cur + "\n\n" + await stats.monthly_table(ws["id"], lang=lang),
-        parse_mode=ParseMode.HTML)
+    text = cur + "\n\n" + await stats.monthly_table(ws["id"], lang=lang)
+    fut = await _fut_report(ws, a, b, title, show_money, lang, with_table=True)
+    if fut:
+        text = i18n.t("st.kind_spot", lang) + "\n" + text + "\n\n" + fut
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+
+async def _fut_report(ws, a, b, title, show_money, lang, with_table=False) -> str | None:
+    """228: oylik/yillik hisobotning futures qismi (savdo bo'lmasa None)."""
+    with db.stats_kind("fut"):
+        if (await db.period_stats(ws["id"], a, b))["total"] == 0:
+            return None
+        txt = await stats.summary(ws["id"], a, b, title, deposit=kind_deposit(ws, "fut"),
+                                  show_money=show_money, lang=lang)
+        if with_table:
+            txt += "\n\n" + await stats.monthly_table(ws["id"], lang=lang)
+    return i18n.t("st.kind_fut", lang) + "\n" + txt
 
 
 async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6306,10 +6331,13 @@ async def cmd_year(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
     show_money = can_manage(uid, ws)
     a, b = stats.year_bounds(y)
-    await update.message.reply_text(
-        await stats.summary(ws["id"], a, b, i18n.t("st.title_year", lang, y=y),
-                             deposit=deposit, show_money=show_money, lang=lang),
-        parse_mode=ParseMode.HTML)
+    title = i18n.t("st.title_year", lang, y=y)
+    text = await stats.summary(ws["id"], a, b, title,
+                               deposit=deposit, show_money=show_money, lang=lang)
+    fut = await _fut_report(ws, a, b, title, show_money, lang)
+    if fut:
+        text = i18n.t("st.kind_spot", lang) + "\n" + text + "\n\n" + fut
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 async def cmd_symbols(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
