@@ -222,8 +222,10 @@ tbody tr:hover{background:#ffffff06}
 .pane{display:none}
 #tab-g:checked~.tabbar label[for=tab-g],
 #tab-c:checked~.tabbar label[for=tab-c],
-#tab-t:checked~.tabbar label[for=tab-t]{background:rgba(218,221,226,.14);color:var(--txt)}
-#tab-g:checked~.pane-g,#tab-c:checked~.pane-c,#tab-t:checked~.pane-t{display:block}
+#tab-t:checked~.tabbar label[for=tab-t],
+#tab-f:checked~.tabbar label[for=tab-f]{background:rgba(218,221,226,.14);color:var(--txt)}
+#tab-g:checked~.pane-g,#tab-c:checked~.pane-c,#tab-t:checked~.pane-t,
+#tab-f:checked~.pane-f{display:block}
 /* Turnir (185) */
 .tmeta{color:var(--mut);font-size:14px;margin-top:6px}
 .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--long);
@@ -348,6 +350,7 @@ tbody tr:hover{background:#ffffff06}
 .dfnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dfpc{font-weight:600}
 .dfout{opacity:.45}
+.b-lev{background:rgba(255,196,0,.14);color:#ffc400}
 .pane-t>.dftour{margin-top:0}
 .dfmore{display:block;margin-top:12px;font-size:14px;font-weight:600}
 .dfempty{margin-top:14px;font-size:13px;color:var(--mut)}
@@ -671,7 +674,7 @@ def join_cta(bot: str | None, lang: str | None = None) -> str:
 def net_result(r) -> float:
     """Guruh natijasi — guruh sahifasidagi AYNI usul: pozitsiya hajmi
     belgilangan bo'lsa depozitga tortilgan, aks holda sof foizlar yig'indisi."""
-    if r["deposit"] and r["n_alloc"]:
+    if r.get("deposit") and r.get("n_alloc"):
         return stats.net_vs_start(float(r["sum_weighted"]))
     return float(r["sum_pct"])
 
@@ -927,6 +930,12 @@ async def index(request):
     # qaysi biriga qanday qo'shilishini tushunmasdi.
     groups = [r for r in rows if not r["is_channel"]]
     channels = [r for r in rows if r["is_channel"]]
+    # 225: Futures — alohida reyting (natija leveraj bilan).
+    try:
+        futs = list(await db.public_futures_workspaces())
+    except Exception:
+        log.exception("Bosh sahifa: futures reytingi o'qilmadi")
+        futs = []
 
     # Turnir tabi (185) — turnir o'tkazilgan bo'lsagina chiqadi: joriy
     # (yoki oxirgi) turnirning TOP-10 i va to'liq sahifaga havola.
@@ -960,14 +969,17 @@ async def index(request):
         "<input type='radio' name='wstab' id='tab-t' checked>"
         "<input type='radio' name='wstab' id='tab-g'>"
         "<input type='radio' name='wstab' id='tab-c'>"
+        "<input type='radio' name='wstab' id='tab-f'>"
         "<div class='tabbar'>"
         f"<label for='tab-t'>{e(i18n.t('w.tab_tourney_short', lang))}</label>"
         f"<label for='tab-g'>{e(i18n.t('w.tab_groups', lang))}</label>"
         f"<label for='tab-c'>{e(i18n.t('w.tab_channels', lang))}</label>"
+        f"<label for='tab-f'>⚡ Futures</label>"
         "</div>"
         f"{t_pane}"
         f"<div class='pane pane-g'>{pane(groups, 'w.groups_empty')}</div>"
         f"<div class='pane pane-c'>{pane(channels, 'w.channels_empty')}</div>"
+        f"<div class='pane pane-f'>{pane(futs, 'w.fut_empty')}</div>"
         "</div>")
 
     # "Botni ochish" faqat sahifa OXIRIDA (join_cta ichida). Avval u tepada
@@ -1090,7 +1102,8 @@ async def open_cards(ws, lang: str | None, reveal: bool) -> str:
             price = None
         # Narx olinmasa ham pozitsiya ro'yxatdan TUSHIB QOLMAYDI (#489):
         # foiz o'rnida "—" chiqadi, savdo esa ko'rinib turadi.
-        p = (tracker.pnl_at(r["side"], float(r["entry"]), price)
+        L = r["leverage"] or 1          # 225: futures — leveraj bilan
+        p = (tracker.pnl_at(r["side"], float(r["entry"]), price) * L
              if price is not None else 0.0)
         pnl_txt = f"{p:+.2f}%" if price is not None else "—"
         since = (f"{r['opened_at'].astimezone(stats.TZ):%d.%m}"
@@ -1100,7 +1113,8 @@ async def open_cards(ws, lang: str | None, reveal: bool) -> str:
         if reveal:
             side_cls = "b-long" if r["side"] == "LONG" else "b-short"
             name = (f"{e(r['symbol'])} "
-                    f"<span class='badge {side_cls}'>{e(r['side'])}</span>")
+                    f"<span class='badge {side_cls}'>{e(r['side'])}</span>"
+                    + (f" <span class='badge b-lev'>{L}x</span>" if L > 1 else ""))
             sub = f"{fmt_price(r['entry'])} · {e(i18n.t('w.since', lang, d=since))}"
         else:
             name = e(i18n.t("w.position_n", lang, i=i))
@@ -1313,7 +1327,8 @@ async def group_page(request):
         # eng yaxshi natijalari bilan tanishtirilsin.
         out = ""
         for r in sorted(rows, key=lambda x: float(x["pnl_pct"] or 0), reverse=True)[:PER_MONTH]:
-            p = float(r["pnl_pct"]) if r["pnl_pct"] is not None else 0.0
+            L = r["leverage"] or 1      # 225: futures — leveraj bilan
+            p = float(r["pnl_pct"]) * L if r["pnl_pct"] is not None else 0.0
             side_cls = "b-long" if r["side"] == "LONG" else "b-short"
             # Sana qisqa: telefonda "0.02038 → 0.02145 · 23.08" bir qatorga
             # sig'sin. Yil ortiqcha — savdolar tabда allaqachon oy bo'yicha
@@ -1325,7 +1340,8 @@ async def group_page(request):
                 f"trade {_cls(p)}-edge",
                 post_url(ws, r["result_msg_id"] or r["group_msg_id"]),
                 f"<div class='tmeta'><div class='tsym'>{e(r['symbol'])} "
-                f"<span class='badge {side_cls}'>{e(r['side'])}</span></div>"
+                f"<span class='badge {side_cls}'>{e(r['side'])}</span>"
+                + (f" <span class='badge b-lev'>{L}x</span>" if L > 1 else "") + "</div>"
                 f"<div class='tsub'>{fmt_price(r['entry'])} → {exit_txt}"
                 f" · {e(when)}</div></div>"
                 f"<img class='tmini' src='/s/{r['id']}/mini.png?v={MINI_V}' loading='lazy' "

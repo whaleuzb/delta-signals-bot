@@ -46,6 +46,8 @@ _NOT_SYMBOL = {
     "stoploss", "target", "take", "profit", "kirish", "chiqish", "maqsad",
     "signal", "spot", "market", "bozor", "limit", "oddiy", "narx", "price",
     "zarar", "yangi", "bugun", "hozir", "va", "ва",
+    "futures", "future", "fyuchers", "perp", "lev", "leverage", "leveraj",
+    "isolated", "cross", "izolyatsiya",
 }
 
 # Juftlik: 2-12 harf, ixtiyoriy ajratgich + kotirovka (USDT/USD/PERP),
@@ -82,6 +84,11 @@ def parse(text: str) -> dict | None:
     if not text:
         return None
     t = text.replace("\u00a0", " ")
+    # 225: leveraj ("10x", "x10", "lev 10") AVVAL ajratib olinadi va matndan
+    # o'chiriladi — aks holda "10" raqamlar ro'yxatiga (entry/TP) tushardi.
+    leverage = parse_leverage(t)
+    if leverage:
+        t = _LEV_STRIP.sub(" ", t)
     low = t.lower()
 
     # --- tomon ---
@@ -138,7 +145,8 @@ def parse(text: str) -> dict | None:
 
     tps = sorted(set(tps), reverse=(side == "SHORT"))
     return {"symbol": symbol, "symbols": cands, "side": side, "entry": entry,
-            "sl": sl, "tps": tps, "entry_mode": entry_mode}
+            "sl": sl, "tps": tps, "entry_mode": entry_mode,
+            "leverage": leverage}
 
 
 def parse_tp_sl(text: str) -> dict | None:
@@ -179,6 +187,35 @@ def parse_tp_sl(text: str) -> dict | None:
     return {"sl": sl, "tps": tps}
 
 
+MAX_LEVERAGE = 125
+
+
+def liq_price(side: str, entry: float, lev: int | None) -> float | None:
+    """225: futures likvidatsiya narxi (izolyatsiyalangan marja, ta'minot
+    marjasi hisobga olinmagan — soddalashtirilgan): LONG entry*(1-1/x),
+    SHORT entry*(1+1/x). Spot (leverage yo'q / 1) — None."""
+    if not lev or lev <= 1:
+        return None
+    return entry * (1 - 1 / lev) if side == "LONG" else entry * (1 + 1 / lev)
+
+
+_LEV_STRIP = re.compile(
+    r"(?<![\w.])\d{1,3}\s?[xхXХ](?![\w])|(?<![\w.])[xхXХ]\s?\d{1,3}(?![\w.])"
+    r"|\b(?:lev(?:erage)?|leveraj|плечо)\s*[:=]?\s*\d{1,3}\b", re.I)
+
+
+def parse_leverage(text: str) -> int | None:
+    """"10x", "x10", "20X", "lev 10", "leverage 10", "плечо 10" -> 10."""
+    low = (text or "").lower()
+    m = (re.search(r"(?<![\w.])(\d{1,3})\s?[xх](?![\w])", low)
+         or re.search(r"(?<![\w.])[xх]\s?(\d{1,3})(?![\w.])", low)
+         or re.search(r"\b(?:lev(?:erage)?|leveraj|плечо)\s*[:=]?\s*(\d{1,3})\b", low))
+    if not m:
+        return None
+    n = int(m.group(1))
+    return n if 2 <= n <= MAX_LEVERAGE else None
+
+
 def validate(d: dict, lang: str | None = None) -> str | None:
     """Mantiqiy xatolarni tutadi. Xato bo'lsa (foydalanuvchi tilidagi)
     matn qaytaradi."""
@@ -195,6 +232,12 @@ def validate(d: dict, lang: str | None = None) -> str | None:
             return i18n.t("err.sl_short", lang, sl=sl, e=e)
         if any(t >= e for t in tps):
             return i18n.t("err.tp_short", lang, e=e)
+    # 225: futures — stop likvidatsiyadan OLDIN turishi shart, aks holda
+    # pozitsiya stopga yetmasdan likvidatsiya bo'ladi.
+    liq = liq_price(d["side"], e, d.get("leverage"))
+    if liq is not None and ((d["side"] == "LONG" and sl <= liq)
+                            or (d["side"] == "SHORT" and sl >= liq)):
+        return i18n.t("err.sl_liq", lang, liq=f"{liq:.8g}", lev=d["leverage"])
     # Risk CHEGARASI ATAYLAB YO'Q. Avval "25% dan katta" risk rad etilardi
     # (verguldan adashishga qarshi himoya sifatida), lekin foydalanuvchi
     # to'g'ri e'tiroz bildirdi: "har bir odamni riski o'ziga bog'liq".

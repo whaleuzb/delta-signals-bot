@@ -663,6 +663,37 @@ def fmt_price(x: float) -> str:
     return f"{x:.8f}".rstrip("0").rstrip(".")
 
 
+def lev(x) -> int:
+    """225: signal/qoralamaning leveraji (spot — 1). `pnl_pct` bazada doim 1x;
+    ko'rsatish va pul hisobida `pnl * lev(sig)`."""
+    try:
+        v = x.get("leverage")
+    except Exception:
+        v = None
+    return int(v) if v and int(v) > 1 else 1
+
+
+def wsx(ws, x):
+    """226: futures signal (leveraj > 1) uchun workspace'ning FUTURES
+    depoziti bilan ko'rinishi — hajm, bo'sh/band pul shu bilan hisoblanadi.
+    Spot signalda ws o'zgarishsiz qaytadi."""
+    if ws is None or lev(x) <= 1:
+        return ws
+    d = dict(ws)
+    d["deposit"] = ws["fut_deposit"]
+    d["_fut"] = True
+    return d
+
+
+def is_fut(x) -> bool:
+    return lev(x) > 1
+
+
+def lev_tag(x) -> str:
+    n = lev(x)
+    return f"⚡ {n}x " if n > 1 else ""
+
+
 def draft_text(d: dict, sig_id: int | None = None, lang: str | None = None) -> str:
     """Signal kartasi. `lang` — GURUH tili (`ws_lang`), chunki bu matn
     guruhga ketadi; ko'rikda ham ayni shu matn ko'rsatiladi ("tasdiqlasangiz
@@ -670,7 +701,10 @@ def draft_text(d: dict, sig_id: int | None = None, lang: str | None = None) -> s
     e, sl, tps = d["entry"], d.get("sl"), d.get("tps") or []
     arrow = i18n.t("side.long" if d["side"] == "LONG" else "side.short", lang)
     tag = {"forex": "💱 ", "stock": "📈 "}.get(d.get("market"), "")
+    L = lev(d)
     head = f"{tag}📊 <b>#{d['symbol']}</b>  {arrow}"
+    if L > 1:
+        head += f"  <b>⚡ Futures {L}x</b>"
     if sig_id:
         head += f"  <code>#{sig_id}</code>"
     entry_note = i18n.t("sig.entry_now", lang) if d.get("entry_mode") == "market" else ""
@@ -681,18 +715,23 @@ def draft_text(d: dict, sig_id: int | None = None, lang: str | None = None) -> s
         # "boshida faqat limitni kiritamiz, TP/SL limit aktivlashgandan
         # keyin so'ralsin"). R:R hali hisoblab bo'lmaydi.
         lines.append(i18n.t("sig.tpsl_later", lang))
+        liq = parsing.liq_price(d["side"], e, L)
+        if liq is not None:
+            lines.append(f"💥 {i18n.t('sig.liq', lang)}: <b>{fmt_price(liq)}</b>")
         return "\n".join(lines)
     risk = abs(e - sl) / e * 100
     reward = abs(tps[-1] - e) / e * 100
     rr = reward / risk if risk else 0
     for i, t in enumerate(tps, 1):
-        pct = abs(t - e) / e * 100
+        pct = abs(t - e) / e * 100 * L
         lines.append(f"🎯 TP{i}: <b>{fmt_price(t)}</b>  <i>(+{pct:.2f}%)</i>")
     lines += [
-        f"🛑 {i18n.t('sig.stop', lang)}: <b>{fmt_price(sl)}</b>  <i>(-{risk:.2f}%)</i>",
-        "",
-        f"{i18n.t('sig.rr', lang)}: <b>1:{rr:.2f}</b>",
+        f"🛑 {i18n.t('sig.stop', lang)}: <b>{fmt_price(sl)}</b>  <i>(-{risk * L:.2f}%)</i>",
     ]
+    liq = parsing.liq_price(d["side"], e, L)
+    if liq is not None:
+        lines.append(f"💥 {i18n.t('sig.liq', lang)}: <b>{fmt_price(liq)}</b>")
+    lines += ["", f"{i18n.t('sig.rr', lang)}: <b>1:{rr:.2f}</b>"]
     return "\n".join(lines)
 
 
@@ -901,7 +940,7 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
     return card.pnl_card(
         symbol=sig["symbol"], side=sig["side"],
         entry=float(sig["entry"]), exit_price=float(sig["exit_price"]),
-        pnl_pct=float(sig["pnl_pct"]),
+        pnl_pct=float(sig["pnl_pct"]) * lev(sig), leverage=lev(sig),
         r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
         closed_at=sig["closed_at"].astimezone(stats.TZ),
         username=username, ws_name=ws["name"], logo=logo,
@@ -1483,8 +1522,8 @@ async def open_signals_view(ws, uid: int, lang: str | None = None,
         cur = ""
         p = None
         if price:
-            p = tracker.pnl_at(s["side"], float(s["entry"]), price)
-            cur = f"  ({p:+.2f}%)"
+            p = tracker.pnl_at(s["side"], float(s["entry"]), price) * lev(s)
+            cur = f"  ({lev_tag(s)}{p:+.2f}%)"
         if s["status"] != "ACTIVE":
             mark = "🕐"  # hali entry/limitga tegmagan (kutilmoqda)
         elif p is None:
@@ -1616,7 +1655,7 @@ async def manage_view(sig, lang: str | None = None,
     if alloc is not None:
         lines.append(i18n.t("man.invested", lang, amt=alloc))
     if filled > 0:
-        lines.append(i18n.t("man.closed_share", lang, pct=filled * 100, run=realized))
+        lines.append(i18n.t("man.closed_share", lang, pct=filled * 100, run=realized * lev(sig)))
     if price:
         # `live` — TO'LIQ pozitsiyaga nisbatan joriy foiz (yopilgan +
         # ochiq ulush birgalikda) — pastdagi `man.live(_money)` bilan
@@ -1624,8 +1663,8 @@ async def manage_view(sig, lang: str | None = None,
         # qo'shiladi: `live% * hajm`. Bu — signal RASMAN yopilganda
         # sanaladigan pul bilan bir xil formula (bot.py:1609,
         # `pnl/100*alloc_amount`), faqat hali yopilmagan holat uchun.
-        live = realized + max(0.0, 1.0 - filled) * tracker.pnl_at(
-            sig["side"], entry, price)
+        live = (realized + max(0.0, 1.0 - filled) * tracker.pnl_at(
+            sig["side"], entry, price)) * lev(sig)
         if alloc is not None:
             lines.append(i18n.t("man.live_money", lang, p=fmt_price(price),
                                 live=live, m=live / 100 * alloc))
@@ -1705,6 +1744,7 @@ async def _add_size_kb(sig, ws, action: str, levels: int, lang) -> tuple[str, li
     u0 = tracker.first_units(sig)
     usd = sig["alloc_amount"] is not None
     free = None
+    ws = wsx(ws, sig)
     if usd and ws["deposit"] is not None:
         _, _, free = await free_deposit(ws)
     btns = []
@@ -1761,7 +1801,7 @@ async def on_add_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     note, rows = await _add_size_kb(sig, ws, "maddgo", 1, lang)
     await q.edit_message_text(
         i18n.t("man.add_head", lang, sid=sig["id"], sym=sig["symbol"], p=fmt_price(price),
-               avg=fmt_price(entry), pnl=tracker.pnl_at(sig["side"], entry, price))
+               avg=fmt_price(entry), pnl=tracker.pnl_at(sig["side"], entry, price) * lev(sig))
         + "\n\n" + note,
         parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
 
@@ -1781,6 +1821,7 @@ async def _do_market_add(message, ctx, uid: int, sig_id: int, units: float) -> N
     if units <= 0:
         await message.reply_text(i18n.t("man.bad_number", lang))
         return
+    ws = wsx(ws, sig)
     if usd and ws["deposit"] is not None:
         _, _, free = await free_deposit(ws)
         if units > free + 1e-9:
@@ -1858,6 +1899,7 @@ async def _do_place_limits(message, ctx, uid: int, sig_id: int, units: float) ->
     if units <= 0:
         await message.reply_text(i18n.t("man.bad_number", lang))
         return
+    ws = wsx(ws, sig)
     if usd and ws["deposit"] is not None:
         _, _, free = await free_deposit(ws)
         if units * len(prices) > free + 1e-9:
@@ -2132,7 +2174,7 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
         # haqiqatdan uzoqlashib ketardi.
         if sig["alloc_amount"] is not None and ev["pnl"] is not None:
             await db.apply_deposit_delta(
-                ws["id"], ev["pnl"] / 100 * float(sig["alloc_amount"]))
+                ws["id"], ev["pnl"] * lev(sig) / 100 * float(sig["alloc_amount"]), is_fut(sig))
         icon = "✅" if (ev["pnl"] or 0) >= 0 else "❌"
         rtxt = f" ({ev['r']:+.2f}R)" if ev["r"] is not None else ""
         # Qisman yopish OXIRGI qismni ham yopdi — bu ham TO'LIQ yopilish,
@@ -2145,18 +2187,18 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
                 ctx, ws, sig2,
                 tw("ev.partial_rest", ws, icon=icon, sid=sig["id"],
                    sym=sig["symbol"], p=fmt_price(ev["price"]),
-                   pnl=ev["pnl"], rtxt=rtxt),
+                   pnl=ev["pnl"] * lev(sig), rtxt=rtxt),
                 ref_uid=q.from_user.id)
         plang = await user_lang(q.from_user.id)
         await q.edit_message_text(
             i18n.t("man.closed_full", plang, icon=icon, sid=sig["id"],
-                   sym=sig["symbol"], pnl=ev["pnl"], rtxt=rtxt),
+                   sym=sig["symbol"], pnl=ev["pnl"] * lev(sig), rtxt=rtxt),
             parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(plang))
         return
 
     await notify_group(ctx, ws, sig, tw(
         "ev.partial", ws, sid=sig["id"], sym=sig["symbol"], pct=pct,
-        p=fmt_price(ev["price"]), run=ev["running"], rest=(1 - ev["filled"]) * 100))
+        p=fmt_price(ev["price"]), run=ev["running"] * lev(sig), rest=(1 - ev["filled"]) * 100))
     await _show_manage(q, sig["id"])
 
 
@@ -2177,6 +2219,13 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         if price is None or price <= 0:
             AWAITING_SL[uid] = sig_id
             await msg.reply_text(i18n.t("man.bad_number", lang))
+            return True
+        # 225: futures — yangi stop likvidatsiyadan narida bo'lmasin.
+        liq = parsing.liq_price(sig["side"], float(sig["entry"]), sig["leverage"])
+        if liq is not None and ((sig["side"] == "LONG" and price <= liq)
+                                or (sig["side"] == "SHORT" and price >= liq)):
+            AWAITING_SL[uid] = sig_id
+            await msg.reply_text(i18n.t("err.sl_liq", lang, liq=fmt_price(liq), lev=sig["leverage"]))
             return True
         # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
         # tashqarisi rad etilardi). Foydalanuvchi: "har bir odamni riski
@@ -2272,6 +2321,7 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             err = parsing.validate({
                 "entry": price, "sl": float(sig["sl"]),
                 "tps": [float(t) for t in sig["tps"]], "side": sig["side"],
+                "leverage": sig["leverage"],
             }, lang)
             if err:
                 AWAITING_ENTRY[uid] = sig_id
@@ -2324,7 +2374,7 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
     side = sig["side"]
     tps = sorted(set(parsed["tps"]), reverse=(side == "SHORT"))
     err = parsing.validate({"entry": entry, "sl": parsed["sl"], "tps": tps,
-                            "side": side}, lang)
+                            "side": side, "leverage": sig["leverage"]}, lang)
     if err:
         AWAITING_TPSL[uid] = sig_id
         await msg.reply_text(i18n.t("tpsl.retry", lang, err=err))
@@ -2396,7 +2446,7 @@ async def on_close_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             filled = float(sig["filled_pct"])
             realized = float(sig["realized_pct"])
             rest = max(0.0, 1.0 - filled)
-            est = realized + rest * tracker.pnl_at(sig["side"], entry, price)
+            est = (realized + rest * tracker.pnl_at(sig["side"], entry, price)) * lev(sig)
             est_txt = f" (~{est:+.2f}%)"
         text = i18n.t("close.ask_active", lang, sid=sig_id, sym=sig["symbol"],
                       est=est_txt)
@@ -2433,12 +2483,12 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             reply_markup=menu_back_kb(lang))
         return
 
-    pnl, r = ev["pnl"], ev["r"]
+    pnl, r = ev["pnl"] * lev(sig), ev["r"]
 
     # poll_job() avtomatik yopilganda depozitni yangilaydi — qo'lda yopish ham
     # xuddi shunday qilishi SHART, aks holda depozit jimgina haqiqatdan uzoqlashadi.
     if sig["alloc_amount"] is not None:
-        await db.apply_deposit_delta(ws["id"], pnl / 100 * float(sig["alloc_amount"]))
+        await db.apply_deposit_delta(ws["id"], pnl / 100 * float(sig["alloc_amount"]), is_fut(sig))
 
     icon = "✅" if pnl >= 0 else "❌"
     rtxt = f" ({r:+.2f}R)" if r is not None else ""
@@ -2706,7 +2756,8 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await _edit_or_reply(
             q, i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt,
-                      extra=await deposit_extra(ws, lang)), back_kb(lang))
+                      extra=await deposit_extra(ws, lang))
+            + "\n\n" + await fut_deposit_block(ws, lang), back_kb(lang))
     elif action == "equity":
         deposit = float(ws["deposit"]) if ws["deposit"] is not None else None
         buf = await stats.equity_chart(ws["id"], deposit, lang=lang)
@@ -2980,7 +3031,8 @@ async def on_channel_connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
 # Rasm bosqichi ATAYLAB yo'q: rasm tanlovi (yuklash / bot grafigi / rasmsiz)
 # barcha darajalar kiritilgandan KEYIN, show_preview() da so'raladi — shunda
 # foydalanuvchi avval signalni ko'radi, keyin rasmni tanlaydi.
-WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL = range(6)
+WIZ_SYMBOL, WIZ_MODE, WIZ_SIDE, WIZ_ENTRY, WIZ_TP, WIZ_SL, WIZ_KIND, WIZ_LEV = range(8)
+LEV_CHOICES = (5, 10, 20, 25, 30, 40, 50, 90, 100)
 
 
 # Klaviaturalar endi FUNKSIYA: matni tilga bog'liq, shuning uchun ular
@@ -3063,8 +3115,81 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["symbol"] = sym
     wiz["market"] = market
+    # 225: kripto juftlikda — Spot yoki Futures (leveraj bilan).
+    if market == "crypto":
+        await msg.reply_text(i18n.t("wiz.step_kind", lang, sym=sym),
+                             parse_mode=ParseMode.HTML, reply_markup=wiz_kind_kb(lang))
+        return WIZ_KIND
     await msg.reply_text(i18n.t("wiz.step_mode", lang, sym=sym),
                          parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
+    return WIZ_MODE
+
+
+def wiz_kind_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(i18n.t("wiz.kind_spot", lang), callback_data="wiz_kind:spot"),
+         InlineKeyboardButton(i18n.t("wiz.kind_fut", lang), callback_data="wiz_kind:fut")],
+        [InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang), callback_data="wiz_cancel")],
+    ])
+
+
+def wiz_lev_kb(lang: str) -> InlineKeyboardMarkup:
+    row = [InlineKeyboardButton(f"{n}x", callback_data=f"wiz_lev:{n}") for n in LEV_CHOICES]
+    return InlineKeyboardMarkup([row[0:3], row[3:6], row[6:9],
+                                 [InlineKeyboardButton(i18n.t("wiz.lev_manual", lang),
+                                                       callback_data="wiz_lev:manual")],
+                                 [InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang),
+                                                       callback_data="wiz_cancel")]])
+
+
+async def wizard_kind(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    q = update.callback_query
+    await q.answer()
+    lang = await user_lang(q.from_user.id)
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    if q.data.endswith(":fut"):
+        await q.edit_message_text(i18n.t("wiz.step_lev", lang), parse_mode=ParseMode.HTML,
+                                  reply_markup=wiz_lev_kb(lang))
+        return WIZ_LEV
+    wiz["leverage"] = None
+    await q.edit_message_text(i18n.t("wiz.kind_picked", lang, label=i18n.t("wiz.kind_spot", lang)))
+    await q.message.reply_text(i18n.t("wiz.step_mode", lang, sym=wiz["symbol"]),
+                               parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
+    return WIZ_MODE
+
+
+async def wizard_lev(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    """Leveraj: tugma (x3…x100) yoki istalgan butun son 2–125."""
+    q = update.callback_query
+    if q:
+        await q.answer()
+        lang = await user_lang(q.from_user.id)
+        raw = q.data.split(":", 1)[1]
+    else:
+        lang = await user_lang(update.effective_user.id)
+        raw = (update.effective_message.text or "").strip().lower().lstrip("x").rstrip("x")
+    wiz = await _wiz_or_end(update, ctx)
+    if wiz is None:
+        return ConversationHandler.END
+    if raw == "manual":
+        await q.edit_message_text(i18n.t("wiz.lev_type", lang, max=parsing.MAX_LEVERAGE),
+                                  parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
+        return WIZ_LEV
+    if not raw.isdigit() or not 2 <= int(raw) <= parsing.MAX_LEVERAGE:
+        await update.effective_message.reply_text(
+            i18n.t("wiz.bad_lev", lang, max=parsing.MAX_LEVERAGE), reply_markup=wiz_lev_kb(lang))
+        return WIZ_LEV
+    wiz["leverage"] = int(raw)
+    label = f"{i18n.t('wiz.kind_fut', lang)} {wiz['leverage']}x"
+    if q:
+        await q.edit_message_text(i18n.t("wiz.kind_picked", lang, label=label))
+        target = q.message
+    else:
+        target = update.effective_message
+    await target.reply_text(i18n.t("wiz.step_mode", lang, sym=wiz["symbol"]),
+                            parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
     return WIZ_MODE
 
 
@@ -3150,7 +3275,7 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         wiz2 = ctx.user_data.pop("wiz")
         draft = {"symbol": wiz2["symbol"], "side": wiz2["side"], "entry": wiz2["entry"],
                  "sl": None, "tps": [], "market": wiz2.get("market", "crypto"),
-                 "entry_mode": "limit"}
+                 "entry_mode": "limit", "leverage": wiz2.get("leverage")}
         await show_preview(msg, ctx, draft, wiz2.get("file_id"), "wizard", wiz2["workspace_id"])
         return ConversationHandler.END
 
@@ -3188,7 +3313,7 @@ async def wizard_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz = ctx.user_data.pop("wiz")
     draft = {"symbol": wiz["symbol"], "side": wiz["side"], "entry": wiz["entry"],
              "sl": sl, "tps": wiz["tps"], "market": wiz.get("market", "crypto"),
-             "entry_mode": wiz.get("entry_mode", "limit")}
+             "entry_mode": wiz.get("entry_mode", "limit"), "leverage": wiz.get("leverage")}
     await show_preview(msg, ctx, draft, wiz.get("file_id"), "wizard", wiz["workspace_id"])
     return ConversationHandler.END
 
@@ -3336,7 +3461,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             await msg.reply_text(i18n.t("al.bad_amount", await user_lang(uid)))
             return
         sig = await db.get_signal(alloc_sig_id)
-        ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+        ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
         # Huquq bu yerda HAM tekshiriladi: so'rov yuborilganidan keyin odam
         # adminlikdan olingan bo'lishi mumkin, tugmalar esa allaqachon
         # `can_manage` bilan himoyalangan — matn yo'li ulardan qolishmasin.
@@ -3521,6 +3646,9 @@ async def show_preview(msg, ctx, draft: dict, file_id, source: str, workspace_id
     draft["symbol"] = sym
     draft["market"] = market
     draft.setdefault("entry_mode", "limit")
+    # 225: leveraj faqat kripto juftlikda (forex/aksiya — spot hisob).
+    if market != "crypto":
+        draft["leverage"] = None
 
     # TP/SL hali kiritilmagan (limit-keyin-so'ralsin oqimi) — `validate()`
     # ularni MAJBURIY deb kutadi (solishtiruv None bilan xato beradi),
@@ -3908,7 +4036,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "sl": d["sl"], "tps": d["tps"], "chart_file_id": post_file_id,
         "author_id": q.from_user.id, "note": d.get("reasoning"),
         "market": d.get("market", "crypto"), "entry_mode": entry_mode,
-        "chart_tf": item.get("chart_tf"),
+        "chart_tf": item.get("chart_tf"), "leverage": d.get("leverage"),
     })
     PENDING.pop(token, None)
     await _clear_kb(q)
@@ -3969,6 +4097,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # Turnir (185): shaxsiy jurnalda faol turnir qatnashchisi — avval turnir
     # summasi so'raladi, shaxsiy depozit hajmi esa undan KEYIN (ikkita
     # matnli so'rov bir vaqtda turmasin — raqam qaysi biriga ekani noaniq).
+    ws = wsx(ws, d)     # 226: futures — futures depozitidan hajm
     if ws["type"] == "personal":
         sig_row = await db.get_signal(sig_id)
         if sig_row and await tournament.register_signal(sig_row):
@@ -4025,11 +4154,12 @@ async def _after_tourney_amount(message, uid: int) -> None:
     if not sid:
         return
     sig = await db.get_signal(sid)
-    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
     if not (sig and ws and ws["deposit"] is not None and sig["status"] in ("PENDING", "ACTIVE")):
         return
     d = {"symbol": sig["symbol"], "entry": float(sig["entry"]),
-         "sl": float(sig["sl"]) if sig["sl"] is not None else None}
+         "sl": float(sig["sl"]) if sig["sl"] is not None else None,
+         "leverage": sig["leverage"]}
     await ask_personal_alloc(message, ws, sid, d, uid)
 
 
@@ -5079,7 +5209,9 @@ def alloc_prompt(sig_id: int, d: dict, deposit: float, free: float,
     "summani o'zingiz yozing" varianti ko'rsatiladi."""
     entry = float(d["entry"])
     sl = float(d["sl"]) if d.get("sl") is not None else None
-    dist = abs(entry - sl) / entry * 100 if (sl is not None and entry > 0) else 0
+    # 226: futures — hajm MARJA; stopgacha zarar marjaning dist*x qismi.
+    L = lev(d)
+    dist = abs(entry - sl) / entry * 100 * L if (sl is not None and entry > 0) else 0
 
     line = i18n.t("al.deposit_line", lang, dep=deposit)
     if sl is not None:
@@ -5095,6 +5227,8 @@ def alloc_prompt(sig_id: int, d: dict, deposit: float, free: float,
         btns = []
         for rp in RISK_CHOICES:
             amt = risk_amount(deposit, entry, sl, rp, cap=free)
+            if amt is not None and L > 1:
+                amt = amt / L
             if amt is None or amt <= 0:
                 continue
             if amt >= free - 1e-9:
@@ -5115,7 +5249,7 @@ def alloc_prompt(sig_id: int, d: dict, deposit: float, free: float,
 async def free_deposit(ws, exclude_sig_id: int | None = None) -> tuple[float, float, float]:
     """(umumiy depozit, ochiqlarda band, bo'sh) — uchalasi ham xabarda kerak."""
     dep = float(ws["deposit"])
-    busy = await db.open_allocated(ws["id"], exclude_sig_id)
+    busy = await db.open_allocated(ws["id"], exclude_sig_id, bool(ws.get("_fut")))
     return dep, busy, max(0.0, dep - busy)
 
 
@@ -5178,7 +5312,7 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     _, sid_s, amt_s = q.data.split(":", 2)
     sig_id, amount = int(sid_s), float(amt_s)
     sig = await db.get_signal(sig_id)
-    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
     lang = await user_lang(q.from_user.id)
     if not sig or not ws or not can_manage(q.from_user.id, ws):
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
@@ -5199,7 +5333,7 @@ async def on_alloc_pick(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     dep = float(ws["deposit"])
     await db.set_signal_allocation(sig_id, amount, dep)
     entry, sl = float(sig["entry"]), float(sig["sl_initial"])
-    risk_money = amount * abs(entry - sl) / entry
+    risk_money = amount * abs(entry - sl) / entry * lev(sig)
     await q.edit_message_text(
         i18n.t("al.set", lang, sid=sig_id, sym=html.escape(sig["symbol"]),
                amt=amount, risk=risk_money, pct=risk_money / dep * 100),
@@ -5211,7 +5345,7 @@ async def _alloc_ctx(q):
     Huquq yo'q yoki signal yo'q bo'lsa — (None, None, til)."""
     sig_id = int(q.data.split(":")[1])
     sig = await db.get_signal(sig_id)
-    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
     lang = await user_lang(q.from_user.id)
     if not sig or not ws or not can_manage(q.from_user.id, ws) \
             or ws["deposit"] is None:
@@ -5242,7 +5376,7 @@ async def on_alloc_topup(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     was, _busy, free = await free_deposit(ws, sig["id"])
     need = max(0.0, amount - free)
     if need > 0:
-        await db.apply_deposit_delta(ws["id"], need)
+        await db.apply_deposit_delta(ws["id"], need, bool(ws.get("_fut")))
     dep = was + need
     AWAITING_ALLOC.pop(q.from_user.id, None)
     await db.set_signal_allocation(sig["id"], amount, dep)
@@ -5338,13 +5472,15 @@ async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         else i18n.t("cp.posted_fail", lang, name=name),
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
-    # Hajm — manzil workspace'ining o'z depoziti bo'yicha.
+    # Hajm — manzil workspace'ining o'z depoziti bo'yicha (futures — futures depoziti).
+    tgt = wsx(tgt, sig)
     if tgt["deposit"] is not None:
         AWAITING_ALLOC[q.from_user.id] = new_id
         dep, busy, free = await free_deposit(tgt, new_id)
         text, kb = alloc_prompt(new_id, {"symbol": sig["symbol"],
                                          "entry": float(sig["entry"]),
-                                         "sl": float(sig["sl"]) if sig["sl"] is not None else None},
+                                         "sl": float(sig["sl"]) if sig["sl"] is not None else None,
+                                         "leverage": sig["leverage"]},
                                 dep, free, busy, lang)
         await q.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
 
@@ -5388,9 +5524,15 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         lang = ws_lang(ws)
 
+        # 225: futures — foizlar leveraj bilan ko'rsatiladi.
+        _s0 = await db.get_signal(sid)
+        L = lev(_s0) if _s0 else 1
         if e["type"] == "STOP":
-            pnl = e["final_pnl"] or 0
-            if e["was_be"]:
+            pnl = (e["final_pnl"] or 0) * L
+            if e.get("liq"):
+                txt = i18n.t("ev.liq", lang, sid=sid, sym=sym, p=fmt_price(e["price"]),
+                             lev=L, pnl=pnl)
+            elif e["was_be"]:
                 txt = i18n.t("ev.stop_be", lang, sid=sid, sym=sym, pnl=pnl)
             elif pnl >= 0:
                 txt = i18n.t("ev.stop_win", lang, sid=sid, sym=sym, pnl=pnl, r=e["r"] or 0)
@@ -5399,9 +5541,9 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                              p=fmt_price(e["price"]), pnl=pnl, r=e["r"] or 0)
         elif e["type"] == "TP":
             txt = i18n.t("ev.tp", lang, sid=sid, sym=sym, n=e["n"],
-                         p=fmt_price(e["price"]), share=e["share"], run=e["running"])
+                         p=fmt_price(e["price"]), share=e["share"], run=e["running"] * L)
             if e.get("closes") and e.get("final_pnl") is not None:
-                txt += i18n.t("ev.tp_closes", lang, pnl=e["final_pnl"], r=e["r"] or 0)
+                txt += i18n.t("ev.tp_closes", lang, pnl=e["final_pnl"] * L, r=e["r"] or 0)
         elif e["type"] == "OPEN":
             txt = i18n.t("ev.open", lang, sid=sid, sym=sym, p=fmt_price(e["price"]))
         elif e["type"] == "ADD":
@@ -5426,8 +5568,8 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         elif e["type"] == "TP" and e.get("closes"):
             closed_pnl = e.get("final_pnl")
         if closed_pnl is not None and sig and sig["alloc_amount"] is not None:
-            money_delta = float(closed_pnl) / 100 * float(sig["alloc_amount"])
-            await db.apply_deposit_delta(ws["id"], money_delta)
+            money_delta = float(closed_pnl) * lev(sig) / 100 * float(sig["alloc_amount"])
+            await db.apply_deposit_delta(ws["id"], money_delta, is_fut(sig))
 
         # Eski signal (197): tarix qayta ko'rib chiqilmoqda — guruhga eski
         # hodisa xabari ketmaydi; yopilgan bo'lsa natija qo'shgan odamga DM.
@@ -5725,6 +5867,9 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         band = milestone_band(pnl)
         if not milestone_should_notify(s["milestone_pct"], band):
             continue
+        # 225: bosqich chegarasi spot (1x) foizda qoladi — x100 da har 0.05%
+        # tebranishda xabar ketmasin; KO'RSATISH esa leveraj bilan.
+        L = lev(s)
         # Faqat XABAR YUBORILGANDA saqlanadi. Avval bosqich har o'zgarganda
         # (0 ga tushganda ham) yozilardi — aynan shu tebranish spamiga
         # sabab bo'lgan edi.
@@ -5738,7 +5883,7 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # Bosqich xabari GURUHGA ketadi — guruh tilida (shaxsiy jurnalda
         # ham xuddi shu ustun, egasi o'zi tanlagan).
         txt = tw("ms.step", ws, mark=mark, sid=s["id"], sym=s["symbol"],
-                 pnl=pnl, band=band)
+                 pnl=pnl * L, band=band * L)
 
         if ws["type"] == "group" and ws["group_chat_id"]:
             try:
@@ -5926,8 +6071,8 @@ async def on_fix(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # bo'lib qolardi), qaytarilganda esa yana qo'shiladi.
     if sig["status"] in ("TP", "SL", "BREAKEVEN") and sig["alloc_amount"] is not None \
             and sig["pnl_pct"] is not None:
-        money = float(sig["pnl_pct"]) / 100 * float(sig["alloc_amount"])
-        await db.apply_deposit_delta(ws["id"], -money if new_state else money)
+        money = float(sig["pnl_pct"]) * lev(sig) / 100 * float(sig["alloc_amount"])
+        await db.apply_deposit_delta(ws["id"], -money if new_state else money, is_fut(sig))
 
     await q.answer(i18n.t("adm.fix_done_off" if new_state else "adm.fix_done_on", lang))
     text, kb = await _fix_view(ws, None if sym == "-" else sym, lang)
@@ -5962,8 +6107,8 @@ async def cmd_qaytar(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # Depozit ham to'g'rilanadi — `cmd_tuzat`dagi bilan bir xil mantiq:
     # yopilganda unga qo'shilgan/ayirilgan pul endi qaytarib olinadi.
     if ev["alloc_amount"] is not None and ev["prev_pnl"] is not None:
-        money = ev["prev_pnl"] / 100 * ev["alloc_amount"]
-        await db.apply_deposit_delta(ev["workspace_id"], -money)
+        money = ev["prev_pnl"] * lev(ev) / 100 * ev["alloc_amount"]
+        await db.apply_deposit_delta(ev["workspace_id"], -money, is_fut(ev))
     await update.message.reply_text(
         i18n.t("adm.reopen_done", lang, sid=sig_id, sym=html.escape(ev["symbol"])),
         parse_mode=ParseMode.HTML)
@@ -6212,6 +6357,39 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.set_deposit(ws["id"], amount)
     await update.message.reply_text(i18n.t("dep.updated", lang, v=amount),
                                      parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+
+async def fut_deposit_block(ws, lang: str | None) -> str:
+    """226: futures depoziti — spotdan ALOHIDA. Bo'sh/band pul ham alohida."""
+    fws = wsx(ws, {"leverage": 2})
+    if fws["deposit"] is None:
+        return i18n.t("fdep.block_unset", lang)
+    _dep, busy, free = await free_deposit(fws)
+    return (i18n.t("fdep.block", lang, v=float(fws["deposit"]))
+            + "\n" + free_lines(free, busy, lang))
+
+
+async def cmd_fdeposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """226: /fdeposit <summa> — futures depozitini o'rnatadi."""
+    ws = await get_ws_or_prompt(update, ctx)
+    if not ws:
+        return
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
+    if not can_manage(uid, ws):
+        await update.message.reply_text(i18n.t("man.no_right", lang))
+        return
+    if not ctx.args:
+        await update.message.reply_text(await fut_deposit_block(ws, lang),
+                                        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+        return
+    amount = _parse_price(ctx.args[0])
+    if amount is None or amount <= 0:
+        await update.message.reply_text(i18n.t("dep.bad_amount", lang))
+        return
+    await db.set_fut_deposit(ws["id"], amount)
+    await update.message.reply_text(i18n.t("fdep.updated", lang, v=amount),
+                                    parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
 async def cmd_public(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -7459,6 +7637,18 @@ async def cmd_top(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         lines.append(
             f"{medal} <b>{name_txt}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
             f"({i18n.t('top.trades', lang, n=r['total'])}, {wr:.0f}% WR)")
+    # 225: futures — alohida reyting (natija leveraj bilan).
+    frows = await db.top_workspaces(a, b, limit=10, futures=True)
+    if frows:
+        lines += ["", i18n.t("top.fut_head", lang)]
+        for i, r in enumerate(frows):
+            medal = medals[i] if i < 3 else f"{i + 1}."
+            wr = r["wins"] / r["total"] * 100 if r["total"] else 0
+            url = paymembers.join_url(r)
+            name = html.escape(r["name"])
+            name_txt = f'<a href="{html.escape(url, quote=True)}">{name}</a>' if url else name
+            lines.append(f"{medal} <b>{name_txt}</b> — <b>{float(r['sum_pct']):+.2f}%</b> "
+                         f"({i18n.t('top.trades', lang, n=r['total'])}, {wr:.0f}% WR)")
     lines += ["", i18n.t("top.footer", lang)]
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML,
                                      reply_markup=menu_back_kb(lang))
@@ -9605,6 +9795,7 @@ def main() -> None:
     app.add_handler(CommandHandler("open", cmd_open))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("depozit", cmd_deposit))
+    app.add_handler(CommandHandler(["fdepozit", "fdeposit"], cmd_fdeposit))
     app.add_handler(CommandHandler("public", cmd_public))
     app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("tasdiq", cmd_pending))
@@ -9673,6 +9864,10 @@ def main() -> None:
             WIZ_SYMBOL: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_symbol)],
             WIZ_MODE: [CallbackQueryHandler(wizard_mode, pattern=r"^wiz_mode:")],
+            WIZ_KIND: [CallbackQueryHandler(wizard_kind, pattern=r"^wiz_kind:")],
+            WIZ_LEV: [CallbackQueryHandler(wizard_lev, pattern=r"^wiz_lev:"),
+                      MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+                                     wizard_lev)],
             WIZ_SIDE: [CallbackQueryHandler(wizard_side, pattern=r"^wiz_side:")],
             WIZ_ENTRY: [MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, wizard_entry)],

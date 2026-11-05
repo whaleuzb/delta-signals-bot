@@ -12,6 +12,7 @@ import db
 import exchange
 import forex
 import futures
+import parsing
 import stocks
 
 log = logging.getLogger(__name__)
@@ -242,6 +243,20 @@ async def process(sig) -> list[dict]:
             break
 
         if awaiting_tpsl:
+            # 225: futures — TP/SL hali yo'q bo'lsa ham likvidatsiya bor:
+            # narx likvidatsiya narxiga tegsa pozitsiya yopiladi (-100%).
+            liq = parsing.liq_price(side, entry, sig["leverage"] if "leverage" in sig.keys() else None)
+            if liq is not None and ((c.low <= liq) if side == "LONG" else (c.high >= liq)):
+                rest = max(0.0, 1.0 - filled)
+                realized += rest * pnl_at(side, entry, liq)
+                filled = 1.0
+                exit_price = liq
+                status = "SL"
+                closed_at = datetime.fromtimestamp(c.close_ms / 1000, timezone.utc)
+                events.append({"type": "STOP", "price": liq, "was_be": False, "liq": True})
+                log.info("Signal #%s %s: likvidatsiya @ %.10g (x%s)", sig["id"], symbol,
+                         liq, sig["leverage"])
+                break
             # Kirish to'ldi, lekin TP/SL hali kiritilmagan (foydalanuvchi
             # javob berishi kutilmoqda — bot.py AWAITING_TPSL orqali) —
             # SL/TP HALI MAVJUD EMAS, shuning uchun tekshirishning ma'nosi
@@ -377,7 +392,8 @@ async def process(sig) -> list[dict]:
     pnl = r = None
     if status in ("TP", "SL", "BREAKEVEN"):
         pnl = round(realized, 4)
-        risk = abs(entry - sl_init) / entry * 100
+        # 225: likvidatsiyada TP/SL bo'lmagan bo'lishi mumkin (sl_init None).
+        risk = abs(entry - sl_init) / entry * 100 if sl_init is not None else 0
         r = round(pnl / risk, 3) if risk > 0 else None
 
     avg = None
@@ -439,12 +455,12 @@ async def close_now(sig_id: int) -> dict | None:
         return None
 
     entry = float(sig["entry"])
-    sl_init = float(sig["sl_initial"])
+    sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
     filled = float(sig["filled_pct"])
     realized = float(sig["realized_pct"])
     rest = max(0.0, 1.0 - filled)
     pnl = round(realized + rest * pnl_at(sig["side"], entry, price), 4)
-    risk = abs(entry - sl_init) / entry * 100
+    risk = abs(entry - sl_init) / entry * 100 if sl_init is not None else 0
     r = round(pnl / risk, 3) if risk > 0 else None
     status = "BREAKEVEN" if abs(pnl) < 1e-9 else ("TP" if pnl > 0 else "SL")
 
@@ -493,7 +509,7 @@ async def partial_close(sig_id: int, portion: float, _retry: bool = False) -> di
         return None
 
     entry = float(sig["entry"])
-    sl_init = float(sig["sl_initial"])
+    sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
     realized = float(sig["realized_pct"]) + share * pnl_at(sig["side"], entry, price)
     new_filled = filled + share
     closes = new_filled >= 1.0 - 1e-9
@@ -505,7 +521,8 @@ async def partial_close(sig_id: int, portion: float, _retry: bool = False) -> di
     if closes:
         new_filled = 1.0
         pnl = round(realized, 4)
-        risk = abs(entry - sl_init) / entry * 100
+        # 225: likvidatsiyada TP/SL bo'lmagan bo'lishi mumkin (sl_init None).
+        risk = abs(entry - sl_init) / entry * 100 if sl_init is not None else 0
         r = round(pnl / risk, 3) if risk > 0 else None
         status = "BREAKEVEN" if abs(pnl) < 1e-9 else ("TP" if pnl > 0 else "SL")
         closed_at = datetime.now(timezone.utc)
@@ -561,7 +578,7 @@ async def reopen_signal(sig_id: int) -> dict | None:
         return None
 
     entry = float(sig["entry"])
-    sl_init = float(sig["sl_initial"])
+    sl_init = float(sig["sl_initial"]) if sig["sl_initial"] is not None else None
     side = sig["side"]
     tps = [float(x) for x in sig["tps"]]
     tp_hit = sig["tp_hit"]
@@ -585,7 +602,8 @@ async def reopen_signal(sig_id: int) -> dict | None:
     return {"type": "REOPEN", "signal_id": sig_id, "workspace_id": sig["workspace_id"],
             "symbol": sig["symbol"],
             "prev_pnl": float(prev_pnl) if prev_pnl is not None else None,
-            "alloc_amount": float(prev_alloc_amount) if prev_alloc_amount is not None else None}
+            "alloc_amount": float(prev_alloc_amount) if prev_alloc_amount is not None else None,
+            "leverage": sig["leverage"]}
 
 
 async def run_once() -> list[dict]:

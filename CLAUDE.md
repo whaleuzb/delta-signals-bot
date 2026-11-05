@@ -7139,3 +7139,35 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `custom_emoji` entity qolganini tekshiradi va xabarni o'chiradi. Qolsa —
      `bot.PROMO_EMOJI` yoqiladi, aks holda oddiy 🤖 (Fragment username yo'q).
      Natija logda: "Promo emoji …: YOQILDI / Telegram ruxsat bermadi".
+224. **Promo emoji tashxisi.** `_promo_emoji_seen` — yangi guruh/kanal
+     postida custom emoji saqlandimi, logga yozadi. Kuzatuv: yopiq guruhda
+     ko'rinadi, kanalda Telegram olib tashlaydi (oddiy 🤖).
+225. **Futures yo'nalishi (leveraj).** Foydalanuvchi: "futures yo'nalishini
+     qo'shaylik" — tanlov: leveraj bilan to'liq; reyting — alohida futures
+     top. `signals.leverage` (NULL = spot). `pnl_pct` bazada DOIM 1x;
+     ko'rsatish/pul/futures reytingida `pnl_pct * leverage` (`bot.lev(x)`).
+     - Yaratish: sehrgarda kripto juftlikdan keyin Spot/Futures (`WIZ_KIND`),
+       Futures -> leveraj tugmalari 5x 10x 20x 25x 30x 40x 50x 90x 100x va
+       "Qo'lda kiritish" (2–125, `WIZ_LEV`). Matnli signal: "10x", "x10",
+       "lev 10" (`parsing.parse_leverage`, raqamlar ro'yxatidan oldin
+       o'chiriladi). Forex/aksiyada leveraj tashlanadi.
+     - Likvidatsiya `parsing.liq_price` (izolyatsiya, MMR'siz: LONG
+       entry*(1-1/x)). `validate` — stop likvidatsiyadan narida bo'lsa xato
+       (`err.sl_liq`); stopni ko'chirishda ham. Kuzatuv: TP/SL hali yo'q
+       futures'da likvidatsiyaga tegsa yopiladi (status SL, `liq` hodisa,
+       `ev.liq`). `sl_init` None bo'lsa R hisoblanmaydi (avval crash xavfi).
+     - Ko'rinish: post sarlavhasida "⚡ Futures 10x", TP/stop % leveraj
+       bilan, "💥 Likvidatsiya" qatori; hodisalar, qisman/to'liq yopish,
+       bosqich (chegara spot %da, ko'rsatish x), ochiq ro'yxat, boshqaruv,
+       karta ("10X" yozuvi), grafik, veb kartalar (`b-lev` nishon).
+     - Reyting: spot (`public_workspaces`, `/top`) faqat leverajsiz;
+       `public_futures_workspaces` + Mini App "⚡ Futures" tabi, `/top`da
+       "⚡ Futures top" bloki (`top_workspaces(futures=True)`).
+     ⚠️ Guruh sahifasidagi umumiy statistika (stats.py, /stats, PDF)
+     hali spot va futures'ni 1x hisobda birga sanaydi.
+226. **Futures depoziti alohida.** `workspaces.fut_deposit`; `/fdepozit`
+     (/fdeposit) va menyu "Depozit" ekranida blok. `bot.wsx(ws, sig)` —
+     futures signal uchun ws'ning futures depozitli nusxasi (`_fut`);
+     `free_deposit`/`open_allocated`/`pending_add_usd` futures/spot bo'yicha
+     alohida; `apply_deposit_delta(..., futures)`. Hajm = MARJA: risk
+     tugmalari `amt/L`, risk puli `amt*dist*L`.

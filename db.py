@@ -518,6 +518,11 @@ ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS member_count_at TIMESTAMPTZ;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_id BIGINT;
 -- 210: eski savdo uchun natija posti qidirildi (topilgan-topilmaganidan qat'i nazar).
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_msg_tried BOOLEAN NOT NULL DEFAULT FALSE;
+-- 225: Futures — leveraj (NULL = spot). `pnl_pct` doim 1x (spot) foizda
+-- saqlanadi; ko'rsatishda va futures reytingida `pnl_pct * leverage`.
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS leverage SMALLINT;
+-- 226: futures depoziti — spot depozitidan ALOHIDA (foydalanuvchi so'rovi).
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS fut_deposit NUMERIC;
 """
 
 
@@ -688,7 +693,14 @@ async def set_deposit(workspace_id: int, amount: float) -> None:
             "UPDATE workspaces SET deposit=$2 WHERE id=$1", workspace_id, _d(amount))
 
 
-async def apply_deposit_delta(workspace_id: int, delta: float) -> None:
+async def set_fut_deposit(workspace_id: int, amount: float | None) -> None:
+    """226: futures depoziti (None — o'chiradi)."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET fut_deposit=$2 WHERE id=$1",
+                        workspace_id, _d(amount) if amount is not None else None)
+
+
+async def apply_deposit_delta(workspace_id: int, delta: float, futures: bool = False) -> None:
     """Signal (alloc_amount bilan) yopilganda uning real puldagi natijasini
     joriy depozitga qo'shadi/ayiradi — shu tufayli depozit vaqt o'tishi bilan
     haqiqiy hisob balansini aks ettiradi. Faqat deposit allaqachon
@@ -696,8 +708,10 @@ async def apply_deposit_delta(workspace_id: int, delta: float) -> None:
     depozit ishlatmaydigan workspace'larga tegilmaydi."""
     async with pool().acquire() as c:
         await c.execute(
-            "UPDATE workspaces SET deposit = deposit + $2 "
-            "WHERE id=$1 AND deposit IS NOT NULL", workspace_id, _d(delta))
+            ("UPDATE workspaces SET fut_deposit = fut_deposit + $2 "
+             "WHERE id=$1 AND fut_deposit IS NOT NULL") if futures else
+            ("UPDATE workspaces SET deposit = deposit + $2 "
+             "WHERE id=$1 AND deposit IS NOT NULL"), workspace_id, _d(delta))
 
 
 async def set_public(workspace_id: int, public: bool) -> None:
@@ -1074,8 +1088,8 @@ async def create_signal(workspace_id: int, d: dict) -> int:
     q = """
     INSERT INTO signals (workspace_id, symbol, side, entry, sl, sl_initial, tps,
                          chart_file_id, author_id, note, market, entry_mode,
-                         status, opened_at, chart_tf)
-    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id
+                         status, opened_at, chart_tf, leverage)
+    VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id
     """
     async with pool().acquire() as c:
         return await c.fetchval(
@@ -1083,7 +1097,7 @@ async def create_signal(workspace_id: int, d: dict) -> int:
             [_d(t) for t in d["tps"]],
             d.get("chart_file_id"), d.get("author_id"), d.get("note"),
             d.get("market", "crypto"), entry_mode, status, opened_at,
-            d.get("chart_tf"),
+            d.get("chart_tf"), d.get("leverage") or None,
         )
 
 
@@ -1133,11 +1147,11 @@ async def copy_signal(sig_id: int, target_ws_id: int) -> int | None:
                          sl_initial, tps, tp_hit, filled_pct, realized_pct,
                          status, created_at, opened_at, last_checked_ms,
                          ambiguous, chart_file_id, author_id, note, market,
-                         entry_mode, chart_tf)
+                         entry_mode, chart_tf, leverage)
     SELECT $2, $1, symbol, side, entry, sl, sl_initial, tps, tp_hit,
            filled_pct, realized_pct, status, created_at, opened_at,
            last_checked_ms, ambiguous, chart_file_id, author_id, note,
-           market, entry_mode, chart_tf
+           market, entry_mode, chart_tf, leverage
     FROM signals WHERE id = $1 AND status IN ('PENDING','ACTIVE')
     ON CONFLICT DO NOTHING
     RETURNING id
@@ -1224,14 +1238,15 @@ async def set_signal_allocation(sig_id: int, alloc_amount: float, deposit_snapsh
             sig_id, _d(alloc_amount), _d(deposit_snapshot))
 
 
-async def pending_add_usd(workspace_id: int) -> float:
+async def pending_add_usd(workspace_id: int, futures: bool = False) -> float:
     """Kutayotgan qo'shimcha limitlarga ($ rejimida) ATALGAN pul (190)."""
     async with pool().acquire() as c:
         v = await c.fetchval(
             "SELECT COALESCE(SUM(a.units), 0) FROM signal_adds a "
             "JOIN signals s ON s.id = a.signal_id WHERE s.workspace_id=$1 "
-            "AND a.status='PENDING' AND a.usd AND s.status IN ('PENDING','ACTIVE')",
-            workspace_id)
+            "AND a.status='PENDING' AND a.usd AND s.status IN ('PENDING','ACTIVE') "
+            "AND (COALESCE(s.leverage, 1) > 1) = $2",
+            workspace_id, futures)
     return float(v)
 
 
@@ -1287,7 +1302,7 @@ async def cancel_pending_adds(sig_id: int) -> int:
 
 
 async def open_allocated(workspace_id: int,
-                         exclude_sig_id: int | None = None) -> float:
+                         exclude_sig_id: int | None = None, futures: bool = False) -> float:
     """Hozir OCHIQ pozitsiyalarda band turgan pul.
 
     `deposit` — umumiy balans, uning bir qismi allaqachon ochiq
@@ -1308,11 +1323,12 @@ async def open_allocated(workspace_id: int,
             "SELECT COALESCE(SUM(alloc_amount), 0) AS s FROM signals "
             "WHERE workspace_id=$1 AND status IN ('PENDING','ACTIVE') "
             "AND NOT excluded AND alloc_amount IS NOT NULL "
-            "AND ($2::bigint IS NULL OR id <> $2)",
-            workspace_id, exclude_sig_id)
+            "AND ($2::bigint IS NULL OR id <> $2) "
+            "AND (COALESCE(leverage, 1) > 1) = $3",
+            workspace_id, exclude_sig_id, futures)
     # Kutayotgan qo'shimcha limitlar ($) ham band (190): to'lganda aynan
     # shu pul ishlatiladi, u boshqa savdoga ikkinchi marta berilmasin.
-    return float(row["s"] or 0) + await pending_add_usd(workspace_id)
+    return float(row["s"] or 0) + await pending_add_usd(workspace_id, futures)
 
 
 async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
@@ -1412,10 +1428,37 @@ async def public_workspaces() -> list[asyncpg.Record]:
     FROM workspaces w
     LEFT JOIN signals s ON s.workspace_id = w.id
          AND s.status IN {CLOSED} AND NOT s.excluded
+         AND COALESCE(s.leverage, 1) = 1          -- 225: spot reyting — futuressiz
     WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived AND {_top_gate('w')}
     GROUP BY w.id, w.name, w.invite_link, w.deposit, w.logo, w.is_channel, w.username
     ORDER BY last_closed DESC NULLS LAST
+    """
+    async with pool().acquire() as c:
+        return await c.fetch(q)
+
+
+async def public_futures_workspaces() -> list[asyncpg.Record]:
+    """225: Futures reytingi — faqat futures signallar, natija LEVERAJ bilan
+    (`pnl_pct * leverage`). Futures savdosi bo'lmagan guruh chiqmaydi."""
+    q = f"""
+    SELECT w.id, w.name, w.invite_link, w.is_channel, w.username,
+           (w.logo IS NOT NULL)                              AS has_logo,
+           COUNT(s.id)                                       AS total,
+           COUNT(s.id) FILTER (WHERE s.pnl_pct > 0)          AS wins,
+           COALESCE(SUM(s.pnl_pct * s.leverage), 0)          AS sum_pct,
+           MAX(s.closed_at)                                  AS last_closed,
+           ROUND(AVG(s.leverage))                            AS avg_lev,
+           (SELECT COUNT(*) FROM signals o
+             WHERE o.workspace_id = w.id AND NOT o.excluded AND o.leverage > 1
+               AND o.status IN ('PENDING','ACTIVE'))          AS n_open
+    FROM workspaces w
+    JOIN signals s ON s.workspace_id = w.id
+         AND s.status IN {CLOSED} AND NOT s.excluded AND s.leverage > 1
+    WHERE w.type='group' AND w.public = TRUE AND w.public_approved = TRUE
+      AND NOT w.archived AND {_top_gate('w')}
+    GROUP BY w.id, w.name, w.invite_link, w.logo, w.is_channel, w.username
+    ORDER BY sum_pct DESC
     """
     async with pool().acquire() as c:
         return await c.fetch(q)
@@ -1508,7 +1551,7 @@ async def closed_for_months(workspace_id: int, limit: int = 600) -> list[asyncpg
     oylar to'liq bo'ladi."""
     q = f"""
     SELECT id, symbol, side, entry, exit_price, pnl_pct, r_multiple,
-           status, opened_at, closed_at, group_msg_id, result_msg_id
+           status, opened_at, closed_at, group_msg_id, result_msg_id, leverage
     FROM signals
     WHERE workspace_id=$1 AND status IN {CLOSED} AND NOT excluded
           AND closed_at IS NOT NULL
@@ -1785,25 +1828,27 @@ async def top_symbols(workspace_id: int, since=None, until=None,
         return await c.fetch(q, *params)
 
 
-async def top_workspaces(since, until, limit: int = 10) -> list[asyncpg.Record]:
+async def top_workspaces(since, until, limit: int = 10,
+                         futures: bool = False) -> list[asyncpg.Record]:
     """/top reytingi uchun — faqat public=TRUE guruh workspace'lari, shu davrda
     yopilgan signallar bo'yicha. Shaxsiy workspace'lar reytingga kirmaydi."""
     q = f"""
     SELECT w.id, w.name, w.username, w.pm_bot, COUNT(*) AS total,
            COUNT(*) FILTER (WHERE s.pnl_pct > 0) AS wins,
-           COALESCE(SUM(s.pnl_pct), 0) AS sum_pct
+           COALESCE(SUM(s.pnl_pct * COALESCE(s.leverage, 1)), 0) AS sum_pct
     FROM signals s
     JOIN workspaces w ON w.id = s.workspace_id
     WHERE w.type = 'group' AND w.public = TRUE AND w.public_approved = TRUE
       AND NOT w.archived AND {_top_gate('w')}
       AND s.status IN {CLOSED} AND NOT s.excluded
+      AND (COALESCE(s.leverage, 1) > 1) = $4
       AND s.closed_at >= $1 AND s.closed_at < $2
     GROUP BY w.id, w.name, w.username, w.pm_bot
     ORDER BY sum_pct DESC
     LIMIT $3
     """
     async with pool().acquire() as c:
-        return await c.fetch(q, since, until, limit)
+        return await c.fetch(q, since, until, limit, futures)
 
 
 async def open_signals_summary(workspace_id: int) -> dict[str, dict]:

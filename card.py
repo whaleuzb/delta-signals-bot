@@ -148,7 +148,8 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
              closed_at: datetime, username: str | None, ws_name: str,
              logo: bytes | None, qr_url: str, sig_id: int | None = None,
              market: str = "crypto", qr_caption: str | None = None,
-             qr_code: str | None = None, lang: str | None = None) -> io.BytesIO:
+             qr_code: str | None = None, lang: str | None = None,
+             leverage: int | None = None) -> io.BytesIO:
     """Ulashish kartasini chizadi va PNG bayt oqimini qaytaradi.
 
     `lang` — GURUH tili (`ws_lang`): karta guruh postiga biriktiriladi,
@@ -203,9 +204,10 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
     x += d.textlength(side_uz, font=f_meta) + 30
     d.text((x, y + 8), "│", font=_f(50), fill=LINE)
     x += 32
-    # Yelka (25X) O'RNIDA — bu spot savdo, yelka yo'q.
-    d.text((x, y + 8), "SPOT" if market == "crypto" else market.upper(),
-           font=f_meta, fill=TXT)
+    # Spot — "SPOT"; futures (225) — yelka, masalan "10X".
+    kind = (f"{leverage}X" if leverage and leverage > 1
+            else ("SPOT" if market == "crypto" else market.upper()))
+    d.text((x, y + 8), kind, font=f_meta, fill=TXT)
 
     # ── Katta foiz ──────────────────────────────────────────────────────
     pct = f"{pnl_pct:+.2f}%"
