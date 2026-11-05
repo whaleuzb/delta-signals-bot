@@ -3229,6 +3229,11 @@ STRINGS: dict[str, dict[str, str]] = {
                      "en": "No futures results yet."},
     "top.fut_head": {"uz": "⚡ <b>Futures top</b> (leveraj bilan)", "ru": "⚡ <b>Фьючерсный топ</b> (с плечом)",
                      "en": "⚡ <b>Futures top</b> (with leverage)"},
+    "dep.pick": {"uz": "💰 <b>Depozit</b> — {name}\nQaysi depozit?",
+                 "ru": "💰 <b>Депозит</b> — {name}\nКакой депозит?",
+                 "en": "💰 <b>Deposit</b> — {name}\nWhich deposit?"},
+    "dep.btn_spot": {"uz": "📊 Spot", "ru": "📊 Спот", "en": "📊 Spot"},
+    "dep.btn_fut": {"uz": "⚡ Futures", "ru": "⚡ Фьючерсы", "en": "⚡ Futures"},
     "fdep.block": {
         "uz": "⚡ <b>Futures depoziti</b> (spotdan alohida): <b>{v:,.2f}</b>\nO'zgartirish: <code>/fdepozit 1000</code>",
         "ru": "⚡ <b>Фьючерсный депозит</b> (отдельно от спота): <b>{v:,.2f}</b>\nИзменить: <code>/fdepozit 1000</code>",

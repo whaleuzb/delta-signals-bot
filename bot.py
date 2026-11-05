@@ -2799,14 +2799,29 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         rows = (list(kb.inline_keyboard) if kb else []) + [back_row(lang)]
         await _edit_or_reply(q, text, InlineKeyboardMarkup(rows))
     elif action == "deposit":
+        # 230: avval tanlov — Spot / Futures / Dip Funded.
+        if not can_manage(q.from_user.id, ws):
+            return
+        rows = [[InlineKeyboardButton(i18n.t("dep.btn_spot", lang), callback_data="m:dep_spot"),
+                 InlineKeyboardButton(i18n.t("dep.btn_fut", lang), callback_data="m:dep_fut")]]
+        if dipfunded.enabled() and q.message.chat.type == "private":
+            rows.append([InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home")])
+        rows.append(back_row(lang))
+        await _edit_or_reply(q, i18n.t("dep.pick", lang, name=html.escape(ws["name"])),
+                             InlineKeyboardMarkup(rows))
+    elif action == "dep_spot":
+        # Spot depozit — avvalgi ekranning AYNAN o'zi.
         if not can_manage(q.from_user.id, ws):
             return
         cur = ws["deposit"]
         txt = f"{float(cur):,.2f}" if cur is not None else i18n.t("dep.unset", lang)
         await _edit_or_reply(
             q, i18n.t("dep.current", lang, name=html.escape(ws["name"]), v=txt,
-                      extra=await deposit_extra(ws, lang))
-            + "\n\n" + await fut_deposit_block(ws, lang), back_kb(lang))
+                      extra=await deposit_extra(ws, lang)), _dep_back_kb(lang))
+    elif action == "dep_fut":
+        if not can_manage(q.from_user.id, ws):
+            return
+        await _edit_or_reply(q, await fut_deposit_block(ws, lang), _dep_back_kb(lang))
     elif action == "equity":
         deposit = kind_deposit(ws, st_kind(ctx))
         with db.stats_kind(st_kind(ctx)):
@@ -6439,6 +6454,12 @@ async def cmd_deposit(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                      parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
 
 
+def _dep_back_kb(lang) -> InlineKeyboardMarkup:
+    """Depozit bo'limidan — tanlov ekraniga qaytish (230)."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("menu.back", lang),
+                                                       callback_data="m:deposit")]])
+
+
 async def fut_deposit_block(ws, lang: str | None) -> str:
     """226: futures depoziti — spotdan ALOHIDA. Bo'sh/band pul ham alohida."""
     fws = wsx(ws, {"leverage": 2})
@@ -9715,7 +9736,8 @@ async def _run_one_time_fixes() -> None:
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
-ANNOUNCE_KEY = "announce_2026_10_postlink"
+ANNOUNCE_KEY = "announce_2026_11_futures"
+ANNOUNCE_FILE = "2026-11-futures"     # announce/<nom>.png va .txt
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
@@ -9725,9 +9747,9 @@ async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.set_setting(ANNOUNCE_KEY, "started")
     admin = min(config.ADMIN_IDS)
     try:
-        with open(os.path.join(_ANNOUNCE_DIR, "2026-10-postlink.txt"), encoding="utf-8") as f:
+        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
             caption = f.read().strip()
-        with open(os.path.join(_ANNOUNCE_DIR, "2026-10-postlink.png"), "rb") as f:
+        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
             msg = await ctx.bot.send_photo(admin, f, caption=caption[:1024])
     except Exception:
         log.exception("E'lon tayyorlanmadi — broadcast boshlanmadi")

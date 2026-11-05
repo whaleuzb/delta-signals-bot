@@ -1,0 +1,14 @@
+⚡ Trade Controller — Futures keldi!
+
+Endi signal berishda 📊 Spot yoki ⚡ Futures tanlanadi.
+
+🔹 Leveraj: 5x, 10x, 20x, 25x, 30x, 40x, 50x, 90x, 100x yoki qo'lda kiritish
+🔹 Postda TP va stop foizlari leveraj bilan, likvidatsiya narxi ham ko'rsatiladi
+🔹 Stop likvidatsiyadan narida bo'lsa, bot ogohlantiradi
+🔹 Alohida futures depoziti — spot depozitiga tegilmaydi
+🔹 Alohida statistika, Mini App'da "⚡ Futures" reytingi
+🔹 Kunlik va oylik hisobotlarda likvidatsiyalar soni va foizi
+
+💰 Depozit tugmasida endi: Spot · Futures · Dip Funded
+
+Botda «Yangi signal» → juftlik → ⚡ Futures 🚀

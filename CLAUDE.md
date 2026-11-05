@@ -7196,3 +7196,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 229. **Likvidatsiya ulushi (%).** "💥 Likvidatsiya: N ta (X% savdolar)" —
      X = likvidatsiyalar / shu davrdagi futures yopilgan savdolar.
      `st.liqs` (stats.summary, digest) va Mini App plitkasi "N (X%)".
+230. **Depozit tugmasi: Spot / Futures / Dip Funded + futures e'loni.**
+     Foydalanuvchi: "depozit tugmasi bosilganida futures, spot va dipfunded
+     tugmasi chiqsin, depozit holati avvalgidek qolsin". `m:deposit` —
+     tanlov; `m:dep_spot` — avvalgi ekranning o'zi; `m:dep_fut` — futures
+     depoziti bloki; Dip Funded (`df:home`, shaxsiy chatda, kalit bo'lsa).
+     Orqaga — tanlov ekraniga (`_dep_back_kb`). E'lon: `ANNOUNCE_KEY =
+     announce_2026_11_futures`, `ANNOUNCE_FILE = 2026-11-futures`
+     (announce/*.png|txt) — keyingi e'lon uchun ikkalasini almashtirish.
