@@ -7216,3 +7216,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      larni hisoblangan "n/jami — " bilan almashtiradi (raqam bo'lmasa
      boshiga qo'shadi). Jami tanlov aniqlashgach o'zgarishi mumkin
      (spot market 6, spot limit 4, futures 8).
+233. **Jami boshidan /8.** Foydalanuvchi tanlovi: "Futures'dagina /8" —
+     Spot/Futures tanlanmaguncha `wiz_steps` futures deb hisoblaydi (1/8,
+     2/8); Futures — oxirigacha /8; Spot (`_kind = "spot"`) va forex/aksiya
+     o'z soni (/6, limit /4).

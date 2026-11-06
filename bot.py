@@ -3104,10 +3104,12 @@ LEV_CHOICES = (5, 10, 20, 25, 30, 40, 50, 90, 100)
 # modul yuklanganda bir marta emas, har chaqiruvda quriladi.
 def wiz_steps(wiz: dict | None) -> list[str]:
     """232: sehrgar qadamlari — tanlangan yo'lga qarab (spot kripto: 6,
-    futures: 8, forex/aksiya: 6). Hali noma'lum tanlov — kripto spot deb."""
+    futures: 8, forex/aksiya: 6). 233: Spot/Futures hali tanlanmagan bo'lsa
+    (boshidagi qadamlar) — futures deb, ya'ni jami /8."""
     wiz = wiz or {}
     crypto = wiz.get("market", "crypto") == "crypto"
-    fut = bool(wiz.get("leverage")) or wiz.get("_fut_pending")
+    fut = (bool(wiz.get("leverage")) or wiz.get("_fut_pending")
+           or (crypto and "_kind" not in wiz))
     st = ["symbol"] + (["kind"] if crypto else []) + (["lev"] if fut else []) + ["mode"]
     if not crypto or fut:
         st.append("side")
@@ -3247,11 +3249,13 @@ async def wizard_kind(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     if q.data.endswith(":fut"):
         wiz["_fut_pending"] = True
+        wiz["_kind"] = "fut"
         await q.edit_message_text(wt("wiz.step_lev", lang, wiz, ["lev"]), parse_mode=ParseMode.HTML,
                                   reply_markup=wiz_lev_kb(lang))
         return WIZ_LEV
     wiz["leverage"] = None
     wiz.pop("_fut_pending", None)
+    wiz["_kind"] = "spot"
     await q.edit_message_text(wt("wiz.kind_picked", lang, wiz, ["kind"], label=i18n.t("wiz.kind_spot", lang)))
     await q.message.reply_text(wt("wiz.step_mode", lang, wiz, ["mode"], sym=wiz["symbol"]),
                                parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
