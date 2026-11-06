@@ -7209,3 +7209,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      leveraj yo'q bo'lsa `side = "LONG"` va to'g'ridan-to'g'ri kirish
      bosqichi (`_wiz_after_side`). Futures, forex va aksiyada yo'nalish
      so'raladi (u yerda short bor).
+232. **Sehrgar qadam raqamlari tanlovga qarab.** 231 dan keyin spot'da
+     "2/6 -> 4/6" sakrardi. `wiz_steps(wiz)` — yo'l: symbol, [kind (kripto)],
+     [lev (futures)], mode, [side (futures/forex/aksiya)], entry, [tp, sl
+     (limit bo'lmasa)]. `wt(key, lang, wiz, names)` matndagi "N/6 — "
+     larni hisoblangan "n/jami — " bilan almashtiradi (raqam bo'lmasa
+     boshiga qo'shadi). Jami tanlov aniqlashgach o'zgarishi mumkin
+     (spot market 6, spot limit 4, futures 8).

@@ -3102,6 +3102,37 @@ LEV_CHOICES = (5, 10, 20, 25, 30, 40, 50, 90, 100)
 
 # Klaviaturalar endi FUNKSIYA: matni tilga bog'liq, shuning uchun ular
 # modul yuklanganda bir marta emas, har chaqiruvda quriladi.
+def wiz_steps(wiz: dict | None) -> list[str]:
+    """232: sehrgar qadamlari — tanlangan yo'lga qarab (spot kripto: 6,
+    futures: 8, forex/aksiya: 6). Hali noma'lum tanlov — kripto spot deb."""
+    wiz = wiz or {}
+    crypto = wiz.get("market", "crypto") == "crypto"
+    fut = bool(wiz.get("leverage")) or wiz.get("_fut_pending")
+    st = ["symbol"] + (["kind"] if crypto else []) + (["lev"] if fut else []) + ["mode"]
+    if not crypto or fut:
+        st.append("side")
+    st.append("entry")
+    if wiz.get("entry_mode") != "limit":
+        st += ["tp", "sl"]
+    return st
+
+
+_STEP_RE = re.compile(r"\b\d/\d — ")
+
+
+def wt(key: str, lang, wiz, names: list[str], **kw) -> str:
+    """Sehrgar matni, qadam raqamlari `wiz_steps` bo'yicha: matndagi har bir
+    "N/6 — " navbatdagi `names` qadami bilan almashtiriladi; matnda raqam
+    bo'lmasa boshiga qo'shiladi."""
+    steps = wiz_steps(wiz)
+    tags = [f"{steps.index(n) + 1}/{len(steps)} — " if n in steps else "" for n in names]
+    text = i18n.t(key, lang, **kw)
+    it = iter(tags)
+    if _STEP_RE.search(text):
+        return _STEP_RE.sub(lambda m: next(it, ""), text)
+    return (tags[0] if tags else "") + text
+
+
 def wiz_cancel_kb(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [[InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang),
@@ -3142,7 +3173,7 @@ async def wizard_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     ctx.user_data["wiz"] = {"workspace_id": ws["id"], "file_id": None}
-    await target.reply_text(i18n.t("wiz.step_symbol", lang),
+    await target.reply_text(wt("wiz.step_symbol", lang, None, ["symbol"]),
                             reply_markup=wiz_cancel_kb(lang))
     return WIZ_SYMBOL
 
@@ -3182,10 +3213,10 @@ async def wizard_symbol(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz["market"] = market
     # 225: kripto juftlikda — Spot yoki Futures (leveraj bilan).
     if market == "crypto":
-        await msg.reply_text(i18n.t("wiz.step_kind", lang, sym=sym),
+        await msg.reply_text(wt("wiz.step_kind", lang, wiz, ["kind"], sym=sym),
                              parse_mode=ParseMode.HTML, reply_markup=wiz_kind_kb(lang))
         return WIZ_KIND
-    await msg.reply_text(i18n.t("wiz.step_mode", lang, sym=sym),
+    await msg.reply_text(wt("wiz.step_mode", lang, wiz, ["mode"], sym=sym),
                          parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
     return WIZ_MODE
 
@@ -3215,12 +3246,14 @@ async def wizard_kind(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if wiz is None:
         return ConversationHandler.END
     if q.data.endswith(":fut"):
-        await q.edit_message_text(i18n.t("wiz.step_lev", lang), parse_mode=ParseMode.HTML,
+        wiz["_fut_pending"] = True
+        await q.edit_message_text(wt("wiz.step_lev", lang, wiz, ["lev"]), parse_mode=ParseMode.HTML,
                                   reply_markup=wiz_lev_kb(lang))
         return WIZ_LEV
     wiz["leverage"] = None
-    await q.edit_message_text(i18n.t("wiz.kind_picked", lang, label=i18n.t("wiz.kind_spot", lang)))
-    await q.message.reply_text(i18n.t("wiz.step_mode", lang, sym=wiz["symbol"]),
+    wiz.pop("_fut_pending", None)
+    await q.edit_message_text(wt("wiz.kind_picked", lang, wiz, ["kind"], label=i18n.t("wiz.kind_spot", lang)))
+    await q.message.reply_text(wt("wiz.step_mode", lang, wiz, ["mode"], sym=wiz["symbol"]),
                                parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
     return WIZ_MODE
 
@@ -3239,7 +3272,7 @@ async def wizard_lev(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if wiz is None:
         return ConversationHandler.END
     if raw == "manual":
-        await q.edit_message_text(i18n.t("wiz.lev_type", lang, max=parsing.MAX_LEVERAGE),
+        await q.edit_message_text(wt("wiz.lev_type", lang, wiz, ["lev"], max=parsing.MAX_LEVERAGE),
                                   parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
         return WIZ_LEV
     if not raw.isdigit() or not 2 <= int(raw) <= parsing.MAX_LEVERAGE:
@@ -3249,11 +3282,11 @@ async def wizard_lev(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     wiz["leverage"] = int(raw)
     label = f"{i18n.t('wiz.kind_fut', lang)} {wiz['leverage']}x"
     if q:
-        await q.edit_message_text(i18n.t("wiz.kind_picked", lang, label=label))
+        await q.edit_message_text(wt("wiz.kind_picked", lang, wiz, ["lev"], label=label))
         target = q.message
     else:
         target = update.effective_message
-    await target.reply_text(i18n.t("wiz.step_mode", lang, sym=wiz["symbol"]),
+    await target.reply_text(wt("wiz.step_mode", lang, wiz, ["mode"], sym=wiz["symbol"]),
                             parse_mode=ParseMode.HTML, reply_markup=wiz_mode_kb(lang))
     return WIZ_MODE
 
@@ -3268,7 +3301,7 @@ async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     wiz["entry_mode"] = mode
     label = i18n.t("wiz.mode_market" if mode == "market" else "wiz.mode_limit", lang)
-    await q.edit_message_text(i18n.t("wiz.mode_picked", lang, label=label))
+    await q.edit_message_text(wt("wiz.mode_picked", lang, wiz, ["mode"], label=label))
     # 231: spot kriptoda yo'nalish so'ralmaydi — doim LONG (spotda short yo'q).
     if wiz.get("market") == "crypto" and not wiz.get("leverage"):
         wiz["side"] = "LONG"
@@ -3278,7 +3311,7 @@ async def wizard_mode(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
          InlineKeyboardButton(i18n.t("side.short", lang), callback_data="wiz_side:SHORT")],
         [InlineKeyboardButton(i18n.t("wiz.cancel_btn", lang), callback_data="wiz_cancel")],
     ])
-    await q.message.reply_text(i18n.t("wiz.step_side", lang), reply_markup=kb)
+    await q.message.reply_text(wt("wiz.step_side", lang, wiz, ["side"]), reply_markup=kb)
     return WIZ_SIDE
 
 
@@ -3291,7 +3324,7 @@ async def wizard_side(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     if wiz is None:
         return ConversationHandler.END
     wiz["side"] = side
-    await q.edit_message_text(i18n.t("wiz.side_picked", lang, side=side))
+    await q.edit_message_text(wt("wiz.side_picked", lang, wiz, ["side"], side=side))
     return await _wiz_after_side(q.message, wiz, lang)
 
 
@@ -3308,16 +3341,16 @@ async def _wiz_after_side(message, wiz, lang) -> int:
         if price:
             wiz["entry"] = price
             await message.reply_text(
-                i18n.t("wiz.entry_auto", lang, p=fmt_price(price)),
+                wt("wiz.entry_auto", lang, wiz, ["entry", "tp"], p=fmt_price(price)),
                 parse_mode=ParseMode.HTML, reply_markup=wiz_cancel_kb(lang))
             return WIZ_TP
         # Narx olinmadi (tarmoq xatosi) — xavfsiz qaytish: eski yo'l bilan
         # qo'lda so'raladi, sehrgar to'xtab qolmaydi.
-        await message.reply_text(i18n.t("wiz.entry_auto_failed", lang),
+        await message.reply_text(wt("wiz.entry_auto_failed", lang, wiz, ["entry"]),
                                    reply_markup=wiz_cancel_kb(lang))
         return WIZ_ENTRY
 
-    await message.reply_text(i18n.t("wiz.step_entry", lang),
+    await message.reply_text(wt("wiz.step_entry", lang, wiz, ["entry"]),
                                reply_markup=wiz_cancel_kb(lang))
     return WIZ_ENTRY
 
@@ -3352,7 +3385,7 @@ async def wizard_entry(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await show_preview(msg, ctx, draft, wiz2.get("file_id"), "wizard", wiz2["workspace_id"])
         return ConversationHandler.END
 
-    await msg.reply_text(i18n.t("wiz.step_tp", lang), reply_markup=wiz_cancel_kb(lang))
+    await msg.reply_text(wt("wiz.step_tp", lang, wiz, ["tp"]), reply_markup=wiz_cancel_kb(lang))
     return WIZ_TP
 
 
@@ -3369,7 +3402,7 @@ async def wizard_tp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     side = wiz["side"]
     wiz["tps"] = sorted(set(tps), reverse=(side == "SHORT"))
-    await msg.reply_text(i18n.t("wiz.step_sl", lang), reply_markup=wiz_cancel_kb(lang))
+    await msg.reply_text(wt("wiz.step_sl", lang, wiz, ["sl"]), reply_markup=wiz_cancel_kb(lang))
     return WIZ_SL
 
 
