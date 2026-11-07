@@ -7235,3 +7235,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      #979 uchun bir martalik `_fix_size_979` (post_init, bayroq
      `onetime_size_979`): egasi aytgan 30 000$ `_save_alloc` bilan yozildi,
      natija adminga DM.
+235. **Natija posti qidiruvi admin DM'ni ishlatmaydi.** `resultlink`
+     forward→delete super-admin chatida "o'z-o'zidan kelib o'chayotgan
+     xabarlar" bo'lib ko'rinardi. Endi faqat `RESULTLINK_CHAT_ID` (bot admin
+     bo'lgan yopiq kanal/guruh); bo'sh bo'lsa qidiruv o'chiq.

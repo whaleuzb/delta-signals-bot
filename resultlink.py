@@ -2,7 +2,7 @@
 
 `signals.result_msg_id` 209-banddan beri saqlanadi; undan oldin yopilgan
 savdolarda u yo'q. Bot API'da chat tarixini o'qish yo'q, shuning uchun
-xabar mazmuni va sanasi uni xizmat chatiga (super-admin DM) JIMGINA
+xabar mazmuni va sanasi uni xizmat chatiga (`RESULTLINK_CHAT_ID`) JIMGINA
 forward qilib bilinadi va forward darhol o'chiriladi.
 
 Qidiruv:
@@ -37,8 +37,11 @@ _fails: dict[int, int] = {}
 
 
 def _dump_chat() -> int | None:
-    # ADMIN_IDS — to'plam; doim bir xil admin tanlansin.
-    return min(config.ADMIN_IDS) if config.ADMIN_IDS else None
+    # 235: avval super-admin DM ishlatilardi — admin chatida xabarlar o'z-
+    # o'zidan paydo bo'lib o'chib ketardi (foydalanuvchi shikoyati). Endi
+    # faqat alohida xizmat chati (`RESULTLINK_CHAT_ID`, bot admin bo'lgan
+    # yopiq kanal/guruh); berilmasa qidiruv o'chiq.
+    return config.RESULTLINK_CHAT_ID
 
 
 async def _probe(bot, chat_id: int, mid: int):

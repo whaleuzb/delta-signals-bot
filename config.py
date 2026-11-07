@@ -280,3 +280,8 @@ MACD_POST_DELAY = float(os.getenv("MACD_POST_DELAY", "3.5"))
 # darrov band qilinardi — shuning uchun u MUKOFOT sifatida beriladi.
 # Super-adminlarga bu chegara qo'llanmaydi.
 REF_CUSTOM_MIN = int(os.getenv("REF_CUSTOM_MIN", "20"))
+
+# 235: eski natija postlarini qidirish uchun xizmat chati (bot admin bo'lgan
+# yopiq kanal/guruh id'si, -100...). Bo'sh — qidiruv o'chiq.
+_rl = os.getenv("RESULTLINK_CHAT_ID", "").strip()
+RESULTLINK_CHAT_ID = int(_rl) if _rl.lstrip("-").isdigit() else None
