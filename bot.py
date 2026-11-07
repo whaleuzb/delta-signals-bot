@@ -9887,6 +9887,41 @@ async def _run_one_time_fixes() -> None:
     await db.set_setting(flag, "done")
 
 
+async def _fix_size_979(bot) -> None:
+    """234: #979 EPICUSDT summasi TP/SL so'roviga yutilib ketgan edi —
+    egasi aytgan 30 000$ bir marta yoziladi va natija puli depozitga
+    qo'shiladi (`_save_alloc`). Faqat signal aynan EPICUSDT, summasiz va
+    yopilgan bo'lsa; bayroq bilan ikkinchi marta ishlamaydi."""
+    flag = "onetime_size_979"
+    if await db.get_setting(flag):
+        return
+    note = "o'zgarish yo'q"
+    try:
+        sig = await db.get_signal(979)
+        ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+        if (sig and ws and sig["symbol"] == "EPICUSDT" and sig["alloc_amount"] is None
+                and wsx(ws, sig)["deposit"] is not None):
+            w = wsx(ws, sig)
+            before = float(w["deposit"])
+            await _save_alloc(sig, w, 30000.0)
+            after = float(wsx(await db.get_workspace(ws["id"]), sig)["deposit"])
+            note = (f"#979 EPICUSDT: summa 30,000$ yozildi ({ws['name']}), "
+                    f"natija {sig['status']} {float(sig['pnl_pct'] or 0):+.2f}%, "
+                    f"depozit {before:,.2f}$ → {after:,.2f}$")
+        else:
+            note = "#979: shart mos kelmadi — hech narsa qilinmadi"
+        log.warning("Bir martalik tuzatish: %s", note)
+    except Exception as e:
+        log.exception("#979 summa tuzatish xato")
+        note = f"#979 xato: {type(e).__name__}: {e}"
+    await db.set_setting(flag, "done")
+    for admin in config.ADMIN_IDS:
+        try:
+            await bot.send_message(admin, "🛠 " + note)
+        except Exception:
+            pass
+
+
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
@@ -9950,6 +9985,7 @@ async def post_init(app: Application) -> None:
                 log.warning("Ko'chirish natijasi adminga yuborilmadi (%s)", admin)
     await tournament.load_active()
     await _run_one_time_fixes()
+    await _fix_size_979(app.bot)
     # Uchala tilda: Telegram foydalanuvchi ilovasining tiliga qarab
     # ro'yxatni o'zi tanlaydi; boshqa tillarda — o'zbekcha (standart).
     for code in (None, "ru", "en"):

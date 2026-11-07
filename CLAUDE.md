@@ -7232,3 +7232,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      YO'Q bo'lsa, can_manage) — `_save_alloc` summani yozadi va yopilishda
      qo'shilmagan natija pulini (pnl_pct×lev×summa, excluded bo'lmasa)
      depozitga qo'shadi. Ochiq signalda bo'sh depozit chegarasi (alloc_over).
+     #979 uchun bir martalik `_fix_size_979` (post_init, bayroq
+     `onetime_size_979`): egasi aytgan 30 000$ `_save_alloc` bilan yozildi,
+     natija adminga DM.
