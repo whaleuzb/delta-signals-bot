@@ -3526,6 +3526,66 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await show_preview(msg, ctx, draft, file_id, "caption", ws["id"])
 
 
+async def _save_alloc(sig, ws, amount: float) -> None:
+    """Hajmni saqlaydi. 234: signal allaqachon yopilgan bo'lsa (summa
+    kech kiritildi) — yopilishda qo'shilmagan natija puli depozitga shu
+    yerda qo'shiladi (hisobdan chiqarilgan signal bundan mustasno)."""
+    await db.set_signal_allocation(sig["id"], amount, float(ws["deposit"]))
+    if (sig["status"] in ("TP", "SL", "BREAKEVEN") and sig["pnl_pct"] is not None
+            and not sig["excluded"]):
+        await db.apply_deposit_delta(
+            ws["id"], float(sig["pnl_pct"]) * lev(sig) / 100 * amount, is_fut(sig))
+
+
+async def cmd_size(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """234: /hajm <signal_id> <summa> — summasi kiritilmay qolgan signalga
+    (ochiq yoki yopilgan) hajm yozadi. Faqat summa hali YO'Q bo'lsa —
+    mavjud summani o'zgartirib natijani "chiroyli" qilib bo'lmasin."""
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
+    if len(ctx.args) != 2 or not ctx.args[0].lstrip("#").isdigit():
+        await update.message.reply_text(i18n.t("size.usage", lang), parse_mode=ParseMode.HTML)
+        return
+    amount = _parse_price(ctx.args[1])
+    if amount is None or amount <= 0:
+        await update.message.reply_text(i18n.t("al.bad_amount", lang))
+        return
+    sig = await db.get_signal(int(ctx.args[0].lstrip("#")))
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not (sig and ws and can_manage(uid, ws)):
+        await update.message.reply_text(i18n.t("man.no_right", lang))
+        return
+    if sig["alloc_amount"] is not None:
+        await update.message.reply_text(i18n.t("size.has", lang, amt=float(sig["alloc_amount"])),
+                                        parse_mode=ParseMode.HTML)
+        return
+    if sig["status"] not in ("PENDING", "ACTIVE", "TP", "SL", "BREAKEVEN"):
+        await update.message.reply_text(i18n.t("size.bad_status", lang))
+        return
+    ws = wsx(ws, sig)
+    if ws["deposit"] is None:
+        await update.message.reply_text(i18n.t("size.no_dep", lang))
+        return
+    if sig["status"] in ("PENDING", "ACTIVE"):
+        over = await alloc_over(ws, sig["id"], amount, lang)
+        if over:
+            AWAITING_ALLOC[uid] = sig["id"]
+            await update.message.reply_text(over[0], parse_mode=ParseMode.HTML,
+                                            reply_markup=over[1])
+            return
+    elif amount > float(ws["deposit"]):
+        await update.message.reply_text(i18n.t("size.over", lang, dep=float(ws["deposit"])),
+                                        parse_mode=ParseMode.HTML)
+        return
+    AWAITING_ALLOC.pop(uid, None)
+    await _save_alloc(sig, ws, amount)
+    ws2 = wsx(await db.get_workspace(ws["id"]), sig)
+    await update.message.reply_text(
+        i18n.t("size.saved", lang, sid=sig["id"], sym=sig["symbol"], amt=amount,
+               dep=float(ws2["deposit"])),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
+
+
 async def _alloc_text(msg, uid: int, text: str) -> bool:
     """Hajm (pozitsiya summasi) matn bilan kiritildi (170). Ishlov berilgan
     bo'lsa True."""
@@ -3556,7 +3616,7 @@ async def _alloc_text(msg, uid: int, text: str) -> bool:
         return True
 
     AWAITING_ALLOC.pop(uid, None)
-    await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
+    await _save_alloc(sig, ws, amount)
     await msg.reply_text(
         i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
@@ -9992,6 +10052,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("depozit", cmd_deposit))
     app.add_handler(CommandHandler(["fdepozit", "fdeposit"], cmd_fdeposit))
+    app.add_handler(CommandHandler(["hajm", "size"], cmd_size))
     app.add_handler(CommandHandler("public", cmd_public))
     app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("tasdiq", cmd_pending))

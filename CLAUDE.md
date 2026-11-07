@@ -7228,3 +7228,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      kiritilmagan ochiq signalga "💰 Hajmni kiritish" (`msize:<sid>`,
      `_size_row`: to'liq ko'rinish, depozit bor, PENDING/ACTIVE) —
      `ask_personal_alloc` orqali odatdagi hajm so'rovi.
+     Yopilgan signal uchun: `/hajm <id> <summa>` (`cmd_size`, faqat summa
+     YO'Q bo'lsa, can_manage) — `_save_alloc` summani yozadi va yopilishda
+     qo'shilmagan natija pulini (pnl_pct×lev×summa, excluded bo'lmasa)
+     depozitga qo'shadi. Ochiq signalda bo'sh depozit chegarasi (alloc_over).
