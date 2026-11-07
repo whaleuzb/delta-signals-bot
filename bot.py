@@ -1600,6 +1600,18 @@ async def copy_target(sig) -> "asyncpg.Record | None":
     return None
 
 
+async def _size_row(sig, full: bool, lang) -> list | None:
+    """234: hajm (summa) kiritilmagan ochiq signalga "💰 Hajm" tugmasi.
+    Masalan limit yaratilgan zahoti to'lib, summa TP/SL so'roviga
+    yutilib ketgan bo'lsa (#979) — keyin ham kiritish mumkin bo'lsin."""
+    if not full or sig["alloc_amount"] is not None or sig["status"] not in ("PENDING", "ACTIVE"):
+        return None
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or wsx(ws, sig)["deposit"] is None:
+        return None
+    return [InlineKeyboardButton(i18n.t("man.btn_size", lang), callback_data=f"msize:{sig['id']}")]
+
+
 async def manage_view(sig, lang: str | None = None,
                       full: bool = True) -> tuple[str, InlineKeyboardMarkup]:
     """`full=False` — signal muallifi bo'lgan oddiy a'zo uchun (181):
@@ -1621,6 +1633,8 @@ async def manage_view(sig, lang: str | None = None,
         # to'g'ridan-to'g'ri TP/SL kiritishga yo'naltiramiz.
         rows = [[InlineKeyboardButton(i18n.t("man.btn_tpsl", lang),
                                        callback_data=f"tpsl:{sid}")]]
+        if (sr := await _size_row(sig, full, lang)):
+            rows.append(sr)
         if pending:
             rows.append([
                 InlineKeyboardButton(i18n.t("man.btn_entry", lang), callback_data=f"mentry:{sid}"),
@@ -1682,6 +1696,8 @@ async def manage_view(sig, lang: str | None = None,
     if pending:
         rows.append([InlineKeyboardButton(i18n.t("man.btn_entry", lang),
                                           callback_data=f"mentry:{sid}")])
+    if (sr := await _size_row(sig, full, lang)):
+        rows.append(sr)
     # Qo'shimcha kirish (190) — faqat to'liq ochiq pozitsiyada.
     pend_adds = await db.signal_adds(sid, "PENDING")
     if sig["status"] == "ACTIVE" and filled == 0:
@@ -1783,6 +1799,23 @@ def _add_side_ok(sig, price: float) -> bool:
     """Narx stopning to'g'ri tomonidami (LONG: stopdan yuqori)."""
     sl = float(sig["sl"])
     return price > sl if sig["side"] == "LONG" else price < sl
+
+
+async def on_size_btn(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """234: "💰 Hajm" — kiritilmay qolgan pozitsiya summasini so'raydi."""
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    sig = await db.get_signal(int(q.data.split(":")[1]))
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not (sig and ws and sig["alloc_amount"] is None
+            and sig["status"] in ("PENDING", "ACTIVE") and can_manage(uid, ws)):
+        return
+    ws = wsx(ws, sig)
+    if ws["deposit"] is None:
+        return
+    AWAITING_TPSL.pop(uid, None)
+    await ask_personal_alloc(q.message, ws, sig["id"], dict(sig), uid)
 
 
 async def on_add_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3493,6 +3526,43 @@ async def on_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await show_preview(msg, ctx, draft, file_id, "caption", ws["id"])
 
 
+async def _alloc_text(msg, uid: int, text: str) -> bool:
+    """Hajm (pozitsiya summasi) matn bilan kiritildi (170). Ishlov berilgan
+    bo'lsa True."""
+    alloc_sig_id = AWAITING_ALLOC.get(uid)
+    if not alloc_sig_id:
+        return False
+    amount = _parse_price(text)
+    if amount is None or amount <= 0:
+        await msg.reply_text(i18n.t("al.bad_amount", await user_lang(uid)))
+        return True
+    sig = await db.get_signal(alloc_sig_id)
+    ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
+    # Huquq bu yerda HAM tekshiriladi: so'rov yuborilganidan keyin odam
+    # adminlikdan olingan bo'lishi mumkin, tugmalar esa allaqachon
+    # `can_manage` bilan himoyalangan — matn yo'li ulardan qolishmasin.
+    if not (sig and ws and ws["deposit"] is not None and can_manage(uid, ws)):
+        AWAITING_ALLOC.pop(uid, None)
+        return True
+    alang = await user_lang(uid)
+
+    # Bo'sh depozitdan oshsa — saqlamaymiz, ikkita tanlov beramiz.
+    # `AWAITING_ALLOC` ATAYLAB o'chirilmaydi: odam tugma bosmasdan
+    # to'g'ridan-to'g'ri boshqa summa yozsa ham ishlashi kerak.
+    over = await alloc_over(ws, alloc_sig_id, amount, alang)
+    if over:
+        await msg.reply_text(over[0], parse_mode=ParseMode.HTML,
+                             reply_markup=over[1])
+        return True
+
+    AWAITING_ALLOC.pop(uid, None)
+    await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
+    await msg.reply_text(
+        i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
+        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
+    return True
+
+
 async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Rasmsiz matnli signal yoki tahrir javobi."""
     uid = update.effective_user.id
@@ -3542,6 +3612,14 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await show_preview(msg, ctx, draft, None, "jurnal", ws["id"])
         return
 
+    # 234: hajm so'rovi va TP/SL so'rovi BIR VAQTDA ochiq bo'lishi mumkin
+    # (limit yaratilgan zahoti to'lsa — #979). Bitta son TP/SL bo'la olmaydi
+    # (kamida TP va SL kerak), demak u hajm javobi — avval o'shanga.
+    if (AWAITING_ALLOC.get(uid) and len(text.split()) == 1
+            and _parse_price(text) is not None):
+        if await _alloc_text(msg, uid, text):
+            return
+
     # Limit to'lib, TP/SL HALI kiritilmagan signal uchun birinchi javob.
     if await handle_tpsl_input(update, ctx):
         return
@@ -3564,36 +3642,7 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
         await apply_tourney_amount(msg, uid, tsig, amount, tlang)
         return
 
-    alloc_sig_id = AWAITING_ALLOC.get(uid)
-    if alloc_sig_id:
-        amount = _parse_price(text)
-        if amount is None or amount <= 0:
-            await msg.reply_text(i18n.t("al.bad_amount", await user_lang(uid)))
-            return
-        sig = await db.get_signal(alloc_sig_id)
-        ws = wsx(await db.get_workspace(sig["workspace_id"]), sig) if sig else None
-        # Huquq bu yerda HAM tekshiriladi: so'rov yuborilganidan keyin odam
-        # adminlikdan olingan bo'lishi mumkin, tugmalar esa allaqachon
-        # `can_manage` bilan himoyalangan — matn yo'li ulardan qolishmasin.
-        if not (sig and ws and ws["deposit"] is not None and can_manage(uid, ws)):
-            AWAITING_ALLOC.pop(uid, None)
-            return
-        alang = await user_lang(uid)
-
-        # Bo'sh depozitdan oshsa — saqlamaymiz, ikkita tanlov beramiz.
-        # `AWAITING_ALLOC` ATAYLAB o'chirilmaydi: odam tugma bosmasdan
-        # to'g'ridan-to'g'ri boshqa summa yozsa ham ishlashi kerak.
-        over = await alloc_over(ws, alloc_sig_id, amount, alang)
-        if over:
-            await msg.reply_text(over[0], parse_mode=ParseMode.HTML,
-                                 reply_markup=over[1])
-            return
-
-        AWAITING_ALLOC.pop(uid, None)
-        await db.set_signal_allocation(alloc_sig_id, amount, float(ws["deposit"]))
-        await msg.reply_text(
-            i18n.t("al.saved_dep", alang, amt=amount, dep=float(ws["deposit"])),
-            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(alang))
+    if await _alloc_text(msg, uid, text):
         return
 
     token = AWAITING_EDIT.get(uid)
@@ -9989,6 +10038,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_manage_entry, pattern=r"^mentry:"))
     app.add_handler(CallbackQueryHandler(on_manage_tp, pattern=r"^mtp:"))
     app.add_handler(CallbackQueryHandler(on_manage_partial, pattern=r"^mpc:"))
+    app.add_handler(CallbackQueryHandler(on_size_btn, pattern=r"^msize:\d+$"))
     app.add_handler(CallbackQueryHandler(on_add_menu, pattern=r"^madd:\d+$"))
     app.add_handler(CallbackQueryHandler(on_add_go, pattern=r"^maddgo:\d+:[\d.]+$"))
     app.add_handler(CallbackQueryHandler(on_addlim_menu, pattern=r"^mlim:\d+$"))

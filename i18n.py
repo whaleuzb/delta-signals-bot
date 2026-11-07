@@ -381,6 +381,7 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- Qo'shimcha kirish / o'rtachalash (190) ---
     "man.entry_avg": {"uz": "O'rtacha kirish", "ru": "Средний вход", "en": "Average entry"},
     "man.entry_first": {"uz": "Birinchi kirish: {p}", "ru": "Первый вход: {p}", "en": "First entry: {p}"},
+    "man.btn_size": {"uz": "💰 Hajmni kiritish", "ru": "💰 Указать сумму", "en": "💰 Set position size"},
     "man.btn_add": {"uz": "➕ Qo'shib olish", "ru": "➕ Докупить", "en": "➕ Add to position"},
     "man.btn_addlim": {"uz": "📌 Qo'shimcha limit", "ru": "📌 Доп. лимит", "en": "📌 Add limit"},
     "man.adds_pending": {"uz": "📌 Kutilayotgan qo'shimcha limitlar: {lst}",

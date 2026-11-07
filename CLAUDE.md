@@ -7220,3 +7220,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Spot/Futures tanlanmaguncha `wiz_steps` futures deb hisoblaydi (1/8,
      2/8); Futures — oxirigacha /8; Spot (`_kind = "spot"`) va forex/aksiya
      o'z soni (/6, limit /4).
+234. **Hajm so'rovi TP/SL so'roviga yutilmasin (#979).** Limit yaratilgan
+     zahoti to'lsa hajm (AWAITING_ALLOC) va TP/SL (AWAITING_TPSL) so'rovi
+     bir vaqtda ochiq bo'ladi; avval TP/SL ishlovchisi yozilgan summani
+     o'zi olardi. Endi bitta son (`_parse_price` o'tadi) kelsa va hajm
+     kutilayotgan bo'lsa — `_alloc_text` (hajm). Boshqaruvda summa
+     kiritilmagan ochiq signalga "💰 Hajmni kiritish" (`msize:<sid>`,
+     `_size_row`: to'liq ko'rinish, depozit bor, PENDING/ACTIVE) —
+     `ask_personal_alloc` orqali odatdagi hajm so'rovi.
