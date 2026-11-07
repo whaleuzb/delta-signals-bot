@@ -782,12 +782,49 @@ async def df_tour_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await db.set_setting(dipfunded.TOUR_KEY, json.dumps(data))
 
 
-async def result_link_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """210: eski yopilgan savdolarning natija postini topadi (`resultlink`)."""
-    try:
-        await resultlink.run(ctx.bot)
-    except Exception:
-        log.exception("Natija posti qidiruvida xato")
+_RL_TASK: asyncio.Task | None = None
+
+
+async def cmd_result_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """236: /natijaqidir — eski yopilgan savdolarning natija postini FAQAT
+    super-admin so'raganda qidiradi (210). Avtomatik sikl olib tashlandi:
+    qidiruv xabarlarni xizmat chatiga forward qilib o'chiradi, admin
+    chatida bu "o'z-o'zidan kelib o'chayotgan xabarlar" bo'lib ko'rinardi."""
+    global _RL_TASK
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    if _RL_TASK and not _RL_TASK.done():
+        await update.message.reply_text("⏳ Qidiruv allaqachon ketyapti.")
+        return
+    resultlink._dump_override = None if config.RESULTLINK_CHAT_ID else update.effective_chat.id
+    await update.message.reply_text(
+        "🔎 Eski natija postlari qidirilmoqda. Shu paytda bu chatda xabarlar "
+        "qisqa paydo bo'lib o'chadi — bu qidiruv. Tugagach xabar beraman.")
+
+    async def _go(chat_id: int) -> None:
+        done = found = idle = 0
+        try:
+            for _ in range(2000):
+                d, f = await resultlink.run(ctx.bot)
+                done += d
+                found += f
+                if not await db.result_link_targets(1):
+                    break
+                idle = idle + 1 if d == 0 else 0
+                if idle >= 5:
+                    break
+                await asyncio.sleep(5 if d == 0 else 1)
+        except Exception:
+            log.exception("Natija posti qidiruvida xato")
+        finally:
+            resultlink._dump_override = None
+        left = len(await db.result_link_targets(1000))
+        await ctx.bot.send_message(
+            chat_id, f"✅ Qidiruv tugadi: {done} ta signal ko'rildi, {found} ta natija posti "
+                     f"topildi. Qolgani: {left}.")
+
+    _RL_TASK = asyncio.create_task(_go(update.effective_chat.id))
 
 
 async def member_count_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -10089,6 +10126,7 @@ def main() -> None:
     app.add_handler(CommandHandler("depozit", cmd_deposit))
     app.add_handler(CommandHandler(["fdepozit", "fdeposit"], cmd_fdeposit))
     app.add_handler(CommandHandler(["hajm", "size"], cmd_size))
+    app.add_handler(CommandHandler("natijaqidir", cmd_result_search))
     app.add_handler(CommandHandler("public", cmd_public))
     app.add_handler(CommandHandler("havola", cmd_link))
     app.add_handler(CommandHandler("tasdiq", cmd_pending))
@@ -10198,7 +10236,6 @@ def main() -> None:
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
-    app.job_queue.run_repeating(result_link_job, interval=60, first=180)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
     app.job_queue.run_once(promo_emoji_job, 15)

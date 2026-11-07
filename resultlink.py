@@ -41,7 +41,11 @@ def _dump_chat() -> int | None:
     # o'zidan paydo bo'lib o'chib ketardi (foydalanuvchi shikoyati). Endi
     # faqat alohida xizmat chati (`RESULTLINK_CHAT_ID`, bot admin bo'lgan
     # yopiq kanal/guruh); berilmasa qidiruv o'chiq.
-    return config.RESULTLINK_CHAT_ID
+    # 236: faqat super-admin buyrug'i bilan (`/natijaqidir`) — o'sha chat.
+    return _dump_override or config.RESULTLINK_CHAT_ID
+
+
+_dump_override: int | None = None
 
 
 async def _probe(bot, chat_id: int, mid: int):
@@ -120,12 +124,12 @@ async def find_result(bot, chat_id: int, sid: int, sym: str, lo: int, hi: int,
     return best_photo or best
 
 
-async def run(bot) -> int:
+async def run(bot) -> tuple[int, int]:
     """Bir sikl: bir nechta signal uchun natija postini qidiradi.
-    Qaytaradi: topilganlar soni."""
+    Qaytaradi: (ko'rib chiqilgan, topilgan)."""
     if not _dump_chat():
-        return 0
-    found = 0
+        return 0, 0
+    found = done = 0
     for r in await db.result_link_targets(PER_RUN):
         chat = r["group_chat_id"]
         res = None
@@ -135,16 +139,17 @@ async def run(bot) -> int:
                                         r["group_msg_id"] + 1, r["hi"], r["closed_at"])
             except Exception as ex:
                 log.warning("Natija posti qidiruvi to'xtadi (#%s): %s", r["id"], ex)
-                return found       # flood — keyingi siklda davom
+                return done, found   # flood — keyingi siklda davom
         if res is None and not _ok_chats:
             # Hali birorta forward o'tmagan — balki xizmat chati (admin DM)
             # ishlamayapti. Bunda "topilmadi" deb belgilash noto'g'ri bo'lardi.
             log.warning("Natija posti qidiruvi: birorta forward o'tmadi — "
                         "admin botni bloklaganmi? (dump=%s)", _dump_chat())
-            return found
+            return done, found
         await db.set_result_found(r["id"], res)
+        done += 1
         if res:
             found += 1
     if found:
         log.info("Eski natija postlari topildi: %s ta", found)
-    return found
+    return done, found

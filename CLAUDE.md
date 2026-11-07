@@ -7239,3 +7239,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      forward→delete super-admin chatida "o'z-o'zidan kelib o'chayotgan
      xabarlar" bo'lib ko'rinardi. Endi faqat `RESULTLINK_CHAT_ID` (bot admin
      bo'lgan yopiq kanal/guruh); bo'sh bo'lsa qidiruv o'chiq.
+236. **Natija posti qidiruvi faqat so'rov bilan.** Avtomatik `result_link_job`
+     olib tashlandi. Super-admin `/natijaqidir` yozsa (`cmd_result_search`)
+     fon vazifasi barcha nomzodlarni ko'rib chiqadi (xizmat chati —
+     `RESULTLINK_CHAT_ID` yoki buyruq yozilgan chat), tugagach hisobot.
