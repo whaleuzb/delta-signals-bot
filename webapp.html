@@ -225,7 +225,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 <div class="page" id="page"></div>
 <nav class="nav glass" id="nav"></nav>
 <script>
-var T=__T__;
+var T=__T__;var BOT=__BOT__;
 var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  trend:'<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
  bars:'<line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/>',
@@ -267,7 +267,7 @@ function botUrl(start){return 'https://t.me/'+S.bot+(start?'?start='+start:'')}
 /* 242: o'z sahifalarimiz (statistika, turnir) ilova ICHIDA ochiladi —
    tg.openLink tashqi brauzerga chiqarib yuborardi. Qaytish — Telegram
    "Orqaga" tugmasi (web.py TG_SCRIPT). */
-function openLink(u){if(!u)return;if(u.indexOf(location.origin)==0||u.charAt(0)=='/'){try{sessionStorage.setItem('tc_from_app','1')}catch(e){}location.href=u;return}if(u.indexOf('https://t.me/')==0&&tg&&tg.openTelegramLink)tg.openTelegramLink(u);else if(tg&&tg.openLink&&u.indexOf('http')==0)tg.openLink(u);else location.href=u}
+function openLink(u){if(!u)return;if(S.pub&&u.indexOf('http')==0&&u.indexOf(location.origin)!=0){window.open(u,'_blank');return}if(u.indexOf(location.origin)==0||u.charAt(0)=='/'){try{sessionStorage.setItem('tc_from_app','1')}catch(e){}location.href=u;return}if(u.indexOf('https://t.me/')==0&&tg&&tg.openTelegramLink)tg.openTelegramLink(u);else if(tg&&tg.openLink&&u.indexOf('http')==0)tg.openLink(u);else location.href=u}
 
 /* ---- pastki panel: siljiydigan indikator ---- */
 function nav(){var tabs=[['home','home'],['signals','trend'],['top','crown'],['tour','trophy'],['profile','user']];
@@ -365,7 +365,7 @@ function loadSpark(){var w=cur();if(!w)return;api('spark',{ws:w.id}).then(functi
   var el=document.getElementById('k'+k);var i=S.items.filter(function(x){return x.id==k})[0];if(el&&i)el.innerHTML=spark(i,first)}}).catch(function(){})}
 
 /* ---- 243: Profil (ilova ichida) ---- */
-function toBot(){tick();try{if(tg&&tg.close){tg.close();return}}catch(e){}openLink(botUrl())}
+function toBot(){tick();if(S.pub){openLink(botUrl());return}try{if(tg&&tg.close){tg.close();return}}catch(e){}openLink(botUrl())}
 function setLang(l){S.lang=l;try{localStorage.setItem('tc_lang',l)}catch(e){}document.getElementById('nav').dataset.ok='';document.getElementById('tBot').textContent=t('bot');S.anim=true;tick();render()}
 function pickWs(id){S.cur=id;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',id)}catch(e){}S.dir='in-l';S.tab='home';S.anim=true;tick();render();load()}
 function profile(v,w){var u=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user)||{};var nm=((u.first_name||'')+' '+(u.last_name||'')).trim()||'Trader';
@@ -535,12 +535,19 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
 (function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
  tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}
- if(!tg||!tg.initData){document.getElementById('view').innerHTML='<div class="empty glass">'+ic('orbit',40)+'<div>'+esc(t('only_tg'))+'</div></div>';return}
+ /* 252: Telegram tashqarisida (brauzer, to'lov boti) — ochiq rejim:
+    Top, Turnir va guruh sahifalari; boshqaruv faqat Telegram ichida. */
+ var q0=new URLSearchParams(location.search);var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
+ if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));
+ if(!tg||!tg.initData){S.pub=true;S.bot=BOT;var nl=q0.get('lang');S.lang=T[nl]?nl:'uz';try{var sl0=localStorage.getItem('tc_lang');if(sl0&&T[sl0])S.lang=sl0}catch(e){}
+  document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+  document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
+  S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
  api('me').then(function(d){S.ws=d.ws;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
-  var q=new URLSearchParams(location.search);if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);
+  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);
   render();load();setInterval(function(){if(!document.hidden&&!document.getElementById('sheet').classList.contains('show'))load()},15000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

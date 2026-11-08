@@ -747,7 +747,7 @@ def web_page_url(ws) -> str | None:
         return None
     if not channel_top_ok(ws):
         return None
-    return f"{config.WEB_URL}/g/{ws['id']}"
+    return f"{config.WEB_URL}/app?g={ws['id']}"   # 252: yangi sahifa
 
 
 def channel_top_ok(ws) -> bool:

@@ -435,7 +435,10 @@ async def api_tour(request):
 
 
 async def app_page(request):
-    return web.Response(text=PAGE, content_type="text/html", headers=NO_CACHE)
+    # 252: bot nomi sahifaga yoziladi — Telegram tashqarisida (brauzer,
+    # to'lov boti) ochilganda ham "Botni ochish" havolasi ishlasin.
+    return web.Response(text=PAGE.replace("__BOT__", json.dumps(request.app["bot_username"] or "")),
+                        content_type="text/html", headers=NO_CACHE)
 
 
 def routes() -> list:

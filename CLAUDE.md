@@ -7356,3 +7356,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      uni yana avtomatik rejimga qaytaradi. Bir martalik `_fix_whales_join`
      (bayroq `onetime_whales_join`): nomi aynan "Whales Uzb", egasi
      super-admin bo'lgan bitta guruh; natija adminga DM.
+252. **Eski HTML sahifalar o'chirildi — faqat yangi ilova.** `/` → `/app?tab=top`,
+     `/g/<id>` (embed/solo ham) → `/app?g=<id>`, `/t[/<id>]` → `/app?tab=tour`
+     (302). `index`, `group_page`, `tourney_page`, `open_reveal` va faqat
+     ular ishlatgan yordamchilar (CSS, TG_SCRIPT, page, open_cards, turnir
+     jadvallari va h.k.) olib tashlandi; `stats.json`, `equity.png`,
+     `logo.png`, `mini.png` qoldi. `stats.json` `url` → `/app?g=<id>` (to'lov
+     boti — whale-payment-bot `trade_stats.py` — "Umumiy ko'rish" shu yerga
+     ochadi). `/app` Telegram tashqarisida (brauzer) ham ishlaydi — ochiq
+     rejim (`S.pub`): Top, Turnir, guruh sahifasi; til `?lang=` yoki uz;
+     tashqi havolalar yangi oynada; `__BOT__` sahifaga server yozadi.
+     `start_param` `g<id>` — guruh sahifasini ochadi. `web_page_url` →
+     `/app?g=<id>`.
