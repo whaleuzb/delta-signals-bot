@@ -855,6 +855,40 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         text, kb = await _df_open(uid, lang)
         await ctx.bot.send_message(uid, text, parse_mode=ParseMode.HTML, reply_markup=kb)
         return True, "ok"
+    if a["action"] in ("dfacc", "dfone"):
+        # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
+        if not dipfunded.enabled():
+            return False, json.dumps({"code": "off"})
+        try:
+            if a["action"] == "dfacc":
+                data = await dipfunded.accounts(uid)
+                s_ = await df_settings(uid)
+                out = {"main": s_["main"], "accounts": [
+                    {"id": x["id"], "name": _df_name(x), "status": x["status"],
+                     "phase": x.get("phase"), "status_txt": _df_status(x, lang),
+                     "equity": x.get("equity"), "pnl_pct": x.get("pnl_pct")}
+                    for x in (data.get("accounts") or [])]}
+            else:
+                data = await dipfunded.account(uid, int(a["arg"]))
+                acc, st = data["account"], data["state"]
+                out = {"id": acc["id"], "name": _df_name(acc), "status": acc["status"],
+                       "status_txt": _df_status(acc, lang), "tradable": bool(acc.get("tradable")),
+                       "equity": st.get("equity"), "pnl": st.get("pnl"), "balance": st.get("balance"),
+                       "available": st.get("available"), "daily": st.get("daily"),
+                       "max": st.get("max"), "target": st.get("target"), "days": st.get("days"),
+                       "positions": [{"symbol": p_["symbol"], "value": p_.get("value"),
+                                      "avg": p_.get("avg_price"), "price": p_.get("price"),
+                                      "upnl": p_.get("upnl"), "upnl_pct": p_.get("upnl_pct"),
+                                      "sl": p_.get("sl"), "tp": p_.get("tp")}
+                                     for p_ in (st.get("positions") or [])],
+                       "orders": [{"id": o["id"], "symbol": o["symbol"], "limit": o.get("limit"),
+                                   "amount": o.get("amount")} for o in (st.get("orders") or [])]}
+            return True, json.dumps(out, default=float)
+        except dipfunded.NotLinked as e:
+            return False, json.dumps({"code": str(e) or "not_linked"})
+        except Exception as e:
+            log.warning("Mini App Dip Funded: %s", e)
+            return False, json.dumps({"code": "unavailable"})
     if a["action"] in ("dep", "fdep"):
         try:
             ws = await db.get_workspace(int(json.loads(a["args"])["ws"]))
@@ -1245,7 +1279,12 @@ def main_menu_kb(uid: int, ws, private: bool = True,
     extra = []
     # Dip Funded hisoblari — faqat shaxsiy chatda (hisob va pul guruhda ko'rinmasin).
     if private and dipfunded.enabled():
-        extra.append(InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home"))
+        # 255: hisoblar Mini App ichida ochiladi (ilovasiz bo'lsa — eski bot menyusi).
+        if config.WEB_URL:
+            extra.append(InlineKeyboardButton(
+                i18n.t("menu.dipfunded", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app?df=1")))
+        else:
+            extra.append(InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home"))
     if config.NEWS_CHANNEL_ID:
         extra.append(InlineKeyboardButton(i18n.t("menu.news", lang),
                                           url=f"https://t.me/{NEWS_CHANNEL_USERNAME}"))

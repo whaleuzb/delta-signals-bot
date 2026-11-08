@@ -308,7 +308,7 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  +'<div class="card glass rise" onclick="depSheet()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
  +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
- +'<div class="card glass acc rise" onclick="dfSheet()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
+ +'<div class="card glass acc rise" onclick="openDf()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
 function bindSlider(){var s=document.getElementById('slider');if(!s)return;
  s.scrollLeft=S.slide*s.clientWidth;
  s.onscroll=function(){var k=Math.round(s.scrollLeft/Math.max(1,s.clientWidth));if(k!=S.slide){S.slide=k;tick();
@@ -484,9 +484,41 @@ function depSheet(){var w=cur();if(!w)return;var bs=0,bf=0;S.items.forEach(funct
  var blk=function(key,act,val,busy){return'<div class="tile2 glass" style="margin-bottom:10px"><div class="k">'+esc(t(key))+'</div><div class="v">'+(val!=null?f0(val):'—')+'</div>'
   +(val!=null?'<div class="rs" style="margin-top:4px">'+esc(t('busy_l'))+' '+f0(busy)+' · '+esc(t('free_l'))+' '+f0(Math.max(0,val-busy))+'</div>':'')
   +'<div style="display:flex;gap:8px;margin-top:10px"><input id="d_'+act+'" inputmode="decimal" placeholder="'+esc(t('new_val'))+'" style="margin:0;font-size:16px;padding:10px 12px"><button class="btn p" style="width:auto;flex:none;margin:0" onclick="saveDep(\''+act+'\')">'+esc(t('save'))+'</button></div></div>'};
- sheetOpen('<h4>'+esc(t('dep_title'))+'</h4><p>'+esc(wsName(w))+'</p>'+blk('dep_spot','dep',w.deposit,bs)+blk('dep_fut','fdep',w.fut_deposit,bf))}
+ var dfb=S.df?'<div class="tile2 glass acc" style="margin-bottom:10px"><div class="k">Dip Funded</div><div class="v" style="font-size:16px">'+esc(t('df_accs'))+'</div>'
+  +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn p" style="margin:0" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button><button class="btn" style="margin:0" onclick="sheetClose();openDf()">'+esc(t('df_accs'))+'</button></div></div>':'';
+ sheetOpen('<h4>'+esc(t('dep_title'))+'</h4><p>'+esc(wsName(w))+'</p>'+blk('dep_spot','dep',w.deposit,bs)+blk('dep_fut','fdep',w.fut_deposit,bf)+dfb)}
 function saveDep(act){var v=num(document.getElementById('d_'+act).value);if(!v)return;var w=cur();
  actWs(act,v,w.id).then(function(r){if(r&&r.ok){if(act=='dep')w.deposit=v;else w.fut_deposit=v;sheetClose();S.anim=false;render()}})}
+/* 255: Dip Funded prop hisoblari — ilova ichida (ma'lumotni bot beradi) */
+function dfCall(a,arg){return api('act',{action:a,arg:arg}).then(function(r){var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}return{ok:r.ok,d:d,pending:r.pending}})}
+function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(back?'openDf(1)':'closeGroup()')+'">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('zap',22)+'</div><div><h2>Dip Funded</h2><div class="rs">'+esc(t('df_accs'))+'</div></div></div>'}
+function dfErr(d){var c=d&&d.code;if(c=='not_linked'||c=='profile')return'<div class="empty glass rise">'+ic('link',36)+'<div style="margin:8px 0 14px">'+esc(t('df_nolink'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button></div>';
+ return'<div class="empty glass rise">'+esc(t('df_unav'))+'</div>'}
+function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}}
+function openDf(inner){if(!inner)tick();S.page={id:'df'};var p=document.getElementById('page');
+ p.innerHTML=dfHead()+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';if(!inner)pageShow();
+ dfCall('dfacc').then(function(r){if(!S.page||S.page.id!='df')return;var h=dfHead();
+  h+='<button class="btn p full rise" style="width:100%;padding:12px;font-size:14px;margin-bottom:12px" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button>';
+  if(!r.ok)h+=dfErr(r.d);else{var L=r.d.accounts||[];
+   h+=L.length?L.map(function(a){var pos=(a.pnl_pct||0)>=0;return'<div class="row glass rise'+(a.id==r.d.main?' acc':'')+'" onclick="dfAcc('+a.id+')"><div class="av" style="font-size:12px">#'+a.id+'</div><div class="rm"><div class="rn">'+esc(a.name)+'</div><div class="rs">'+esc(a.status_txt)+'</div></div>'
+    +(a.equity!=null?'<div class="rv '+(pos?'g':'r')+'">'+f0(+a.equity)+'<small>'+fpc(+a.pnl_pct||0)+'</small></div>':'')+'</div>'}).join(''):'<div class="empty glass rise">'+esc(t('df_none'))+'</div>'}
+  h+='<button class="btn full rise" style="width:100%;margin-top:8px" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button>';
+  p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*50)+'ms'})})}
+function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col=u>=80?'var(--r)':u>=50?'#e8e8ea':'var(--g)';
+ return'<div style="margin:8px 0"><div class="rs" style="display:flex;justify-content:space-between"><span>'+esc(lbl)+'</span><span>'+txt+'</span></div><div class="bar" style="margin-top:6px"><i style="left:0;width:'+u+'%;background:'+col+'"></i></div></div>'}
+function dfAcc(id){tick();S.page={id:'df',acc:id};var p=document.getElementById('page');p.scrollTop=0;
+ p.innerHTML=dfHead(1)+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';
+ dfCall('dfone',id).then(function(r){if(!S.page||S.page.acc!=id)return;var h=dfHead(1);if(!r.ok){p.innerHTML=h+dfErr(r.d);return}var a=r.d;
+  h+='<div class="slide glass acc rise" style="min-height:0;margin-bottom:12px"><div class="k">#'+a.id+' · '+esc(a.name)+'</div><div class="v">'+f0(+a.equity)+'</div><div class="d"><span class="'+((+a.pnl||0)>=0?'g':'r')+'">'+fm(+a.pnl||0)+'</span> · '+esc(a.status_txt)+'</div></div>';
+  h+='<div class="tiles"><div class="tile2 glass rise"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">'+f0(+a.balance)+'</div></div><div class="tile2 glass rise"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">'+f0(+a.available)+'</div></div></div>';
+  if(a.tradable){h+='<div class="eq glass rise">';if(a.daily)h+=bar(t('df_daily'),a.daily.used_pct,f0(+a.daily.left));if(a.max)h+=bar(t('df_maxdd'),a.max.used_pct,f0(+a.max.left));
+   if(a.target&&a.target.progress!=null)h+=bar(t('df_target'),a.target.progress,f0(+a.target.amount));if(a.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+a.days.done+' / '+a.days.min+'</div>';h+='</div>'}
+  h+='<div class="sect rise">'+esc(t('df_pos'))+' · '+a.positions.length+'</div>';
+  h+=a.positions.map(function(x){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">'+esc(x.symbol)+'</div><div class="rs">'+f0(+x.value)+' · '+fp(x.avg)+' → '+fp(x.price)+(x.sl!=null?' · SL '+fp(x.sl):'')+(x.tp!=null?' · TP '+fp(x.tp):'')+'</div></div><div class="rv '+((+x.upnl||0)>=0?'g':'r')+'">'+fm(+x.upnl||0)+'<small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'}).join('');
+  if(a.orders.length)h+='<div class="sect rise">'+esc(t('df_orders'))+' · '+a.orders.length+'</div>'+a.orders.map(function(o){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">#'+o.id+' '+esc(o.symbol)+'</div><div class="rs">≤ '+fp(o.limit)+' · '+f0(+o.amount)+'</div></div></div>'}).join('');
+  var tu=(S.df||'').replace(/[/]$/,'')+'/account/trade/'+a.id;
+  h+='<div style="display:flex;gap:8px;margin-top:10px" class="rise"><button class="btn p" onclick="openLink(\''+esc(tu)+'\')">'+esc(t('df_term'))+'</button><button class="btn" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button></div>';
+  p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'})})}
 function dfSheet(){sheetOpen('<h4>'+esc(t('df_title'))+'</h4><p>'+esc(t('df_txt'))+'</p>'
  +'<button class="btn p full" onclick="dfBot()">'+esc(t('df_acc'))+'</button>'
  +(S.df?'<button class="btn full" style="margin-top:8px" onclick="openLink(S.df)">'+esc(t('df_site'))+'</button>':'')
@@ -568,11 +600,11 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
   S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
- api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+ api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
-  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);
+  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(openDf,50);
   render();load();setInterval(function(){if(!document.hidden&&!document.getElementById('sheet').classList.contains('show'))load()},15000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

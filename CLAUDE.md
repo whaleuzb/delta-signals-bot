@@ -7385,3 +7385,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `db.period_stats`: natija %, $ natija, signal, WR, foyda/zarar, o'rtacha,
      likvidatsiya); egada umumiy plitkalar takrorlanmaydi. Shaxsiy jurnalda
      "qo'shilish havolasi" eslatmasi chiqmaydi.
+255. **Dip Funded prop hisoblari Mini App ichida.** Veb servisda DIPFUNDED
+     kaliti yo'q — ma'lumotni bot beradi: `dfacc` (ro'yxat) va `dfone` (hisob
+     tafsiloti) amallari (`sig_id=0`), natija `app_actions.result`da JSON;
+     `NotLinked` → `{"code":"not_linked"|"profile"}` (ilovada "Akkauntni
+     ulash" — `/account/telegram/link`). Ilovada: hisoblar (equity, %),
+     hisob sahifasi (balans, bo'sh, kunlik/maks. zarar va maqsad chiziqlari,
+     savdo kunlari, pozitsiyalar, limit buyruqlar), "Savdo terminali"
+     (sayt), "Botda boshqarish". "Prop hisob olish" — `/account/buy`
+     (Depozit oynasida ham). Bosh menyudagi "💼 Dip Funded" endi web_app
+     (`/app?df=1`).

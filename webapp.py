@@ -28,7 +28,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
-WS_ACTIONS = ("dep", "fdep", "df")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -75,7 +75,9 @@ async def api_me(request):
     import dipfunded
     return web.json_response({"uid": uid, "lang": lang, "ws": out,
                               "bot": request.app["bot_username"],
-                              "df": dipfunded.site_url("/") if dipfunded.enabled() else None},
+                              "df": dipfunded.site_url("/") if dipfunded.enabled() else None,
+                              "df_buy": dipfunded.site_url("/account/buy") if dipfunded.enabled() else None,
+                              "df_link": dipfunded.site_url("/account/telegram/link") if dipfunded.enabled() else None},
                              headers=NO_CACHE)
 
 
@@ -204,7 +206,12 @@ async def _ws_act(body, uid: int, act: str):
     """254: depozit o'rnatish (spot/futures) va Dip Funded menyusini botda
     ochish — bot bajaradi (`app_action_job`), sig_id=0."""
     arg = None
-    if act != "df":
+    if act == "dfone":
+        try:
+            arg = float(int(body.get("arg")))
+        except (TypeError, ValueError):
+            raise web.HTTPBadRequest()
+    if act not in ("df", "dfacc", "dfone"):
         try:
             ws = await db.get_workspace(int(body.get("ws")))
             arg = float(body.get("arg"))
@@ -552,6 +559,12 @@ T = {
         "busy_l": "Pozitsiyalarda", "free_l": "Bo'sh", "new_val": "Yangi qiymat, $",
         "df_open": "Dip Funded botda ochildi", "df_site": "Saytni ochish", "df_acc": "Hisoblarim (botda)",
         "df_title": "Dip Funded", "df_txt": "Prop hisoblar: savdo, sotish va hisob holati botda. Turnir — Turnir bo'limida.",
+        "df_buy": "Prop hisob olish", "df_accs": "Prop hisoblar", "df_none": "Hali prop hisob yo'q",
+        "df_nolink": "Telegram Dip Funded akkauntiga ulanmagan", "df_link_btn": "Akkauntni ulash",
+        "df_unav": "Dip Funded hozir javob bermayapti", "df_equity": "Equity", "df_balance": "Balans",
+        "df_free": "Bo'sh", "df_daily": "Kunlik limit", "df_maxdd": "Maks. zarar", "df_target": "Maqsad",
+        "df_days": "Savdo kunlari", "df_pos": "Pozitsiyalar", "df_orders": "Limit buyruqlar",
+        "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -595,6 +608,12 @@ T = {
         "busy_l": "В позициях", "free_l": "Свободно", "new_val": "Новое значение, $",
         "df_open": "Dip Funded открыт в боте", "df_site": "Открыть сайт", "df_acc": "Мои счета (в боте)",
         "df_title": "Dip Funded", "df_txt": "Проп-счета: торговля и состояние счёта в боте. Турнир — во вкладке Турнир.",
+        "df_buy": "Купить проп-счёт", "df_accs": "Проп-счета", "df_none": "Пока нет проп-счетов",
+        "df_nolink": "Telegram не привязан к Dip Funded", "df_link_btn": "Привязать аккаунт",
+        "df_unav": "Dip Funded сейчас не отвечает", "df_equity": "Equity", "df_balance": "Баланс",
+        "df_free": "Свободно", "df_daily": "Дневной лимит", "df_maxdd": "Макс. просадка", "df_target": "Цель",
+        "df_days": "Торговые дни", "df_pos": "Позиции", "df_orders": "Лимитные ордера",
+        "df_term": "Терминал", "df_inbot": "Управлять в боте",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -638,6 +657,12 @@ T = {
         "busy_l": "In positions", "free_l": "Free", "new_val": "New value, $",
         "df_open": "Dip Funded opened in the bot", "df_site": "Open website", "df_acc": "My accounts (bot)",
         "df_title": "Dip Funded", "df_txt": "Prop accounts: trading and status in the bot. Tournament — in the Tournament tab.",
+        "df_buy": "Get a prop account", "df_accs": "Prop accounts", "df_none": "No prop accounts yet",
+        "df_nolink": "Telegram is not linked to Dip Funded", "df_link_btn": "Link account",
+        "df_unav": "Dip Funded is not responding", "df_equity": "Equity", "df_balance": "Balance",
+        "df_free": "Free", "df_daily": "Daily limit", "df_maxdd": "Max loss", "df_target": "Target",
+        "df_days": "Trading days", "df_pos": "Positions", "df_orders": "Limit orders",
+        "df_term": "Trading terminal", "df_inbot": "Manage in bot",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",
