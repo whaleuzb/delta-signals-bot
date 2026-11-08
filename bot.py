@@ -1179,7 +1179,8 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig")])
     # 238: Mini App — faqat shaxsiy chatda (web_app tugmasi guruhda rad etiladi)
     # va faqat egasi uchun (1-bosqich: o'z workspace'lari boshqaruvi).
-    if private and manage and config.WEB_URL:
+    # 244: endi hamma uchun (reyting, turnir, guruh sahifalari ilova ichida).
+    if private and config.WEB_URL:
         rows.append([InlineKeyboardButton(
             i18n.t("menu.app", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
             api_kwargs={"style": "primary"})])

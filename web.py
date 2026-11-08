@@ -20,6 +20,7 @@ import html
 import json
 import logging
 import os
+import sys
 import time
 from datetime import datetime
 from urllib.parse import parse_qsl
@@ -474,6 +475,17 @@ TG_SCRIPT = """
 (function () {
   var tg = window.Telegram && window.Telegram.WebApp;
   if (!tg) return;                       // oddiy brauzer — hech narsa qilmaymiz
+  // 244: Telegram Mini App ichida ochilgan bo'lsa — eski sahifalar o'rniga
+  // yagona ilova (/app): guruh sahifasi, reyting va turnir o'sha yerda.
+  try {
+    if (tg.initData) {
+      var pth = location.pathname, m = pth.match(/^\/g\/(\d+)\/?$/), to = null;
+      if (m) to = '/app?g=' + m[1];
+      else if (pth === '/' ) to = '/app?tab=top';
+      else if (/^\/t(\/\d+)?\/?$/.test(pth)) to = '/app?tab=tour';
+      if (to) { location.replace(to); return; }
+    }
+  } catch (e) {}
   try { tg.ready(); } catch (e) {}
   try { tg.expand(); } catch (e) {}      // to'liq balandlikda ochilsin
   // Pastga surganda ilova yopilib ketmasin: sahifa uzun, foydalanuvchi
@@ -1569,6 +1581,7 @@ def build_app() -> web.Application:
     ])
     # 238: Mini App (bosh sahifa + ochiq signallar boshqaruvi).
     webapp.VERIFY = verify_init_data
+    webapp.W = sys.modules[__name__]
     app.add_routes(webapp.routes())
     app.on_startup.append(on_start)
     app.on_cleanup.append(on_stop)

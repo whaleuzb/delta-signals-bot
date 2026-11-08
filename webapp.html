@@ -165,6 +165,50 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
  border-radius:14px;padding:12px 14px;outline:none;margin-bottom:12px}
 .sheet input:focus{border-color:rgba(46,204,143,.55)}
 .sheet .btn{padding:13px;font-size:14px}
+/* ---- 244: reyting, turnir, guruh sahifasi ---- */
+.seg{display:flex;padding:4px;border-radius:14px;margin:0 0 12px;position:relative}
+.seg a{flex:1;text-align:center;padding:8px 4px;font-size:12px;font-weight:700;color:var(--mut);border-radius:10px;cursor:pointer;position:relative;z-index:1;transition:color .3s}
+.seg a.on{color:#fff}.seg .si{position:absolute;top:4px;bottom:4px;left:4px;border-radius:10px;background:rgba(255,255,255,.12);transition:transform .45s var(--ease)}
+.row{display:flex;align-items:center;gap:11px;border-radius:18px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:transform .25s var(--ease)}
+.row:active{transform:scale(.98)}
+.rk{width:22px;text-align:center;font-weight:800;font-size:13px;color:var(--mut);flex:none}
+.rk.t3{color:var(--g)}
+.av{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;font-weight:800;font-size:15px;overflow:hidden;
+ background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1)}
+.av img{width:100%;height:100%;object-fit:cover}
+.rm{flex:1;min-width:0}.rn{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs{font-size:11px;color:var(--mut);margin-top:1px}
+.rv{font-weight:800;font-size:15px;text-align:right;flex:none}
+.rv small{display:block;font-size:10px;color:var(--mut);font-weight:600}
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:4px 0 14px}
+.pod{border-radius:20px;padding:12px 8px;text-align:center;cursor:pointer}
+.pod .av{margin:0 auto 8px;width:44px;height:44px;border-radius:14px}
+.pod .pn{font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pod .pv{font-weight:800;font-size:15px;margin-top:3px}
+.pod .pr{font-size:10px;color:var(--mut);font-weight:700;margin-bottom:6px}
+.pod.p1{padding-top:20px}
+.badge2{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 11px;font-size:11px;font-weight:700}
+.prizes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
+.prizes div{border-radius:14px;padding:10px 6px;text-align:center;font-size:11px;color:var(--mut)}
+.prizes b{display:block;color:var(--ink);font-size:15px;margin-top:2px}
+.prizes div:first-child b{color:var(--g)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tile2{border-radius:18px;padding:12px 13px}
+.tile2 .k{font-size:11px;color:var(--mut)}.tile2 .v{font-size:19px;font-weight:800;margin-top:4px;letter-spacing:-.02em}
+.eq{border-radius:22px;padding:14px;margin-bottom:12px}
+.eq svg{width:100%;height:120px;display:block;overflow:visible}
+.sect{font-size:14px;font-weight:800;margin:16px 2px 10px;letter-spacing:-.01em}
+.page{position:fixed;inset:0;z-index:25;overflow-y:auto;padding:calc(var(--top) + 10px) 14px 110px;transform:translateX(100%);
+ transition:transform .5s var(--ease);background:rgba(5,5,6,.6);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+.page.show{transform:none}
+.page:not(.show){visibility:hidden;transition:transform .5s var(--ease),visibility 0s .5s}
+.ghd{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
+.ghd .av{width:54px;height:54px;border-radius:18px;font-size:20px}
+.ghd h2{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.bk{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;cursor:pointer;flex:none}
+.trow{display:flex;align-items:center;gap:10px;border-radius:16px;padding:10px 12px;margin-bottom:7px;cursor:pointer}
+.tsp{width:80px;height:30px;flex:none}.tsp svg{width:100%;height:100%;display:block;overflow:visible}.tsp .sk{height:100%;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.03),rgba(255,255,255,.08),rgba(255,255,255,.03));background-size:200% 100%;animation:sh 1.4s infinite}
+.cd{font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head><body>
 <canvas id="bg"></canvas><div class="neb a"></div><div class="neb b"></div><div class="neb c"></div><div class="grain"></div>
@@ -173,6 +217,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 <div id="view"></div>
 <div class="toast glass" id="toast"></div>
 <div class="shade" id="shade" onclick="sheetClose()"></div><div class="sheet glass" id="sheet"></div>
+<div class="page" id="page"></div>
 <nav class="nav glass" id="nav"></nav>
 <script>
 var T=__T__;
@@ -189,11 +234,15 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  book:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
  pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
  chev:'<polyline points="6 9 12 15 18 9"/>',
+ crown:'<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
+ back:'<polyline points="15 18 9 12 15 6"/>',
+ link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
  orbit:'<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/>',
  layers:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>'};
 function ic(n,z){z=z||22;return '<svg class="ic" width="'+z+'" height="'+z+'" viewBox="0 0 24 24">'+I[n]+'</svg>'}
 var tg=window.Telegram&&window.Telegram.WebApp;
-var TABS=['home','signals','stats','tour','profile'];
+var TABS=['home','signals','top','tour','profile'];
 var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
 function t(k,o){var s=(T[S.lang]||T.uz)[k]||k;if(o)for(var x in o)s=s.replace('{'+x+'}',o[x]);return s}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -216,14 +265,12 @@ function botUrl(start){return 'https://t.me/'+S.bot+(start?'?start='+start:'')}
 function openLink(u){if(!u)return;if(u.indexOf(location.origin)==0||u.charAt(0)=='/'){try{sessionStorage.setItem('tc_from_app','1')}catch(e){}location.href=u;return}if(u.indexOf('https://t.me/')==0&&tg&&tg.openTelegramLink)tg.openTelegramLink(u);else if(tg&&tg.openLink&&u.indexOf('http')==0)tg.openLink(u);else location.href=u}
 
 /* ---- pastki panel: siljiydigan indikator ---- */
-function nav(){var tabs=[['home','home'],['signals','trend'],['stats','bars'],['tour','trophy'],['profile','user']];
+function nav(){var tabs=[['home','home'],['signals','trend'],['top','crown'],['tour','trophy'],['profile','user']];
  var n=document.getElementById('nav');
- if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){return'<a data-t="'+x[0]+'" onclick="go(\''+x[0]+'\')"><span class="i">'+ic(x[1],20)+'</span>'+esc(t(x[0]=='home'?'home':x[0]=='signals'?'signals':x[0]=='stats'?'stats':x[0]=='tour'?'tour':'profile'))+'</a>'}).join('');n.dataset.ok=1}
+ if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){return'<a data-t="'+x[0]+'" onclick="go(\''+x[0]+'\')"><span class="i">'+ic(x[1],20)+'</span>'+esc(t(x[0]))+'</a>'}).join('');n.dataset.ok=1}
  var idx=TABS.indexOf(S.tab);n.querySelectorAll('a').forEach(function(a,k){a.classList.toggle('on',k==idx)});
  var ind=document.getElementById('ind');var w=(n.clientWidth-10)/TABS.length;ind.style.width=w+'px';ind.style.transform='translateX('+(idx*w)+'px)'}
 function go(tab){if(tab==S.tab)return;
- if(tab=='stats'){var w=cur();tick();if(w&&w.page)openLink(location.origin+w.page);else toast(esc(t('soon')));return}
- if(tab=='tour'){tick();openLink(location.origin+'/t');return}
   S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}
 function pill(){var w=cur();var el=document.getElementById('wsPill');
  if(!w){el.textContent='Trade Controller';return}
@@ -232,8 +279,8 @@ function pill(){var w=cur();var el=document.getElementById('wsPill');
 function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null){m+=i.money;has=true}});return has?m:null}
 function render(){nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
- if(!w){v.innerHTML='<div class="empty glass">'+ic('orbit',40)+'<div>'+esc(t('nows'))+'</div></div>';return}
- if(S.tab=='signals')signals(v,w);else if(S.tab=='profile')profile(v,w);else home(v,w);
+ if(S.tab=='top')topView(v);else if(S.tab=='tour')tourView(v);else if(S.tab=='profile')profile(v,w);
+ else if(!w)noWs(v);else if(S.tab=='signals')signals(v,w);else home(v,w);
  var k=0;v.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(k++*60)+'ms'});
  if(S.anim){setTimeout(countUp,80)}
  S.anim=false;S.dir='';bindSlider()}
@@ -254,7 +301,7 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  +'<div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>'
  +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('open'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('open_n',{n:n}))+'</div><div class="deco">'+ic('trend',50)+'</div></div>'
  +'<div class="card glass rise" onclick="toBot()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
- +'<div class="row2"><div class="card glass rise" onclick="go(\'stats\')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(w.page?t('stats_sub'):t('soon'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
+ +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
  +'<div class="card glass acc rise" onclick="toBot()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
 function bindSlider(){var s=document.getElementById('slider');if(!s)return;
@@ -282,7 +329,7 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+'<div class="acts">'+a+'</div></div>'}
 function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return f=='all'||(f=='long'&&i.side=='LONG')||(f=='short'&&i.side=='SHORT')||(f=='limit'&&i.status=='PENDING')});
  var tot=totals();
- v.innerHTML='<h3 class="rise">'+esc(t('open'))+(tot!=null?'<small class="'+(tot>=0?'g':'r')+'">'+fm(tot)+'</small>':'')+'</h3>'
+ v.innerHTML='<h3 class="rise">'+esc(t('signals'))+(tot!=null?'<small class="'+(tot>=0?'g':'r')+'">'+fm(tot)+'</small>':'')+'</h3>'
  +'<div class="chips rise">'+[['all','Hammasi'],['long','LONG'],['short','SHORT'],['limit',t('limit')]].map(function(c){return'<span class="chip glass'+(f==c[0]?' on':'')+'" onclick="setF(\''+c[0]+'\')">'+esc(c[0]=='all'?({uz:'Hammasi',ru:'Все',en:'All'}[S.lang]||'Hammasi'):c[1])+'</span>'}).join('')+'</div>'
  +(list.length?list.map(sigCard).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('none'))+'</div></div>');
  S.items.forEach(function(i){S.prev[i.id]=i.live})}
@@ -323,6 +370,91 @@ function profile(v,w){var u=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user)||{};
  h+='<h3 class="rise" style="font-size:15px">'+esc(t('ui_lang'))+'</h3><div class="chips rise">'+[['uz',"O'zbek"],['ru','Русский'],['en','English']].map(function(l){return'<span class="chip glass'+(S.lang==l[0]?' on':'')+'" onclick="setLang(\''+l[0]+'\')">'+l[1]+'</span>'}).join('')+'</div>';
  h+='<button class="btn p full rise" style="width:100%;margin-top:10px;padding:13px;font-size:14px" onclick="toBot()">'+ic('bot',16)+' '+esc(t('back_bot'))+'</button>';
  v.innerHTML=h}
+
+/* ===== 244: Top, Turnir, guruh sahifasi (ochiq sahifalar ilova ichida) ===== */
+S.top=null;S.topSeg='groups';S.tour=null;S.page=null;
+function logoHtml(id,has,name){return '<div class="av">'+(has?'<img src="/g/'+id+'/logo.png" loading="lazy" onerror="this.nextSibling&&(this.nextSibling.style.display=\'\');this.remove()">':'')+'<span'+(has?' style="display:none"':'')+'>'+esc((name||'?').charAt(0).toUpperCase())+'</span></div>'}
+function seg(id,opts,cur,fn){var k=Math.max(0,opts.map(function(o){return o[0]}).indexOf(cur));
+ return '<div class="seg glass rise" id="'+id+'"><div class="si" style="width:calc((100% - 8px)/'+opts.length+');transform:translateX('+(k*100)+'%)"></div>'+opts.map(function(o){return'<a class="'+(o[0]==cur?'on':'')+'" onclick="'+fn+'(\''+o[0]+'\')">'+esc(o[1])+'</a>'}).join('')+'</div>'}
+function rel(iso){if(!iso)return'—';var d=new Date(iso);return ('0'+d.getDate()).slice(-2)+'.'+('0'+(d.getMonth()+1)).slice(-2)}
+function noWs(v){v.innerHTML='<div class="slide glass acc rise" style="margin-top:22px;min-height:0"><div class="art">'+ic('orbit',28)+'</div><div class="k">Trade Controller</div><div class="v" style="font-size:22px">'+esc(t('welcome'))+'</div><div class="d">'+esc(t('nows'))+'</div></div>'
+ +'<div class="card glass rise" onclick="go(\'top\')" style="margin-top:12px"><h2>'+esc(t('top'))+'</h2><div class="s">'+esc(t('top_sub'))+'</div><div class="deco">'+ic('crown',46)+'</div></div>'
+ +'<div class="card glass acc rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',46)+'</div></div>'}
+function topView(v){if(!S.top){v.innerHTML='<h3 class="rise">'+esc(t('top'))+'</h3><div class="spk"><div class="sk"></div></div>';
+  api('top').then(function(d){S.top=d;S.anim=true;if(S.tab=='top')render()}).catch(function(){});return}
+ var L=S.top[S.topSeg]||[];
+ var h='<h3 class="rise">'+esc(t('top'))+'<small>'+esc(t('top_sub'))+'</small></h3>'+seg('tseg',[['groups',t('groups')],['channels',t('channels')],['futures','Futures']],S.topSeg,'setTop');
+ if(!L.length){v.innerHTML=h+'<div class="empty glass rise">'+ic('crown',40)+'<div>'+esc(t('top_empty'))+'</div></div>';return}
+ var p=L.slice(0,3);if(p.length==3){var o=[p[1],p[0],p[2]],pl=[2,1,3];
+  h+='<div class="podium">'+o.map(function(x,k){return'<div class="pod glass rise'+(pl[k]==1?' acc p1':'')+'" onclick="openGroup('+x.id+')"><div class="pr">#'+pl[k]+'</div>'+logoHtml(x.id,x.logo,x.name)+'<div class="pn">'+esc(x.name)+'</div><div class="pv '+(x.net>=0?'g':'r')+'">'+fpc(x.net)+'</div></div>'}).join('')+'</div>';L=L.slice(3)}
+ var off=p.length==3?3:0;
+ h+=L.map(function(x,k){var r=k+1+off;return'<div class="row glass rise" onclick="openGroup('+x.id+')"><span class="rk'+(r<=3?' t3':'')+'">'+r+'</span>'+logoHtml(x.id,x.logo,x.name)
+  +'<div class="rm"><div class="rn">'+esc(x.name)+'</div><div class="rs">'+x.total+' '+esc(t('sig_w'))+' · '+x.wr.toFixed(0)+'% WR'+(x.lev?' · '+x.lev+'x':'')+(x.open?' · '+esc(t('open_n',{n:x.open})):'')+'</div></div>'
+  +'<div class="rv '+(x.net>=0?'g':'r')+'">'+fpc(x.net)+'<small>'+rel(x.last)+'</small></div></div>'}).join('');
+ v.innerHTML=h}
+function setTop(k){if(k==S.topSeg)return;S.topSeg=k;S.anim=true;tick();render()}
+function cdown(iso){var ms=new Date(iso)-Date.now();if(ms<=0)return'0';var d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),m=Math.floor(ms%36e5/6e4);return(d?d+'d ':'')+h+'h '+('0'+m).slice(-2)+'m'}
+function tourView(v){if(!S.tour){v.innerHTML='<h3 class="rise">'+esc(t('tour'))+'</h3><div class="spk"><div class="sk"></div></div>';
+  api('tour').then(function(d){S.tour=d;S.anim=true;if(S.tab=='tour')render()}).catch(function(){});return}
+ var d=S.tour.df,o=S.tour.own,live=d.state=='live';
+ var h='<h3 class="rise">'+esc(t('tour'))+'</h3>'
+ +'<div class="slide glass acc rise" style="min-height:0;margin-bottom:12px"><div class="art">'+ic('trophy',28)+'</div>'
+ +'<span class="badge2 glass">'+(live?'<span class="pulse"></span>':ic('clock',13))+esc(live?t('t_live'):t('t_soon'))+' · <span class="cd" data-cd="'+(live?d.ends:d.starts)+'">'+cdown(live?d.ends:d.starts)+'</span></span>'
+ +'<div class="v" style="font-size:22px;margin-top:14px">Dip Funded</div><div class="d">'+esc(t('t_df_sub'))+(d.count?' · '+d.count+' '+esc(t('t_players')):'')+'</div>'
+ +'<div class="prizes">'+d.prizes.slice(0,3).map(function(p,k){return'<div class="glass">'+(k+1)+'-'+esc(t('t_place'))+'<b>$'+p.toLocaleString('en-US')+'</b></div>'}).join('')+'</div>'
+ +'<button class="btn p full" style="width:100%;padding:12px;font-size:14px" onclick="openLink(\''+esc(d.url)+'\')">'+esc(t('t_join'))+'</button></div>';
+ if(d.board&&d.board.length){h+='<div class="sect rise">'+esc(t('t_board'))+'</div>'+d.board.slice(0,30).map(function(r,k){var rk=r.rank||k+1;return'<div class="row glass rise" style="cursor:default'+(r.out?';opacity:.5':'')+'"><span class="rk'+(rk<=3?' t3':'')+'">'+rk+'</span><div class="rm"><div class="rn">'+esc(r.name)+'</div></div><div class="rv '+(r.pct>=0?'g':'r')+'">'+fpc(r.pct)+'</div></div>'}).join('')}
+ if(o){h+='<div class="sect rise">'+esc(t('t_own'))+' #'+o.id+(o.status=='ACTIVE'?' · <span class="cd" data-cd="'+o.ends+'">'+cdown(o.ends)+'</span>':'')+'</div>';
+  h+=o.rows.length?o.rows.map(function(r){return'<div class="row glass rise" style="cursor:default"><span class="rk'+(r.rank<=3?' t3':'')+'">'+r.rank+'</span><div class="rm"><div class="rn">'+esc(r.name)+'</div><div class="rs">'+f0(r.eq)+' · '+r.trades+' '+esc(t('sig_w'))+(r.wr!=null?' · '+r.wr.toFixed(0)+'% WR':'')+'</div></div><div class="rv '+(r.ret>=0?'g':'r')+'">'+fpc(r.ret)+'</div></div>'}).join(''):'<div class="empty glass rise">'+esc(t('t_empty'))+'</div>';
+  if(o.opens.length)h+='<div class="sect rise">'+esc(t('open'))+' · '+o.opens.length+'</div>'+o.opens.map(function(r){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">'+esc(r.symbol)+'<span class="b '+(r.side=='LONG'?'bl':'bs')+'">'+r.side+'</span></div><div class="rs">'+esc(r.name)+' · '+f0(r.amount)+'</div></div><div class="rv '+(r.pnl==null?'m':r.pnl>=0?'g':'r')+'">'+(r.pnl==null?esc(t('limit')):fpc(r.pnl))+'</div></div>'}).join('')}
+ v.innerHTML=h}
+setInterval(function(){document.querySelectorAll('[data-cd]').forEach(function(e){e.textContent=cdown(e.getAttribute('data-cd'))})},30000);
+
+/* guruh sahifasi — o'ngdan chiqadigan oyna, Telegram "Orqaga" bilan yopiladi */
+function openGroup(id){tick();S.page={id:id,kind:'spot',mon:null,data:null};pageRender();var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');
+ try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}
+ api('group',{id:id,lang:S.lang}).then(function(d){if(!S.page||S.page.id!=id)return;S.page.data=d;pageRender(true)}).catch(function(){var p=document.getElementById('page');p.innerHTML=pageHead(null)+'<div class="empty glass">'+esc(t('not_public'))+'</div>'})}
+function closeGroup(){document.getElementById('page').classList.remove('show');S.page=null;try{tg.BackButton.offClick(closeGroup);tg.BackButton.hide()}catch(e){}}
+function pageHead(d){return'<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div>'+(d?logoHtml(d.id,d.logo,d.name)+'<div style="min-width:0"><h2>'+esc(d.name)+'</h2><div class="rs">'+esc(d.channel?t('channel'):t('group'))+'</div></div>':'')+'</div>'}
+function curve(pts){if(!pts||pts.length<2)return'';var W=300,H=120,n=pts.length,a=[0].concat(pts);n=a.length;var mn=Math.min.apply(null,a),mx=Math.max.apply(null,a);if(mx==mn)mx=mn+1;
+ var X=function(k){return k/(n-1)*W},Y=function(v){return H-(v-mn)/(mx-mn)*H};var up=a[n-1]>=0;var c=up?'#2ecc8f':'#ff5c5c';
+ var d=a.map(function(v,k){return X(k).toFixed(1)+','+Y(v).toFixed(1)}).join(' L');
+ return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+c+'" stop-opacity=".3"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs>'
+ +'<line x1="0" x2="'+W+'" y1="'+Y(0).toFixed(1)+'" y2="'+Y(0).toFixed(1)+'" stroke="rgba(255,255,255,.25)" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/>'
+ +'<path d="M'+d+' L'+W+','+H+' L0,'+H+'Z" fill="url(#eqg)"/><path class="ln draw" pathLength="1" d="M'+d+'" fill="none" stroke="'+c+'" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>'}
+var MON={uz:['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'],ru:['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'],en:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']};
+function pageRender(anim){var p=document.getElementById('page');var g=S.page;if(!g)return;var d=g.data;
+ if(!d){p.innerHTML=pageHead(null)+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
+ var k=d[g.kind]?g.kind:'spot';var K=d[k];var h=pageHead(d);
+ if(d.join)h+='<button class="btn p full rise" style="width:100%;padding:12px;font-size:14px;margin-bottom:12px" onclick="openLink(\''+esc(d.join)+'\')">'+ic('link',15)+' '+esc(d.channel?t('subscribe'):t('join'))+'</button>';
+ if(d.fut)h+=seg('gseg',[['spot','Spot'],['fut','Futures']],k,'setKind');
+ if(K){var tl=[[t('s_net'),fpc(K.net),K.net>0?'g':K.net<0?'r':''],[t('s_sig'),String(K.n),''],[t('s_wr'),K.wr.toFixed(1)+'%',''],[t('s_r'),(K.avg_r>=0?'+':'')+K.avg_r.toFixed(2),K.avg_r>0?'g':K.avg_r<0?'r':'']];
+  if(K.liqs)tl.push([t('s_liq'),K.liqs,'r']);
+  h+='<div class="tiles">'+tl.map(function(x,j){return'<div class="tile2 glass rise'+(j==0?' acc':'')+'"><div class="k">'+esc(x[0])+'</div><div class="v '+x[2]+'">'+esc(x[1])+'</div></div>'}).join('')+'</div>';
+  if(K.curve.length>1)h+='<div class="eq glass rise"><div class="rs" style="margin-bottom:8px;display:flex;justify-content:space-between"><span>'+esc(t('equity'))+'</span><b class="'+(K.net>=0?'g':'r')+'">'+fpc(K.net)+'</b></div>'+curve(K.curve)+'</div>';
+  if(K.months.length)h+='<div class="sect rise">'+esc(t('months'))+'</div>'+K.months.map(function(m){return'<div class="row glass rise" style="cursor:default;padding:9px 13px"><div class="rm"><div class="rn" style="font-size:13px">'+(MON[S.lang]||MON.uz)[m.m-1]+' '+m.y+'</div><div class="rs">'+m.n+' '+esc(t('sig_w'))+' · '+m.wr+'% WR</div></div><div class="rv '+(m.sum>=0?'g':'r')+'" style="font-size:14px">'+fpc(m.sum)+'</div></div>'}).join('')}
+ if(d.opens.length)h+='<div class="sect rise">'+esc(t('open_s'))+' · '+d.opens.length+'</div>'+d.opens.map(function(o){return'<div class="row glass rise" onclick="openLink(\''+esc(o.url||'')+'\')"><div class="rm"><div class="rn">'+(o.symbol?esc(o.symbol)+'<span class="b '+(o.side=='LONG'?'bl':'bs')+'">'+o.side+'</span>'+(o.lev>1?'<span class="b bx">'+o.lev+'x</span>':''):esc(t('position'))+' '+o.n)+'</div><div class="rs">'+(o.entry!=null?fp(o.entry)+' · ':'')+rel(o.since)+'</div></div><div class="rv '+(o.pnl==null?'m':o.pnl>=0?'g':'r')+'">'+(o.pnl==null?'—':fpc(o.pnl))+'</div></div>'}).join('')+(d.reveal?'':'<div class="rs rise" style="margin:-2px 4px 8px">'+esc(t('hidden_note'))+'</div>');
+ var tr=d.trades.filter(function(x){return k=='fut'?x.lev>1:x.lev<=1});
+ if(tr.length){var by={},keys=[];tr.forEach(function(x){var dt=new Date(x.closed);var key=dt.getFullYear()*100+dt.getMonth();if(!by[key]){by[key]=[];keys.push(key)}by[key].push(x)});
+  if(g.mon==null||!by[g.mon])g.mon=keys[0];
+  h+='<div class="sect rise">'+esc(t('history'))+'</div><div class="chips rise">'+keys.slice(0,12).map(function(key){return'<span class="chip glass'+(key==g.mon?' on':'')+'" onclick="setMon('+key+')">'+(MON[S.lang]||MON.uz)[key%100]+' '+String(Math.floor(key/100)).slice(2)+'</span>'}).join('')+'</div>';
+  h+=by[g.mon].slice().sort(function(a,b){return b.pnl-a.pnl}).slice(0,50).map(function(x){return'<div class="trow glass rise" onclick="openLink(\''+esc(x.url||'')+'\')"><div class="rm"><div class="rn" style="font-size:13px">'+esc(x.symbol)+'<span class="b '+(x.side=='LONG'?'bl':'bs')+'">'+x.side+'</span>'+(x.lev>1?'<span class="b bx">'+x.lev+'x</span>':'')+'</div><div class="rs">'+fp(x.entry)+' → '+fp(x.exit)+' · '+rel(x.closed)+'</div></div>'
+   +'<div class="tsp" data-tid="'+x.id+'" data-p="'+x.pnl+'">'+tsparkSvg(x.id,x.pnl)+'</div>'+'<div class="rv '+(x.pnl>=0?'g':'r')+'" style="font-size:14px">'+fpc(x.pnl)+'</div></div>'}).join('')}
+ else if(!K||!K.tiles.length)h+='<div class="empty glass rise">'+esc(t('no_closed'))+'</div>';
+ p.innerHTML='<div class="'+(anim?'anim':'')+'">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'});loadTspark()}
+/* yopilgan savdo kichik grafigi (yangi uslubda, SVG) */
+S.ts={};
+function tsparkSvg(id,pnl){var d=S.ts[id];if(!d)return'<div class="sk"></div>';var c=d.c,n=c.length,W=80,H=30;var ref=[d.e];if(d.x!=null)ref.push(d.x);
+ var mn=Math.min.apply(null,c.concat(ref)),mx=Math.max.apply(null,c.concat(ref));if(mx==mn)mx=mn*1.001+1e-9;var X=function(k){return k/(n-1)*W},Y=function(v){return H-2-(v-mn)/(mx-mn)*(H-4)};
+ var col=pnl>=0?'#2ecc8f':'#ff5c5c';var pts=c.map(function(v,k){return X(k).toFixed(1)+','+Y(v).toFixed(1)}).join(' L');
+ return'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><line x1="0" x2="'+W+'" y1="'+Y(d.e).toFixed(1)+'" y2="'+Y(d.e).toFixed(1)+'" stroke="rgba(255,255,255,.3)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>'
+ +'<path d="M'+pts+' L'+W+','+H+' L0,'+H+'Z" fill="'+col+'" fill-opacity=".12"/><path d="M'+pts+'" fill="none" stroke="'+col+'" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>'}
+function loadTspark(){var els=[].slice.call(document.querySelectorAll('#page .tsp')).filter(function(e){return!S.ts[e.getAttribute('data-tid')]});
+ var ids=els.map(function(e){return+e.getAttribute('data-tid')});if(!ids.length)return;
+ (function batch(k){var part=ids.slice(k,k+15);if(!part.length)return;api('tspark',{ids:part}).then(function(d){for(var i in d)S.ts[i]=d[i];
+  part.forEach(function(i){var e=document.querySelector('#page .tsp[data-tid="'+i+'"]');if(e){if(S.ts[i])e.innerHTML=tsparkSvg(i,+e.getAttribute('data-p'));else e.remove()}});batch(k+15)}).catch(function(){})})(0)}
+function setKind(k){S.page.kind=k;S.page.mon=null;tick();pageRender(true)}
+function setMon(k){S.page.mon=k;tick();pageRender(false)}
 function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
 
 /* ---- yon tomonga surish (swipe) bilan bo'limlar ---- */
@@ -330,7 +462,7 @@ function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
  document.addEventListener('touchstart',function(e){var tch=e.touches[0];x0=tch.clientX;y0=tch.clientY;tgt=e.target},{passive:true});
  document.addEventListener('touchend',function(e){if(x0==null)return;var tch=e.changedTouches[0];var dx=tch.clientX-x0,dy=tch.clientY-y0;x0=null;
   if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6)return;if(tgt&&tgt.closest&&(tgt.closest('.slider')||tgt.closest('.chips')||tgt.closest('.sheet')))return;
-  var main=['home','signals','profile'];var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
+  var main=TABS;var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
 
 /* ---- pastdan chiqadigan oyna (yangi stop) ---- */
 function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show')}
@@ -376,7 +508,7 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
-  var q=new URLSearchParams(location.search);if(q.get('tab')=='signals')S.tab='signals';
+  var q=new URLSearchParams(location.search);if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);
   render();load();setInterval(function(){if(!document.hidden&&!document.getElementById('sheet').classList.contains('show'))load()},15000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

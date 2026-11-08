@@ -7302,3 +7302,18 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      almashtirish, ilova tili uz/ru/en — `localStorage.tc_lang`, "Botga
      qaytish" = `tg.close()`); swipe: Bosh ↔ Signallar ↔ Profil. Botga
      olib boradigan kartalar `toBot()` (= `tg.close()`).
+244. **Hammasi bitta joyda — Mini App.** Ochiq natijalar sahifasi (`/g/<id>`),
+     reyting (`/`) va turnir (`/t`) endi `/app` ichida, yangi uslubda.
+     Panel: Bosh · Signallar · Top · Turnir · Profil (swipe — hammasi).
+     API (`webapp.py`): `/api/app/top` (guruh/kanal/futures, `web.net_result`),
+     `/api/app/group` (`web._group_numbers` — sahifa bilan AYNI son; xom
+     raqamlar, equity egri chizig'i `_curve`, oylar, ochiq — kanalda/egaga/
+     a'zoga juftlik bilan (213), yopilganlar), `/api/app/tour` (Dip Funded
+     nusxasi + o'z turnirimiz), `/api/app/tspark` (yopilgan savdo grafigi,
+     doimiy kesh; faqat ochiq workspace yoki egasi). Guruh sahifasi o'ngdan
+     chiqadi, Telegram "Orqaga" bilan yopiladi; Top'da 1–3 o'rin podium.
+     Grafiklar — SVG (eski PNG o'rniga), yozuvlar qisqartirildi.
+     Telegram Mini App ichida eski sahifalar ochilsa (`tg.initData` bor)
+     `web.TG_SCRIPT` `/app?g=<id>` / `?tab=top` / `?tab=tour`ga yo'naltiradi;
+     tashqi brauzerdagi havolalar (postlar) eski sahifada qoladi.
+     Bot menyusidagi "📱 Ilovani ochish" endi HAMMAGA (shaxsiy chatda).
