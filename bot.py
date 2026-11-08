@@ -1199,20 +1199,8 @@ def main_menu_kb(uid: int, ws, private: bool = True,
     if config.NEWS_CHANNEL_ID:
         rows.append([InlineKeyboardButton(i18n.t("menu.news", lang),
                                           url=f"https://t.me/{NEWS_CHANNEL_USERNAME}")])
-    url = web_page_url(ws)
-    if url:
-        # web_app — sahifa Telegram ICHIDA ochiladi (Mini App). Telegram uni
-        # FAQAT shaxsiy chatdagi inline tugmada qabul qiladi; guruhda yuborilsa
-        # butun xabar BUTTON_TYPE_INVALID bilan rad etiladi va foydalanuvchi
-        # "Ishlov berishda xato" ko'radi. Shu sabab guruhda oddiy URL tugmasi
-        # ishlatiladi — u sahifani brauzerda ochadi va hamma joyda ishlaydi.
-        # Yonida "🔗 Havola" tugmasi ham bor edi — olib tashlandi: ikkalasi
-        # ham AYNI sahifaga olib borardi. Havolani ulashish kerak bo'lsa
-        # /sahifa buyrug'i bor (u manzilni <code> ichida yuboradi).
-        page_label = i18n.t("menu.page", lang)
-        page = (InlineKeyboardButton(page_label, web_app=WebAppInfo(url=url))
-                if private else InlineKeyboardButton(page_label, url=url))
-        rows.append([page])
+    # 246: "🌐 Ochiq sahifa" tugmasi olib tashlandi — guruh sahifasi endi
+    # Mini App ichida ("📱 Ilovani ochish" → Statistika / Top).
     rows.append([InlineKeyboardButton(i18n.t("menu.help", lang), callback_data="help:home"),
                  InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
     rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])

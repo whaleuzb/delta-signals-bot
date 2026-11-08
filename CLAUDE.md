@@ -7321,3 +7321,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ochiq sahifaga sozlangan edi. `post_init` har ishga tushishda
      `set_chat_menu_button(MenuButtonWebApp("Ilova", WEB_URL/app))` qiladi
      (barcha chatlar uchun standart).
+246. **Bosh menyudan "🌐 Ochiq sahifa" olib tashlandi** — guruh sahifasi Mini
+     App ichida (Statistika kartasi / Top). `/sahifa` buyrug'i havolani
+     ulashish uchun qoladi.
