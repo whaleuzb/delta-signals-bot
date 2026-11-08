@@ -7243,3 +7243,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      olib tashlandi. Super-admin `/natijaqidir` yozsa (`cmd_result_search`)
      fon vazifasi barcha nomzodlarni ko'rib chiqadi (xizmat chati —
      `RESULTLINK_CHAT_ID` yoki buyruq yozilgan chat), tugagach hisobot.
+237. **Rangli tugmalar.** Bot API `style` (primary ko'k / success yashil /
+     danger qizil; PTB 21.9'da yo'q — `api_kwargs={"style": ...}`).
+     `MENU_STYLE` + `_style_rows` bosh menyuda: Yangi signal, Ochiq
+     signallar, Dip Funded — yashil; Depozit, Statistika, Equity, Turnir,
+     sahifa (web_app) — ko'k. Boshqaruvda: Yopish/Bekor — qizil, TP/SL
+     kiritish — yashil, Hajm — ko'k. Eski Telegram ilovalarida oddiy rangda.

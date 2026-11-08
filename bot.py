@@ -1071,6 +1071,28 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
             log.warning("Natija xabari id'si saqlanmadi (#%s)", sid, exc_info=True)
 
 
+# 237: rangli tugmalar (Bot API `style`: primary=ko'k, success=yashil,
+# danger=qizil; Telegram 2026-fevraldan keyingi ilovalarda ko'rinadi,
+# eskilarida oddiy tugma). PTB 21.9 bu maydonni bilmaydi — `api_kwargs`.
+MENU_STYLE = {
+    "newsig": "success", "m:open": "success", "df:home": "success",
+    "m:deposit": "primary", "m:stats": "primary", "tr:menu": "primary",
+    "m:equity": "primary",
+}
+
+
+def styled(b: InlineKeyboardButton, style: str | None) -> InlineKeyboardButton:
+    if not style:
+        return b
+    return InlineKeyboardButton(b.text, callback_data=b.callback_data, url=b.url,
+                                web_app=b.web_app, api_kwargs={"style": style})
+
+
+def _style_rows(rows: list) -> list:
+    return [[styled(b, "primary" if b.web_app else MENU_STYLE.get(b.callback_data))
+             for b in row] for row in rows]
+
+
 def main_menu_kb(uid: int, ws, private: bool = True,
                   lang: str | None = None) -> InlineKeyboardMarkup:
     """`lang` — odamning SHAXSIY tili (`users.lang`). Berilmasa
@@ -1143,7 +1165,7 @@ def main_menu_kb(uid: int, ws, private: bool = True,
     rows.append([InlineKeyboardButton(i18n.t("menu.help", lang), callback_data="help:home"),
                  InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
     rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup(_style_rows(rows))
 
 
 def top_menu_row(ws, lang: str | None = None) -> list:
@@ -1646,7 +1668,8 @@ async def _size_row(sig, full: bool, lang) -> list | None:
     ws = await db.get_workspace(sig["workspace_id"])
     if not ws or wsx(ws, sig)["deposit"] is None:
         return None
-    return [InlineKeyboardButton(i18n.t("man.btn_size", lang), callback_data=f"msize:{sig['id']}")]
+    return [InlineKeyboardButton(i18n.t("man.btn_size", lang), callback_data=f"msize:{sig['id']}",
+                                 api_kwargs={"style": "primary"})]
 
 
 async def manage_view(sig, lang: str | None = None,
@@ -1669,7 +1692,8 @@ async def manage_view(sig, lang: str | None = None,
         # kutadi, shuning uchun bu yerda mavjud emas. Foydalanuvchini
         # to'g'ridan-to'g'ri TP/SL kiritishga yo'naltiramiz.
         rows = [[InlineKeyboardButton(i18n.t("man.btn_tpsl", lang),
-                                       callback_data=f"tpsl:{sid}")]]
+                                       callback_data=f"tpsl:{sid}",
+                                       api_kwargs={"style": "success"})]]
         if (sr := await _size_row(sig, full, lang)):
             rows.append(sr)
         if pending:
@@ -1766,7 +1790,7 @@ async def manage_view(sig, lang: str | None = None,
 
     rows.append([InlineKeyboardButton(
         i18n.t("man.btn_cancel" if pending else "man.btn_close", lang),
-        callback_data=f"close:{sid}")])
+        callback_data=f"close:{sid}", api_kwargs={"style": "danger"})])
     rows.append([InlineKeyboardButton(i18n.t("menu.back", lang), callback_data="m:open"),
                  InlineKeyboardButton(i18n.t("menu.home", lang), callback_data="menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
