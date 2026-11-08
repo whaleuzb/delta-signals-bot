@@ -7267,3 +7267,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bir xil chiziqli SVG ikonkalar (`I` + `ic()` webapp.py'da); TP'lar
      nuqta (yashil — bajarilgan); bot javobidagi emoji toast'da olib
      tashlanadi.
+240. **Mini App dizayni: kosmik fon + shisha.** Sahifa `webapp.html`da
+     (`webapp.PAGE` o'qiydi, `__T__` — tarjimalar). Fon: canvas yulduzlar
+     (miltillaydi, sekin suzadi), 3 ta xira tumanlik (kulrang/yashil),
+     donadorlik, chetdagi nur chiziqlari; `body` foni shaffof bo'lishi SHART
+     (aks holda manfiy z-index qatlamlar ko'rinmaydi). Kartalar `.glass`
+     (backdrop blur + yarim shaffof + yuqori yorug' chet), `.acc` — yashil
+     nur. Shriftlar kichraytirildi (asos 13px). Animatsiyalar: kartalar
+     ketma-ket ko'tarilishi (faqat birinchi chizishda, 15 s yangilanishda
+     EMAS), bo'limlar o'rtasida yon tomonga surish (swipe) va siljish,
+     pastki panelda siljiydigan indikator, bosh slayder (scroll-snap, 5.5 s
+     avto, nuqtalar), sonlarning sanab chiqishi, PnL o'zgarganda yorqin
+     chaqnash, stop uchun pastdan chiqadigan oyna (pastga surib yopiladi),
+     signallar filtri (Hammasi/LONG/SHORT/Limit), stop→TP chizig'i.
+     `prefers-reduced-motion` — animatsiyasiz.
