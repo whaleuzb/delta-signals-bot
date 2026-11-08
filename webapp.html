@@ -224,8 +224,7 @@ function nav(){var tabs=[['home','home'],['signals','trend'],['stats','bars'],['
 function go(tab){if(tab==S.tab)return;
  if(tab=='stats'){var w=cur();tick();if(w&&w.page)openLink(location.origin+w.page);else toast(esc(t('soon')));return}
  if(tab=='tour'){tick();openLink(location.origin+'/t');return}
- if(tab=='profile'){tick();openLink(botUrl());return}
- S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}
+  S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}
 function pill(){var w=cur();var el=document.getElementById('wsPill');
  if(!w){el.textContent='Trade Controller';return}
  el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1?ic('chev',14)+'<select id="wsSel">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>':'');
@@ -234,7 +233,7 @@ function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null
 function render(){nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
  if(!w){v.innerHTML='<div class="empty glass">'+ic('orbit',40)+'<div>'+esc(t('nows'))+'</div></div>';return}
- if(S.tab=='signals')signals(v,w);else home(v,w);
+ if(S.tab=='signals')signals(v,w);else if(S.tab=='profile')profile(v,w);else home(v,w);
  var k=0;v.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(k++*60)+'ms'});
  if(S.anim){setTimeout(countUp,80)}
  S.anim=false;S.dir='';bindSlider()}
@@ -254,10 +253,10 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  v.innerHTML='<div class="slider rise" id="slider">'+sl.join('')+'</div>'
  +'<div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>'
  +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('open'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('open_n',{n:n}))+'</div><div class="deco">'+ic('trend',50)+'</div></div>'
- +'<div class="card glass rise" onclick="openLink(botUrl())"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
+ +'<div class="card glass rise" onclick="toBot()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
  +'<div class="row2"><div class="card glass rise" onclick="go(\'stats\')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(w.page?t('stats_sub'):t('soon'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
- +'<div class="card glass acc rise" onclick="openLink(botUrl())"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
+ +'<div class="card glass acc rise" onclick="toBot()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
 function bindSlider(){var s=document.getElementById('slider');if(!s)return;
  s.scrollLeft=S.slide*s.clientWidth;
  s.onscroll=function(){var k=Math.round(s.scrollLeft/Math.max(1,s.clientWidth));if(k!=S.slide){S.slide=k;tick();
@@ -307,6 +306,23 @@ function spark(i,draw){var d=S.spark[i.id];if(!d)return'<div class="sk"></div>';
  return svg}
 function loadSpark(){var w=cur();if(!w)return;api('spark',{ws:w.id}).then(function(d){for(var k in d){var first=!S.spark[k];S.spark[k]=d[k];
   var el=document.getElementById('k'+k);var i=S.items.filter(function(x){return x.id==k})[0];if(el&&i)el.innerHTML=spark(i,first)}}).catch(function(){})}
+
+/* ---- 243: Profil (ilova ichida) ---- */
+function toBot(){tick();try{if(tg&&tg.close){tg.close();return}}catch(e){}openLink(botUrl())}
+function setLang(l){S.lang=l;try{localStorage.setItem('tc_lang',l)}catch(e){}document.getElementById('nav').dataset.ok='';document.getElementById('tBot').textContent=t('bot');S.anim=true;tick();render()}
+function pickWs(id){S.cur=id;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',id)}catch(e){}S.dir='in-l';S.tab='home';S.anim=true;tick();render();load()}
+function profile(v,w){var u=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user)||{};var nm=((u.first_name||'')+' '+(u.last_name||'')).trim()||'Trader';
+ var av=u.photo_url?'<img src="'+esc(u.photo_url)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">':'<span style="font-size:26px;font-weight:800">'+esc(nm.charAt(0).toUpperCase())+'</span>';
+ var h='<div class="rise" style="text-align:center;margin:26px 0 18px"><div class="logo glass" style="margin:0 auto 12px;width:84px;height:84px;border-radius:50%;color:var(--ink)">'+av+'</div>'
+  +'<div style="font-size:18px;font-weight:800;letter-spacing:-.02em">'+esc(nm)+'</div>'+(u.username?'<div class="m" style="font-size:12px;margin-top:2px">@'+esc(u.username)+'</div>':'')+'</div>';
+ h+='<h3 class="rise" style="font-size:15px">'+esc(t('journals'))+'</h3>';
+ h+=S.ws.map(function(x){var on=x.id==S.cur;return'<div class="card glass rise'+(on?' acc':'')+'" style="min-height:0;display:flex;align-items:center;gap:12px" onclick="pickWs('+x.id+')">'
+  +'<span style="color:'+(on?'var(--g)':'var(--mut)')+'">'+wsIc(x)+'</span><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(wsName(x))+'</div>'
+  +'<div class="m" style="font-size:11px">'+esc(x.type=='personal'?t('personal'):x.channel?t('channel'):t('group'))+(x.deposit!=null?' · '+f0(x.deposit):'')+'</div></div>'
+  +'<span class="tag" style="position:static">'+esc(t('open_n',{n:x.open||0}))+'</span></div>'}).join('');
+ h+='<h3 class="rise" style="font-size:15px">'+esc(t('ui_lang'))+'</h3><div class="chips rise">'+[['uz',"O'zbek"],['ru','Русский'],['en','English']].map(function(l){return'<span class="chip glass'+(S.lang==l[0]?' on':'')+'" onclick="setLang(\''+l[0]+'\')">'+l[1]+'</span>'}).join('')+'</div>';
+ h+='<button class="btn p full rise" style="width:100%;margin-top:10px;padding:13px;font-size:14px" onclick="toBot()">'+ic('bot',16)+' '+esc(t('back_bot'))+'</button>';
+ v.innerHTML=h}
 function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
 
 /* ---- yon tomonga surish (swipe) bilan bo'limlar ---- */
@@ -314,7 +330,7 @@ function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
  document.addEventListener('touchstart',function(e){var tch=e.touches[0];x0=tch.clientX;y0=tch.clientY;tgt=e.target},{passive:true});
  document.addEventListener('touchend',function(e){if(x0==null)return;var tch=e.changedTouches[0];var dx=tch.clientX-x0,dy=tch.clientY-y0;x0=null;
   if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6)return;if(tgt&&tgt.closest&&(tgt.closest('.slider')||tgt.closest('.chips')||tgt.closest('.sheet')))return;
-  var main=['home','signals'];var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
+  var main=['home','signals','profile'];var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
 
 /* ---- pastdan chiqadigan oyna (yangi stop) ---- */
 function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show')}
@@ -356,8 +372,8 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
  tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}
  if(!tg||!tg.initData){document.getElementById('view').innerHTML='<div class="empty glass">'+ic('orbit',40)+'<div>'+esc(t('only_tg'))+'</div></div>';return}
- api('me').then(function(d){S.ws=d.ws;S.lang=d.lang||'uz';S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
-  document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
+ api('me').then(function(d){S.ws=d.ws;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+  document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
   var q=new URLSearchParams(location.search);if(q.get('tab')=='signals')S.tab='signals';

@@ -7295,3 +7295,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      qo'yadi; `web.TG_SCRIPT` shu belgini ko'rsa Telegram "Orqaga" tugmasini
      ko'rsatadi (`history.back()`), /app qaytganda (`pageshow`) yashiriladi.
      Bot havolalari (t.me) — `openTelegramLink` (chatga o'tadi).
+243. **Mini App: Profil bo'limi ilova ichida.** Avval Profil (va Depozit,
+     Dip Funded kartalari, "Bot" tugmasi) `openTelegramLink(t.me/<bot>)` qilardi —
+     ilova shu botning o'zidan ochilgani uchun Telegram hech narsa qilmasdi.
+     Endi Profil — alohida bo'lim (avatar/ism, "Jurnallarim" — bosib
+     almashtirish, ilova tili uz/ru/en — `localStorage.tc_lang`, "Botga
+     qaytish" = `tg.close()`); swipe: Bosh ↔ Signallar ↔ Profil. Botga
+     olib boradigan kartalar `toBot()` (= `tg.close()`).
