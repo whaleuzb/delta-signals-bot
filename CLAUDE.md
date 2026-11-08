@@ -7251,3 +7251,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      kiritish — yashil, Hajm — ko'k. Eski Telegram ilovalarida oddiy rangda.
      News Trade postlarida: "💹 Savdo qilish" — yashil, "📝 Jurnalga
      kiritish" — ko'k (`_signal_buttons`).
+238. **Mini App, 1-bosqich** (`webapp.py`, `/app`). Tuzilish namunaga ko'ra:
+     tepada workspace tanlovi + "🤖 Bot", logo va ochiq natija ($), katta
+     kartalar (Ochiq signallar, Depozit, Statistika, Turnir, Dip Funded),
+     pastda suzuvchi panel (Bosh, Signallar, Statistika, Turnir, Profil).
+     Signallar: jonli %/$, BE, ✏️ Stop, 25/50/75%, Yopish/Bekor. API
+     `/api/app/{me,open,act}` — har so'rovda initData (`web.verify_init_data`
+     → `webapp.VERIFY`), faqat egasi/super-admin. Yozish veb'da EMAS:
+     `app_actions` navbati → bot `app_action_job` (2 s) → `act_be/act_sl/
+     act_partial/act_close` (bot tugmalari ham shu funksiyalardan
+     foydalanadi). Veb natijani 25 s kutadi. Bosh menyuda egasiga
+     "📱 Ilovani ochish" (faqat shaxsiy chatda, web_app).

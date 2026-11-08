@@ -526,6 +526,19 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS leverage SMALLINT;
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS fut_deposit NUMERIC;
 -- 228: futures savdo likvidatsiya bilan yopilgan.
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS liquidated BOOLEAN NOT NULL DEFAULT FALSE;
+-- 238: Mini App amallari navbati. Veb servis yozadi, bot bajaradi (guruhga
+-- xabar, depozit, natija kartasi — botdagi bilan AYNI kod).
+CREATE TABLE IF NOT EXISTS app_actions (
+    id         BIGSERIAL PRIMARY KEY,
+    uid        BIGINT NOT NULL,
+    sig_id     INTEGER NOT NULL,
+    action     TEXT NOT NULL,
+    arg        NUMERIC,
+    status     TEXT NOT NULL DEFAULT 'new',
+    result     TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS app_actions_new ON app_actions (id) WHERE status = 'new';
 """
 
 
@@ -2253,3 +2266,43 @@ async def add_market_hashtag(tag: str) -> None:
 async def remove_market_hashtag(tag: str) -> None:
     async with pool().acquire() as c:
         await c.execute("DELETE FROM market_hashtags WHERE hashtag=$1", tag)
+
+
+# ─────────────── Mini App amallari (238) ───────────────
+
+async def app_action_add(uid: int, sig_id: int, action: str, arg: float | None) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO app_actions (uid, sig_id, action, arg) VALUES ($1,$2,$3,$4) "
+            "RETURNING id", uid, sig_id, action, _d(arg) if arg is not None else None)
+
+
+async def app_action_take(limit: int = 5) -> list[asyncpg.Record]:
+    """Yangi amallarni oladi va 'work' deb belgilaydi. 2 daqiqadan eski
+    yangilari bajarilmaydi ('stale') — odam allaqachon kutishdan voz kechgan."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE app_actions SET status='stale' WHERE status='new' "
+                        "AND created_at < now() - interval '2 minutes'")
+        return await c.fetch(
+            "UPDATE app_actions SET status='work' WHERE id IN ("
+            " SELECT id FROM app_actions WHERE status='new' ORDER BY id LIMIT $1"
+            " FOR UPDATE SKIP LOCKED) RETURNING *", limit)
+
+
+async def app_action_done(aid: int, ok: bool, result: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE app_actions SET status=$2, result=$3 WHERE id=$1",
+                        aid, "ok" if ok else "fail", result)
+
+
+async def app_action_get(aid: int) -> asyncpg.Record | None:
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM app_actions WHERE id=$1", aid)
+
+
+async def user_manage_workspaces(uid: int) -> list[asyncpg.Record]:
+    """Odam egasi bo'lgan shaxsiy jurnal + guruh/kanallar (arxivsiz)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT * FROM workspaces WHERE owner_id=$1 AND NOT archived "
+            "ORDER BY (type='personal') DESC, is_channel, id", uid)

@@ -37,6 +37,7 @@ import paymembers
 import tournament
 import stats
 import tracker
+import webapp
 
 log = logging.getLogger("web")
 
@@ -1554,6 +1555,9 @@ def build_app() -> web.Application:
         web.get(r"/g/{wid:\d+}/logo.png", logo_png),
         web.get(r"/s/{sid:\d+}/mini.png", mini_png),
     ])
+    # 238: Mini App (bosh sahifa + ochiq signallar boshqaruvi).
+    webapp.VERIFY = verify_init_data
+    app.add_routes(webapp.routes())
     app.on_startup.append(on_start)
     app.on_cleanup.append(on_stop)
     return app

@@ -827,6 +827,50 @@ async def cmd_result_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     _RL_TASK = asyncio.create_task(_go(update.effective_chat.id))
 
 
+async def app_action_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """238: Mini App amallari navbati (veb servis yozadi). Har amal botdagi
+    tugma bilan AYNI funksiya orqali bajariladi: huquq, guruhga xabar,
+    depozit, natija kartasi — hammasi bir xil."""
+    try:
+        rows = await db.app_action_take()
+    except Exception:
+        log.exception("Mini App amallari olinmadi")
+        return
+    for a in rows:
+        try:
+            ok, res = await _app_exec(ctx, a)
+        except Exception as ex:
+            log.exception("Mini App amali xato (#%s)", a["id"])
+            ok, res = False, f"{type(ex).__name__}"
+        await db.app_action_done(a["id"], ok, res)
+
+
+async def _app_exec(ctx, a) -> tuple[bool, str]:
+    uid = a["uid"]
+    lang = await user_lang(uid)
+    sig = await db.get_signal(a["sig_id"])
+    if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
+        return False, i18n.t("man.gone", lang)
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
+        return False, i18n.t("man.no_right", lang)
+    act, arg = a["action"], (float(a["arg"]) if a["arg"] is not None else None)
+    if act == "be":
+        err = await act_be(ctx, ws, sig, lang)
+        return (False, err) if err else (True, i18n.t("app.be_ok", lang))
+    if act == "sl":
+        if sig["sl"] is None or not arg or arg <= 0:
+            return False, i18n.t("man.bad_number", lang)
+        err = await act_sl(ctx, ws, sig, arg, lang)
+        return (False, err) if err else (True, i18n.t("man.stop_set", lang, p=fmt_price(arg)))
+    if act == "pc" and arg in (25, 50, 75, 100):
+        ok, msg, _closed = await act_partial(ctx, ws, sig, int(arg), uid)
+        return ok, msg
+    if act == "close":
+        return await act_close(ctx, ws, sig, uid, lang)
+    return False, "?"
+
+
 async def member_count_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Reytingga chiqishni so'ragan kanallarning obunachilar sonini
     yangilaydi (6 soatda): 100 dan tushsa reytingdan yashirinadi, yetsa
@@ -1133,6 +1177,12 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         # Egasi ruxsat bergan bo'lsa — a'zo "Depozit"siz, faqat "Yangi
         # signal" tugmasini ko'radi.
         rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig")])
+    # 238: Mini App — faqat shaxsiy chatda (web_app tugmasi guruhda rad etiladi)
+    # va faqat egasi uchun (1-bosqich: o'z workspace'lari boshqaruvi).
+    if private and manage and config.WEB_URL:
+        rows.append([InlineKeyboardButton(
+            i18n.t("menu.app", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
+            api_kwargs={"style": "primary"})])
     rows += [
         [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
          InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")],
@@ -2178,10 +2228,21 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not sig:
         return
     lang = await user_lang(q.from_user.id)
+    err = await act_be(ctx, ws, sig, lang)
+    if err:
+        await q.answer(err, show_alert=True)
+        return
+    await _show_manage(q, sig["id"])
+
+
+async def act_be(ctx, ws, sig, lang) -> str | None:
+    """238: stopni kirishga ko'chirish (bot tugmasi va Mini App uchun umumiy).
+    Xato bo'lsa — odamga ko'rsatiladigan matn, muvaffaqiyatda None."""
+    if sig["sl"] is None:
+        return i18n.t("man.no_tpsl", lang)
     entry = float(sig["entry"])
     if abs(float(sig["sl"]) - entry) < 1e-12:
-        await q.answer(i18n.t("man.be_already", lang), show_alert=True)
-        return
+        return i18n.t("man.be_already", lang)
     # "✏️ Stop" oqimidagi bilan bir xil ogohlantirish — narx allaqachon
     # kirish narxidan "narigi tomonda" bo'lsa, breakeven'ga ko'chirish
     # signalni DARHOL yopib yuboradi.
@@ -2193,16 +2254,13 @@ async def on_manage_be(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if live_price:
         breached = (live_price <= entry) if sig["side"] == "LONG" else (live_price >= entry)
         if breached:
-            await q.answer(
-                i18n.t("man.be_breached", lang, p=fmt_price(live_price),
-                       dir=i18n.t("man.dir_below" if sig["side"] == "LONG"
-                                  else "man.dir_above", lang)),
-                show_alert=True)
-            return
+            return i18n.t("man.be_breached", lang, p=fmt_price(live_price),
+                          dir=i18n.t("man.dir_below" if sig["side"] == "LONG"
+                                     else "man.dir_above", lang))
     await db.set_stop(sig["id"], entry)
     await notify_group(ctx, ws, sig, tw("ev.be_moved", ws, sid=sig["id"],
                                         sym=sig["symbol"], p=fmt_price(entry)))
-    await _show_manage(q, sig["id"])
+    return None
 
 
 async def on_manage_sl(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2257,11 +2315,27 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
     if not sig:
         return
     pct = int(q.data.split(":")[2])
+    ok, msg, closed = await act_partial(ctx, ws, sig, pct, q.from_user.id)
+    if not ok:
+        await q.answer(msg, show_alert=True)
+        return
+    if closed:
+        plang = await user_lang(q.from_user.id)
+        await q.edit_message_text(msg, parse_mode=ParseMode.HTML,
+                                  reply_markup=menu_back_kb(plang))
+        return
+    await _show_manage(q, sig["id"])
+
+
+async def act_partial(ctx, ws, sig, pct: int, uid: int) -> tuple[bool, str, bool]:
+    """238: qisman yopish (bot va Mini App uchun umumiy).
+    Qaytaradi: (muvaffaqiyat, odamga matn, to'liq yopildimi)."""
+    plang = await user_lang(uid)
+    if sig["status"] != "ACTIVE" or sig["sl"] is None:
+        return False, i18n.t("man.partial_failed", plang), False
     ev = await tracker.partial_close(sig["id"], pct / 100)
     if not ev:
-        await q.answer(i18n.t("man.partial_failed", await user_lang(q.from_user.id)),
-                       show_alert=True)
-        return
+        return False, i18n.t("man.partial_failed", plang), False
 
     if ev["closes"]:
         # Depozit avtomatik yopilishdagidek yangilanadi, aks holda u jimgina
@@ -2273,8 +2347,7 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
         rtxt = f" ({ev['r']:+.2f}R)" if ev["r"] is not None else ""
         # Qisman yopish OXIRGI qismni ham yopdi — bu ham TO'LIQ yopilish,
         # shuning uchun natija boshqa ikki yo'l bilan AYNI ko'rinishda
-        # (grafik + ulashish kartasi) ketadi. Avval bu yerda faqat matn
-        # bor edi va shaxsiy jurnalda umuman hech narsa kelmasdi.
+        # (grafik + ulashish kartasi) ketadi.
         sig2 = await db.get_signal(sig["id"])
         if sig2:
             await send_close_result(
@@ -2282,18 +2355,55 @@ async def on_manage_partial(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> N
                 tw("ev.partial_rest", ws, icon=icon, sid=sig["id"],
                    sym=sig["symbol"], p=fmt_price(ev["price"]),
                    pnl=ev["pnl"] * lev(sig), rtxt=rtxt),
-                ref_uid=q.from_user.id)
-        plang = await user_lang(q.from_user.id)
-        await q.edit_message_text(
-            i18n.t("man.closed_full", plang, icon=icon, sid=sig["id"],
-                   sym=sig["symbol"], pnl=ev["pnl"] * lev(sig), rtxt=rtxt),
-            parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(plang))
-        return
+                ref_uid=uid)
+        return True, i18n.t("man.closed_full", plang, icon=icon, sid=sig["id"],
+                            sym=sig["symbol"], pnl=ev["pnl"] * lev(sig), rtxt=rtxt), True
 
     await notify_group(ctx, ws, sig, tw(
         "ev.partial", ws, sid=sig["id"], sym=sig["symbol"], pct=pct,
         p=fmt_price(ev["price"]), run=ev["running"] * lev(sig), rest=(1 - ev["filled"]) * 100))
-    await _show_manage(q, sig["id"])
+    return True, i18n.t("app.partial_ok", plang, pct=pct, p=fmt_price(ev["price"])), False
+
+
+async def act_sl(ctx, ws, sig, price: float, lang) -> str | None:
+    """238: yangi stop (bot matni va Mini App uchun umumiy). Xato — HTML matn."""
+    # 225: futures — yangi stop likvidatsiyadan narida bo'lmasin.
+    liq = parsing.liq_price(sig["side"], float(sig["entry"]), sig["leverage"])
+    if liq is not None and ((sig["side"] == "LONG" and price <= liq)
+                            or (sig["side"] == "SHORT" and price >= liq)):
+        return html.escape(i18n.t("err.sl_liq", lang, liq=fmt_price(liq), lev=sig["leverage"]))
+    # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
+    # tashqarisi rad etilardi). Foydalanuvchi: "har bir odamni riski
+    # o'ziga bog'liq". Xavfli holat — stopni narxning NARIGI tomoniga
+    # qo'yib signalni bexosdan darhol yopish — pastdagi "breached"
+    # ogohlantirishi bilan baribir tutiladi; uzoqdagi, lekin TO'G'RI
+    # tomondagi stop esa hech kimga zarar qilmaydi (u shunchaki
+    # tegmaydi).
+    # Foydalanuvchi: "stopni ko'tarsam, narx hali yetmagan bo'lsa ham
+    # erta yopib yuboryapti". Sabab — agar yangi stop JORIY narxning
+    # NARIGI tomonida bo'lsa (LONG: narx allaqachon stopdan PAST;
+    # SHORT: allaqachon BALAND), signal KEYINGI tekshiruvda (odatda
+    # sekundlar ichida) DARHOL yopiladi — bu texnik jihatdan to'g'ri
+    # (stop haqiqatan ham allaqachon "tegilgan"), lekin foydalanuvchiga
+    # "narx hali yetmagan" bo'lib tuyuladi, chunki ular buni CHART
+    # dagi narx bilan emas, o'z fikridagi narx bilan solishtirishgan.
+    # Shu sabab oldindan ANIQ ogohlantiramiz, jimgina qabul qilmaymiz.
+    try:
+        live_price = await tracker.provider(sig["market"]).last_price(
+            sig["symbol"], fresh=True)
+    except Exception:
+        live_price = None
+    if live_price:
+        side = sig["side"]
+        breached = (live_price <= price) if side == "LONG" else (live_price >= price)
+        if breached:
+            return i18n.t("man.sl_breached", lang, p=fmt_price(live_price),
+                          dir=i18n.t("man.dir_below_caps" if side == "LONG"
+                                     else "man.dir_above_caps", lang))
+    await db.set_stop(sig["id"], price)
+    await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig["id"],
+                                        sym=sig["symbol"], p=fmt_price(price)))
+    return None
 
 
 async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -2314,51 +2424,14 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             AWAITING_SL[uid] = sig_id
             await msg.reply_text(i18n.t("man.bad_number", lang))
             return True
-        # 225: futures — yangi stop likvidatsiyadan narida bo'lmasin.
-        liq = parsing.liq_price(sig["side"], float(sig["entry"]), sig["leverage"])
-        if liq is not None and ((sig["side"] == "LONG" and price <= liq)
-                                or (sig["side"] == "SHORT" and price >= liq)):
-            AWAITING_SL[uid] = sig_id
-            await msg.reply_text(i18n.t("err.sl_liq", lang, liq=fmt_price(liq), lev=sig["leverage"]))
-            return True
-        # Bu yerda MASOFA chegarasi ATAYLAB YO'Q (avval entrydan ±50%
-        # tashqarisi rad etilardi). Foydalanuvchi: "har bir odamni riski
-        # o'ziga bog'liq". Xavfli holat — stopni narxning NARIGI tomoniga
-        # qo'yib signalni bexosdan darhol yopish — pastdagi "breached"
-        # ogohlantirishi bilan baribir tutiladi; uzoqdagi, lekin TO'G'RI
-        # tomondagi stop esa hech kimga zarar qilmaydi (u shunchaki
-        # tegmaydi).
-        # Foydalanuvchi: "stopni ko'tarsam, narx hali yetmagan bo'lsa ham
-        # erta yopib yuboryapti". Sabab — agar yangi stop JORIY narxning
-        # NARIGI tomonida bo'lsa (LONG: narx allaqachon stopdan PAST;
-        # SHORT: allaqachon BALAND), signal KEYINGI tekshiruvda (odatda
-        # sekundlar ichida) DARHOL yopiladi — bu texnik jihatdan to'g'ri
-        # (stop haqiqatan ham allaqachon "tegilgan"), lekin foydalanuvchiga
-        # "narx hali yetmagan" bo'lib tuyuladi, chunki ular buni CHART
-        # dagi narx bilan emas, o'z fikridagi narx bilan solishtirishgan.
-        # Shu sabab oldindan ANIQ ogohlantiramiz, jimgina qabul qilmaymiz.
-        try:
-            live_price = await tracker.provider(sig["market"]).last_price(
-                sig["symbol"], fresh=True)
-        except Exception:
-            live_price = None
-        if live_price:
-            side = sig["side"]
-            breached = (live_price <= price) if side == "LONG" else (live_price >= price)
-            if breached:
-                AWAITING_SL[uid] = sig_id
-                await msg.reply_text(
-                    i18n.t("man.sl_breached", lang, p=fmt_price(live_price),
-                           dir=i18n.t("man.dir_below_caps" if side == "LONG"
-                                      else "man.dir_above_caps", lang)),
-                    parse_mode=ParseMode.HTML)
-                return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
-        await db.set_stop(sig_id, price)
-        await notify_group(ctx, ws, sig, tw("ev.stop_moved", ws, sid=sig_id,
-                                            sym=sig["symbol"], p=fmt_price(price)))
+        err = await act_sl(ctx, ws, sig, price, lang)
+        if err:
+            AWAITING_SL[uid] = sig_id
+            await msg.reply_text(err, parse_mode=ParseMode.HTML)
+            return True
         await msg.reply_text(i18n.t("man.stop_set", lang, p=fmt_price(price)),
                               parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
@@ -2566,16 +2639,19 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         await q.answer(i18n.t("man.no_right", lang), show_alert=True)
         return
 
+    ok, msg = await act_close(ctx, ws, sig, q.from_user.id, lang)
+    await q.edit_message_text(msg, reply_markup=menu_back_kb(lang))
+
+
+async def act_close(ctx, ws, sig, uid: int, lang) -> tuple[bool, str]:
+    """238: to'liq yopish / PENDING'ni bekor qilish (bot va Mini App)."""
+    sig_id = sig["id"]
     ev = await tracker.close_now(sig_id)
     if not ev:
-        await q.edit_message_text(i18n.t("close.failed", lang), reply_markup=menu_back_kb(lang))
-        return
+        return False, i18n.t("close.failed", lang)
 
     if ev["status"] == "CANCELLED":
-        await q.edit_message_text(
-            i18n.t("close.cancelled_sig", lang, sid=sig_id, sym=ev["symbol"]),
-            reply_markup=menu_back_kb(lang))
-        return
+        return True, i18n.t("close.cancelled_sig", lang, sid=sig_id, sym=ev["symbol"])
 
     pnl, r = ev["pnl"] * lev(sig), ev["r"]
 
@@ -2586,20 +2662,16 @@ async def on_close_confirm(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
     icon = "✅" if pnl >= 0 else "❌"
     rtxt = f" ({r:+.2f}R)" if r is not None else ""
-    await q.edit_message_text(
-        i18n.t("close.done", lang, icon=icon, sid=sig_id, sym=ev["symbol"],
-               p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt),
-        reply_markup=menu_back_kb(lang))
-
     txt = tw("ev.manual_close", ws, icon=icon, sid=sig_id, sym=ev["symbol"],
              p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt)
     # `close_now()` natijani bazaga allaqachon yozdi — yangilangan yozuv
-    # (closed_at/exit_price/pnl_pct) bilan grafik ham, ulashish kartasi ham
-    # avtomatik yopilishdagi kabi chiqadi. Kartadagi QR — yopgan odamning
-    # taklif havolasi (kartani aynan u ulashadi).
+    # bilan grafik ham, ulashish kartasi ham avtomatik yopilishdagi kabi
+    # chiqadi. Kartadagi QR — yopgan odamning taklif havolasi.
     sig2 = await db.get_signal(sig_id)
     if sig2:
-        await send_close_result(ctx, ws, sig2, txt, ref_uid=q.from_user.id)
+        await send_close_result(ctx, ws, sig2, txt, ref_uid=uid)
+    return True, i18n.t("close.done", lang, icon=icon, sid=sig_id, sym=ev["symbol"],
+                        p=fmt_price(ev["price"]), pnl=pnl, rtxt=rtxt)
 
 
 async def on_close_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -10261,6 +10333,7 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    app.job_queue.run_repeating(app_action_job, interval=2, first=15)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
