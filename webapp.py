@@ -294,7 +294,8 @@ async def api_group(request):
     lang = i18n.normalize(body.get("lang"))
     out = {"id": ws["id"], "name": ws["name"], "channel": bool(ws["is_channel"]),
            "logo": bool(ws["logo"]), "public": not owner,
-           "join": __import__("paymembers").join_url(ws) or None}
+           "join": __import__("paymembers").join_url(ws) or None,
+           "mine": uid is not None and _can(ws, uid)}
     for kind in ("spot", "fut"):
         n = await W._group_numbers(ws, lang, kind)
         if kind == "fut" and not n["total"]:
@@ -475,6 +476,7 @@ T = {
         "now": "Hozirgi narx", "lim": "Limit", "size_usd": "Summa, $", "size_x": "Hajm (1 = boshlang'ich)",
         "prices": "Limit narxlari (5 tagacha)", "lims": "Limitlar", "size_btn": "Summa",
         "size_title": "Pozitsiya summasi",
+        "join_setup": "Qo'shilish havolasi ulanmagan — botda ulash",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -511,6 +513,7 @@ T = {
         "now": "По рынку", "lim": "Лимит", "size_usd": "Сумма, $", "size_x": "Объём (1 = исходный)",
         "prices": "Цены лимитов (до 5)", "lims": "Лимиты", "size_btn": "Сумма",
         "size_title": "Сумма позиции",
+        "join_setup": "Ссылка для вступления не подключена — подключить в боте",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -547,6 +550,7 @@ T = {
         "now": "Market", "lim": "Limit", "size_usd": "Size, $", "size_x": "Size (1 = initial)",
         "prices": "Limit prices (up to 5)", "lims": "Limits", "size_btn": "Size",
         "size_title": "Position size",
+        "join_setup": "Join link not connected — set it in the bot",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",

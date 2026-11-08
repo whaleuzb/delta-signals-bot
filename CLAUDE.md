@@ -7343,3 +7343,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      o'z signalini boshqaradigan a'zo) chiqadi.
 249. **"🔁 Boshqa joyga o'tish" asosiy menyuga qaytdi** (Sozlamalardan olindi):
      egada Statistika yonida, ilovasiz holatda alohida qatorda.
+250. **Guruh sahifasi: oylar kvadrat plitkalarda, qo'shilish tugmasi.**
+     Oylar — 3 ustunli kvadratlar (`.mgrid/.mtile`): oy, katta foiz, "n · WR";
+     fon yashil/qizil nur, kuchi foiz kattaligiga qarab. Qo'shilish tugmasi
+     `paymembers.join_url` (ochiq @nik yoki Pay Members boti) bo'lsagina; egasi
+     ko'rsa va havola yo'q bo'lsa — "Qo'shilish havolasi ulanmagan — botda
+     ulash" (`mine`).
