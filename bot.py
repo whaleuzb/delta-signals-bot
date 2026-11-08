@@ -868,6 +868,55 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return ok, msg
     if act == "close":
         return await act_close(ctx, ws, sig, uid, lang)
+    # 248: qolgan boshqaruv amallari (botdagi bilan AYNI funksiyalar).
+    try:
+        args = json.loads(a["args"]) if a["args"] else None
+    except Exception:
+        args = None
+    if act == "tps" and isinstance(args, list) and sig["sl"] is not None:
+        err, shown = await act_tps(ctx, ws, sig, [float(x) for x in args], lang)
+        return (False, err) if err else (True, i18n.t("man.tps_set", lang, tps=shown))
+    if act == "entry" and arg:
+        err = await act_entry(ctx, ws, sig, arg, lang)
+        return (False, err) if err else (True, i18n.t("man.entry_set", lang, p=fmt_price(arg)))
+    if act == "tpsl" and isinstance(args, dict):
+        try:
+            sl_v, tps_v = float(args["sl"]), [float(x) for x in args["tps"]]
+        except Exception:
+            return False, i18n.t("man.bad_format", lang)
+        err, _body = await act_tpsl(ctx, ws, sig, sl_v, tps_v, lang)
+        return (False, err) if err else (True, i18n.t("app.tpsl_ok", lang))
+    if act in ("add", "lim") and arg and arg > 0:
+        units = arg if sig["alloc_amount"] is not None else arg * tracker.first_units(sig)
+        if act == "add":
+            return await act_add(ctx, uid, sig, ws, units, lang)
+        if sig["status"] != "ACTIVE" or float(sig["filled_pct"]) > 0 or sig["sl"] is None:
+            return False, i18n.t("man.add_not_allowed", lang)
+        prices = sorted({float(x) for x in (args or []) if float(x) > 0},
+                        reverse=sig["side"] == "LONG")
+        err = await addlim_check(sig, prices, lang)
+        if err:
+            return False, err
+        ok, txt = await act_addlim(ctx, uid, sig, ws, prices, units, lang)
+        return (True, i18n.t("man.addlim_done", lang, lst=txt)) if ok else (False, txt)
+    if act == "limx":
+        n = await db.cancel_pending_adds(sig["id"])
+        if n:
+            await notify_group(ctx, ws, sig, tw("ev.add_lim_x", ws, sid=sig["id"], sym=sig["symbol"]))
+        return True, i18n.t("app.limx_ok", lang)
+    if act == "size" and arg and arg > 0:
+        if sig["alloc_amount"] is not None:
+            return False, i18n.t("size.has", lang, amt=float(sig["alloc_amount"]))
+        if not can_manage(uid, ws):
+            return False, i18n.t("man.no_right", lang)
+        w = wsx(ws, sig)
+        if w["deposit"] is None:
+            return False, i18n.t("size.no_dep", lang)
+        dep, busy, free = await free_deposit(w, sig["id"])
+        if arg > free + 1e-9:
+            return False, i18n.t("app.size_over", lang, free=free)
+        await _save_alloc(sig, w, arg)
+        return True, i18n.t("al.saved_dep", lang, amt=arg, dep=float(w["deposit"]))
     return False, "?"
 
 
@@ -1158,8 +1207,14 @@ def main_menu_kb(uid: int, ws, private: bool = True,
         rows.append([InlineKeyboardButton(
             i18n.t("menu.app", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
             api_kwargs={"style": "primary"})])
-    rows.append([InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
-                 InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open")])
+    # 248: egasi uchun ochiq signallar boshqaruvi to'liq Mini App'da —
+    # shaxsiy chatda "Ochiq signallar" tugmasi kerak emas. Guruh chatida va
+    # o'z signalini boshqaradigan a'zo (Mini App faqat egaga) uchun qoladi.
+    in_app = private and manage and bool(config.WEB_URL)
+    top = [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats")]
+    if not in_app:
+        top.append(InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open"))
+    rows.append(top)
     extra = []
     # Dip Funded hisoblari — faqat shaxsiy chatda (hisob va pul guruhda ko'rinmasin).
     if private and dipfunded.enabled():
@@ -1930,6 +1985,37 @@ async def on_add_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
 
 
+async def act_add(ctx, uid: int, sig, ws, units: float, lang) -> tuple[bool, str]:
+    """248: hozirgi narxda qo'shish (bot va Mini App). (ok, matn)."""
+    if sig["status"] != "ACTIVE" or float(sig["filled_pct"]) > 0 or sig["sl"] is None:
+        return False, i18n.t("man.add_not_allowed", lang)
+    usd = sig["alloc_amount"] is not None
+    if usd and not can_manage(uid, ws):
+        return False, i18n.t("man.add_money_owner", lang)
+    if units <= 0:
+        return False, i18n.t("man.bad_number", lang)
+    ws = wsx(ws, sig)
+    if usd and ws["deposit"] is not None:
+        _, _, free = await free_deposit(ws)
+        if units > free + 1e-9:
+            return False, i18n.t("man.add_over", lang, free=free)
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if not price:
+        return False, i18n.t("man.add_no_price", lang)
+    if not _add_side_ok(sig, price):
+        return False, i18n.t("man.add_past_sl", lang)
+    res = await db.add_market(sig["id"], price, units, usd)
+    if not res:
+        return False, i18n.t("man.add_not_allowed", lang)
+    t_add = await tournament.scale_for_add(sig["id"], res["ratio"])
+    await notify_group(ctx, ws, sig, tw("ev.add_mkt", ws, sid=sig["id"], sym=sig["symbol"],
+                                        p=fmt_price(price), avg=fmt_price(res["entry"])))
+    txt = i18n.t("man.add_done", lang, p=fmt_price(price), avg=fmt_price(res["entry"]))
+    if t_add:
+        txt += "\n" + i18n.t("man.add_tourney", lang, amt=t_add)
+    return True, txt
+
+
 async def _do_market_add(message, ctx, uid: int, sig_id: int, units: float) -> None:
     """Hozirgi (yangi olingan) narxda qo'shish, guruhga xabar, turnir."""
     lang = await user_lang(uid)
@@ -1938,36 +2024,10 @@ async def _do_market_add(message, ctx, uid: int, sig_id: int, units: float) -> N
     if not sig or not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
         await message.reply_text(i18n.t("man.no_right", lang))
         return
-    usd = sig["alloc_amount"] is not None
-    if usd and not can_manage(uid, ws):
-        await message.reply_text(i18n.t("man.add_money_owner", lang))
+    ok, txt = await act_add(ctx, uid, sig, ws, units, lang)
+    if not ok:
+        await message.reply_text(txt)
         return
-    if units <= 0:
-        await message.reply_text(i18n.t("man.bad_number", lang))
-        return
-    ws = wsx(ws, sig)
-    if usd and ws["deposit"] is not None:
-        _, _, free = await free_deposit(ws)
-        if units > free + 1e-9:
-            await message.reply_text(i18n.t("man.add_over", lang, free=free))
-            return
-    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
-    if not price:
-        await message.reply_text(i18n.t("man.add_no_price", lang))
-        return
-    if sig["sl"] is None or not _add_side_ok(sig, price):
-        await message.reply_text(i18n.t("man.add_past_sl", lang))
-        return
-    res = await db.add_market(sig_id, price, units, usd)
-    if not res:
-        await message.reply_text(i18n.t("man.add_not_allowed", lang))
-        return
-    t_add = await tournament.scale_for_add(sig_id, res["ratio"])
-    await notify_group(ctx, ws, sig, tw("ev.add_mkt", ws, sid=sig_id, sym=sig["symbol"],
-                                        p=fmt_price(price), avg=fmt_price(res["entry"])))
-    txt = i18n.t("man.add_done", lang, p=fmt_price(price), avg=fmt_price(res["entry"]))
-    if t_add:
-        txt += "\n" + i18n.t("man.add_tourney", lang, amt=t_add)
     text, kb = await manage_view(await db.get_signal(sig_id), lang,
                                  full=can_manage(uid, ws))
     await message.reply_text(txt + "\n\n" + text, parse_mode=ParseMode.HTML, reply_markup=kb)
@@ -2015,27 +2075,49 @@ async def _do_place_limits(message, ctx, uid: int, sig_id: int, units: float) ->
             or float(sig["filled_pct"]) > 0:
         await message.reply_text(i18n.t("man.add_not_allowed", lang))
         return
+    ok, lst = await act_addlim(ctx, uid, sig, ws, pend[1], units, lang)
+    if not ok:
+        PENDING_ADDLIM[uid] = pend
+        await message.reply_text(lst)
+        return
+    text, kb = await manage_view(await db.get_signal(sig_id), lang, full=can_manage(uid, ws))
+    await message.reply_text(i18n.t("man.addlim_done", lang, lst=lst) + "\n\n" + text,
+                             parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+async def act_addlim(ctx, uid: int, sig, ws, prices: list, units: float, lang) -> tuple[bool, str]:
+    """248: qo'shimcha limit(lar) (bot va Mini App). Muvaffaqiyatda — narxlar
+    ro'yxati matni, aks holda xato matni."""
     usd = sig["alloc_amount"] is not None
     if usd and not can_manage(uid, ws):
-        await message.reply_text(i18n.t("man.add_money_owner", lang))
-        return
-    prices = pend[1]
-    if units <= 0:
-        await message.reply_text(i18n.t("man.bad_number", lang))
-        return
+        return False, i18n.t("man.add_money_owner", lang)
+    if units <= 0 or not prices:
+        return False, i18n.t("man.bad_number", lang)
     ws = wsx(ws, sig)
     if usd and ws["deposit"] is not None:
         _, _, free = await free_deposit(ws)
         if units * len(prices) > free + 1e-9:
-            PENDING_ADDLIM[uid] = pend
-            await message.reply_text(i18n.t("man.add_over", lang, free=free))
-            return
-    await db.place_add_limits(sig_id, prices, units, usd)
+            return False, i18n.t("man.add_over", lang, free=free)
+    await db.place_add_limits(sig["id"], prices, units, usd)
     lst = ", ".join(fmt_price(p) for p in prices)
-    await notify_group(ctx, ws, sig, tw("ev.add_lim", ws, sid=sig_id, sym=sig["symbol"], lst=lst))
-    text, kb = await manage_view(await db.get_signal(sig_id), lang, full=can_manage(uid, ws))
-    await message.reply_text(i18n.t("man.addlim_done", lang, lst=lst) + "\n\n" + text,
-                             parse_mode=ParseMode.HTML, reply_markup=kb)
+    await notify_group(ctx, ws, sig, tw("ev.add_lim", ws, sid=sig["id"], sym=sig["symbol"], lst=lst))
+    return True, lst
+
+
+async def addlim_check(sig, prices: list, lang) -> str | None:
+    """Limit narxlari to'g'rimi: stopdan to'g'ri tomonda va joriy narxdan
+    "orqada" (LONG — pastda). Xato bo'lsa — HTML matn."""
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if not prices or len(prices) > 5:
+        return i18n.t("man.addlim_bad", lang)
+    long_ = sig["side"] == "LONG"
+    bad = [p for p in prices
+           if not (_add_side_ok(sig, p) and (price is None or (p < price if long_ else p > price)))]
+    if bad:
+        return i18n.t("man.addlim_range_long" if long_ else "man.addlim_range_short",
+                      lang, bad=", ".join(fmt_price(p) for p in bad),
+                      p=fmt_price(price) if price else "—", sl=fmt_price(float(sig["sl"])))
+    return None
 
 
 async def on_addlim_go(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2386,6 +2468,46 @@ async def act_sl(ctx, ws, sig, price: float, lang) -> str | None:
     return None
 
 
+async def act_tps(ctx, ws, sig, tps: list, lang) -> tuple[str | None, str]:
+    """248: maqsadlarni o'zgartirish (bot matni va Mini App)."""
+    tps = [float(x) for x in tps if x and float(x) > 0]
+    if not tps:
+        return i18n.t("man.bad_format", lang), ""
+    # Allaqachon bajarilgan maqsadlardan kam qoldirib bo'lmaydi — tp_hit
+    # indeksi ro'yxatdan chiqib ketib, kuzatuv chalkashib qolardi.
+    if len(tps) < sig["tp_hit"]:
+        return i18n.t("man.tps_too_few", lang, n=sig["tp_hit"]), ""
+    tps = sorted(set(tps), reverse=(sig["side"] == "SHORT"))
+    await db.set_tps(sig["id"], tps)
+    shown = " · ".join(fmt_price(t) for t in tps)
+    await notify_group(ctx, ws, sig, tw("ev.tps_changed", ws, sid=sig["id"],
+                                        sym=sig["symbol"], tps=f"<b>{shown}</b>"))
+    return None, shown
+
+
+async def act_entry(ctx, ws, sig, price: float, lang) -> str | None:
+    """248: kirish narxini o'zgartirish — faqat PENDING (bot va Mini App)."""
+    if sig["status"] != "PENDING":
+        return i18n.t("man.entry_locked", lang)
+    old_entry = float(sig["entry"])
+    # Eski entrydan juda uzoq qiymat deyarli doim xato yozuv — bejiz
+    # noto'g'ri narxda signal "aktivlashtirib" yuborilmasligi uchun.
+    if not (old_entry * 0.5 <= price <= old_entry * 1.5):
+        return i18n.t("man.entry_far", lang)
+    if sig["sl"] is not None:
+        err = parsing.validate({
+            "entry": price, "sl": float(sig["sl"]),
+            "tps": [float(t) for t in sig["tps"]], "side": sig["side"],
+            "leverage": sig["leverage"],
+        }, lang)
+        if err:
+            return i18n.t("man.entry_conflict", lang, err=err)
+    await db.set_entry(sig["id"], price)
+    await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig["id"],
+                                        sym=sig["symbol"], p=fmt_price(price)))
+    return None
+
+
 async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bool:
     """Yangi stop / yangi maqsadlar matni. Ishlov berilgan bo'lsa True."""
     uid = update.effective_user.id
@@ -2427,20 +2549,14 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             AWAITING_TPS[uid] = sig_id
             await msg.reply_text(i18n.t("man.bad_format", lang))
             return True
-        # Allaqachon bajarilgan maqsadlardan kam qoldirib bo'lmaydi — tp_hit
-        # indeksi ro'yxatdan chiqib ketib, kuzatuv chalkashib qolardi.
-        if len(tps) < sig["tp_hit"]:
-            AWAITING_TPS[uid] = sig_id
-            await msg.reply_text(i18n.t("man.tps_too_few", lang, n=sig["tp_hit"]))
-            return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
-        tps = sorted(set(tps), reverse=(sig["side"] == "SHORT"))
-        await db.set_tps(sig_id, tps)
-        shown = " · ".join(fmt_price(t) for t in tps)
-        await notify_group(ctx, ws, sig, tw("ev.tps_changed", ws, sid=sig_id,
-                                            sym=sig["symbol"], tps=f"<b>{shown}</b>"))
+        err, shown = await act_tps(ctx, ws, sig, tps, lang)
+        if err:
+            AWAITING_TPS[uid] = sig_id
+            await msg.reply_text(err)
+            return True
         await msg.reply_text(i18n.t("man.tps_set", lang, tps=shown),
                               parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
@@ -2457,29 +2573,14 @@ async def handle_manage_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
             AWAITING_ENTRY[uid] = sig_id
             await msg.reply_text(i18n.t("man.bad_number", lang))
             return True
-        old_entry = float(sig["entry"])
-        # Eski entrydan juda uzoq qiymat deyarli doim xato yozuv — bejiz
-        # noto'g'ri narxda signal "aktivlashtirib" yuborilmasligi uchun.
-        if not (old_entry * 0.5 <= price <= old_entry * 1.5):
-            AWAITING_ENTRY[uid] = sig_id
-            await msg.reply_text(i18n.t("man.entry_far", lang))
-            return True
-        if sig["sl"] is not None:
-            err = parsing.validate({
-                "entry": price, "sl": float(sig["sl"]),
-                "tps": [float(t) for t in sig["tps"]], "side": sig["side"],
-                "leverage": sig["leverage"],
-            }, lang)
-            if err:
-                AWAITING_ENTRY[uid] = sig_id
-                await msg.reply_text(i18n.t("man.entry_conflict", lang, err=err))
-                return True
         ws = await db.get_workspace(sig["workspace_id"])
         if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
             return True
-        await db.set_entry(sig_id, price)
-        await notify_group(ctx, ws, sig, tw("ev.entry_changed", ws, sid=sig_id,
-                                            sym=sig["symbol"], p=fmt_price(price)))
+        err = await act_entry(ctx, ws, sig, price, lang)
+        if err:
+            AWAITING_ENTRY[uid] = sig_id
+            await msg.reply_text(err)
+            return True
         await msg.reply_text(i18n.t("man.entry_set", lang, p=fmt_price(price)),
                               parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
         return True
@@ -2517,35 +2618,41 @@ async def handle_tpsl_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> b
         await msg.reply_text(i18n.t("tpsl.unreadable", lang), parse_mode=ParseMode.HTML)
         return True
 
-    entry = float(sig["entry"])
-    side = sig["side"]
-    tps = sorted(set(parsed["tps"]), reverse=(side == "SHORT"))
-    err = parsing.validate({"entry": entry, "sl": parsed["sl"], "tps": tps,
-                            "side": side, "leverage": sig["leverage"]}, lang)
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
+        return True
+    err, body = await act_tpsl(ctx, ws, sig, parsed["sl"], parsed["tps"], lang)
     if err:
         AWAITING_TPSL[uid] = sig_id
         await msg.reply_text(i18n.t("tpsl.retry", lang, err=err))
         return True
-
-    ws = await db.get_workspace(sig["workspace_id"])
-    if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
-        return True
-
-    await db.set_tp_sl(sig_id, parsed["sl"], tps)
-    # Karta IKKI MARTA chiziladi: shaxsiy javob odamning tilida, guruh
-    # posti esa guruh tilida. Bu shunchaki matn qurish — narx ham,
-    # bazaga so'rov ham yo'q, ya'ni qo'shimcha xarajat sezilmaydi.
-    # Aks holda shaxsiy chatda ikki til aralashib ketardi.
-    d = {"symbol": sig["symbol"], "side": side, "entry": entry,
-         "sl": parsed["sl"], "tps": tps, "market": sig["market"]}
-    await msg.reply_text(
-        i18n.t("tpsl.placed", lang, body=draft_text(d, sig_id, lang)),
-        parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
-    await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig_id,
-                                        sym=sig["symbol"],
-                                        body=draft_text(d, sig_id, ws_lang(ws))
-                                        + await sig_author_line(ws, sig, ws_lang(ws))))
+    await msg.reply_text(i18n.t("tpsl.placed", lang, body=body),
+                         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
     return True
+
+
+async def act_tpsl(ctx, ws, sig, sl: float, tps: list, lang) -> tuple[str | None, str]:
+    """248: limit to'lgandan keyin birinchi TP/SL (bot matni va Mini App).
+    Qaytaradi: (xato matni yoki None, odamga karta matni)."""
+    if sig["status"] != "ACTIVE" or sig["sl"] is not None:
+        return i18n.t("tpsl.not_needed", lang), ""
+    entry = float(sig["entry"])
+    side = sig["side"]
+    tps = sorted(set(tps), reverse=(side == "SHORT"))
+    err = parsing.validate({"entry": entry, "sl": sl, "tps": tps,
+                            "side": side, "leverage": sig["leverage"]}, lang)
+    if err:
+        return err, ""
+    await db.set_tp_sl(sig["id"], sl, tps)
+    # Karta IKKI MARTA chiziladi: shaxsiy javob odamning tilida, guruh
+    # posti esa guruh tilida.
+    d = {"symbol": sig["symbol"], "side": side, "entry": entry,
+         "sl": sl, "tps": tps, "market": sig["market"]}
+    await notify_group(ctx, ws, sig, tw("ev.tpsl_placed", ws, sid=sig["id"],
+                                        sym=sig["symbol"],
+                                        body=draft_text(d, sig["id"], ws_lang(ws))
+                                        + await sig_author_line(ws, sig, ws_lang(ws))))
+    return None, draft_text(d, sig["id"], lang)
 
 
 async def on_tpsl_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

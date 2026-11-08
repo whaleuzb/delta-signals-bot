@@ -27,7 +27,7 @@ import tracker
 log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
-ACTIONS = ("be", "sl", "pc", "close")
+ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -102,7 +102,11 @@ async def api_open(request):
         if price and r["status"] == "ACTIVE":
             live = (realized + max(0.0, 1 - filled) * tracker.pnl_at(r["side"], entry, price)) * L
         alloc = _f(r["alloc_amount"])
+        adds = await db.signal_adds(r["id"], "PENDING")
+        dep_k = ws["fut_deposit"] if (r["leverage"] or 1) > 1 else ws["deposit"]
         out.append({
+            "adds": [float(a["price"]) for a in adds],
+            "usd": alloc is not None, "can_size": alloc is None and dep_k is not None,
             "id": r["id"], "symbol": r["symbol"], "side": r["side"], "lev": L,
             "status": r["status"], "market": r["market"],
             "entry": entry, "sl": _f(r["sl"]),
@@ -196,7 +200,12 @@ async def api_act(request):
     ws = await db.get_workspace(sig["workspace_id"]) if sig else None
     if not _can(ws, uid):
         raise web.HTTPForbidden()
-    aid = await db.app_action_add(uid, sid, act, arg)
+    args = body.get("args")
+    if args is not None:
+        if not isinstance(args, (list, dict)):
+            raise web.HTTPBadRequest()
+        args = json.dumps(args)[:2000]
+    aid = await db.app_action_add(uid, sid, act, arg, args)
     # Bot navbatni ~2 soniyada oladi; natijani 25 soniyagacha kutamiz.
     for _ in range(50):
         await asyncio.sleep(0.5)
@@ -460,6 +469,12 @@ T = {
         "no_closed": "Hali yopilgan signal yo'q",
         "s_sig": "Signal", "s_wr": "Winrate", "s_net": "Natija", "s_r": "O'rtacha R", "s_liq": "Likvidatsiya",
         "months": "Oylar", "history": "Tarix", "open_s": "Ochiq",
+        "tp_btn": "TP", "tps_title": "Maqsadlar (TP)", "tps_hint": "Bo'sh joy bilan: 110 120 130",
+        "entry_btn": "Kirish", "entry_title": "Yangi kirish narxi", "tpsl_btn": "TP/SL qo'yish",
+        "sl_l": "Stop (SL)", "add_btn": "Qo'shish", "add_title": "Pozitsiyaga qo'shish",
+        "now": "Hozirgi narx", "lim": "Limit", "size_usd": "Summa, $", "size_x": "Hajm (1 = boshlang'ich)",
+        "prices": "Limit narxlari (5 tagacha)", "lims": "Limitlar", "size_btn": "Summa",
+        "size_title": "Pozitsiya summasi",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -490,6 +505,12 @@ T = {
         "no_closed": "Пока нет закрытых сигналов",
         "s_sig": "Сигналы", "s_wr": "Винрейт", "s_net": "Итог", "s_r": "Средний R", "s_liq": "Ликвидации",
         "months": "Месяцы", "history": "История", "open_s": "Открытые",
+        "tp_btn": "TP", "tps_title": "Цели (TP)", "tps_hint": "Через пробел: 110 120 130",
+        "entry_btn": "Вход", "entry_title": "Новая цена входа", "tpsl_btn": "Поставить TP/SL",
+        "sl_l": "Стоп (SL)", "add_btn": "Добавить", "add_title": "Добавить к позиции",
+        "now": "По рынку", "lim": "Лимит", "size_usd": "Сумма, $", "size_x": "Объём (1 = исходный)",
+        "prices": "Цены лимитов (до 5)", "lims": "Лимиты", "size_btn": "Сумма",
+        "size_title": "Сумма позиции",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -520,6 +541,12 @@ T = {
         "no_closed": "No closed signals yet",
         "s_sig": "Signals", "s_wr": "Winrate", "s_net": "Result", "s_r": "Avg R", "s_liq": "Liquidations",
         "months": "Months", "history": "History", "open_s": "Open",
+        "tp_btn": "TP", "tps_title": "Targets (TP)", "tps_hint": "Space-separated: 110 120 130",
+        "entry_btn": "Entry", "entry_title": "New entry price", "tpsl_btn": "Set TP/SL",
+        "sl_l": "Stop (SL)", "add_btn": "Add", "add_title": "Add to position",
+        "now": "Market", "lim": "Limit", "size_usd": "Size, $", "size_x": "Size (1 = initial)",
+        "prices": "Limit prices (up to 5)", "lims": "Limits", "size_btn": "Size",
+        "size_title": "Position size",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",

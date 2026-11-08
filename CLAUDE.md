@@ -7330,3 +7330,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `settings_kb` (`m:settings`): A'zolar signali, Topda/Qo'shilish havolasi,
      Juftliklar, Boshqa joyga o'tish, Til, Guruhni uzish, Ortga. Eski
      xabarlardagi `m:equity`, `tr:menu` ishlovchilari qoladi.
+248. **Mini App: qolgan boshqaruv amallari.** Botdagi mantiq umumiy
+     funksiyalarga ajratildi va bot matn oqimlari ham shularni chaqiradi:
+     `act_tps`, `act_entry` (faqat PENDING), `act_tpsl` (limit to'lgandan keyin
+     birinchi TP/SL), `act_add` (bozor narxida qo'shish), `act_addlim` +
+     `addlim_check` (qo'shimcha limitlar), `limx` (bekor), `size` (summasiz
+     signalga hajm, bo'sh depozit chegarasi, `_save_alloc`). `app_actions.args`
+     (JSON) — TP ro'yxati / limit narxlari / {sl,tps}. Ilovada: TP, Kirish,
+     TP/SL qo'yish, + Qo'shish (Hozirgi narx / Limit), $ Summa tugmalari va
+     pastdan chiqadigan formalar; kutilayotgan limitlar kartada (Bekor).
+     Bosh menyuda "Ochiq signallar" endi faqat ilovasiz holatda (guruh chati,
+     o'z signalini boshqaradigan a'zo) chiqadi.

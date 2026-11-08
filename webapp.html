@@ -161,10 +161,10 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .sheet .grab{width:38px;height:4px;border-radius:4px;background:rgba(255,255,255,.25);margin:0 auto 14px}
 .sheet h4{font-size:16px;font-weight:700;margin-bottom:4px}
 .sheet p{color:var(--mut);font-size:12px;margin-bottom:14px}
-.sheet input{width:100%;font-size:22px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+.sheet input{width:100%;display:block;font-size:22px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
  border-radius:14px;padding:12px 14px;outline:none;margin-bottom:12px}
 .sheet input:focus{border-color:rgba(46,204,143,.55)}
-.sheet .btn{padding:13px;font-size:14px}
+.sheet .btn{padding:13px;font-size:14px;width:100%;margin-top:4px}
 /* ---- 244: reyting, turnir, guruh sahifasi ---- */
 .seg{display:flex;padding:4px;border-radius:14px;margin:0 0 12px;position:relative}
 .seg a{flex:1;text-align:center;padding:8px 4px;font-size:12px;font-weight:700;color:var(--mut);border-radius:10px;cursor:pointer;position:relative;z-index:1;transition:color .3s}
@@ -319,14 +319,19 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  var fl=(pr!=null&&i.live!=null&&Math.abs(pr-i.live)>0.005)?(i.live>pr?' flash-g':' flash-r'):'';
  var pnl=i.live!=null?'<div class="pnl '+(i.live>=0?'g':'r')+fl+'">'+fpc(i.live)+(i.money!=null?'<small>'+fm(i.money)+'</small>':'')+'</div>':'<div class="pnl m" style="font-size:12px">'+esc(pend?t('limit'):'—')+'</div>';
  var tps=i.tps.map(function(x,k){return'<span class="dot'+(k<i.tp_hit?' on':'')+'"></span>'+fp(x)}).join('&nbsp;&nbsp; ');
- var a='';if(!pend&&i.sl!=null){var be=Math.abs(i.sl-i.entry)<1e-12;
-  a+='<button class="btn p" '+(be?'disabled':'')+' onclick="act('+i.id+',\'be\')">'+esc(t('be'))+'</button>'
-   +'<button class="btn" onclick="askStop('+i.id+')">'+ic('pen',13)+' '+esc(t('stop'))+'</button>';
-  if(i.filled<0.999)a+='<button class="btn" onclick="act('+i.id+',\'pc\',25)">25%</button><button class="btn" onclick="act('+i.id+',\'pc\',50)">50%</button><button class="btn" onclick="act('+i.id+',\'pc\',75)">75%</button>'}
- a+='<button class="btn d full" onclick="act('+i.id+',\'close\')">'+esc(pend?t('cancel'):t('close'))+'</button>';
+ var a='',sid=i.id;var B=function(cls,on,txt,dis){return'<button class="btn '+cls+'" '+(dis?'disabled ':'')+'onclick="'+on+'">'+txt+'</button>'};
+ if(!pend&&i.sl!=null){var be=Math.abs(i.sl-i.entry)<1e-12;
+  a+=B('p',"act("+sid+",'be')",esc(t('be')),be)+B('',"askStop("+sid+")",ic('pen',13)+' '+esc(t('stop')))+B('',"askTps("+sid+")",esc(t('tp_btn')));
+  if(i.filled<0.999)a+=B('',"act("+sid+",'pc',25)",'25%')+B('',"act("+sid+",'pc',50)",'50%')+B('',"act("+sid+",'pc',75)",'75%');
+  if(i.filled==0)a+=B('',"askAdd("+sid+")",'+ '+esc(t('add_btn')))}
+ if(!pend&&i.sl==null)a+=B('p full',"askTpsl("+sid+")",esc(t('tpsl_btn')));
+ if(pend)a+=B('',"askEntry("+sid+")",ic('pen',13)+' '+esc(t('entry_btn')));
+ if(i.can_size)a+=B('',"askSize("+sid+")",'$ '+esc(t('size_btn')));
+ a+=B('d full',"act("+sid+",'close')",esc(pend?t('cancel'):t('close')));
+ var lims=i.adds&&i.adds.length?'<div class="tps" style="display:flex;justify-content:space-between;align-items:center"><span><b>'+esc(t('lims'))+'</b>'+i.adds.map(fp).join(' · ')+'</span><span class="r" style="cursor:pointer;font-weight:700" onclick="act('+sid+',\'limx\')">'+esc(t('cancel'))+'</span></div>':'';
  return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
  +'<div class="spk" id="k'+i.id+'">'+spark(i,false)+'</div><div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
- +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+'<div class="acts">'+a+'</div></div>'}
+ +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+lims+'<div class="acts">'+a+'</div></div>'}
 function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return f=='all'||(f=='long'&&i.side=='LONG')||(f=='short'&&i.side=='SHORT')||(f=='limit'&&i.status=='PENDING')});
  var tot=totals();
  v.innerHTML='<h3 class="rise">'+esc(t('signals'))+(tot!=null?'<small class="'+(tot>=0?'g':'r')+'">'+fm(tot)+'</small>':'')+'</h3>'
@@ -476,11 +481,30 @@ function askStop(id){var i=S.items.filter(function(x){return x.id==id})[0];
  +'<input id="stopIn" inputmode="decimal" value="'+(i.sl!=null?i.sl:'')+'"><button class="btn p full" onclick="saveStop('+id+')">'+esc(t('save'))+'</button>');
  setTimeout(function(){var e=document.getElementById('stopIn');if(e){e.focus();e.select()}},350)}
 function saveStop(id){var p=parseFloat(String(document.getElementById('stopIn').value).replace(',','.'));if(!(p>0))return;sheetClose();act(id,'sl',p,true)}
+/* ---- 248: qolgan boshqaruv amallari (pastdan chiqadigan oyna) ---- */
+function itm(id){return S.items.filter(function(x){return x.id==id})[0]}
+function num(v){v=parseFloat(String(v||'').replace(',','.'));return v>0?v:null}
+function nums(v){return String(v||'').replace(/,/g,' ').split(/[\s;]+/).map(num).filter(function(x){return x})}
+function inp(id,lbl,val,ph){return'<div class="rs" style="margin:2px 2px 6px">'+esc(lbl)+'</div><input id="'+id+'" inputmode="decimal" value="'+(val==null?'':esc(val))+'" placeholder="'+esc(ph||'')+'">'}
+function sub(i){return esc(i.symbol)+' · '+esc(t('entry'))+' '+fp(i.entry)+' · '+esc(t('price'))+' '+fp(i.price)}
+function askTps(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tps_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('tps_hint'),i.tps.join(' '))+'<button class="btn p full" onclick="var v=nums(document.getElementById(\'f1\').value);if(!v.length)return;sheetClose();act('+id+',\'tps\',null,true,v)">'+esc(t('save'))+'</button>')}
+function askEntry(id){var i=itm(id);sheetOpen('<h4>'+esc(t('entry_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('entry'),i.entry)+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'entry\',v,true)">'+esc(t('save'))+'</button>')}
+function askTpsl(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tpsl_btn'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('sl_l'),'')+inp('f2',t('tps_hint'),'')+'<button class="btn p full" onclick="var s=num(document.getElementById(\'f1\').value),v=nums(document.getElementById(\'f2\').value);if(!s||!v.length)return;sheetClose();act('+id+',\'tpsl\',null,true,{sl:s,tps:v})">'+esc(t('save'))+'</button>')}
+function askSize(id){var i=itm(id);sheetOpen('<h4>'+esc(t('size_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('size_usd'),'')+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'size\',v,true)">'+esc(t('save'))+'</button>')}
+var ADDM='now';
+function askAdd(id,m){var i=itm(id);ADDM=m||ADDM;var usd=i.usd;
+ sheetOpen('<h4>'+esc(t('add_title'))+'</h4><p>'+sub(i)+'</p>'
+ +'<div class="seg glass" style="margin-bottom:12px"><div class="si" style="width:calc((100% - 8px)/2);transform:translateX('+(ADDM=='lim'?100:0)+'%)"></div><a class="'+(ADDM=='now'?'on':'')+'" onclick="askAdd('+id+',\'now\')">'+esc(t('now'))+'</a><a class="'+(ADDM=='lim'?'on':'')+'" onclick="askAdd('+id+',\'lim\')">'+esc(t('lim'))+'</a></div>'
+ +(ADDM=='lim'?inp('f2',t('prices'),'',i.side=='LONG'?'< '+fp(i.price):'> '+fp(i.price)):'')
+ +inp('f1',usd?t('size_usd'):t('size_x'),usd?Math.round(i.alloc||0):1)
+ +'<button class="btn p full" onclick="saveAdd('+id+')">'+esc(t('save'))+'</button>')}
+function saveAdd(id){var v=num(document.getElementById('f1').value);if(!v)return;
+ if(ADDM=='lim'){var p=nums(document.getElementById('f2').value);if(!p.length)return;sheetClose();act(id,'lim',v,true,p)}else{sheetClose();act(id,'add',v,true)}}
 function confirmBox(m,cb){if(tg&&tg.showConfirm){try{tg.showConfirm(m,function(ok){if(ok)cb()});return}catch(e){}}if(confirm(m))cb()}
-function act(id,a,arg,skip){var i=S.items.filter(function(x){return x.id==id})[0];
+function act(id,a,arg,skip,args){var i=S.items.filter(function(x){return x.id==id})[0];
  var m=a=='close'?(i.status=='PENDING'?t('confirm_cancel'):t('confirm_close')):a=='pc'?t('confirm_pc',{p:arg}):null;
  var run=function(){var card=document.getElementById('s'+id);if(card){card.style.opacity=.6;card.querySelectorAll('button').forEach(function(b){b.disabled=true})}toast(esc(t('wait')));
-  api('act',{sig:id,action:a,arg:arg}).then(function(r){if(r.pending){toast(esc(t('slow')))}else{toast(esc(noEmoji(r.msg||'OK')));haptic(r.ok?'success':'error')}load()}).catch(function(){toast('Error');load()})};
+  api('act',{sig:id,action:a,arg:arg,args:args}).then(function(r){if(r.pending){toast(esc(t('slow')))}else{toast(esc(noEmoji(String(r.msg||'OK').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error')}load()}).catch(function(){toast('Error');load()})};
  if(m&&!skip)confirmBox(m,run);else run()}
 function load(){var w=cur();if(!w){render();return}
  return api('open',{ws:w.id}).then(function(d){if(!S.items.length&&d.items.length)S.anim=true;S.items=d.items;w.open=d.items.length;render();loadSpark()}).catch(function(){render()})}

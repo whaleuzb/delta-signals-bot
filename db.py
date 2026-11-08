@@ -539,6 +539,8 @@ CREATE TABLE IF NOT EXISTS app_actions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS app_actions_new ON app_actions (id) WHERE status = 'new';
+-- 248: murakkab amallar argumentlari (TP ro'yxati, limit narxlari) — JSON.
+ALTER TABLE app_actions ADD COLUMN IF NOT EXISTS args TEXT;
 """
 
 
@@ -2270,11 +2272,12 @@ async def remove_market_hashtag(tag: str) -> None:
 
 # ─────────────── Mini App amallari (238) ───────────────
 
-async def app_action_add(uid: int, sig_id: int, action: str, arg: float | None) -> int:
+async def app_action_add(uid: int, sig_id: int, action: str, arg: float | None,
+                         args: str | None = None) -> int:
     async with pool().acquire() as c:
         return await c.fetchval(
-            "INSERT INTO app_actions (uid, sig_id, action, arg) VALUES ($1,$2,$3,$4) "
-            "RETURNING id", uid, sig_id, action, _d(arg) if arg is not None else None)
+            "INSERT INTO app_actions (uid, sig_id, action, arg, args) VALUES ($1,$2,$3,$4,$5) "
+            "RETURNING id", uid, sig_id, action, _d(arg) if arg is not None else None, args)
 
 
 async def app_action_take(limit: int = 5) -> list[asyncpg.Record]:
