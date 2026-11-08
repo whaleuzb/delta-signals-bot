@@ -399,6 +399,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "size.saved": {"uz": "✅ #{sid} {sym}: summa <b>{amt:,.2f}$</b> saqlandi.\nDepozit: <b>{dep:,.2f}$</b>",
                    "ru": "✅ #{sid} {sym}: сумма <b>{amt:,.2f}$</b> сохранена.\nДепозит: <b>{dep:,.2f}$</b>",
                    "en": "✅ #{sid} {sym}: size <b>{amt:,.2f}$</b> saved.\nDeposit: <b>{dep:,.2f}$</b>"},
+    "menu.settings": {"uz": "⚙️ Sozlamalar", "ru": "⚙️ Настройки", "en": "⚙️ Settings"},
+    "menu.settings_h": {"uz": "⚙️ Sozlamalar", "ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "menu.app": {"uz": "📱 Ilovani ochish", "ru": "📱 Открыть приложение", "en": "📱 Open app"},
     "app.be_ok": {"uz": "✅ Stop kirish narxiga ko'chirildi", "ru": "✅ Стоп перенесён в безубыток",
                   "en": "✅ Stop moved to breakeven"},

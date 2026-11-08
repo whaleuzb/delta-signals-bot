@@ -7324,3 +7324,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 246. **Bosh menyudan "🌐 Ochiq sahifa" olib tashlandi** — guruh sahifasi Mini
      App ichida (Statistika kartasi / Top). `/sahifa` buyrug'i havolani
      ulashish uchun qoladi.
+247. **Bosh menyu qisqartirildi (15 → 9).** Qoldi: Yangi signal, Depozit,
+     📱 Ilova, Statistika, Ochiq signallar, Dip Funded, News Trade AI,
+     ⚙️ Sozlamalar, Yordam. Olib tashlandi (Mini App'da bor): Equity, Turnir.
+     `settings_kb` (`m:settings`): A'zolar signali, Topda/Qo'shilish havolasi,
+     Juftliklar, Boshqa joyga o'tish, Til, Guruhni uzish, Ortga. Eski
+     xabarlardagi `m:equity`, `tr:menu` ishlovchilari qoladi.

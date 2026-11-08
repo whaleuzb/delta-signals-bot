@@ -1139,72 +1139,63 @@ def _style_rows(rows: list) -> list:
 
 def main_menu_kb(uid: int, ws, private: bool = True,
                   lang: str | None = None) -> InlineKeyboardMarkup:
-    """`lang` — odamning SHAXSIY tili (`users.lang`). Berilmasa
-    o'zbekcha (i18n.normalize) — hali tarjimaga o'tkazilmagan eski
-    chaqiruv joylari shu sabab o'zgarishsiz ishlayveradi."""
+    """`lang` — odamning SHAXSIY tili (`users.lang`).
+
+    247: menyu qisqartirildi — Mini App'ga ko'chganlari (Equity, Turnir)
+    olib tashlandi, kam ishlatiladigan sozlamalar "⚙️ Sozlamalar" ichida
+    (`settings_kb`)."""
     rows = []
     manage = can_manage(uid, ws)
     if manage:
-        # "Depozit" — moliyaviy sozlama, faqat egaga: a'zoga ruxsat
-        # berilgan bo'lsa ham u DEPOZITGA tegmaydi (170-band — bo'sh
-        # depozitdan oshmaydigan hajm shu depozitga bog'liq).
+        # "Depozit" — moliyaviy sozlama, faqat egaga (170).
         rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig"),
                      InlineKeyboardButton(i18n.t("menu.deposit", lang), callback_data="m:deposit")])
-        # Guruh egasining o'zigagina — a'zolarga signal huquqini
-        # yoqib/o'chirish. Shaxsiy jurnalda "a'zo" tushunchasi yo'q,
-        # kanalda esa obunachilar signal bermaydi — shu sabab FAQAT
-        # `type=='group'` (kanal HAM shu turda, lekin `is_channel`
-        # bayrog'i bilan ajratiladi).
-        if ws["type"] == "group" and not ws["is_channel"]:
-            rows.append([InlineKeyboardButton(i18n.t("menu.member_signals", lang),
-                                              callback_data="m:membersig")])
-        # Har bir guruh VA kanal uchun — /top reytingiga chiqarish (183).
-        # Yopiq (@niksiz) va reytingga chiqarilgan bo'lsa yonida qo'shilish
-        # tugmasini ulash — u faqat Pay Members boti bo'lishi mumkin (182).
-        # Ochiq kanal/guruhga kerak emas: tugma ommaviy manzilga o'zi chiqadi.
-        if ws["type"] == "group":
-            rows.append(top_menu_row(ws, lang))
-            # Egasi guruh/kanalini botdan uzishi (202) — tasdiq ekrani bilan.
-            rows.append([InlineKeyboardButton(
-                i18n.t("dt.btn_channel" if ws["is_channel"] else "dt.btn_group", lang),
-                callback_data=f"wsdet:{ws['id']}")])
-        # Shaxsiy jurnalda — turnir bo'limi (185). 215: Dip Funded turniri
-        # doim bor, shuning uchun tugma ham doim (o'z turnirimiz bo'lmasa ham).
-        if ws["type"] == "personal":
-            rows.append([InlineKeyboardButton(i18n.t("menu.tourney", lang),
-                                              callback_data="tr:menu")])
     elif ws["type"] == "group" and not ws["is_channel"] and ws["allow_member_signals"]:
-        # Egasi ruxsat bergan bo'lsa — a'zo "Depozit"siz, faqat "Yangi
-        # signal" tugmasini ko'radi.
+        # Egasi ruxsat bergan bo'lsa — a'zo faqat "Yangi signal"ni ko'radi.
         rows.append([InlineKeyboardButton(i18n.t("menu.new_signal", lang), callback_data="newsig")])
-    # 238: Mini App — faqat shaxsiy chatda (web_app tugmasi guruhda rad etiladi)
-    # va faqat egasi uchun (1-bosqich: o'z workspace'lari boshqaruvi).
-    # 244: endi hamma uchun (reyting, turnir, guruh sahifalari ilova ichida).
+    # Mini App (238/244) — faqat shaxsiy chatda (web_app guruhda rad etiladi).
     if private and config.WEB_URL:
         rows.append([InlineKeyboardButton(
             i18n.t("menu.app", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
             api_kwargs={"style": "primary"})])
-    rows += [
-        [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
-         InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")],
-        [InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open"),
-         InlineKeyboardButton(i18n.t("menu.equity", lang), callback_data="m:equity")],
-    ]
-    # Dip Funded hisoblari (dipfunded.com) — faqat shaxsiy chatda: hisob
-    # va pul guruhda ko'rinmasin. Kalit sozlanmagan bo'lsa tugma yo'q.
+    rows.append([InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats"),
+                 InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open")])
+    extra = []
+    # Dip Funded hisoblari — faqat shaxsiy chatda (hisob va pul guruhda ko'rinmasin).
     if private and dipfunded.enabled():
-        rows.append([InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home")])
-    # News Trade AI kanaliga havola — sozlanmagan bo'lsa (NEWS_CHANNEL_ID
-    # bo'sh) butun funksiya o'chiq, tugma ham chiqmaydi.
+        extra.append(InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home"))
     if config.NEWS_CHANNEL_ID:
-        rows.append([InlineKeyboardButton(i18n.t("menu.news", lang),
-                                          url=f"https://t.me/{NEWS_CHANNEL_USERNAME}")])
-    # 246: "🌐 Ochiq sahifa" tugmasi olib tashlandi — guruh sahifasi endi
-    # Mini App ichida ("📱 Ilovani ochish" → Statistika / Top).
-    rows.append([InlineKeyboardButton(i18n.t("menu.help", lang), callback_data="help:home"),
-                 InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")])
-    rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
+        extra.append(InlineKeyboardButton(i18n.t("menu.news", lang),
+                                          url=f"https://t.me/{NEWS_CHANNEL_USERNAME}"))
+    if extra:
+        rows.append(extra)
+    rows.append([InlineKeyboardButton(i18n.t("menu.settings", lang), callback_data="m:settings"),
+                 InlineKeyboardButton(i18n.t("menu.help", lang), callback_data="help:home")])
     return InlineKeyboardMarkup(_style_rows(rows))
+
+
+def settings_kb(uid: int, ws, lang: str | None = None) -> InlineKeyboardMarkup:
+    """247: "⚙️ Sozlamalar" — bosh menyudan olingan, kam ishlatiladigan
+    tugmalar (huquq shartlari avvalgidek)."""
+    rows = []
+    if can_manage(uid, ws) and ws["type"] == "group":
+        # A'zolarga signal huquqi — faqat guruhda (kanalda obunachi signal bermaydi).
+        if not ws["is_channel"]:
+            rows.append([InlineKeyboardButton(i18n.t("menu.member_signals", lang),
+                                              callback_data="m:membersig")])
+        # /top reytingi va qo'shilish havolasi (182/183).
+        rows.append(top_menu_row(ws, lang))
+    # Juftliklar statistikasi.
+    rows.append([InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch"),
+                 InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
+    if can_manage(uid, ws) and ws["type"] == "group":
+        # Guruh/kanalni botdan uzish (202) — tasdiq ekrani bilan.
+        rows.append([InlineKeyboardButton(
+            i18n.t("dt.btn_channel" if ws["is_channel"] else "dt.btn_group", lang),
+            callback_data=f"wsdet:{ws['id']}")])
+    rows.append(back_row(lang))
+    return InlineKeyboardMarkup(rows)
 
 
 def top_menu_row(ws, lang: str | None = None) -> list:
@@ -2936,7 +2927,10 @@ async def on_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     action = q.data.split(":", 1)[1]
     lang = await user_lang(q.from_user.id)
 
-    if action == "weblink":
+    if action == "settings":
+        await q.edit_message_text(i18n.t("menu.settings_h", lang),
+                                  reply_markup=settings_kb(q.from_user.id, ws, lang))
+    elif action == "weblink":
         await send_web_link(q.message, ws, lang)
     elif action == "stats":
         # Statistika ochiq signallar uchun jonli narx so'raydi — sekin bo'lishi
