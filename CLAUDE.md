@@ -7317,3 +7317,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `web.TG_SCRIPT` `/app?g=<id>` / `?tab=top` / `?tab=tour`ga yo'naltiradi;
      tashqi brauzerdagi havolalar (postlar) eski sahifada qoladi.
      Bot menyusidagi "📱 Ilovani ochish" endi HAMMAGA (shaxsiy chatda).
+245. **Chat pastidagi menyu tugmasi → /app.** BotFather'da "Web" tugmasi eski
+     ochiq sahifaga sozlangan edi. `post_init` har ishga tushishda
+     `set_chat_menu_button(MenuButtonWebApp("Ilova", WEB_URL/app))` qiladi
+     (barcha chatlar uchun standart).

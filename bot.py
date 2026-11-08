@@ -23,7 +23,7 @@ from PIL import Image
 
 from telegram import (
     InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    InputFile, WebAppInfo,
+    InputFile, WebAppInfo, MenuButtonWebApp,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter, TimedOut
@@ -10134,6 +10134,15 @@ async def post_init(app: Application) -> None:
     # Avvalgi ishga tushirishda /tg_login bilan allaqachon login qilingan
     # bo'lsa (sessiya Postgres'da saqlangan) — qayta login talab qilinmasdan
     # darhol tinglashni boshlaydi.
+    # 245: chat pastidagi menyu tugmasi ("Web") — BotFather'da eski manzil
+    # (ochiq sahifa) turardi. Har ishga tushishda yagona Mini App'ga (/app)
+    # o'rnatiladi (barcha chatlar uchun standart).
+    if config.WEB_URL:
+        try:
+            await app.bot.set_chat_menu_button(menu_button=MenuButtonWebApp(
+                "Ilova", WebAppInfo(url=f"{config.WEB_URL}/app")))
+        except Exception:
+            log.warning("Menyu tugmasi o'rnatilmadi", exc_info=True)
     await _start_markettwits_listener(app.bot)
 
 
