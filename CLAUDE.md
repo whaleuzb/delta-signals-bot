@@ -7395,3 +7395,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (sayt), "Botda boshqarish". "Prop hisob olish" — `/account/buy`
      (Depozit oynasida ham). Bosh menyudagi "💼 Dip Funded" endi web_app
      (`/app?df=1`).
+256. **Depozit oynasidagi Dip Funded bloki chiqmasdi**: `api_me` havolalarni
+     `dipfunded.enabled()` (DIPFUNDED_API_KEY) ga bog'lagan edi, veb servisda
+     kalit yo'q. Endi havolalar faqat `config.DIPFUNDED_URL`ga bog'liq.

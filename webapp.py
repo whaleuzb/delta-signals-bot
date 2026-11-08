@@ -75,9 +75,11 @@ async def api_me(request):
     import dipfunded
     return web.json_response({"uid": uid, "lang": lang, "ws": out,
                               "bot": request.app["bot_username"],
-                              "df": dipfunded.site_url("/") if dipfunded.enabled() else None,
-                              "df_buy": dipfunded.site_url("/account/buy") if dipfunded.enabled() else None,
-                              "df_link": dipfunded.site_url("/account/telegram/link") if dipfunded.enabled() else None},
+                              # 256: veb servisda Dip Funded kaliti yo'q (enabled() False) —
+                              # havolalar faqat sayt manziliga bog'liq, hisoblarni bot beradi.
+                              "df": dipfunded.site_url("/") if config.DIPFUNDED_URL else None,
+                              "df_buy": dipfunded.site_url("/account/buy") if config.DIPFUNDED_URL else None,
+                              "df_link": dipfunded.site_url("/account/telegram/link") if config.DIPFUNDED_URL else None},
                              headers=NO_CACHE)
 
 
