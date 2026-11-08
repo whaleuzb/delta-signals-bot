@@ -7249,3 +7249,5 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      signallar, Dip Funded — yashil; Depozit, Statistika, Equity, Turnir,
      sahifa (web_app) — ko'k. Boshqaruvda: Yopish/Bekor — qizil, TP/SL
      kiritish — yashil, Hajm — ko'k. Eski Telegram ilovalarida oddiy rangda.
+     News Trade postlarida: "💹 Savdo qilish" — yashil, "📝 Jurnalga
+     kiritish" — ko'k (`_signal_buttons`).

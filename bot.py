@@ -8194,10 +8194,12 @@ async def _signal_buttons(symbol: str, market: str,
             base = symbol[:-len(config.QUOTE)] if symbol.endswith(config.QUOTE) else symbol
             pair = f"{base}_{config.QUOTE}"
             url = ref.replace("{symbol}", pair) if "{symbol}" in ref else ref
-            rows.append([InlineKeyboardButton("💹 Savdo qilish", url=url)])
+            rows.append([InlineKeyboardButton("💹 Savdo qilish", url=url,
+                                              api_kwargs={"style": "success"})])
     if bot_username:
         rows.append([InlineKeyboardButton(
-            "📝 Jurnalga kiritish", url=f"https://t.me/{bot_username}?start=journal_{symbol}")])
+            "📝 Jurnalga kiritish", url=f"https://t.me/{bot_username}?start=journal_{symbol}",
+            api_kwargs={"style": "primary"})])
     return InlineKeyboardMarkup(rows) if rows else None
 
 
