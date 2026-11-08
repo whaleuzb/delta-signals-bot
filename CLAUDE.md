@@ -7341,3 +7341,5 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      pastdan chiqadigan formalar; kutilayotgan limitlar kartada (Bekor).
      Bosh menyuda "Ochiq signallar" endi faqat ilovasiz holatda (guruh chati,
      o'z signalini boshqaradigan a'zo) chiqadi.
+249. **"🔁 Boshqa joyga o'tish" asosiy menyuga qaytdi** (Sozlamalardan olindi):
+     egada Statistika yonida, ilovasiz holatda alohida qatorda.

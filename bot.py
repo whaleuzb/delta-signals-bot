@@ -1212,9 +1212,16 @@ def main_menu_kb(uid: int, ws, private: bool = True,
     # o'z signalini boshqaradigan a'zo (Mini App faqat egaga) uchun qoladi.
     in_app = private and manage and bool(config.WEB_URL)
     top = [InlineKeyboardButton(i18n.t("menu.stats", lang), callback_data="m:stats")]
+    switch_btn = InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch")
     if not in_app:
         top.append(InlineKeyboardButton(i18n.t("menu.open", lang), callback_data="m:open"))
-    rows.append(top)
+    # 249: "Boshqa joyga o'tish" — asosiy tugmalar orasida (foydalanuvchi so'rovi).
+    if len(top) < 2:
+        top.append(switch_btn)
+        rows.append(top)
+    else:
+        rows.append(top)
+        rows.append([switch_btn])
     extra = []
     # Dip Funded hisoblari — faqat shaxsiy chatda (hisob va pul guruhda ko'rinmasin).
     if private and dipfunded.enabled():
@@ -1242,8 +1249,7 @@ def settings_kb(uid: int, ws, lang: str | None = None) -> InlineKeyboardMarkup:
         rows.append(top_menu_row(ws, lang))
     # Juftliklar statistikasi.
     rows.append([InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")])
-    rows.append([InlineKeyboardButton(i18n.t("menu.switch", lang), callback_data="switch"),
-                 InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
+    rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
     if can_manage(uid, ws) and ws["type"] == "group":
         # Guruh/kanalni botdan uzish (202) — tasdiq ekrani bilan.
         rows.append([InlineKeyboardButton(
