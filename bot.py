@@ -7920,7 +7920,9 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if len(msg_ids) > 1:
             await ctx.bot.copy_messages(uid, from_chat, msg_ids)
         else:
-            await ctx.bot.copy_message(uid, from_chat, msg_ids[0])
+            # 253: copy_message tugmani o'zi ko'chirmaydi — alohida beriladi.
+            await ctx.bot.copy_message(uid, from_chat, msg_ids[0],
+                                       reply_markup=d.get("markup"))
 
     for uid in targets:
         try:
@@ -10184,8 +10186,8 @@ async def _fix_whales_join(bot) -> None:
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
-ANNOUNCE_KEY = "announce_2026_11_futures"
-ANNOUNCE_FILE = "2026-11-futures"     # announce/<nom>.png va .txt
+ANNOUNCE_KEY = "announce_2026_11_miniapp"
+ANNOUNCE_FILE = "2026-11-miniapp"     # announce/<nom>.png va .txt
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
@@ -10198,13 +10200,24 @@ async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
             caption = f.read().strip()
         with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
-            msg = await ctx.bot.send_photo(admin, f, caption=caption[:1024])
+            msg = await ctx.bot.send_photo(admin, f, caption=caption[:1024],
+                                           reply_markup=_announce_kb())
     except Exception:
         log.exception("E'lon tayyorlanmadi — broadcast boshlanmadi")
         return
     log.info("E'lon broadcast boshlandi (admin=%s, msg=%s)", admin, msg.message_id)
     ctx.job_queue.run_once(run_broadcast, 3, data={
-        "admin": admin, "from_chat": admin, "msg_id": msg.message_id})
+        "admin": admin, "from_chat": admin, "msg_id": msg.message_id,
+        "markup": _announce_kb()})
+
+
+def _announce_kb():
+    """253: e'lon ostidagi tugma — Mini App (shaxsiy chatda web_app ishlaydi)."""
+    if not config.WEB_URL:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        "📱 Ilovani ochish", web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
+        api_kwargs={"style": "success"})]])
 
 
 async def post_init(app: Application) -> None:

@@ -7368,3 +7368,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      tashqi havolalar yangi oynada; `__BOT__` sahifaga server yozadi.
      `start_param` `g<id>` — guruh sahifasini ochadi. `web_page_url` →
      `/app?g=<id>`.
+253. **E'lon: "Hammasi bitta ilovada" (rasm + tugma).** `ANNOUNCE_KEY =
+     announce_2026_11_miniapp`, `announce/2026-11-miniapp.{png,txt}`. E'lon
+     ostida "📱 Ilovani ochish" (web_app, yashil) — `_announce_kb()`;
+     `run_broadcast` `data["markup"]`ni `copy_message`ga beradi (copy tugmani
+     o'zi ko'chirmaydi). Broadcast paytida push qilinmasin (qayta ishga
+     tushish yuborishni to'xtatadi).

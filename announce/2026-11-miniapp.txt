@@ -1,0 +1,14 @@
+📱 Trade Controller — endi hammasi bitta ilovada!
+
+Bot ichida yangi Mini App ishga tushdi:
+
+🔹 Signallarni boshqarish — BE, stop, TP, 25/50/75% yopish, qo'shish va limitlar
+🔹 Har signalda jonli grafik, natija % va $ da
+🔹 Top reyting — guruhlar, kanallar va Futures
+🔹 Guruh sahifasi — natija dinamikasi, oylar, tarix
+🔹 Dip Funded va TC turniri — sovrinlar va reyting
+🔹 Yangi dizayn, animatsiyalar, swipe bilan o'tish
+
+Bosh menyu ham soddalashdi: kam ishlatiladiganlar endi ⚙️ Sozlamalar ichida.
+
+Ochish: pastdagi tugma yoki chatdagi «Ilova» tugmasi 👇
