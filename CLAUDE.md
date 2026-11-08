@@ -7349,3 +7349,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `paymembers.join_url` (ochiq @nik yoki Pay Members boti) bo'lsagina; egasi
      ko'rsa va havola yo'q bo'lsa — "Qo'shilish havolasi ulanmagan — botda
      ulash" (`mine`).
+251. **Whales Uzb → @mamurjonpaybot (qo'lda).** Egasining so'rovi: shaxsiy
+     yopiq guruhiga qo'shilish tugmasi o'z to'lov boti orqali. `pm_manual`
+     ustuni — qo'lda biriktirilgan bot `pm_job` (Pay Members tekshiruvi)
+     tomonidan o'chirilmaydi; `set_pm_bot` (egasining "🔗" tugmasi/`/havola`)
+     uni yana avtomatik rejimga qaytaradi. Bir martalik `_fix_whales_join`
+     (bayroq `onetime_whales_join`): nomi aynan "Whales Uzb", egasi
+     super-admin bo'lgan bitta guruh; natija adminga DM.

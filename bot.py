@@ -10153,6 +10153,34 @@ async def _fix_size_979(bot) -> None:
             pass
 
 
+async def _fix_whales_join(bot) -> None:
+    """251: egasining so'rovi — "Whales Uzb" yopiq guruhiga qo'shilish tugmasi
+    @mamurjonpaybot (egasining o'z to'lov boti) orqali. Qo'lda biriktiriladi
+    (`pm_manual`), Pay Members tekshiruvi uni o'chirmaydi. Faqat nomi aynan
+    shu, egasi super-admin bo'lgan bitta guruh bo'lsa; bir marta."""
+    flag = "onetime_whales_join"
+    if await db.get_setting(flag):
+        return
+    try:
+        rows = [r for r in await db.find_group_by_exact_name("Whales Uzb")
+                if r["owner_id"] in config.ADMIN_IDS]
+        if len(rows) == 1:
+            await db.set_pm_bot_manual(rows[0]["id"], "mamurjonpaybot")
+            note = f"Whales Uzb (id={rows[0]['id']}): qo'shilish tugmasi → @mamurjonpaybot"
+        else:
+            note = f"Whales Uzb: {len(rows)} ta mos guruh — hech narsa qilinmadi"
+        log.warning("Bir martalik tuzatish: %s", note)
+    except Exception as e:
+        log.exception("Whales Uzb qo'shilish tuzatishi xato")
+        note = f"Whales Uzb xato: {type(e).__name__}"
+    await db.set_setting(flag, "done")
+    for admin in config.ADMIN_IDS:
+        try:
+            await bot.send_message(admin, "🛠 " + note)
+        except Exception:
+            pass
+
+
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
@@ -10217,6 +10245,7 @@ async def post_init(app: Application) -> None:
     await tournament.load_active()
     await _run_one_time_fixes()
     await _fix_size_979(app.bot)
+    await _fix_whales_join(app.bot)
     # Uchala tilda: Telegram foydalanuvchi ilovasining tiliga qarab
     # ro'yxatni o'zi tanlaydi; boshqa tillarda — o'zbekcha (standart).
     for code in (None, "ru", "en"):

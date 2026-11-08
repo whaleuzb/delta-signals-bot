@@ -541,6 +541,9 @@ CREATE TABLE IF NOT EXISTS app_actions (
 CREATE INDEX IF NOT EXISTS app_actions_new ON app_actions (id) WHERE status = 'new';
 -- 248: murakkab amallar argumentlari (TP ro'yxati, limit narxlari) — JSON.
 ALTER TABLE app_actions ADD COLUMN IF NOT EXISTS args TEXT;
+-- 251: qo'lda (super-admin) biriktirilgan to'lov boti — Pay Members API
+-- tekshiruvi (`pm_job`) uni o'chirib yubormasin.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS pm_manual BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 
@@ -757,8 +760,22 @@ async def set_pm_bot(workspace_id: int, bot_username: str | None) -> None:
     egasi ixtiyoriy (fishing ham bo'lishi mumkin) havola qo'yardi. Bu
     qiymatni esa ega emas, Pay Members API beradi — tasdiq saqlanadi."""
     async with pool().acquire() as c:
-        await c.execute("UPDATE workspaces SET pm_bot=$2 WHERE id=$1",
+        await c.execute("UPDATE workspaces SET pm_bot=$2, pm_manual=FALSE WHERE id=$1",
                         workspace_id, bot_username)
+
+
+async def set_pm_bot_manual(workspace_id: int, bot_username: str) -> None:
+    """251: super-admin qo'lda biriktirgan qo'shilish boti (pm_job tegmaydi)."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE workspaces SET pm_bot=$2, pm_manual=TRUE WHERE id=$1",
+                        workspace_id, bot_username)
+
+
+async def find_group_by_exact_name(name: str) -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, name, owner_id, pm_bot FROM workspaces WHERE type='group' "
+            "AND NOT is_channel AND NOT archived AND lower(name)=lower($1)", name)
 
 
 async def pm_linked_workspaces() -> list[asyncpg.Record]:
@@ -767,7 +784,7 @@ async def pm_linked_workspaces() -> list[asyncpg.Record]:
         return await c.fetch(
             "SELECT id, owner_id, name, group_chat_id, pm_bot FROM workspaces "
             "WHERE pm_bot IS NOT NULL AND group_chat_id IS NOT NULL "
-            "AND NOT archived ORDER BY id")
+            "AND NOT archived AND NOT pm_manual ORDER BY id")
 
 
 async def set_public_approved(workspace_id: int, approved: bool) -> None:
