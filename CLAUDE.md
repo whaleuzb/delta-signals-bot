@@ -7262,3 +7262,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      act_partial/act_close` (bot tugmalari ham shu funksiyalardan
      foydalanadi). Veb natijani 25 s kutadi. Bosh menyuda egasiga
      "📱 Ilovani ochish" (faqat shaxsiy chatda, web_app).
+239. **Mini App — 3 rang, emoji yo'q.** Faqat oq/kulrang (asos), yashil
+     (urg'u, foyda, faol bo'lim) va qizil (zarar, yopish). Emoji o'rniga
+     bir xil chiziqli SVG ikonkalar (`I` + `ic()` webapp.py'da); TP'lar
+     nuqta (yashil — bajarilgan); bot javobidagi emoji toast'da olib
+     tashlanadi.
