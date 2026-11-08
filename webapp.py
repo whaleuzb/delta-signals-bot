@@ -28,6 +28,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
+WS_ACTIONS = ("dep", "fdep", "df")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -71,8 +72,11 @@ async def api_me(request):
             "page": (f"/g/{w['id']}" if w["type"] == "group" and w["public"]
                      and w["public_approved"] else None),
         })
+    import dipfunded
     return web.json_response({"uid": uid, "lang": lang, "ws": out,
-                              "bot": request.app["bot_username"]}, headers=NO_CACHE)
+                              "bot": request.app["bot_username"],
+                              "df": dipfunded.site_url("/") if dipfunded.enabled() else None},
+                             headers=NO_CACHE)
 
 
 async def _price(r):
@@ -186,9 +190,70 @@ async def api_spark(request):
         headers=NO_CACHE)
 
 
+async def _wait_action(aid: int):
+    for _ in range(50):
+        await asyncio.sleep(0.5)
+        a = await db.app_action_get(aid)
+        if a and a["status"] in ("ok", "fail", "stale"):
+            return web.json_response({"ok": a["status"] == "ok",
+                                      "msg": a["result"] or ""}, headers=NO_CACHE)
+    return web.json_response({"ok": False, "pending": True, "msg": ""}, headers=NO_CACHE)
+
+
+async def _ws_act(body, uid: int, act: str):
+    """254: depozit o'rnatish (spot/futures) va Dip Funded menyusini botda
+    ochish — bot bajaradi (`app_action_job`), sig_id=0."""
+    arg = None
+    if act != "df":
+        try:
+            ws = await db.get_workspace(int(body.get("ws")))
+            arg = float(body.get("arg"))
+        except (TypeError, ValueError):
+            raise web.HTTPBadRequest()
+        if not _can(ws, uid) or not (arg > 0):
+            raise web.HTTPForbidden()
+        args = json.dumps({"ws": ws["id"]})
+    else:
+        args = None
+    aid = await db.app_action_add(uid, 0, act, arg, args)
+    return await _wait_action(aid)
+
+
+async def api_period(request):
+    """254: davr bo'yicha statistika (bot "📊 Statistika"dagi kabi) — faqat egasi."""
+    from datetime import datetime, timedelta
+    import stats as _st
+    body, uid = await _body(request)
+    try:
+        ws = await db.get_workspace(int(body.get("id")))
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    if not _can(ws, uid):
+        raise web.HTTPForbidden()
+    kind = "fut" if body.get("kind") == "fut" else "spot"
+    p = str(body.get("p") or "all")
+    now = datetime.now(_st.TZ)
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    since = {"d": day0, "w": day0 - timedelta(days=day0.weekday()),
+             "m": day0.replace(day=1), "y": day0.replace(month=1, day=1)}.get(p)
+    with db.stats_kind(kind):
+        r = await db.period_stats(ws["id"], since)
+    total = r["total"] or 0
+    return web.json_response({
+        "n": total, "wins": r["wins"] or 0, "losses": r["losses"] or 0, "be": r["be"] or 0,
+        "sum": float(r["sum_pct"] or 0), "avg_win": float(r["avg_win"] or 0),
+        "avg_loss": float(r["avg_loss"] or 0), "avg_r": float(r["avg_r"] or 0),
+        "liqs": r["liqs"] or 0,
+        "money": float(r["real_pnl_money"]) if r["real_pnl_money"] is not None else None,
+        "wr": (r["wins"] / total * 100) if total else 0,
+    }, headers=NO_CACHE)
+
+
 async def api_act(request):
     body, uid = await _body(request)
     act = str(body.get("action") or "")
+    if act in WS_ACTIONS:
+        return await _ws_act(body, uid, act)
     if act not in ACTIONS:
         raise web.HTTPBadRequest()
     try:
@@ -295,7 +360,7 @@ async def api_group(request):
     out = {"id": ws["id"], "name": ws["name"], "channel": bool(ws["is_channel"]),
            "logo": bool(ws["logo"]), "public": not owner,
            "join": __import__("paymembers").join_url(ws) or None,
-           "mine": uid is not None and _can(ws, uid)}
+           "mine": uid is not None and _can(ws, uid), "personal": ws["type"] == "personal"}
     for kind in ("spot", "fut"):
         n = await W._group_numbers(ws, lang, kind)
         if kind == "fut" and not n["total"]:
@@ -449,6 +514,7 @@ def routes() -> list:
         web.post("/api/app/act", api_act),
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/top", api_top),
+        web.post("/api/app/period", api_period),
         web.post("/api/app/group", api_group),
         web.post("/api/app/tour", api_tour),
         web.post("/api/app/tspark", api_tspark),
@@ -480,6 +546,12 @@ T = {
         "prices": "Limit narxlari (5 tagacha)", "lims": "Limitlar", "size_btn": "Summa",
         "size_title": "Pozitsiya summasi",
         "join_setup": "Qo'shilish havolasi ulanmagan — botda ulash",
+        "p_d": "Bugun", "p_w": "Hafta", "p_m": "Oy", "p_y": "Yil", "p_all": "Hammasi",
+        "money": "Pul natija", "wl": "Foyda / zarar", "avg_wl": "O'rtacha foyda / zarar",
+        "dep_title": "Depozit", "dep_spot": "Spot depozit", "dep_fut": "Futures depozit",
+        "busy_l": "Pozitsiyalarda", "free_l": "Bo'sh", "new_val": "Yangi qiymat, $",
+        "df_open": "Dip Funded botda ochildi", "df_site": "Saytni ochish", "df_acc": "Hisoblarim (botda)",
+        "df_title": "Dip Funded", "df_txt": "Prop hisoblar: savdo, sotish va hisob holati botda. Turnir — Turnir bo'limida.",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -517,6 +589,12 @@ T = {
         "prices": "Цены лимитов (до 5)", "lims": "Лимиты", "size_btn": "Сумма",
         "size_title": "Сумма позиции",
         "join_setup": "Ссылка для вступления не подключена — подключить в боте",
+        "p_d": "Сегодня", "p_w": "Неделя", "p_m": "Месяц", "p_y": "Год", "p_all": "Всё",
+        "money": "Результат в $", "wl": "Прибыль / убыток", "avg_wl": "Средняя прибыль / убыток",
+        "dep_title": "Депозит", "dep_spot": "Спот депозит", "dep_fut": "Фьючерс депозит",
+        "busy_l": "В позициях", "free_l": "Свободно", "new_val": "Новое значение, $",
+        "df_open": "Dip Funded открыт в боте", "df_site": "Открыть сайт", "df_acc": "Мои счета (в боте)",
+        "df_title": "Dip Funded", "df_txt": "Проп-счета: торговля и состояние счёта в боте. Турнир — во вкладке Турнир.",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -554,6 +632,12 @@ T = {
         "prices": "Limit prices (up to 5)", "lims": "Limits", "size_btn": "Size",
         "size_title": "Position size",
         "join_setup": "Join link not connected — set it in the bot",
+        "p_d": "Today", "p_w": "Week", "p_m": "Month", "p_y": "Year", "p_all": "All",
+        "money": "Result $", "wl": "Wins / losses", "avg_wl": "Avg win / loss",
+        "dep_title": "Deposit", "dep_spot": "Spot deposit", "dep_fut": "Futures deposit",
+        "busy_l": "In positions", "free_l": "Free", "new_val": "New value, $",
+        "df_open": "Dip Funded opened in the bot", "df_site": "Open website", "df_acc": "My accounts (bot)",
+        "df_title": "Dip Funded", "df_txt": "Prop accounts: trading and status in the bot. Tournament — in the Tournament tab.",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",

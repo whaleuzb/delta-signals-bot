@@ -402,6 +402,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "menu.settings": {"uz": "⚙️ Sozlamalar", "ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "menu.settings_h": {"uz": "⚙️ Sozlamalar", "ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "menu.app": {"uz": "📱 Ilovani ochish", "ru": "📱 Открыть приложение", "en": "📱 Open app"},
+    "app.dep_ok": {"uz": "✅ Spot depozit: {v:,.2f}$", "ru": "✅ Спот депозит: {v:,.2f}$",
+                   "en": "✅ Spot deposit: {v:,.2f}$"},
     "app.tpsl_ok": {"uz": "✅ TP/SL qo'yildi", "ru": "✅ TP/SL установлены", "en": "✅ TP/SL placed"},
     "app.limx_ok": {"uz": "Qo'shimcha limitlar bekor qilindi", "ru": "Доп. лимиты отменены",
                     "en": "Extra limits cancelled"},

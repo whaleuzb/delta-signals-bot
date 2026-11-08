@@ -848,6 +848,26 @@ async def app_action_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
+    # 254: workspace/odam darajasidagi amallar (signal emas).
+    if a["action"] == "df":
+        if not dipfunded.enabled():
+            return False, "Dip Funded"
+        text, kb = await _df_open(uid, lang)
+        await ctx.bot.send_message(uid, text, parse_mode=ParseMode.HTML, reply_markup=kb)
+        return True, "ok"
+    if a["action"] in ("dep", "fdep"):
+        try:
+            ws = await db.get_workspace(int(json.loads(a["args"])["ws"]))
+        except Exception:
+            ws = None
+        amount = float(a["arg"]) if a["arg"] is not None else 0
+        if not ws or not can_manage(uid, ws) or amount <= 0:
+            return False, i18n.t("man.no_right", lang)
+        if a["action"] == "fdep":
+            await db.set_fut_deposit(ws["id"], amount)
+            return True, i18n.t("fdep.updated", lang, v=amount)
+        await db.set_deposit(ws["id"], amount)
+        return True, i18n.t("app.dep_ok", lang, v=amount)
     sig = await db.get_signal(a["sig_id"])
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
         return False, i18n.t("man.gone", lang)

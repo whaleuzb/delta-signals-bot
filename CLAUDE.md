@@ -7374,3 +7374,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `run_broadcast` `data["markup"]`ni `copy_message`ga beradi (copy tugmani
      o'zi ko'chirmaydi). Broadcast paytida push qilinmasin (qayta ishga
      tushish yuborishni to'xtatadi).
+254. **Mini App: Depozit, Statistika, Dip Funded ilova ichida.** Avval
+     Depozit va Dip Funded kartalari `tg.close()` qilardi. Endi: Depozit —
+     pastdan oyna (spot/futures: joriy, pozitsiyalarda, bo'sh; yangi qiymat →
+     `dep`/`fdep` amali, `set_deposit`/`set_fut_deposit`). Dip Funded — oyna:
+     "Hisoblarim (botda)" (`df` amali — bot `_df_open` menyusini chatga
+     yuboradi, ilova yopiladi), sayt, Turnir. Workspace/odam darajasidagi
+     amallar `app_actions.sig_id=0`, `_ws_act`. Statistika (guruh sahifasi)
+     egaga davr tanlovi: Bugun/Hafta/Oy/Yil/Hammasi (`/api/app/period`,
+     `db.period_stats`: natija %, $ natija, signal, WR, foyda/zarar, o'rtacha,
+     likvidatsiya); egada umumiy plitkalar takrorlanmaydi. Shaxsiy jurnalda
+     "qo'shilish havolasi" eslatmasi chiqmaydi.
