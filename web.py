@@ -480,6 +480,18 @@ TG_SCRIPT = """
   // jadvalni o'qish uchun suradi va bu tasodifan yopilishga olib kelardi.
   // Bot API 7.7+ da mavjud, eskirog'ida jimgina o'tkazib yuboriladi.
   try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
+  // 242: Mini App (/app) ichidan ochilgan bo'lsa — Telegram "Orqaga"
+  // tugmasi ilovaga qaytaradi (tashqi brauzerga chiqmasdan).
+  try {
+    var fromApp = false;
+    try { fromApp = sessionStorage.getItem('tc_from_app') === '1'; } catch (e) {}
+    if (fromApp && tg.BackButton) {
+      tg.BackButton.show();
+      tg.BackButton.onClick(function () {
+        if (history.length > 1) history.back(); else location.href = '/app';
+      });
+    }
+  } catch (e) {}
   try {
     tg.setHeaderColor && tg.setHeaderColor('#0b0e14');
     tg.setBackgroundColor && tg.setBackgroundColor('#0b0e14');

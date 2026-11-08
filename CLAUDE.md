@@ -7289,3 +7289,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      TP (yashil) uzuq chiziqlari, ochilish vertikal chizig'i, oxirgi narxda
      miltillovchi nuqta; birinchi marta chizilish animatsiyasi. Avvalgi
      stop→TP chizig'i olib tashlandi.
+242. **Mini App ichidan o'z sahifalarimiz brauzerga chiqmaydi.** `openLink`
+     o'z domenimiz (statistika `/g/<id>`, turnir `/t`) uchun `location.href`
+     (avval `tg.openLink` — tashqi brauzer edi) va `sessionStorage.tc_from_app`
+     qo'yadi; `web.TG_SCRIPT` shu belgini ko'rsa Telegram "Orqaga" tugmasini
+     ko'rsatadi (`history.back()`), /app qaytganda (`pageshow`) yashiriladi.
+     Bot havolalari (t.me) — `openTelegramLink` (chatga o'tadi).
