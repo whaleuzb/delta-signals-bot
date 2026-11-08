@@ -115,6 +115,73 @@ async def api_open(request):
     return web.json_response({"ws": ws["id"], "items": out}, headers=NO_CACHE)
 
 
+# 241: kartadagi kichik grafik. Shamlar (market, juftlik, tf) bo'yicha
+# keshlanadi — kripto 2 daqiqa, forex/aksiya 10 daqiqa (Twelve Data limiti).
+_SPARK: dict[tuple, tuple[float, list]] = {}
+_SPARK_SEM = asyncio.Semaphore(3)
+_TFS = (("5m", 300_000), ("15m", 900_000), ("1h", 3_600_000),
+        ("4h", 14_400_000), ("1d", 86_400_000))
+
+
+def _spark_tf(start_ms: int, now_ms: int) -> tuple[str, int]:
+    span = max(now_ms - start_ms, 3 * 3_600_000) * 1.25
+    for tf, ms in _TFS:
+        if span / ms <= 110:
+            return tf, int(now_ms - span)
+    return "1d", int(now_ms - 110 * 86_400_000)
+
+
+async def _spark(r) -> list | None:
+    import time as _t
+    now = int(_t.time() * 1000)
+    t0 = r["opened_at"] or r["created_at"]
+    tf, begin = _spark_tf(int(t0.timestamp() * 1000), now)
+    key = (r["market"], r["symbol"], tf)
+    ttl = 120 if r["market"] in ("crypto", "futures", None) else 600
+    hit = _SPARK.get(key)
+    if hit and _t.monotonic() - hit[0] < ttl:
+        return hit[1]
+    async with _SPARK_SEM:
+        hit = _SPARK.get(key)
+        if hit and _t.monotonic() - hit[0] < ttl:
+            return hit[1]
+        try:
+            cs = await tracker.provider(r["market"]).klines(
+                r["symbol"], begin, limit=200, tf=tf, end_ms=now)
+            data = [round(float(c.close), 10) for c in cs][-120:]
+            mark = None
+            if r["opened_at"]:
+                om = int(r["opened_at"].timestamp() * 1000)
+                for k, c in enumerate(cs[-120:]):
+                    if c.open_ms >= om:
+                        mark = k
+                        break
+            out = [data, mark]
+        except Exception:
+            log.warning("Kichik grafik shamlari olinmadi (%s)", r["symbol"], exc_info=True)
+            out = None
+        if out is not None:
+            if len(_SPARK) > 500:
+                _SPARK.clear()
+            _SPARK[key] = (_t.monotonic(), out)
+        return out
+
+
+async def api_spark(request):
+    body, uid = await _body(request)
+    try:
+        ws = await db.get_workspace(int(body.get("ws")))
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    if not _can(ws, uid):
+        raise web.HTTPForbidden()
+    rows = await db.live_signals(ws["id"])
+    res = await asyncio.gather(*(_spark(r) for r in rows))
+    return web.json_response(
+        {str(r["id"]): {"c": v[0], "m": v[1]} for r, v in zip(rows, res) if v and v[0]},
+        headers=NO_CACHE)
+
+
 async def api_act(request):
     body, uid = await _body(request)
     act = str(body.get("action") or "")
@@ -150,6 +217,7 @@ def routes() -> list:
         web.post("/api/app/me", api_me),
         web.post("/api/app/open", api_open),
         web.post("/api/app/act", api_act),
+        web.post("/api/app/spark", api_spark),
     ]
 
 

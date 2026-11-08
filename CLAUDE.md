@@ -7281,3 +7281,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      chaqnash, stop uchun pastdan chiqadigan oyna (pastga surib yopiladi),
      signallar filtri (Hammasi/LONG/SHORT/Limit), stop→TP chizig'i.
      `prefers-reduced-motion` — animatsiyasiz.
+241. **Mini App: har signalda kichik grafik.** `/api/app/spark` — har ochiq
+     signal uchun ochilishdan (yo'q bo'lsa yaratilishdan) beri yopilish
+     narxlari; tf oynaga qarab (5m…1d, ~110 sham), kesh: kripto 2 daqiqa,
+     forex/aksiya 10 daqiqa, bir vaqtda 3 so'rov. Kartada SVG: chiziq
+     (foyda yashil / zarar qizil) + soya, kirish (oq), SL (qizil), keyingi
+     TP (yashil) uzuq chiziqlari, ochilish vertikal chizig'i, oxirgi narxda
+     miltillovchi nuqta; birinchi marta chizilish animatsiyasi. Avvalgi
+     stop→TP chizig'i olib tashlandi.

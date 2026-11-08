@@ -102,6 +102,20 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .pnl small{display:block;font-size:12px;font-weight:600}
 .bar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);margin:12px 0 2px;overflow:hidden;position:relative}
 .bar i{position:absolute;top:0;bottom:0;border-radius:3px;transition:all .8s var(--ease)}
+.spk{height:70px;margin:10px -2px 2px;position:relative}
+.spk svg{width:100%;height:100%;display:block;overflow:visible}
+.spk .sk{height:100%;border-radius:12px;background:linear-gradient(90deg,rgba(255,255,255,.03),rgba(255,255,255,.08),rgba(255,255,255,.03));background-size:200% 100%;animation:sh 1.4s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.spk .ln{fill:none;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.spk .draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.3s var(--ease) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.spk .ar{opacity:0;animation:fade .9s .4s forwards}@keyframes fade{to{opacity:1}}
+.spk .lv{stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:3 4}
+.spk .lb{position:absolute;left:0;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;transform:translateY(-50%);
+ background:rgba(10,10,12,.7);border:1px solid rgba(255,255,255,.08)}
+.spk .pt{position:absolute;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%)}
+.spk .pt::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid currentColor;opacity:.6;animation:ring 1.8s infinite}
+@keyframes ring{to{transform:scale(2.2);opacity:0}}
 .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
 .kv div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:7px 9px;font-size:12px}
 .kv b{display:block;font-size:10px;color:var(--mut);font-weight:500}
@@ -180,7 +194,7 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
 function ic(n,z){z=z||22;return '<svg class="ic" width="'+z+'" height="'+z+'" viewBox="0 0 24 24">'+I[n]+'</svg>'}
 var tg=window.Telegram&&window.Telegram.WebApp;
 var TABS=['home','signals','stats','tour','profile'];
-var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{}};
+var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
 function t(k,o){var s=(T[S.lang]||T.uz)[k]||k;if(o)for(var x in o)s=s.replace('{'+x+'}',o[x]);return s}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function fp(x){if(x==null)return'—';x=+x;if(x>=100)return x.toLocaleString('en-US',{maximumFractionDigits:2});if(x>=1)return x.toFixed(4);return(+x.toFixed(8)).toString()}
@@ -212,7 +226,7 @@ function go(tab){if(tab==S.tab)return;
 function pill(){var w=cur();var el=document.getElementById('wsPill');
  if(!w){el.textContent='Trade Controller';return}
  el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1?ic('chev',14)+'<select id="wsSel">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>':'');
- el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){S.cur=+s.value;S.anim=true;S.items=[];try{localStorage.setItem('tc_ws',S.cur)}catch(e){}load()}}
+ el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){S.cur=+s.value;S.anim=true;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',S.cur)}catch(e){}load()}}
 function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null){m+=i.money;has=true}});return has?m:null}
 function render(){nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
@@ -256,18 +270,13 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  var fl=(pr!=null&&i.live!=null&&Math.abs(pr-i.live)>0.005)?(i.live>pr?' flash-g':' flash-r'):'';
  var pnl=i.live!=null?'<div class="pnl '+(i.live>=0?'g':'r')+fl+'">'+fpc(i.live)+(i.money!=null?'<small>'+fm(i.money)+'</small>':'')+'</div>':'<div class="pnl m" style="font-size:12px">'+esc(pend?t('limit'):'—')+'</div>';
  var tps=i.tps.map(function(x,k){return'<span class="dot'+(k<i.tp_hit?' on':'')+'"></span>'+fp(x)}).join('&nbsp;&nbsp; ');
- /* stop -> narx -> keyingi TP chizig'i */
- var bar='';var tp=i.tps[i.tp_hit]||i.tps[i.tps.length-1];
- if(i.price!=null&&i.sl!=null&&tp!=null&&!pend&&tp!=i.sl){var f=function(x){var v=long?(x-i.sl)/(tp-i.sl):(i.sl-x)/(i.sl-tp);return Math.max(0,Math.min(1,v))};
-  var p=f(i.price),e=f(i.entry),lo=Math.min(p,e),hi=Math.max(p,e);
-  bar='<div class="bar"><i style="left:'+(lo*100)+'%;width:'+(Math.max(.01,hi-lo)*100)+'%;background:'+(p>=e?'var(--g)':'var(--r)')+'"></i></div>'}
  var a='';if(!pend&&i.sl!=null){var be=Math.abs(i.sl-i.entry)<1e-12;
   a+='<button class="btn p" '+(be?'disabled':'')+' onclick="act('+i.id+',\'be\')">'+esc(t('be'))+'</button>'
    +'<button class="btn" onclick="askStop('+i.id+')">'+ic('pen',13)+' '+esc(t('stop'))+'</button>';
   if(i.filled<0.999)a+='<button class="btn" onclick="act('+i.id+',\'pc\',25)">25%</button><button class="btn" onclick="act('+i.id+',\'pc\',50)">50%</button><button class="btn" onclick="act('+i.id+',\'pc\',75)">75%</button>'}
  a+='<button class="btn d full" onclick="act('+i.id+',\'close\')">'+esc(pend?t('cancel'):t('close'))+'</button>';
  return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
- +bar+'<div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
+ +'<div class="spk" id="k'+i.id+'">'+spark(i,false)+'</div><div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
  +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+'<div class="acts">'+a+'</div></div>'}
 function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return f=='all'||(f=='long'&&i.side=='LONG')||(f=='short'&&i.side=='SHORT')||(f=='limit'&&i.status=='PENDING')});
  var tot=totals();
@@ -275,6 +284,26 @@ function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return 
  +'<div class="chips rise">'+[['all','Hammasi'],['long','LONG'],['short','SHORT'],['limit',t('limit')]].map(function(c){return'<span class="chip glass'+(f==c[0]?' on':'')+'" onclick="setF(\''+c[0]+'\')">'+esc(c[0]=='all'?({uz:'Hammasi',ru:'Все',en:'All'}[S.lang]||'Hammasi'):c[1])+'</span>'}).join('')+'</div>'
  +(list.length?list.map(sigCard).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('none'))+'</div></div>');
  S.items.forEach(function(i){S.prev[i.id]=i.live})}
+
+/* ---- 241: kichik grafik ---- */
+function spark(i,draw){var d=S.spark[i.id];if(!d)return'<div class="sk"></div>';var c=d.c.slice();if(i.price!=null)c.push(i.price);if(c.length<2)return'';
+ var tp=i.tps[i.tp_hit]!=null?i.tps[i.tp_hit]:null;var lv=[c[0]].concat(c);var ref=[i.entry];if(i.sl!=null)ref.push(i.sl);if(tp!=null)ref.push(tp);
+ var mn=Math.min.apply(null,lv.concat(ref)),mx=Math.max.apply(null,lv.concat(ref));var pad=(mx-mn)*.08||mx*.01;mn-=pad;mx+=pad;
+ var W=300,H=70,n=c.length;function X(k){return k/(n-1)*W}function Y(v){return H-(v-mn)/(mx-mn)*H}
+ var up=i.live==null?c[n-1]>=c[0]:i.live>=0;var col=up?'var(--g)':'var(--r)';var gid='gr'+i.id;
+ var pts=c.map(function(v,k){return X(k).toFixed(1)+','+Y(v).toFixed(1)}).join(' L');
+ var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+(up?'#2ecc8f':'#ff5c5c')+'" stop-opacity=".28"/><stop offset="1" stop-color="'+(up?'#2ecc8f':'#ff5c5c')+'" stop-opacity="0"/></linearGradient></defs>';
+ var hl=function(v,cl){return'<line class="lv" x1="0" x2="'+W+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="'+cl+'"/>'};
+ svg+=hl(i.entry,'rgba(255,255,255,.45)');if(i.sl!=null)svg+=hl(i.sl,'rgba(255,92,92,.7)');if(tp!=null)svg+=hl(tp,'rgba(46,204,143,.7)');
+ if(d.m!=null&&d.m>0&&d.m<n)svg+='<line x1="'+X(d.m).toFixed(1)+'" x2="'+X(d.m).toFixed(1)+'" y1="0" y2="'+H+'" stroke="rgba(255,255,255,.18)" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+ svg+='<path class="ar'+(draw?'':'" style="opacity:1')+'" d="M'+pts+' L'+W+','+H+' L0,'+H+'Z" fill="url(#'+gid+')"/>';
+ svg+='<path class="ln'+(draw?' draw':'')+'" pathLength="1" d="M'+pts+'" stroke="'+col+'"/></svg>';
+ var lb=function(v,txt,cl){return'<span class="lb" style="top:'+(Y(v)/H*100).toFixed(1)+'%;color:'+cl+'">'+txt+'</span>'};
+ svg+=(i.sl!=null?lb(i.sl,'SL','var(--r)'):'')+(tp!=null?lb(tp,'TP'+(i.tp_hit+1),'var(--g)'):'');
+ svg+='<span class="pt" style="left:'+(X(n-1)/W*100)+'%;top:'+(Y(c[n-1])/H*100).toFixed(1)+'%;background:'+col+';color:'+col+'"></span>';
+ return svg}
+function loadSpark(){var w=cur();if(!w)return;api('spark',{ws:w.id}).then(function(d){for(var k in d){var first=!S.spark[k];S.spark[k]=d[k];
+  var el=document.getElementById('k'+k);var i=S.items.filter(function(x){return x.id==k})[0];if(el&&i)el.innerHTML=spark(i,first)}}).catch(function(){})}
 function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
 
 /* ---- yon tomonga surish (swipe) bilan bo'limlar ---- */
@@ -303,7 +332,7 @@ function act(id,a,arg,skip){var i=S.items.filter(function(x){return x.id==id})[0
   api('act',{sig:id,action:a,arg:arg}).then(function(r){if(r.pending){toast(esc(t('slow')))}else{toast(esc(noEmoji(r.msg||'OK')));haptic(r.ok?'success':'error')}load()}).catch(function(){toast('Error');load()})};
  if(m&&!skip)confirmBox(m,run);else run()}
 function load(){var w=cur();if(!w){render();return}
- return api('open',{ws:w.id}).then(function(d){if(!S.items.length&&d.items.length)S.anim=true;S.items=d.items;w.open=d.items.length;render()}).catch(function(){render()})}
+ return api('open',{ws:w.id}).then(function(d){if(!S.items.length&&d.items.length)S.anim=true;S.items=d.items;w.open=d.items.length;render();loadSpark()}).catch(function(){render()})}
 
 /* ---- yulduzli fon ---- */
 (function(){var c=document.getElementById('bg'),x=c.getContext('2d'),W,H,st=[],dpr=Math.min(2,window.devicePixelRatio||1);
