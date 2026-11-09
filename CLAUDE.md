@@ -7559,3 +7559,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      tushadi): ikki statik SVG feTurbulence qatlami (oq va qora mayda don,
      baseFrequency 1.45/1.25, past alfa). Fon `.grain` .10 → .14. Matn:
      `text-rendering:optimizeLegibility`, grayscale smoothing. Hammasi statik.
+277. **Muzli (frosted) shisha** — namuna: orqadagi fon kuchli xiralashgan,
+     sutsimon och shisha, chetlarda nur sinishi. `.slide/.card/.pod/.tile2/
+     .eq/.sig/.empty/.mtile .glass`: `backdrop-filter: blur(20px)
+     brightness(1.12)`, oq tus .035, ichki yorug'lik, chetlarda iliq/sovuq
+     ingichka chiziq (xromatik aberratsiya taqlidi). Uzun ro'yxat qatorlarida
+     (`.row/.trow`) blur YO'Q — 257 (qizish). Telefon yana qizisa — birinchi
+     navbatda shu blurni kamaytirish/o'chirish kerak.
