@@ -364,7 +364,7 @@ async def api_diptop(request):
         n = (r["first_name"] or "").strip().split()
         return (n[0][:18] if n else None) or "Trader"
     out = [{"rank": r["rank"], "name": nm(r), "dip": round(float(r["earned"]), 2), "refs": r["refs"],
-            "me": bool(uid) and r["user_id"] == uid} for r in rows]
+            "av": r["av"], "me": bool(uid) and r["user_id"] == uid} for r in rows]
     top = [x for x in out if x["rank"] <= 50]
     mine = next((x for x in out if x["me"]), None)
     return web.json_response({"top": top, "me": mine}, headers=NO_CACHE)

@@ -3572,6 +3572,35 @@ async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
         return False
 
 
+async def dip_avatar_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """271: DIP reytingidagilarning Telegram avatari — 128px JPEG bazaga
+    (veb `/av/<key>.jpg` beradi). Har siklda ko'pi bilan 15 kishi, sutkada
+    bir marta yangilanadi. Rasm yo'q / yashirilgan bo'lsa — harf-avatar."""
+    try:
+        uids = await db.avatar_targets()
+    except Exception:
+        log.exception("Avatar siklida xato (bazadan o'qishda)")
+        return
+    for uid in uids:
+        data = None
+        try:
+            ph = await ctx.bot.get_user_profile_photos(uid, limit=1)
+            if ph.total_count and ph.photos:
+                sizes = ph.photos[0]
+                pick = next((x for x in sizes if x.width >= 160), sizes[-1])
+                f = await ctx.bot.get_file(pick.file_id)
+                img = Image.open(io.BytesIO(bytes(await f.download_as_bytearray()))).convert("RGB")
+                side = min(img.size)
+                l, t = (img.width - side) // 2, (img.height - side) // 2
+                img = img.crop((l, t, l + side, t + side)).resize((128, 128))
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=85)
+                data = buf.getvalue()
+        except Exception as e:
+            log.info("Avatar olinmadi (%s): %s", uid, e)
+        await db.set_user_avatar(uid, data)
+
+
 async def logo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Logotiplarni sutkada bir marta yangilaydi — guruh avatarini o'zgartirsa
     sahifada ham o'zgarsin. Bir siklda ko'pi bilan 25 ta guruh."""
@@ -10898,6 +10927,7 @@ def main() -> None:
     app.job_queue.run_repeating(digest_job, interval=900, first=60)
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
+    app.job_queue.run_repeating(dip_avatar_job, interval=900, first=120)
     app.job_queue.run_repeating(app_action_job, interval=2, first=15)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)

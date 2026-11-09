@@ -355,6 +355,15 @@ async def logo_png(request):
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
+async def avatar_jpg(request):
+    """271: DIP reytingidagi odam avatari (bazadan; kalit tasodifiy)."""
+    data = await db.user_avatar(request.match_info["key"])
+    if not data:
+        raise web.HTTPNotFound()
+    return web.Response(body=bytes(data), content_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
 async def mini_png(request):
     """Bitta yopilgan savdoning kichik grafigi.
 
@@ -436,6 +445,7 @@ def build_app() -> web.Application:
         web.get(r"/g/{wid:\d+}/stats.json", stats_json),
         web.get(r"/g/{wid:\d+}/equity.png", equity_png),
         web.get(r"/g/{wid:\d+}/logo.png", logo_png),
+        web.get(r"/av/{key:[A-Za-z0-9_-]{8,20}}.jpg", avatar_jpg),
         web.get(r"/s/{sid:\d+}/mini.png", mini_png),
     ])
     # 238: Mini App (bosh sahifa + ochiq signallar boshqaruvi).

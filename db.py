@@ -574,6 +574,14 @@ ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS dest TEXT NOT NULL DEFAULT 
 ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS network TEXT;
 ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS fee NUMERIC NOT NULL DEFAULT 0;
+-- 271: DIP reytingidagi odamlarning Telegram avatari (bayt bazada — veb
+-- servisda BOT_TOKEN yo'q). `key` — tasodifiy, URL'da user_id oshkor bo'lmasin.
+CREATE TABLE IF NOT EXISTS user_avatars (
+    user_id BIGINT PRIMARY KEY,
+    key     TEXT NOT NULL UNIQUE,
+    img     BYTEA,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -1101,11 +1109,44 @@ async def dip_top(limit: int = 50, me: int | None = None) -> list[asyncpg.Record
             ), r AS (
                 SELECT e.*, ROW_NUMBER() OVER (ORDER BY earned DESC, first, user_id) AS rank FROM e
             )
-            SELECT r.user_id, r.earned, r.refs, r.rank, u.first_name, u.username
+            SELECT r.user_id, r.earned, r.refs, r.rank, u.first_name, u.username,
+                   CASE WHEN a.img IS NOT NULL THEN a.key END AS av
             FROM r LEFT JOIN users u ON u.user_id = r.user_id
+                   LEFT JOIN user_avatars a ON a.user_id = r.user_id
             WHERE r.rank <= $1 OR r.user_id = $2
             ORDER BY r.rank
         """, limit, me or 0)
+
+
+async def avatar_targets(top: int = 50, limit: int = 15) -> list[int]:
+    """271: DIP reytingi (top `top`) dagi, avatari yo'q yoki 24 soatdan eski odamlar."""
+    async with pool().acquire() as c:
+        rows = await c.fetch("""
+            WITH e AS (
+                SELECT user_id, SUM(amount) AS earned, MIN(created_at) AS first FROM dip_ledger
+                WHERE reason NOT IN ('withdraw', 'withdraw_refund')
+                GROUP BY user_id HAVING SUM(amount) > 0
+                ORDER BY earned DESC, first, user_id LIMIT $1
+            )
+            SELECT e.user_id FROM e LEFT JOIN user_avatars a ON a.user_id = e.user_id
+            WHERE a.user_id IS NULL OR a.at < now() - interval '24 hours'
+            ORDER BY a.at NULLS FIRST LIMIT $2
+        """, top, limit)
+    return [r["user_id"] for r in rows]
+
+
+async def set_user_avatar(user_id: int, img: bytes | None) -> None:
+    import secrets
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO user_avatars (user_id, key, img) VALUES ($1,$2,$3) "
+            "ON CONFLICT (user_id) DO UPDATE SET img=EXCLUDED.img, at=now()",
+            user_id, secrets.token_urlsafe(9), img)
+
+
+async def user_avatar(key: str) -> bytes | None:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT img FROM user_avatars WHERE key=$1", key)
 
 
 async def dip_pending(user_id: int) -> float:

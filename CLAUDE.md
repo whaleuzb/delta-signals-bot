@@ -7517,3 +7517,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      to'liq DIP Token kartasi + chiqarish blokini ko'rsatadi. DIP bo'limida
      (`dipView`) karta yo'q: ixcham "DIP balans" qatori (≈ $, bosilsa
      `openRef`), taklif tugmalari va reyting.
+271. **DIP bo'limi — fokus reytingda, avatarlar bilan.** `dipView`: 1–3
+     shohsupa (`.dpod`, 1-o'rin o'rtada, toj va yashil halqa), 4–5 ikki
+     alohida karta (`.d45`), keyin o'zim qatori ("Siz · #N", bosilsa Taklif
+     sahifasi — karta va chiqarish o'sha yerda), 6+ ro'yxat, pastda "Do'st
+     taklif qilish". Avatarlar: jadval `user_avatars` (user_id, tasodifiy
+     `key`, 128px JPEG `img`); bot `dip_avatar_job` (15 daqiqada, ≤15 kishi,
+     DIP top-50 dagilar uchun sutkada bir marta `get_user_profile_photos`);
+     veb `GET /av/<key>.jpg` (user_id URL'da oshkor emas). Rasm yo'q yoki
+     yashirilgan bo'lsa harf-avatar (`uav()`). `diptop` JSON'da `av`.
