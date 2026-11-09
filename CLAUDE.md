@@ -7436,3 +7436,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Spot/Futures bo'yicha (`/api/app/period` → `syms`, `db.top_symbols`),
      ochiq sahifada butun davr (`/api/app/group` → `<kind>.syms`). Botda
      "📉 Juftliklar" Sozlamalardan Statistika ekraniga (PDF yonida) ko'chdi.
+261. **Taklif uchun DIP (har taklif +5, chegarasiz).** DIP — Dip Funded DIP
+     bilan bir xil qiymat (1 DIP = $1); hozircha Trade Controller'da
+     yig'iladi, Dip Funded'da ishlatish keyin. `dip_ledger` (balans = yig'indi;
+     taklif uchun `ref_user` UNIQUE — bitta odam uchun bir marta). `cmd_start`:
+     `add_referral` yangi yozuv bo'lsa `dip_referral` (`config.DIP_PER_REF`,
+     standart 5) va taklif qilganga "🎉 +5 DIP" xabari. Ishga tushishda
+     `dip_backfill` — oldingi takliflar uchun ham (idempotent). Ko'rinishi:
+     /taklif xabarida DIP qatori; ilovada Taklif sahifasida "DIP balans".

@@ -544,6 +544,19 @@ ALTER TABLE app_actions ADD COLUMN IF NOT EXISTS args TEXT;
 -- 251: qo'lda (super-admin) biriktirilgan to'lov boti — Pay Members API
 -- tekshiruvi (`pm_job`) uni o'chirib yubormasin.
 ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS pm_manual BOOLEAN NOT NULL DEFAULT FALSE;
+-- 261: DIP (Dip Funded'dagi DIP bilan bir xil qiymat: 1 DIP = $1). Hozircha
+-- Trade Controller'da yig'iladi; balans = harakatlar yig'indisi. Taklif uchun
+-- bitta taklif qilingan odamga bitta yozuv (ref_user UNIQUE) — qayta yozilmaydi.
+CREATE TABLE IF NOT EXISTS dip_ledger (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL,
+    amount     NUMERIC NOT NULL,
+    reason     TEXT NOT NULL,
+    ref_user   BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS dip_ledger_ref ON dip_ledger (ref_user) WHERE reason = 'referral';
+CREATE INDEX IF NOT EXISTS dip_ledger_user ON dip_ledger (user_id);
 """
 
 
@@ -1022,11 +1035,39 @@ async def remove_required_channel(chat_id: int) -> bool:
 
 # ─────────────────────────── Referrallar ───────────────────────────
 
-async def add_referral(referrer_id: int, referred_id: int) -> None:
+async def add_referral(referrer_id: int, referred_id: int) -> bool:
+    """Yangi taklif yozilgan bo'lsa True (261: shunda DIP beriladi)."""
     async with pool().acquire() as c:
-        await c.execute(
+        r = await c.execute(
             "INSERT INTO referrals (referrer_id, referred_id) VALUES ($1,$2) "
             "ON CONFLICT (referred_id) DO NOTHING", referrer_id, referred_id)
+    return r.endswith(" 1")
+
+
+async def dip_referral(referrer_id: int, referred_id: int, amount: float) -> bool:
+    """261: taklif uchun DIP — bitta taklif qilingan odam uchun bir marta."""
+    async with pool().acquire() as c:
+        r = await c.execute(
+            "INSERT INTO dip_ledger (user_id, amount, reason, ref_user) VALUES ($1,$2,'referral',$3) "
+            "ON CONFLICT (ref_user) WHERE reason = 'referral' DO NOTHING",
+            referrer_id, _d(amount), referred_id)
+    return r.endswith(" 1")
+
+
+async def dip_backfill(amount: float) -> int:
+    """261: oldingi takliflar uchun ham DIP (bir marta — UNIQUE indeks)."""
+    async with pool().acquire() as c:
+        r = await c.execute(
+            "INSERT INTO dip_ledger (user_id, amount, reason, ref_user) "
+            "SELECT referrer_id, $1, 'referral', referred_id FROM referrals "
+            "ON CONFLICT (ref_user) WHERE reason = 'referral' DO NOTHING", _d(amount))
+    return int(r.split()[-1])
+
+
+async def dip_balance(user_id: int) -> float:
+    async with pool().acquire() as c:
+        v = await c.fetchval("SELECT COALESCE(SUM(amount), 0) FROM dip_ledger WHERE user_id=$1", user_id)
+    return float(v or 0)
 
 
 async def referral_stats(limit: int = 10) -> tuple[int, list[asyncpg.Record]]:

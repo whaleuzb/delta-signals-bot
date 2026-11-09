@@ -285,3 +285,6 @@ REF_CUSTOM_MIN = int(os.getenv("REF_CUSTOM_MIN", "20"))
 # yopiq kanal/guruh id'si, -100...). Bo'sh — qidiruv o'chiq.
 _rl = os.getenv("RESULTLINK_CHAT_ID", "").strip()
 RESULTLINK_CHAT_ID = int(_rl) if _rl.lstrip("-").isdigit() else None
+
+# 261: har bir taklif uchun DIP (Dip Funded DIP bilan bir xil qiymat).
+DIP_PER_REF = float(os.getenv("DIP_PER_REF", "5"))

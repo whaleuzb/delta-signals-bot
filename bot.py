@@ -981,6 +981,7 @@ async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
             return False, i18n.t("ref.taken", lang)
     code, link = await referral_token(uid, ctx.bot.username)
     return True, json.dumps({"code": code, "link": link, "count": count,
+                             "dip": await db.dip_balance(uid), "dip_per": config.DIP_PER_REF,
                              "can_pick": can_pick_ref_code(uid, count),
                              "need": max(0, config.REF_CUSTOM_MIN - count),
                              "min": REF_CODE_MIN, "max": REF_CODE_MAX})
@@ -6593,7 +6594,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.warning("Taklif kodi o'qilmadi: %r", token, exc_info=True)
             referrer_id = None
         if referrer_id and referrer_id != uid:
-            await db.add_referral(referrer_id, uid)
+            if await db.add_referral(referrer_id, uid) and config.DIP_PER_REF > 0:
+                # 261: taklif qilganga DIP va xabar.
+                try:
+                    if await db.dip_referral(referrer_id, uid, config.DIP_PER_REF):
+                        rlang = await user_lang(referrer_id)
+                        await ctx.bot.send_message(referrer_id, i18n.t(
+                            "dip.ref_got", rlang, n=f"{config.DIP_PER_REF:g}",
+                            bal=f"{await db.dip_balance(referrer_id):g}"), parse_mode=ParseMode.HTML)
+                except Exception:
+                    log.warning("Taklif DIP'i/xabari (%s)", referrer_id, exc_info=True)
 
     # News Trade AI/surge posti ostidagi "📝 Jurnalga kiritish" tugmasi —
     # tiker allaqachon ma'lum (postdan), shuning uchun bu yerda tikerni
@@ -8383,7 +8393,8 @@ async def cmd_invite(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         i18n.t("ref.head", lang) + "\n\n"
         + code_txt
         + i18n.t("ref.link_line", lang, link=link_txt) + "\n\n"
-        + i18n.t("ref.count", lang, n=count) + extra,
+        + i18n.t("ref.count", lang, n=count) + "\n"
+        + i18n.t("dip.line", lang, bal=f"{await db.dip_balance(uid):g}", n=f"{config.DIP_PER_REF:g}") + extra,
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(rows))
 
@@ -10477,6 +10488,12 @@ async def post_init(app: Application) -> None:
     await _run_one_time_fixes()
     await _fix_size_979(app.bot)
     await _fix_whales_join(app.bot)
+    try:
+        n = await db.dip_backfill(config.DIP_PER_REF)
+        if n:
+            log.warning("DIP: oldingi %s ta taklif uchun DIP yozildi", n)
+    except Exception:
+        log.exception("DIP backfill")
     # Uchala tilda: Telegram foydalanuvchi ilovasining tiliga qarab
     # ro'yxatni o'zi tanlaydi; boshqa tillarda — o'zbekcha (standart).
     for code in (None, "ru", "en"):

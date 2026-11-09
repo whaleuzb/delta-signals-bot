@@ -1624,6 +1624,16 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Taklif (referal) ---
+    "dip.ref_got": {
+        "uz": "🎉 Siz orqali yangi odam qo'shildi: <b>+{n} DIP</b>\nDIP balansingiz: <b>{bal} DIP</b>",
+        "ru": "🎉 По вашей ссылке пришёл новый человек: <b>+{n} DIP</b>\nВаш баланс DIP: <b>{bal} DIP</b>",
+        "en": "🎉 Someone joined through you: <b>+{n} DIP</b>\nYour DIP balance: <b>{bal} DIP</b>",
+    },
+    "dip.line": {
+        "uz": "💎 DIP balansingiz: <b>{bal} DIP</b> (har bir taklif uchun +{n} DIP)",
+        "ru": "💎 Ваш баланс DIP: <b>{bal} DIP</b> (+{n} DIP за каждое приглашение)",
+        "en": "💎 Your DIP balance: <b>{bal} DIP</b> (+{n} DIP per invite)",
+    },
     "ref.share_caption": {
         "uz": ("🚀 <b>Trade Controller</b> — signallaringiz natijasini avtomatik kuzatadigan bot\n\n"
                "✅ TP va stop avtomatik kuzatiladi\n📊 Natija % va $ da, statistika va hisobotlar\n"
