@@ -914,6 +914,29 @@ S.pairs={};
 function pairsGet(kind){var c=S.pairs[kind];if(c&&Date.now()-c.at<60000)return Promise.resolve(c.p);
  return api('pairs',{kind:kind}).then(function(d){S.pairs[kind]={at:Date.now(),p:d.p||[]};return d.p||[]})}
 function dfSym(sym){var g=S.page;if(!g||!g.df)return;g.df.sym=sym;g.c=null;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
+/* 314: pozitsiya kartasi — signal terminalidagi bilan bir xil (yorliqlar, P&L/ROI, 6 maydon, tugmalar) */
+function dfInfo(i,g,s){var tr=s.tradable,x=i.pos,n2=function(v){return v==null?'—':(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
+  sg=function(v){return v==null?'—':(v>=0?'+':'−')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},cl=function(v){return v==null?'':v>=0?'g':'r'};
+ var it=function(k,v,c){return'<div class="mci"><span>'+esc(t(k))+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
+ var tabs='<div class="ttabs">'+[['pos',t('t_tab_pos')+(x?' (1)':'')],['ord',t('t_tab_ord')+(i.orders.length?' ('+i.orders.length+')':'')],['hist',t('t_tab_hist')]].map(function(z){return'<a class="'+(g.ttab==z[0]?'on':'')+'" onclick="termTab(\''+z[0]+'\')">'+esc(z[1])+'</a>'}).join('')+'</div>';
+ var h='<div class="tile2 glass" style="margin-top:10px;padding:14px 14px 12px">'+tabs;
+ if(g.ttab=='ord'){h+=i.orders.length?i.orders.map(function(o){return'<div class="ordrow"><div>'+coinIc(i.symbol,20)+'<div><b>'+esc(i.symbol)+'</b><span class="rs">Limit · '+f0(+o.amount)+(o.sl!=null?' · SL '+fp(o.sl):'')+(o.tp!=null?' · TP '+fp(o.tp):'')+'</span></div></div><b>'+fp(o.limit)+'</b><button class="btn d" style="flex:none;width:auto;margin:0;padding:8px 12px" '+(tr?'':'disabled ')+'onclick="dfDo({op:\'cancel\',order_id:'+o.id+'})">'+esc(t('cancel'))+'</button></div>'}).join('')
+   :'<div class="rs" style="text-align:center;padding:18px 0">'+esc(t('t_no_ord'))+'</div>';return h+'</div>'}
+ if(g.ttab=='hist'){var T=(s.trades||[]).filter(function(z){return z.symbol==i.symbol});
+  h+=T.length?'<div class="hist">'+T.map(function(z){var b=String(z.side).toLowerCase()=='buy';return'<div class="hrow"><span class="hdot"></span><div style="flex:1"><div class="rs">'+esc(String(z.time||'').slice(5,16))+'</div><div style="font-size:13px;line-height:1.4;margin-top:2px;display:flex;justify-content:space-between;gap:8px"><span><span class="b '+(b?'bl':'bs')+'">'+(b?'BUY':'SELL')+'</span> '+fp(z.price)+'</span>'+(b?'':'<b class="'+cl(+z.pnl)+'">'+sg(+z.pnl)+'</b>')+'</div></div></div>'}).join('')+'</div>'
+   :'<div class="rs" style="text-align:center;padding:18px 0">'+esc(t('t_no_hist'))+'</div>';return h+'</div>'}
+ h+='<div style="display:flex;align-items:center;gap:9px;margin:12px 0 12px">'+coinIc(i.symbol,26)+'<b style="font-size:17px;letter-spacing:-.01em">'+esc(i.symbol)+'</b><span class="b bx">Spot</span>'+(x?'<span class="b bl">LONG</span>':'')+'</div>';
+ if(!x)return h+'<div class="rs" style="text-align:center;padding:10px 0 14px">'+esc(t('df_no_pos'))+'</div></div>';
+ var up=+x.upnl||0;
+ h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px"><div><span class="rs">'+esc(t('t_pnl'))+'</span><div class="'+cl(up)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+sg(up)+'</div></div>'
+  +'<div style="text-align:right"><span class="rs">'+esc(t('t_roi'))+'</span><div class="'+cl(up)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+fpc(+x.upnl_pct||0)+'</div></div></div>';
+ h+='<div class="mcg">'+it('t_vol',n2(x.value))+it('t_qty',esc(String(x.qty||'—')))+it('t_entry_px',fp(x.avg))
+  +it('t_now',fp(x.price))+it('stop',x.sl!=null?fp(x.sl):'—',x.sl!=null?'r':'')+it('tp_btn',x.tp!=null?fp(x.tp):'—',x.tp!=null?'g':'')+'</div>';
+ if(g.more){var eq=+s.equity||0,cost=(+x.avg||0)*(+x.qty||0);
+  h+='<div class="mcg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)">'+it('t_margin',f0(cost))+it('df_share',eq?((+x.value||0)/eq*100).toFixed(1)+'%':'—')+it('df_free',f0(+s.available))
+   +it('df_equity2',f0(eq))+it('df_daily',s.daily?f0(+s.daily.left):'—')+it('df_maxdd',s.max?f0(+s.max.left):'—')+'</div>'}
+ h+='<div class="mcb"><button class="btn" '+(tr?'':'disabled ')+'onclick="dfTpslSheet()">TP/SL</button><button class="btn" onclick="termMore()">'+esc(t('t_more'))+' '+(g.more?'▴':'▾')+'</button><button class="btn" '+(tr?'':'disabled ')+'onclick="dfSellSheet()">'+esc(t('close'))+'</button></div>';
+ return h+'</div>'}
 function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var h='<div class="ghd"><div class="bk glass" onclick="dfAcc('+g.df.acc+')">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
@@ -924,17 +947,11 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
  if(!s||s.id!=g.df.acc){p.innerHTML=h+'<div class="spk"><div class="sk"></div></div>';termBind();return}
  var tr=s.tradable;
- h+='<div style="display:grid;grid-template-columns:'+(i.pos?'1fr 1fr':'1fr')+';gap:8px;margin:10px 0">'+'<button class="btn" style="margin:0;background:var(--g);color:#050506;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfBuySheet()">BUY</button>'
-  +(i.pos?'<button class="btn" style="margin:0;background:var(--r);color:#fff;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfSellSheet()">SELL</button>':'')+'</div>';
- if(i.pos){var x=i.pos,up=(+x.upnl||0)>=0,it=function(k,v,c){return'<div class="mci"><span>'+esc(k)+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
-  h+='<div class="tile2 glass acc" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center"><div class="k">'+esc(t('df_pos1'))+' · '+esc(x.qty||'')+' '+esc(i.symbol)+'</div><div class="'+(up?'g':'r')+'" style="font-weight:800">'+fm(+x.upnl||0)+' <small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'
-   +'<div class="mcg" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px">'+it(t('df_avg'),fp(x.avg))+it(t('df_value'),f0(+x.value))+it(t('df_mark'),fp(x.price))+it('SL',x.sl!=null?fp(x.sl):'—',x.sl!=null?'r':'')+it('TP',x.tp!=null?fp(x.tp):'—',x.tp!=null?'g':'')+'</div>'
-   +'<button class="btn" style="width:100%;margin:10px 0 0" '+(tr?'':'disabled ')+'onclick="dfTpslSheet()">'+ic('pen',13)+' TP / SL</button></div>'}
- else h+='<div class="rs" style="text-align:center;margin:4px 0 10px">'+esc(t('df_no_pos'))+'</div>';
- if(i.orders.length)h+='<div class="sect">'+esc(t('df_orders'))+' · '+i.orders.length+'</div>'+i.orders.map(function(o){return'<div class="row glass" style="cursor:default"><div class="rm"><div class="rn" style="font-size:13px">Limit ≤ '+fp(o.limit)+'</div><div class="rs">'+f0(+o.amount)+(o.sl!=null?' · SL '+fp(o.sl):'')+(o.tp!=null?' · TP '+fp(o.tp):'')+'</div></div><button class="btn" style="margin:0;padding:8px 14px;width:auto;flex:none" onclick="dfDo({op:\'cancel\',order_id:'+o.id+'})">✕</button></div>'}).join('');
- h+='<div class="tiles" style="margin-top:6px"><div class="tile2 glass"><div class="k">Equity</div><div class="v" style="font-size:16px">'+f0(+s.equity)+'</div></div><div class="tile2 glass"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">'+f0(+s.available)+'</div></div></div>';
- if(tr&&(s.daily||s.max)){h+='<div class="eq glass">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,f0(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,f0(+s.max.left));h+='</div>'}
- if(s.trades&&s.trades.length)h+='<div class="sect">'+esc(t('df_trades'))+'</div>'+s.trades.map(function(x){var b=x.side=='buy'||x.side=='BUY';return'<div class="row glass" style="cursor:default;padding:9px 12px">'+coinIc(x.symbol,22)+'<div class="rm"><div class="rn" style="font-size:13px">'+esc(x.symbol)+' <span class="b '+(b?'bl':'bs')+'">'+(b?'BUY':'SELL')+'</span></div><div class="rs">'+esc(String(x.time||'').slice(5,16))+' · '+fp(x.price)+'</div></div>'+(b?'':'<div class="rv '+((+x.pnl||0)>=0?'g':'r')+'" style="font-size:13px">'+fm(+x.pnl||0)+'</div>')+'</div>'}).join('');
+ h+='<div style="display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 0">'+'<button class="btn" style="margin:0;background:var(--g);color:#050506;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfBuySheet()">BUY '+esc(i.symbol)+'</button>'
+  +'</div>';
+ g.ttab=g.ttab||'pos';
+ h+=dfInfo(i,g,s);
+ if(tr&&(s.daily||s.max)){h+='<div class="eq glass" style="margin-top:10px">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,f0(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,f0(+s.max.left));h+='</div>'}
  h+='<div class="endsp"></div>';p.innerHTML=h;termBind()}
 setInterval(function(){var g=S.page;if(!g||!g.df||g.drag||g.pend||document.hidden)return;dfRefresh()},12000);
 /* ===== 258: yangi signal (ilova ichida) ===== */

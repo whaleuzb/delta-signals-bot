@@ -7873,3 +7873,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - "Yangi signal" formasi: juftlik matn maydoni o'rniga tanlash tugmasi (belgi + nom, yashirin `#ns_sym` — `nsKeep` o'zgarmagan) → `nsPick` — Spot bo'lsa spot, Futures bo'lsa fyuchers ro'yxati.
 - `/api/app/pairs` {kind: spot|fut} → `exchange.price_list()` (`/api/v3/ticker/24hr`, faqat `valid_symbols`, narx>0) yoki `futures.price_list()` (`/api/v1/contract/ticker`, `_USDT`), 24 soatlik hajm bo'yicha, 60 s kesh (modulda), 2500 tagacha; ilovada `pairsGet` 60 s kesh.
 - Tarjimalar: `pp_typed`, `pp_choose`. Sinov: `test_313.py` 2/2 (MEXC javobini o'qish), brauzer `t_pp.py` (qidiruv, typed, futures ro'yxati).
+
+## 314. Dip Funded terminali: pozitsiya kartasi signal terminalidagidek
+- Foydalanuvchi (signal terminali pozitsiya kartasi skrinshoti): "dipfundeddagi position bo'limi ham shunday ko'rinishda bo'lsin, ya'ni bot ichidagi".
+- `webapp.html` `dfInfo(i,g,s)` — `termInfo` bilan bir xil klasslar (`ttabs`, `mcg`, `mcb`, `ordrow`, `hist`): yorliqlar Pozitsiya (1) | Buyurtmalar (n) | Tarix (`termTab`); belgi + juftlik + "Spot" + LONG; P&L (USDT) / ROI katta; 6 maydon (Hajm, Miqdor, Kirish narxi, Joriy narx, Stop, TP); tugmalar TP/SL · Batafsil ▾ (`termMore`: marja, hisobdagi ulush, bo'sh, equity, kunlik/maks. zarar qoldig'i) · Yopish (`dfSellSheet`). Buyurtmalar — "Bekor qilish"; Tarix — shu juftlik savdolari.
+- Yuqorida bitta "BUY <juftlik>" tugmasi (SELL kartadagi "Yopish"ga ko'chdi); pastda kunlik/maks. zarar chiziqlari. Tarjimalar: `df_share`, `df_equity2`.
