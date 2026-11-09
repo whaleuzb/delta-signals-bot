@@ -421,7 +421,8 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
         lo, hi = lo - pad, hi + pad
         Y = lambda v: iy1 - (v - lo) / (hi - lo) * (iy1 - iy0)
         n = len(cs)
-        bw = (ix1 - ix0) / n
+        cx1 = ix0 + (ix1 - ix0) * 0.80  # o'ngda bo'sh joy qolsin, shamlar chetga tiqilmasin
+        bw = (cx1 - ix0) / n
         for k, c in enumerate(cs):
             o, h_, l_, cl = c[1], c[2], c[3], c[4]
             col = LIME if cl >= o else RED
@@ -454,7 +455,12 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
             d.rounded_rectangle((lx, yy - 15, lx + lw, yy + 15), radius=9, fill="#0A0A0C", outline=col, width=2)
             d.text((lx + 8, yy - 11), t, font=fl, fill=col)
         py = Y(price)
-        d.ellipse((ix1 - 9, py - 9, ix1 + 9, py + 9), fill=acc)
+        lx0 = cx1 + 6
+        xx = lx0
+        while xx < ix1:
+            d.line((xx, py, min(xx + 6, ix1), py), fill=acc, width=2)
+            xx += 12
+        d.ellipse((lx0 - 8, py - 8, lx0 + 8, py + 8), fill=acc)
     # Narxlar qatori
     y = 966
     cols = [(i18n.t("card.entry", lang), _fmt_price(entry), TXT),
