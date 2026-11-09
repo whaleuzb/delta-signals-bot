@@ -1272,6 +1272,7 @@ async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception as e:
             note = f"\n⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
     tid = await db.dip_task_add(ap["kind"], title, url, chat_id, float(reward), ap["id"], config.DIP_PLACE_DAYS)
+    await refresh_task_logo(ctx.bot, {"id": tid, "url": url, "chat_id": chat_id})
     await q.answer("Qo'shildi")
     try:
         await q.edit_message_text(q.message.text_html + f"\n\n<b>✅ Vazifa #{tid} qo'shildi: +{reward} DIP, {config.DIP_PLACE_DAYS} kunga</b>"
@@ -3753,6 +3754,93 @@ async def refresh_logo(bot, ws_id: int, chat_id: int) -> bool:
     except Exception:
         log.warning("Logotip: #%s rasmi yuklanmadi", ws_id, exc_info=True)
         return False
+
+
+def _img128(raw: bytes) -> bytes | None:
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, (18, 18, 20, 255))
+        bg.alpha_composite(img)
+        img = bg.convert("RGB")
+        side = min(img.size)
+        l, t = (img.width - side) // 2, (img.height - side) // 2
+        img = img.crop((l, t, l + side, t + side)).resize((128, 128))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG", optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+async def _site_icon(url: str) -> bytes | None:
+    """294: sayt belgisi — apple-touch-icon / icon / og:image, bo'lmasa /favicon.ico."""
+    import httpx
+    from urllib.parse import urljoin, urlparse
+    try:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True,
+                                     headers={"User-Agent": "Mozilla/5.0 (TradeController)"}) as c:
+            cands = []
+            try:
+                r = await c.get(url)
+                h = r.text[:200000]
+                for rel in ("apple-touch-icon", "icon", "shortcut icon"):
+                    for m in re.finditer(r"<link[^>]+>", h, re.I):
+                        tag = m.group(0)
+                        if re.search(r'rel=["\']?[^"\'>]*' + re.escape(rel), tag, re.I):
+                            hm = re.search(r'href=["\']([^"\']+)', tag, re.I)
+                            if hm:
+                                cands.append(urljoin(str(r.url), hm.group(1)))
+                og = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', h, re.I)
+                if og:
+                    cands.append(urljoin(str(r.url), og.group(1)))
+            except Exception:
+                pass
+            u = urlparse(url)
+            cands.append(f"{u.scheme or 'https'}://{u.netloc}/favicon.ico")
+            for cu in cands:
+                if cu.lower().endswith(".svg"):
+                    continue
+                try:
+                    r2 = await c.get(cu)
+                    if r2.status_code == 200 and r2.content:
+                        out = _img128(r2.content)
+                        if out:
+                            return out
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return None
+
+
+async def refresh_task_logo(bot, r) -> None:
+    """294: Earn vazifasi avatari — kanal/guruh/bot rasmi (Telegram) yoki sayt belgisi."""
+    data = None
+    url = r["url"] or ""
+    m = re.match(r"^https?://(?:t\.me|telegram\.me)/([A-Za-z][A-Za-z0-9_]{3,})/?$", url)
+    target = r["chat_id"] or (("@" + m.group(1)) if m else None)
+    try:
+        if target:
+            ch = await bot.get_chat(target)
+            if ch.photo:
+                f = await bot.get_file(ch.photo.small_file_id)
+                data = _img128(bytes(await f.download_as_bytearray()))
+        elif url.startswith("http"):
+            data = await _site_icon(url)
+    except Exception as e:
+        log.info("Vazifa #%s avatari olinmadi: %s", r["id"], e)
+    await db.dip_task_set_logo(r["id"], data)
+
+
+async def dip_task_logo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        rows = await db.dip_task_logo_targets()
+    except Exception:
+        log.exception("Vazifa avatarlari siklida xato")
+        return
+    for r in rows:
+        await refresh_task_logo(ctx.bot, r)
 
 
 async def dip_avatar_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -8242,8 +8330,11 @@ async def _admin_earn_view() -> tuple[str, InlineKeyboardMarkup]:
         chk = "tekshiriladi" if r["chat_id"] else "tekshirilmaydi"
         lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · "
                      f"{r['n']} kishi · {chk}{till}")
+        if r["note"]:
+            lines.append(f"   <i>{html.escape(r['note'][:80])}</i>")
         kb.append([InlineKeyboardButton(("⏸ O'chirish #" if r["active"] else "▶️ Yoqish #") + str(r["id"]),
-                                        callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}")])
+                                        callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}"),
+                   InlineKeyboardButton(f"✍️ Izoh #{r['id']}", callback_data=f"adm:earnn:{r['id']}")])
     kb.append([InlineKeyboardButton("➕ Vazifa qo'shish", callback_data="adm:earnadd",
                                     api_kwargs={"style": "success"})])
     kb.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="adm:home")])
@@ -8254,6 +8345,17 @@ async def handle_earn_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE, st: 
     """293: admin havolani yubordi — kanal/guruh bo'lsa nomi va botning adminligi aniqlanadi."""
     uid = update.effective_user.id
     raw = (update.effective_message.text or "").strip()
+    if st.get("stage") == "note":
+        st["note"] = raw[:300] or None
+        st["stage"] = "reward"
+        await update.effective_message.reply_text("Mukofotni tanlang:", reply_markup=_earn_reward_kb())
+        return
+    if st.get("stage") == "editnote":
+        await db.dip_task_set_note(st["id"], None if raw in ("-", "—") else raw[:300])
+        txt, kb = await _admin_earn_view()
+        await update.effective_message.reply_text("✅ Izoh saqlandi.\n\n" + txt, parse_mode=ParseMode.HTML,
+                                                  reply_markup=kb, disable_web_page_preview=True)
+        return
     shown, url = _place_target(raw)
     if not url:
         AWAITING_EARN[uid] = st
@@ -8272,13 +8374,21 @@ async def handle_earn_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE, st: 
                 note = "⚠️ Bot u yerda admin emas — obuna TEKSHIRILMAYDI. Avval botni admin qiling."
         except Exception as e:
             note = f"⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
-    st.update(title=title, url=url, chat_id=chat_id)
+    st.update(title=title, url=url, chat_id=chat_id, stage="note")
     ctx.user_data["earn_new"] = st
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(f"+{n} DIP", callback_data=f"adm:earnr:{n}") for n in (5, 10, 20, 50)],
-                               [InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]])
+    AWAITING_EARN[uid] = st
     await update.effective_message.reply_text(
-        f"<b>{html.escape(title)}</b>\n{html.escape(url)}\n{note}\n\nMukofotni tanlang:",
-        parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
+        f"<b>{html.escape(title)}</b>\n{html.escape(url)}\n{note}\n\n"
+        "✍️ Vazifa izohini yozing — foydalanuvchi nima qilishi kerak "
+        "(masalan: «Kanalga obuna bo'ling va xabarlarni kuzating»).",
+        parse_mode=ParseMode.HTML, disable_web_page_preview=True,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⏭ Izohsiz", callback_data="adm:earnskip")],
+                                           [InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]]))
+
+
+def _earn_reward_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton(f"+{n} DIP", callback_data=f"adm:earnr:{n}") for n in (5, 10, 20, 50)],
+                                 [InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]])
 
 
 async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -8314,6 +8424,17 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 if kind in ("channel", "group") else "Havolani yuboring (t.me/... yoki https://...).")
         await q.edit_message_text(f"<b>➕ Yangi Earn vazifasi</b>\n\n{hint}", parse_mode=ParseMode.HTML,
                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]]))
+    elif action == "earnskip":
+        AWAITING_EARN.pop(q.from_user.id, None)
+        st = ctx.user_data.get("earn_new")
+        if st:
+            st["note"] = None
+        await q.edit_message_text("Mukofotni tanlang:", reply_markup=_earn_reward_kb())
+    elif action.startswith("earnn:"):
+        tid = int(action.split(":", 1)[1])
+        AWAITING_EARN[q.from_user.id] = {"stage": "editnote", "id": tid}
+        await q.edit_message_text(f"✍️ #{tid} vazifa uchun yangi izohni yozing (o'chirish uchun «-»).",
+                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]]))
     elif action.startswith("earnr:"):
         st = ctx.user_data.get("earn_new")
         if not st:
@@ -8332,7 +8453,9 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         st = ctx.user_data.pop("earn_new", None)
         if st and st.get("reward"):
             days = int(action.split(":", 1)[1]) or None
-            tid = await db.dip_task_add(st["kind"], st["title"], st["url"], st.get("chat_id"), st["reward"], None, days)
+            tid = await db.dip_task_add(st["kind"], st["title"], st["url"], st.get("chat_id"), st["reward"], None, days,
+                                        st.get("note"))
+            await refresh_task_logo(ctx.bot, {"id": tid, "url": st["url"], "chat_id": st.get("chat_id")})
             log.info("Admin Earn vazifasi qo'shdi: #%s %s", tid, st["title"])
         txt, kb = await _admin_earn_view()
         await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
@@ -11216,6 +11339,7 @@ def main() -> None:
     # Logotip: sutkada bir marta yetarli — guruh avatari kamdan-kam o'zgaradi.
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(dip_avatar_job, interval=900, first=120)
+    app.job_queue.run_repeating(dip_task_logo_job, interval=1800, first=45)
     app.job_queue.run_repeating(app_action_job, interval=2, first=15)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)

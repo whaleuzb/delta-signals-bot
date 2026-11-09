@@ -598,6 +598,10 @@ CREATE TABLE IF NOT EXISTS dip_task_done (
 );
 -- 285: joylashtirish muddati (1 oy) — o'tgach vazifa Earn'da ko'rinmaydi.
 ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+-- 294: vazifa avatari (kanal/guruh/bot rasmi yoki sayt belgisi) va izohi.
+ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS logo BYTEA;
+ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS logo_at TIMESTAMPTZ;
+ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS note TEXT;
 -- 282: Earn'ga joylashtirish arizalari (narx `config.DIP_PLACE_PRICE` USDT).
 CREATE TABLE IF NOT EXISTS dip_apps (
     id         BIGSERIAL PRIMARY KEY,
@@ -1186,6 +1190,7 @@ async def dip_tasks_for(user_id: int | None) -> list[asyncpg.Record]:
     async with pool().acquire() as c:
         return await c.fetch("""
             SELECT t.id, t.kind, t.title, t.url, t.reward, (t.chat_id IS NOT NULL) AS verified,
+                   t.note, (t.logo IS NOT NULL) AS has_logo,
                    (d.user_id IS NOT NULL) AS done,
                    (SELECT COUNT(*) FROM dip_task_done x WHERE x.task_id = t.id) AS n
             FROM dip_tasks t LEFT JOIN dip_task_done d ON d.task_id = t.id AND d.user_id = $1
@@ -1214,13 +1219,36 @@ async def dip_task_complete(task_id: int, user_id: int, reward: float) -> bool:
 
 
 async def dip_task_add(kind: str, title: str, url: str, chat_id: int | None, reward: float,
-                       app_id: int | None = None, days: int | None = None) -> int:
+                       app_id: int | None = None, days: int | None = None, note: str | None = None) -> int:
     """285: `days` — joylashtirish muddati (None — muddatsiz)."""
     async with pool().acquire() as c:
         return await c.fetchval(
-            "INSERT INTO dip_tasks (kind, title, url, chat_id, reward, app_id, expires_at) "
-            "VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN $7::int IS NULL THEN NULL ELSE now() + make_interval(days => $7::int) END) "
-            "RETURNING id", kind, title, url, chat_id, _d(reward), app_id, days)
+            "INSERT INTO dip_tasks (kind, title, url, chat_id, reward, app_id, expires_at, note) "
+            "VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN $7::int IS NULL THEN NULL ELSE now() + make_interval(days => $7::int) END, $8) "
+            "RETURNING id", kind, title, url, chat_id, _d(reward), app_id, days, note)
+
+
+async def dip_task_logo(task_id: int) -> bytes | None:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT logo FROM dip_tasks WHERE id=$1", task_id)
+
+
+async def dip_task_set_logo(task_id: int, data: bytes | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_tasks SET logo=$2, logo_at=now() WHERE id=$1", task_id, data)
+
+
+async def dip_task_set_note(task_id: int, note: str | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_tasks SET note=$2 WHERE id=$1", task_id, note)
+
+
+async def dip_task_logo_targets(limit: int = 10) -> list[asyncpg.Record]:
+    """294: avatari yo'q yoki 24 soatdan eski faol vazifalar."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, kind, url, chat_id FROM dip_tasks WHERE active AND "
+            "(logo_at IS NULL OR logo_at < now() - interval '24 hours') ORDER BY logo_at NULLS FIRST LIMIT $1", limit)
 
 
 async def dip_tasks_all() -> list[asyncpg.Record]:

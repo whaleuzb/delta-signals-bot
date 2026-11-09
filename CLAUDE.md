@@ -7685,3 +7685,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bo'lmasa ogohlantirish) → mukofot +5/+10/+20/+50 (`adm:earnr:`) →
      muddat 7/30/90 kun yoki muddatsiz (`adm:earnd:`) → `db.dip_task_add`.
      Holat `ctx.user_data["earn_new"]` da.
+294. **Earn vazifalari: avatar va izoh.** `dip_tasks.logo/logo_at/note`.
+     Avatar avtomatik (`refresh_task_logo`): kanal/guruh/bot — Telegram
+     `get_chat(chat_id yoki @username).photo`; sayt — `_site_icon`
+     (apple-touch-icon / icon / og:image, bo'lmasa /favicon.ico; SVG
+     o'tkaziladi), 128px PNG. Vazifa qo'shilganda darhol + `dip_task_logo_job`
+     (30 daqiqada, sutkada bir yangilanadi). Veb `GET /tl/<id>.png`. Izoh:
+     admin panelda havoladan keyin "✍️ izoh" bosqichi (yoki "⏭ Izohsiz"),
+     mavjud vazifalarga "✍️ Izoh #id" (`adm:earnn:`; «-» — o'chirish).
+     Ilovada izoh sarlavha ostida (3 qatorgacha); izoh bo'lmasa turiga
+     qarab standart matn (`earn_def_*`). Sayt nomi "https://" siz.

@@ -845,7 +845,12 @@ function earnView(v,top){var h=top;
  h+=L.length?L.map(function(x){var b;if(x.done)b='<span class="b bl">✓ '+esc(t('earn_done'))+'</span>';
    else if(S.eopen[x.id])b='<button class="btn p" style="flex:none;width:auto;padding:9px 14px" onclick="event.stopPropagation();earnCheck('+x.id+')">'+esc(t('earn_check'))+'</button>';
    else b='<button class="btn" style="flex:none;width:auto;padding:9px 14px" onclick="event.stopPropagation();earnGo('+x.id+')">'+esc(t('earn_go'))+'</button>';
-   return'<div class="row glass rise'+(x.done?'':' acc')+'" style="cursor:default'+(x.done?';opacity:.6':'')+'"><div class="av" style="color:var(--g)">'+ic(I[KIC[x.kind]]?KIC[x.kind]:'link',20)+'</div><div class="rm"><div class="rn">'+esc(x.title)+'</div><div class="rs"><b class="g">+'+x.reward+' DIP</b> · '+x.n+' '+esc(t('earn_people'))+(x.verified?' · '+esc(t('earn_verified')):'')+'</div></div>'+b+'</div>'}).join('')
+   var nm=String(x.title||'').replace(/^https?:\/\//,'').replace(/\/$/,''),nt=x.note||t('earn_def_'+(x.kind in {channel:1,group:1,bot:1}?x.kind:'link'));
+   var av=x.logo?'<div class="av" style="padding:0;overflow:hidden;border-radius:50%"><img src="/tl/'+x.id+'.png" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentNode.innerHTML=ic(\'link\',20)"></div>'
+    :'<div class="av" style="color:var(--g)">'+ic(I[KIC[x.kind]]?KIC[x.kind]:'link',20)+'</div>';
+   return'<div class="row glass rise'+(x.done?'':' acc')+'" style="cursor:default;align-items:flex-start'+(x.done?';opacity:.6':'')+'">'+av+'<div class="rm"><div class="rn">'+esc(nm)+'</div>'
+    +'<div class="rs" style="margin-top:3px;line-height:1.35;color:var(--ink);opacity:.78;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(nt)+'</div>'
+    +'<div class="rs" style="margin-top:4px"><b class="g">+'+x.reward+' DIP</b> · '+x.n+' '+esc(t('earn_people'))+(x.verified?' · '+esc(t('earn_verified')):'')+'</div></div><div style="align-self:center">'+b+'</div></div>'}).join('')
   :'<div class="empty glass rise">'+ic('dip',40)+'<div>'+esc(t('earn_empty'))+'</div></div>';
  h+='<div style="text-align:center;margin:14px 0 6px" class="rise"><button class="btn" style="width:auto;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;font-size:12px" onclick="earnApply()">'+ic('plus',14)+' '+esc(t('earn_apply_btn'))+'</button></div>';
  v.innerHTML=h}
