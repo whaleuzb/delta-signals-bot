@@ -259,17 +259,20 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     # 309: LIQ — masshtabga kirmaydi (uzoqda bo'lsa yorliq chetda "▲/▼ LIQ").
     lvl = [(v, c, lb) for v, c, lb in ((tp, LIME, "TP"), (sl, RED, "SL"), (entry, "#D8D8DC", "IN"),
                                        (liq, ORANGE, "LIQ")) if v]
+    if closed:
+        lvl = []      # 318: yopilgan kartada daraja chiziqlari yo'q — faqat shamlar va kirish/chiqish belgilari
     lw = max([d.textlength(("▼ " if lb == "LIQ" else "") + f"{lb} {_fmt_price(v)}", font=fl) for v, _c, lb in lvl] or [0]) + 16
-    ix0, iy0, ix1, iy1 = gx0 + 26, gy0 + 28, gx1 - 22 - lw - 10, gy1 - 28
+    ix0, iy0, ix1, iy1 = gx0 + 26, gy0 + 28, (gx1 - 26 if closed else gx1 - 22 - lw - 10), gy1 - 28
     if cs:
-        levels = [entry, price] + [v for v in (sl, tp) if v]
+        levels = ([entry, price] + [mp for _m, mp, _b in (marks or []) if mp]) if closed else \
+            [entry, price] + [v for v in (sl, tp) if v]
         lo = min(min(c[3] for c in cs), *levels)
         hi = max(max(c[2] for c in cs), *levels)
         pad = (hi - lo) * 0.06 or hi * 0.01
         lo, hi = lo - pad, hi + pad
         Y = lambda v: iy1 - (v - lo) / (hi - lo) * (iy1 - iy0)
         n = len(cs)
-        cx1 = ix0 + (ix1 - ix0) * 0.80  # o'ngda bo'sh joy qolsin, shamlar chetga tiqilmasin
+        cx1 = ix0 + (ix1 - ix0) * (0.94 if closed else 0.80)  # o'ngda bo'sh joy qolsin, shamlar chetga tiqilmasin
         bw = (cx1 - ix0) / n
         for k, c in enumerate(cs):
             o, h_, l_, cl = c[1], c[2], c[3], c[4]
@@ -331,13 +334,14 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
                 d.line((ix1, ly, lx, yy), fill=_mix(col, .45), width=1)
             d.rounded_rectangle((lx, yy - TH, lx + lw, yy + TH), radius=8, fill="#151517")   # 317: ramkasiz
             d.text((lx + 8, yy - 10), t, font=fl, fill=_mix(col, .92))
-        py = Y(price)
-        lx0 = cx1 + 6
-        xx = lx0
-        while xx < ix1:
-            d.line((xx, py, min(xx + 5, ix1), py), fill=_mix(acc, .7), width=1)
-            xx += 11
-        d.ellipse((lx0 - 7, py - 7, lx0 + 7, py + 7), fill=acc)
+        if not closed:      # 318: yopilganda joriy narx nuqtasi yo'q — chiqish belgisi bor
+            py = Y(price)
+            lx0 = cx1 + 6
+            xx = lx0
+            while xx < ix1:
+                d.line((xx, py, min(xx + 5, ix1), py), fill=_mix(acc, .7), width=1)
+                xx += 11
+            d.ellipse((lx0 - 7, py - 7, lx0 + 7, py + 7), fill=acc)
     # Narxlar qatori
     y = 966
     cols = [(i18n.t("card.entry", lang), _fmt_price(entry), TXT),
