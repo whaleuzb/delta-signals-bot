@@ -7801,3 +7801,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - `build_pnl_card(..., bot=)` endi `open_card(closed=True)` chiqaradi (eski `card.pnl_card` ishlatilmaydi, lekin o'chirilmadi); `/card` buyrug'i ham yangi karta beradi.
 - `send_close_result`: `send_media_group` yo'q — BITTA `send_photo` (yangi karta + matn). Karta chiqmasa — eski `chart.signal_chart`, u ham bo'lmasa oddiy matn.
 - Sinov: `test_305.py` 5/5 (albom yo'q, bitta rasm, 15m shamlar, PNG, kartasiz — grafik).
+
+## 306. Yopilgan savdo — ilova ichida natija kartasi
+- Foydalanuvchi: "yopilgan signallar ustiga bosilsa natijaga olib o'tmayabti. Shaxsiy jurnalda. Yoki ilova ichida ochiladigan qilish kerak yoki kartaga olib o'tadigan."
+- Sabab: shaxsiy jurnalda natija DM'ga ketadi, `post_url` None — `openLink('')` hech narsa qilmasdi.
+- `webapp.html`: `.trow` endi `openTrade(id, url, mine)`. Egasi (`d.mine`) — sheet: yuklanish skeleti → natija kartasi rasmi + "Ulashish" (`tg.shareMessage`, bo'lmasa `refShareUrl`) + post bo'lsa "Postni ochish". Begona — avvalgidek postga (bo'lsa).
+- Yangi signal amali `rcard` (`webapp.ACTIONS`; web `_can` — egasi/admin). Bot `_app_exec` uni status tekshiruvidan OLDIN ushlaydi → `_app_rcard`: `can_manage`, `build_pnl_card(ref_uid=uid)` (305 yangi karta), JPEG `share_images` → `/sc/<key>.jpg`, `save_prepared_inline_message` (matn `share.caption_closed`, tugma `share.btn`). Javob `{"img","id","link"}`.
+- Tarjimalar: `rc_share`, `rc_post` (webapp T), `share.caption_closed` (i18n).
+- Sinov: `test_305.py` 9/9 (rcard: rasm, JPEG, matn, begonaga yo'q), brauzerda sheet ochildi (rc_sheet.png).

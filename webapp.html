@@ -588,6 +588,15 @@ function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase().replace(/(USD
 function sigShare(id){toast(esc(t('wait')));api('act',{sig:id,action:'share'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg)}catch(e){}
  if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
  if(d&&d.link){refShareUrl(d.link);return}toast(esc(noEmoji(String(r.msg||'Error').replace(/<[^>]+>/g,''))))}).catch(function(){toast('Error')})}
+/* 306: yopilgan savdo — egasi uchun ilova ichida natija kartasi (shaxsiy jurnalda post yo'q) */
+function openTrade(id,url,mine){if(!mine){if(url)openLink(url);return}
+ sheetOpen('<div id="rcbox"><div class="sk" style="width:100%;aspect-ratio:1080/1420;border-radius:18px"></div></div>');
+ api('act',{sig:id,action:'rcard'}).then(function(r){var b=document.getElementById('rcbox');if(!b)return;var d=null;try{d=JSON.parse(r.msg)}catch(e){}
+  if(r.pending||!r.ok||!d){b.innerHTML='<p>'+esc(r.pending?t('slow'):noEmoji(String(r.msg||'Error').replace(/<[^>]+>/g,'')))+'</p>';return}
+  S.rc=d;b.innerHTML='<img src="'+esc(d.img)+'" alt="" style="display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:18px;margin:0 auto 12px">'
+   +'<div style="display:grid;grid-template-columns:'+(url?'1fr 1fr':'1fr')+';gap:8px">'+(url?'<button class="btn" style="margin:0" onclick="openLink(\''+esc(url)+'\')">'+esc(t('rc_post'))+'</button>':'')
+   +'<button class="btn p" style="margin:0" onclick="rcShare()">'+esc(t('rc_share'))+'</button></div>'}).catch(function(){var b=document.getElementById('rcbox');if(b)b.innerHTML='<p>Error</p>'})}
+function rcShare(){var d=S.rc;if(!d)return;if(d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}if(d.link)refShareUrl(d.link)}
 function termTab(k){var g=S.page;if(!g||g.ttab==k)return;g.ttab=k;tick();termRender()}
 function termMore(){var g=S.page;g.more=!g.more;tick();termRender()}
 function tpslSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt,dis){return'<button class="btn '+cls+'" style="margin:0" '+(dis?'disabled ':'')+'onclick="sheetClose();'+on+'">'+txt+'</button>'};
@@ -767,7 +776,7 @@ function pageRender(anim){var p=document.getElementById('page');var g=S.page;if(
  if(tr.length){var by={},keys=[];tr.forEach(function(x){var dt=new Date(x.closed);var key=dt.getFullYear()*100+dt.getMonth();if(!by[key]){by[key]=[];keys.push(key)}by[key].push(x)});
   if(g.mon==null||!by[g.mon])g.mon=keys[0];
   h+='<div class="sect rise">'+esc(t('history'))+'</div><div class="chips rise">'+keys.slice(0,12).map(function(key){return'<span class="chip glass'+(key==g.mon?' on':'')+'" onclick="setMon('+key+')">'+(MON[S.lang]||MON.uz)[key%100]+' '+String(Math.floor(key/100)).slice(2)+'</span>'}).join('')+'</div>';
-  h+=by[g.mon].slice().sort(function(a,b){return b.pnl-a.pnl}).slice(0,50).map(function(x){return'<div class="trow glass rise" onclick="openLink(\''+esc(x.url||'')+'\')"><div class="rm"><div class="rn" style="font-size:13px">'+esc(x.symbol)+'<span class="b '+(x.side=='LONG'?'bl':'bs')+'">'+x.side+'</span>'+(x.lev>1?'<span class="b bx">'+x.lev+'x</span>':'')+'</div><div class="rs">'+fp(x.entry)+' → '+fp(x.exit)+' · '+rel(x.closed)+'</div></div>'
+  h+=by[g.mon].slice().sort(function(a,b){return b.pnl-a.pnl}).slice(0,50).map(function(x){return'<div class="trow glass rise" onclick="openTrade('+x.id+',\''+esc(x.url||'')+'\','+(d.mine?1:0)+')"><div class="rm"><div class="rn" style="font-size:13px">'+esc(x.symbol)+'<span class="b '+(x.side=='LONG'?'bl':'bs')+'">'+x.side+'</span>'+(x.lev>1?'<span class="b bx">'+x.lev+'x</span>':'')+'</div><div class="rs">'+fp(x.entry)+' → '+fp(x.exit)+' · '+rel(x.closed)+'</div></div>'
    +'<div class="tsp" data-tid="'+x.id+'" data-p="'+x.pnl+'">'+tsparkSvg(x.id,x.pnl)+'</div>'+'<div class="rv '+(x.pnl>=0?'g':'r')+'" style="font-size:14px">'+fpc(x.pnl)+'</div></div>'}).join('')}
  else if(!K||!K.tiles.length)h+='<div class="empty glass rise">'+esc(t('no_closed'))+'</div>';
  p.innerHTML='<div class="'+(anim?'anim':'')+'">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'});loadTspark()}

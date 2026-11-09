@@ -1717,6 +1717,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "share.caption": {"uz": "📊 <b>{sym}</b> {side} — ochiq pozitsiya, unrealized <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatilmoqda\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
                       "ru": "📊 <b>{sym}</b> {side} — открытая позиция, нереализ. <b>{pnl}%</b>\n{ws} · отслеживается в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
                       "en": "📊 <b>{sym}</b> {side} — open position, unrealized <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
+    "share.caption_closed": {"uz": "✅ <b>{sym}</b> {side} — yopilgan savdo, natija <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatildi\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
+                             "ru": "✅ <b>{sym}</b> {side} — сделка закрыта, итог <b>{pnl}%</b>\n{ws} · отслежено в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
+                             "en": "✅ <b>{sym}</b> {side} — closed trade, result <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
     "share.btn": {"uz": "🚀 Botni ochish", "ru": "🚀 Открыть бота", "en": "🚀 Open the bot"},
     "dip.out_done": {
         "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",

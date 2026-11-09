@@ -1494,6 +1494,51 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
     return True, json.dumps({"id": pm.id, "link": link})
 
 
+async def _app_rcard(ctx, uid: int, lang, sig) -> tuple[bool, str]:
+    """306: yopilgan savdo ustiga bosilganda (shaxsiy jurnalda post havolasi yo'q) —
+    ilova ichida natija kartasi: rasm `share_images` da (`/sc/<key>.jpg`), ulashish
+    uchun tayyor post (rasm + matn + "Botni ochish", QR — bosgan odamning taklifi)."""
+    if not sig or sig["exit_price"] is None or sig["pnl_pct"] is None or not sig["closed_at"]:
+        return False, i18n.t("man.gone", lang)
+    ws = await db.get_workspace(sig["workspace_id"])
+    if not ws or not config.WEB_URL or not can_manage(uid, ws):
+        return False, i18n.t("man.no_right", lang)
+    buf = await build_pnl_card(sig, ws, ctx.bot.username, ref_uid=uid,
+                               show_id=ws["type"] != "group", bot=ctx.bot)
+    if buf is None:
+        return False, i18n.t("ref.no_link", lang)
+    img = Image.open(buf).convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=88)
+    import secrets as _sec
+    key = _sec.token_urlsafe(10)
+    await db.share_image_put(key, out.getvalue())
+    url = f"{config.WEB_URL}/sc/{key}.jpg"
+    _code, link = await referral_token(uid, ctx.bot.username)
+    res_d = {"img": url, "link": link}
+    if link:
+        from telegram import InlineQueryResultPhoto
+        import uuid as _uuid
+        L = lev(sig)
+        pnl = float(sig["pnl_pct"]) * L
+        cap = i18n.t("share.caption_closed", lang, sym=html.escape(sig["symbol"]),
+                     side=sig["side"] + (f" {L}x" if L > 1 else ""),
+                     pnl=f"{'+' if pnl >= 0 else ''}{pnl:.2f}", ws=html.escape(ws["name"]))
+        res = InlineQueryResultPhoto(
+            id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=url, photo_width=img.width,
+            photo_height=img.height, caption=cap, parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                i18n.t("share.btn", lang), url=link, api_kwargs={"style": "success"})]]))
+        try:
+            pm = await ctx.bot.save_prepared_inline_message(
+                user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True,
+                allow_channel_chats=True)
+            res_d["id"] = pm.id
+        except Exception as e:
+            log.warning("Natija kartasi posti tayyorlanmadi: %s", e)
+    return True, json.dumps(res_d)
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -1566,6 +1611,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         await db.set_deposit(ws["id"], amount)
         return True, i18n.t("app.dep_ok", lang, v=amount)
     sig = await db.get_signal(a["sig_id"])
+    if a["action"] == "rcard":           # 306: yopilgan savdo kartasi (ilova ichida)
+        return await _app_rcard(ctx, uid, lang, sig)
     if not sig or sig["status"] not in ("PENDING", "ACTIVE"):
         return False, i18n.t("man.gone", lang)
     ws = await db.get_workspace(sig["workspace_id"])

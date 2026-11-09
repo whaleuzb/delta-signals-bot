@@ -27,7 +27,7 @@ import tracker
 log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
-ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share")
+ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share", "rcard")
 WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply")       # 254: signalga emas, workspace/odamga
 
 
@@ -775,7 +775,7 @@ T = {
         "confirm_pc": "{p}% qismini yopasizmi?", "wait": "Bajarilmoqda…",
         "pending": "Kutilmoqda", "nows": "Sizda hali jurnal yo'q. Botda /start bosing.",
         "only_tg": "Bu sahifa Telegram ichida ochiladi.", "personal": "Shaxsiy jurnal",
-        "channel": "Kanal", "group": "Guruh", "slow": "Bot hozir band — birozdan keyin qayta urinib ko'ring.",
+        "channel": "Kanal", "group": "Guruh", "slow": "Bot hozir band — birozdan keyin qayta urinib ko'ring.", "rc_share": "Ulashish", "rc_post": "Postni ochish",
         "pnl_total": "Ochiq natija", "open_n": "{n} ta ochiq",
         "goto_bot": "Botda ochish", "invested": "Summa", "limit": "Limit",
         "save": "Saqlash", "spot_dep": "Spot depozit", "fut_dep": "Futures depozit",
@@ -837,7 +837,7 @@ T = {
         "confirm_pc": "Закрыть {p}%?", "wait": "Выполняется…",
         "pending": "Ожидание", "nows": "У вас ещё нет журнала. Нажмите /start в боте.",
         "only_tg": "Эта страница открывается внутри Telegram.", "personal": "Личный журнал",
-        "channel": "Канал", "group": "Группа", "slow": "Бот занят — попробуйте чуть позже.",
+        "channel": "Канал", "group": "Группа", "slow": "Бот занят — попробуйте чуть позже.", "rc_share": "Поделиться", "rc_post": "Открыть пост",
         "pnl_total": "Открытый результат", "open_n": "{n} открыто",
         "goto_bot": "Открыть в боте", "invested": "Сумма", "limit": "Лимит",
         "save": "Сохранить", "spot_dep": "Спот депозит", "fut_dep": "Фьючерс депозит",
@@ -899,7 +899,7 @@ T = {
         "confirm_pc": "Close {p}%?", "wait": "Working…",
         "pending": "Pending", "nows": "No journal yet. Press /start in the bot.",
         "only_tg": "Open this page inside Telegram.", "personal": "Personal journal",
-        "channel": "Channel", "group": "Group", "slow": "Bot is busy — try again shortly.",
+        "channel": "Channel", "group": "Group", "slow": "Bot is busy — try again shortly.", "rc_share": "Share", "rc_post": "Open post",
         "pnl_total": "Open result", "open_n": "{n} open",
         "goto_bot": "Open in bot", "invested": "Size", "limit": "Limit",
         "save": "Save", "spot_dep": "Spot deposit", "fut_dep": "Futures deposit",
