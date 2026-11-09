@@ -59,6 +59,12 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
    (faqat bosilganda ishlaydi — doimiy animatsiya yo'q, 257) */
 .glass{transition:transform .25s var(--ease),border-color .35s,box-shadow .35s}
 .glass.tap{border-color:rgba(194,242,58,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 1px rgba(194,242,58,.12),0 14px 34px rgba(0,0,0,.4)}
+.ttabs{display:flex;gap:18px;border-bottom:1px solid rgba(255,255,255,.08);margin:-2px 0 0}
+.ttabs a{padding:4px 0 10px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ttabs a.on{color:var(--ink);border-bottom-color:var(--ink)}
+.mcb{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:14px}.mcb .btn{margin:0;padding:12px 6px;font-size:13.5px}
+.ordrow{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.ordrow>div{display:flex;align-items:center;gap:8px}.ordrow .rs{display:block}
 .mcg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px}
 .mcg .mci span{display:block;color:var(--mut);font-size:11px;margin-bottom:3px}
 .mcg .mci b{font-size:13.5px;font-weight:700;overflow-wrap:anywhere}
@@ -570,38 +576,53 @@ function termBind(){var sv=document.getElementById('tsvg');if(!sv)return;var g=S
  sv.ondblclick=function(){g.vn=null;g.ys=1;termRedraw()}}
 setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.drag||g.pend||document.hidden)return;var w=cur();if(!w)return;
  api('open',{ws:w.id}).then(function(d){if(S.page!==g||g.drag||g.pend)return;S.items=d.items;termRender()}).catch(function(){})},15000);
-/* 297: pozitsiya kartasi — birjadagidek (Dip Funded mobil kartasi kabi) */
-function termInfo(i){var L=i.lev||1,dir=i.side=='LONG'?1:-1,pend=i.status=='PENDING',al=i.alloc,e=+i.entry,pr=i.price;
- var mo=function(pct){return(al&&pct!=null)?pct/100*al:null},sg=function(x,d){return x==null?'—':(x>=0?'+':'−')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:d==null?2:d,maximumFractionDigits:d==null?2:d})},
-  cl=function(x){return x==null?'':x>=0?'g':'r'};
- var un=i.unreal,re=i.real||0,tot=i.live,uM=mo(un),rM=mo(re);
+/* 297/298: pozitsiya kartasi — Dip Funded mobil kartasi kabi (tanga belgisi, P&L/ROI, 6 maydon, ichida tugmalar),
+   yorliqlar: Pozitsiya | Buyurtmalar; qo'shimcha ma'lumot «Batafsil» ichida */
+var COINS=__COINS__;
+function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase().replace(/(USDT|USDC|BUSD|USD|PERP)$/,'').toLowerCase();
+ if(COINS.indexOf(b)>=0)return'<img src="/coins/'+b+'.svg" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none">';
+ return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>'}
+function termTab(k){var g=S.page;if(!g||g.ttab==k)return;g.ttab=k;tick();termRender()}
+function termMore(){var g=S.page;g.more=!g.more;tick();termRender()}
+function tpslSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt,dis){return'<button class="btn '+cls+'" style="margin:0" '+(dis?'disabled ':'')+'onclick="sheetClose();'+on+'">'+txt+'</button>'};
+ if(i.sl==null){askTpsl(id);return}var be=Math.abs(i.sl-i.entry)<1e-12;
+ sheetOpen('<h4>TP / SL · '+esc(i.symbol)+'</h4><p>SL '+fp(i.sl)+' · TP '+(i.tps||[]).map(fp).join(', ')+'</p><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+  +B('',"askStop("+id+")",ic('pen',13)+' SL')+B('',"askTps("+id+")",ic('pen',13)+' TP')+B('p',"act("+id+",'be')",esc(t('be')),be)+'</div>')}
+function termInfo(i){var g=S.page,L=i.lev||1,dir=i.side=='LONG'?1:-1,pend=i.status=='PENDING',al=i.alloc,e=+i.entry,pr=i.price;g.ttab=g.ttab||'pos';
+ var mo=function(pct){return(al&&pct!=null)?pct/100*al:null},sg=function(x){return x==null?'—':(x>=0?'+':'−')+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
+  cl=function(x){return x==null?'':x>=0?'g':'r'},n2=function(x){return x==null?'—':x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})};
+ var un=i.unreal,re=i.real||0,tot=i.live,uM=mo(un),rM=mo(re),nOrd=(i.adds||[]).length+(pend?1:0);
  var nextTp=(i.tps||[])[i.tp_hit||0],pAt=function(p){return p==null?null:(p/e-1)*100*dir*L*Math.max(0,1-(i.filled||0))};
  var risk=i.sl!=null?pAt(+i.sl):null,rew=nextTp!=null?pAt(+nextTp):null,rr=(risk!=null&&rew!=null&&risk<0)?(rew/-risk):null;
- var liq=L>1?e*(1-dir/L):null,note=al?(al*L):null,qty=note?note/e:null;
+ var liq=L>1?e*(1-dir/L):null,note=al?(al*L):null,qty=note?note/e:null,vol=qty&&pr?qty*pr:note;
  var it=function(k,v,c){return'<div class="mci"><span>'+esc(t(k))+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
- var h='<div class="tile2 glass" style="margin-top:10px;padding:14px">';
- h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:15px">'+esc(i.symbol)+'</b><span><span class="b '+(dir>0?'bl':'bs')+'">'+i.side+'</span>'+(L>1?'<span class="b bx">'+L+'x</span>':'<span class="b bx">Spot</span>')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</span></div>';
- if(!pend){h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px"><div><span class="rs">'+esc(t('t_upnl'))+'</span><div class="'+cl(un)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em">'+(uM!=null?sg(uM):(un!=null?fpc(un):'—'))+'</div></div>'
-   +'<div style="text-align:right"><span class="rs">'+esc(t('t_roe'))+'</span><div class="'+cl(un)+'" style="font-size:20px;font-weight:800">'+(un!=null?fpc(un):'—')+'</div></div></div>'}
- h+='<div class="mcg">';
- if(al)h+=it('t_margin',f0(al))+it('t_notional',note!=null?f0(note):'—')+it('t_qty',qty!=null?(qty>=1?qty.toFixed(3):(+qty.toPrecision(4))):'—');
- h+=it(i.adds&&i.adds.length?'t_avg':'entry',fp(e))+it('t_mark',fp(pr))+it('t_liq',liq?fp(liq):'—',liq?'r':'');
- h+=it('stop',i.sl!=null?fp(i.sl):'—',i.sl!=null?'r':'')+it('tp_btn',nextTp!=null?fp(nextTp)+((i.tps||[]).length>1?' <small class="m">'+((i.tp_hit||0)+1)+'/'+i.tps.length+'</small>':''):'—',nextTp!=null?'g':'')+it('t_rr',rr!=null?'1 : '+rr.toFixed(2):'—');
- if(!pend){h+=it('t_risk',risk!=null?(al?sg(mo(risk)):fpc(risk)):'—',cl(risk))+it('t_reward',rew!=null?(al?sg(mo(rew)):fpc(rew)):'—',cl(rew))+it('t_closed',Math.round((i.filled||0)*100)+'%');
-  h+=it('t_rpnl',re?(al?sg(rM):fpc(re)):'0',cl(re||null))+it('t_total',tot!=null?(al?sg(mo(tot)):fpc(tot)):'—',cl(tot))+it('t_opened',i.opened?rel(i.opened):'—')}
- h+='</div>';if(!al&&!pend)h+='<div class="rs" style="margin-top:10px">'+esc(t('t_nosize'))+'</div>';
+ var tabs='<div class="ttabs">'+[['pos',t('t_tab_pos')+(pend?'':' (1)')],['ord',t('t_tab_ord')+(nOrd?' ('+nOrd+')':'')]].map(function(x){return'<a class="'+(g.ttab==x[0]?'on':'')+'" onclick="termTab(\''+x[0]+'\')">'+esc(x[1])+'</a>'}).join('')+'</div>';
+ var h='<div class="tile2 glass" style="margin-top:10px;padding:14px 14px 12px">'+tabs;
+ if(g.ttab=='ord'){var rows=[];if(pend)rows.push([t('t_entry_ord'),fp(e),"act("+i.id+",'close')"]);(i.adds||[]).forEach(function(p){rows.push([t('t_lim_add'),fp(p),"act("+i.id+",'limx')"])});
+  h+=rows.length?rows.map(function(r){return'<div class="ordrow"><div>'+coinIc(i.symbol,20)+'<div><b>'+esc(i.symbol)+'</b><span class="rs">'+esc(r[0])+'</span></div></div><b>'+r[1]+'</b><button class="btn d" style="flex:none;width:auto;margin:0;padding:8px 12px" onclick="'+r[2]+'">'+esc(t('cancel'))+'</button></div>'}).join('')
+   :'<div class="rs" style="text-align:center;padding:18px 0">'+esc(t('t_no_ord'))+'</div>';
+  return h+'</div>'}
+ h+='<div style="display:flex;align-items:center;gap:9px;margin:12px 0 12px">'+coinIc(i.symbol,26)+'<b style="font-size:17px;letter-spacing:-.01em">'+esc(i.symbol)+'</b><span class="b bx">'+(L>1?'Futures '+L+'x':'Spot')+'</span>'+(L>1||dir<0?'<span class="b '+(dir>0?'bl':'bs')+'">'+i.side+'</span>':'')+'</div>';
+ if(!pend)h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px"><div><span class="rs">'+esc(t('t_pnl'))+'</span><div class="'+cl(un)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+(uM!=null?sg(uM):'—')+'</div></div>'
+   +'<div style="text-align:right"><span class="rs">'+esc(t('t_roi'))+'</span><div class="'+cl(un)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+(un!=null?fpc(un):'—')+'</div></div></div>';
+ h+='<div class="mcg">'+it('t_vol',vol!=null?n2(vol):'—')+it('t_qty',qty!=null?(+qty.toPrecision(8)).toString():'—')+it('t_entry_px',fp(e))
+  +it('t_now',fp(pr))+it('stop',i.sl!=null?fp(i.sl):'—',i.sl!=null?'r':'')+it('tp_btn',nextTp!=null?fp(nextTp):'—',nextTp!=null?'g':'')+'</div>';
+ if(g.more){h+='<div class="mcg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)">';
+  if(al)h+=it('t_margin',f0(al))+it('t_notional',note!=null?f0(note):'—')+it('t_liq',liq?fp(liq):'—',liq?'r':'');
+  h+=it('t_rr',rr!=null?'1 : '+rr.toFixed(2):'—')+it('t_risk',risk!=null?(al?sg(mo(risk)):fpc(risk)):'—',cl(risk))+it('t_reward',rew!=null?(al?sg(mo(rew)):fpc(rew)):'—',cl(rew));
+  if(!pend)h+=it('t_closed',Math.round((i.filled||0)*100)+'%')+it('t_rpnl',re?(al?sg(rM):fpc(re)):'0',cl(re||null))+it('t_total',tot!=null?(al?sg(mo(tot)):fpc(tot)):'—',cl(tot))+it('t_opened',i.opened?rel(i.opened):'—');
+  h+='</div>';if(!al&&!pend)h+='<div class="rs" style="margin-top:10px">'+esc(t('t_nosize'))+'</div>'}
+ h+='<div class="mcb">'+(pend?'<button class="btn" onclick="askEntry('+i.id+')">'+ic('pen',13)+' '+esc(t('entry_btn'))+'</button>':'<button class="btn" onclick="tpslSheet('+i.id+')">TP/SL</button>')
+  +'<button class="btn" onclick="termMore()">'+esc(t('t_more'))+' '+(g.more?'▴':'▾')+'</button>'
+  +'<button class="btn" onclick="'+(pend?"act("+i.id+",'close')":"sellSheet("+i.id+")")+'">'+esc(pend?t('cancel'):t('close'))+'</button></div>';
  return h+'</div>'}
 /* 296: terminal tugmalari — BUY (qo'shimcha kirish) / SELL (qisman yoki to'liq yopish) va boshqaruv */
 function termActs(i){var sid=i.id,pend=i.status=='PENDING',B=function(cls,on,txt,dis,st){return'<button class="btn '+cls+'" style="'+(st||'')+'" '+(dis?'disabled ':'')+'onclick="'+on+'">'+txt+'</button>'};
  var big='padding:14px;font-size:15px;font-weight:800;letter-spacing:.02em',h='<div class="tile2 glass" style="margin-top:10px;padding:12px">';
- if(pend){h+='<div style="display:flex;gap:8px">'+B('p',"askEntry("+sid+")",ic('pen',14)+' '+esc(t('entry_btn')),0,big)+B('d',"act("+sid+",'close')",esc(t('cancel')),0,big)+'</div>'}
+ if(pend)return'';
  else{var canAdd=i.filled==0&&i.sl!=null,canSell=true;
   h+='<div style="display:flex;gap:8px">'+B('p',"askAdd("+sid+")",'BUY · '+esc(t('add_btn')),!canAdd,big)+B('d',"sellSheet("+sid+")",'SELL · '+esc(t('close')),!canSell,big)+'</div>';
-  var row='';if(i.sl!=null){var be=Math.abs(i.sl-i.entry)<1e-12;row+=B('',"act("+sid+",'be')",esc(t('be')),be)+B('',"askStop("+sid+")",ic('pen',13)+' '+esc(t('stop')))+B('',"askTps("+sid+")",esc(t('tp_btn')))}
-  else row+=B('p',"askTpsl("+sid+")",esc(t('tpsl_btn')));
-  if(i.can_size)row+=B('',"askSize("+sid+")",'$ '+esc(t('size_btn')));
-  if(i.adds&&i.adds.length)row+=B('',"act("+sid+",'limx')",esc(t('lims'))+' ✕');
-  h+='<div class="acts" style="margin-top:8px">'+row+'</div>'}
+  if(i.can_size)h+='<div class="acts" style="margin-top:8px">'+B('',"askSize("+sid+")",'$ '+esc(t('size_btn')))+'</div>'}
  return h+'</div>'}
 function sellSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt){return'<button class="btn '+cls+'" style="margin:0" onclick="sheetClose();'+on+'">'+txt+'</button>'};
  sheetOpen('<h4>SELL · '+esc(i.symbol)+'</h4><p>'+(i.live!=null?fpc(i.live):'')+'</p>'

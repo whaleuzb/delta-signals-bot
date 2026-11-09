@@ -7719,3 +7719,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      TP (n/N), R:R, SL'da / keyingi TP'da natija ($ yoki %), Yopilgan qism,
      Realized PnL, Jami natija, Ochilgan. Summa kiritilmagan bo'lsa natijalar
      % da va izoh. Karta grafik ostida, BUY/SELL undan keyin.
+298. **Pozitsiya kartasi — Dip Funded mobil kartasi bilan bir xil ko'rinishda.**
+     Tanga belgilari Dip Funded'dan nusxa: `static/coins/*.svg` (115 ta,
+     CC0/MIT — `static/coins/LICENSE.md`), `GET /coins/<c>.svg`, ro'yxat
+     sahifaga `__COINS__` bilan; `coinIc(sym)` (USDT/USDC/USD qo'shimchasiz,
+     bo'lmasa harf). Karta: yorliqlar **Pozitsiya (1) | Buyurtmalar (N)**
+     (kutilayotgan limit kirish va qo'shimcha limitlar, "Bekor qilish");
+     sarlavha — tanga + SYMBOL + "Futures 10x"/"Spot" + yo'nalish; P&L (USDT) /
+     ROI; 6 maydon: Hajm (USDT, joriy qiymat), Miqdor, Kirish narxi, Joriy
+     narx, Stop, TP; karta ichida **TP/SL** (`tpslSheet`: SL, TP, BE) ·
+     **Batafsil ▾** (marja, pozitsiya hajmi, likvidatsiya, R:R, SL'da/TP'da,
+     yopilgan qism, realized, jami, ochilgan) · **Yopish** (`sellSheet`).
+     Pastda BUY/SELL qoldi (BE/Stop/TP qatori kartaga ko'chdi).
