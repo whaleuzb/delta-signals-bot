@@ -66,6 +66,9 @@ async def resolve(raw: str) -> str | None:
     return s if s in await valid_symbols() else None
 
 
+_nodata_logged: dict[tuple, float] = {}
+
+
 async def klines(symbol: str, start_ms: int, limit: int = 500,
                  tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
     """`exchange.klines` bilan bir xil shart: [start_ms, end_ms] oynasidan
@@ -82,7 +85,11 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
         log.warning("MEXC fyuchers rate limit — kutamiz")
         return []
     if 400 <= r.status_code < 500:
-        log.warning("MEXC fyuchers %s: %s %s uchun ma'lumot yo'q", r.status_code, symbol, interval)
+        # 307: bir xil juftlik har 45 s da shu xatoni yozardi — soatiga bir marta yetadi.
+        k = (symbol, interval)
+        if time.time() - _nodata_logged.get(k, 0) > 3600:
+            _nodata_logged[k] = time.time()
+            log.warning("MEXC fyuchers %s: %s %s uchun ma'lumot yo'q", r.status_code, symbol, interval)
         return []
     r.raise_for_status()
     body = r.json()

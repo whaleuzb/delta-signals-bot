@@ -7809,3 +7809,20 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Yangi signal amali `rcard` (`webapp.ACTIONS`; web `_can` — egasi/admin). Bot `_app_exec` uni status tekshiruvidan OLDIN ushlaydi → `_app_rcard`: `can_manage`, `build_pnl_card(ref_uid=uid)` (305 yangi karta), JPEG `share_images` → `/sc/<key>.jpg`, `save_prepared_inline_message` (matn `share.caption_closed`, tugma `share.btn`). Javob `{"img","id","link"}`.
 - Tarjimalar: `rc_share`, `rc_post` (webapp T), `share.caption_closed` (i18n).
 - Sinov: `test_305.py` 9/9 (rcard: rasm, JPEG, matn, begonaga yo'q), brauzerda sheet ochildi (rc_sheet.png).
+
+## 307. Xavfsizlik ko'rigi, eski kod tozalash, xarajatni kamaytirish
+Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski ishlatilmaydigan kodlarni tozala. harajatni kamaytirish yo'llarini top va tuzat".
+
+**O'lchov (Railway, 7 kun):** bot ~0.02 vCPU / 276 MB, web ~0 vCPU / 141 MB, Postgres 166 MB, disk 0.31 GB. Asosiy xarajat — RAM; CPU juda kichik.
+
+**Xavfsizlik (tekshirildi, tartibda):** barcha `/api/app/*` endpointlari initData imzosi (HMAC, 24 soat) + `_can` (egasi/admin) bilan; ommaviy ma'lumotlar `public_workspace` orqali. Dip Funded `/api/tc/dip/credit` — `X-Api-Key` (compare_digest) + idempotent `ref`. Repoda kalit/token yo'q (`.env.example` faqat). Kunlik zaxirada `settings` (telethon sessiyasi) YO'Q. httpx loglari WARNING (URL'dagi bot tokeni logga tushmaydi). webapp'da foydalanuvchi matnlari `esc()` orqali.
+- **Tuzatildi:** `api_act` da cheklov yo'q edi — `webapp._act_allowed`: har odamga 60 s da 30 ta amal, oshsa 429 (navbatni to'ldirib, bot jarayonida rasm chizdirib band qilishdan himoya).
+
+**Eski kod o'chirildi (−491 qator):** `card.pnl_card` + `_glow` va ular uchungina bo'lgan konstantalar (305 dan beri ishlatilmaydi); `cmd_dip_tasks` ichidagi `return` dan keyingi o'lik blok; `tournament.compute` (o'rami); `chart.TF_LABELS`, `dipfunded.TOUR_ACCOUNT`; i18n'dan 82 ta ishlatilmaydigan kalit (asosan eski HTML sahifalarning `w.*`, 273 dan beri ilovaga yo'naltiriladi; `card.subtitle`, `card.r`, `menu.*`, `df.tour_*`); webapp T'dan 14 ta (`t_upnl`, `t_mark`, `goto_bot` ...) × 3 til. Dinamik kalit prefikslari (`df.fmt_`, `df.st_`, `help.`, `lang.name_`, `public.`, `earn_def_`) hisobga olingan.
+
+**Xarajat / yuk:**
+- `apscheduler` logi WARNING — `app_action_job` (2 s) har ishga tushishda 2 qator yozardi (daqiqasiga ~60+).
+- Twelve Data (bepul: 8 so'rov/daqiqa) doim limitda edi: `news_live_job` forex/aksiya grafigini har 4 s da qayta so'rardi. Endi: kripto bo'lmagan jonli hodisa 45 s da bir (oyna tugagach darhol — yakuniy natija yo'qolmaydi, `_LIVE_AT`); `forex.time_series` 20 s kesh (bir xil oyna); 429 (status yoki JSON `code`) dan keyin 60 s hech narsa so'ralmaydi (`_hit_limit`), narx shu paytda 2 daqiqalik keshdan.
+- MEXC fyuchers 4xx ("ma'lumot yo'q") logi juftlik bo'yicha soatiga bir marta.
+- `db.housekeeping`: `app_actions` dan 14 kundan eski bajarilgan qatorlar o'chiriladi (jadval cheksiz o'sardi). `share_images` 30 kunlik tozalash avvaldan bor.
+- Sinov: `test_307.py` 8/8; qolganlari — test_app 44, test_term 18, test_earn 16, test_adm_earn 14, test_adm299 7, test_dipout 27, test_300 17, test_305 9, test_tracker ✅.

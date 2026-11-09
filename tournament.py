@@ -238,12 +238,6 @@ def _trade_pct(s, price: float | None) -> float:
     return float(s["pnl_pct"] or 0)
 
 
-async def compute(tid: int, price_fn) -> list[dict]:
-    """Barcha qatnashchilar natijasi, reyting tartibida. `price_fn(market,
-    symbol)` — async, narx yoki None (bot: `safe_last_price`)."""
-    return (await _compute(tid, price_fn))[0]
-
-
 async def _compute(tid: int, price_fn) -> tuple[list[dict], list[tuple]]:
     """(reyting, ochiq savdolarning jonli holati [(signal_id, foiz, narx)]).
     Ikkalasi BITTA narx to'plamidan — veb ko'rsatadigan pozitsiya foizi
@@ -287,7 +281,7 @@ async def _compute(tid: int, price_fn) -> tuple[list[dict], list[tuple]]:
 
 
 async def refresh(tid: int, price_fn) -> list[dict]:
-    """`compute` natijasini bazaga yozadi (faqat faol turnirda)."""
+    """`_compute` natijasini bazaga yozadi (faqat faol turnirda)."""
     res, live = await _compute(tid, price_fn)
     async with db.pool().acquire() as c:
         async with c.transaction():

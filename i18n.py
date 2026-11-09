@@ -1648,11 +1648,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Ваша предыдущая заявка на вывод ещё рассматривается",
         "en": "Your previous withdrawal request is still being reviewed",
     },
-    "dip.out_sent": {
-        "uz": "✅ {n} DIP chiqarish so'rovi yuborildi. Admin ko'rib chiqib siz bilan bog'lanadi.",
-        "ru": "✅ Заявка на вывод {n} DIP отправлена. Админ рассмотрит и свяжется с вами.",
-        "en": "✅ Request to withdraw {n} DIP sent. The admin will review it and contact you.",
-    },
     "dip.df_done": {
         "uz": "✅ {n} DIP Dip Funded hisobingizga o'tkazildi. Dip Funded'dagi DIP balansingiz: <b>{bal} DIP</b>",
         "ru": "✅ {n} DIP переведены на ваш счёт Dip Funded. Баланс DIP в Dip Funded: <b>{bal} DIP</b>",
@@ -1992,34 +1987,10 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Ochiq sahifadagi bo'limlar (yopiq guruhlar / ommaviy kanallar) ---
-    "w.tab_groups": {
-        "uz": "Yopiq guruhlar", "ru": "Закрытые группы", "en": "Private groups",
-    },
-    "w.tab_channels": {
-        "uz": "Ommaviy kanallar", "ru": "Публичные каналы", "en": "Public channels",
-    },
     # Kanal sahifasidagi katta tugma. `w.join_channel` dan alohida: u
     # bosh ro'yxatdagi kartochka ostida turadi va u yerda qisqa bo'lishi
     # kerak, bu esa sarlavha ostidagi asosiy tugma — `w.join_btn` bilan
     # bir xil shaklda ("→" bilan) bo'lgani tabiiy ko'rinadi.
-    "w.join_channel_btn": {
-        "uz": "Kanalga obuna bo'lish →",
-        "ru": "Подписаться на канал →",
-        "en": "Subscribe to the channel →",
-    },
-    "w.join_channel": {
-        "uz": "Obuna bo'lish", "ru": "Подписаться", "en": "Subscribe",
-    },
-    "w.channels_empty": {
-        "uz": "Hozircha ommaviy kanal yo'q.",
-        "ru": "Публичных каналов пока нет.",
-        "en": "No public channels yet.",
-    },
-    "w.groups_empty": {
-        "uz": "Hozircha ochiq guruh yo'q.",
-        "ru": "Открытых групп пока нет.",
-        "en": "No open groups yet.",
-    },
 
     "web.off": {
         "uz": ("🌐 Ochiq sahifa hali yoqilmagan.\n\n"
@@ -2116,9 +2087,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "✅ Your group is now visible in the <code>/top</code> ranking.",
     },
     # --- Turnir (185) ---
-    "menu.tourney": {"uz": "🏆 Turnir", "ru": "🏆 Турнир", "en": "🏆 Tournament"},
-    "tr.none": {"uz": "Hozir faol turnir yo'q.", "ru": "Сейчас нет активного турнира.",
-                "en": "There is no active tournament right now."},
     "tr.rules": {
         "uz": ("🏆 <b>Turnir #{id}</b>\n\n"
                "Har bir qatnashchiga alohida turnir depoziti: <b>{dep:,.0f}$</b>\n"
@@ -2299,77 +2267,15 @@ STRINGS: dict[str, dict[str, str]] = {
     "adm.t_ended_empty": {"uz": "🏁 Turnir #{id} yakunlandi (qatnashchi bo'lmadi).",
                           "ru": "🏁 Турнир #{id} завершён (участников не было).",
                           "en": "🏁 Tournament #{id} is over (no players)."},
-    "w.tab_tourney": {"uz": "🏆 Turnir", "ru": "🏆 Турнир", "en": "🏆 Tournament"},
-    "w.t_title": {"uz": "Turnir #{id}", "ru": "Турнир #{id}", "en": "Tournament #{id}"},
-    "w.t_live": {"uz": "Faol · tugaydi {ends}", "ru": "Идёт · до {ends}", "en": "Live · ends {ends}"},
-    "w.t_done": {"uz": "Yakunlangan · {ends}", "ru": "Завершён · {ends}", "en": "Finished · {ends}"},
-    "w.t_meta": {"uz": "Har bir qatnashchiga {dep}$ depozit · {n} qatnashchi",
-                 "ru": "Депозит {dep}$ каждому · {n} участников",
-                 "en": "{dep}$ deposit per player · {n} players"},
-    "w.t_none": {"uz": "Hozircha turnir o'tkazilmagan. Tez orada!",
-                 "ru": "Турниров пока не было. Скоро!", "en": "No tournaments yet. Coming soon!"},
-    "w.t_empty": {"uz": "Hali qatnashchi yo'q — birinchi bo'ling!",
-                  "ru": "Участников пока нет — будьте первым!", "en": "No players yet — be the first!"},
-    "w.t_tile_players": {"uz": "Qatnashchilar", "ru": "Участники", "en": "Players"},
-    "w.t_tile_deposit": {"uz": "Depozit", "ru": "Депозит", "en": "Deposit"},
-    "w.t_tile_leader": {"uz": "🥇 Yetakchi", "ru": "🥇 Лидер", "en": "🥇 Leader"},
     "df.tour_title": {"uz": "Dip Funded turniri — $100\u00a0000 sovrin",
                       "ru": "Турнир Dip Funded — призы $100\u00a0000",
                       "en": "Dip Funded tournament — $100,000 in prizes"},
     "df.tour_live": {"uz": "Davom etmoqda · {end} gacha", "ru": "Идёт · до {end}",
                      "en": "Live · until {end}"},
     "df.tour_soon": {"uz": "Start: {start}", "ru": "Старт: {start}", "en": "Starts: {start}"},
-    "df.tour_rules": {
-        "uz": ("Har 2 haftada · $10 000 turnir hisobi · faqat spot, leveraj yo'q · "
-               "kunlik zarar −5%, maksimal −7% · eng yuqori foyda % — g'olib"),
-        "ru": ("Каждые 2 недели · турнирный счёт $10 000 · только спот, без плеча · "
-               "дневной убыток −5%, максимальный −7% · побеждает наибольшая доходность %"),
-        "en": ("Every 2 weeks · $10,000 tournament account · spot only, no leverage · "
-               "daily loss −5%, max −7% · highest profit % wins"),
-    },
-    "df.tour_prizes": {"uz": "Sovrinlar — Dip Trader hisobi", "ru": "Призы — счёт Dip Trader",
-                       "en": "Prizes — Dip Trader account"},
     "df.tour_place": {"uz": "{n}-o'rin", "ru": "{n}-е место", "en": "#{n}"},
-    "df.tour_how": {
-        "uz": "dipfunded.com da istalgan challenge'ni oling — turnir hisobi kabinetingizda bepul ochiladi.",
-        "ru": "Купите любой challenge на dipfunded.com — турнирный счёт откроется в кабинете бесплатно.",
-        "en": "Get any challenge on dipfunded.com — your tournament account opens for free.",
-    },
-    "df.tour_board_empty": {"uz": "Hali qatnashchilar yo'q — birinchi bo'ling!",
-                             "ru": "Участников пока нет — будьте первым!",
-                             "en": "No participants yet — be the first!"},
-    "w.tab_tourney_short": {"uz": "Turnir", "ru": "Турнир", "en": "Tournament"},
-    "df.tour_all": {"uz": "To'liq reyting", "ru": "Весь рейтинг", "en": "Full leaderboard"},
     "df.tour_btn": {"uz": "Qatnashish", "ru": "Участвовать", "en": "Join"},
     "df.tour_board": {"uz": "Reyting", "ru": "Рейтинг", "en": "Leaderboard"},
-    "w.t_cta_h3": {"uz": "Turnirda qatnashing", "ru": "Участвуйте в турнире",
-                   "en": "Join the tournament"},
-    "w.t_cta_next": {
-        "uz": "Keyingi turnir boshlanganda botdagi shaxsiy jurnalingizda «🏆 Turnir» tugmasi paydo bo'ladi.",
-        "ru": "Когда начнётся следующий турнир, в личном журнале в боте появится кнопка «🏆 Турнир».",
-        "en": "When the next tournament starts, a «🏆 Tournament» button appears in your personal journal in the bot.",
-    },
-    "w.t_open_h2": {"uz": "Ochiq pozitsiyalar ({n})", "ru": "Открытые позиции ({n})",
-                    "en": "Open positions ({n})"},
-    "w.t_open_none": {"uz": "Hozir ochiq pozitsiya yo'q.", "ru": "Сейчас открытых позиций нет.",
-                      "en": "No open positions right now."},
-    "w.t_pending": {"uz": "⏳ limit kutilmoqda", "ru": "⏳ ждёт лимит", "en": "⏳ limit pending"},
-    "w.t_entry": {"uz": "Kirish", "ru": "Вход", "en": "Entry"},
-    "w.t_col_trader": {"uz": "Treyder", "ru": "Трейдер", "en": "Trader"},
-    "w.t_col_equity": {"uz": "Balans", "ru": "Баланс", "en": "Balance"},
-    "w.t_col_ret": {"uz": "Natija", "ru": "Результат", "en": "Result"},
-    "w.t_col_trades": {"uz": "Savdolar", "ru": "Сделки", "en": "Trades"},
-    "w.t_col_wr": {"uz": "WR", "ru": "WR", "en": "WR"},
-    "w.t_how": {
-        "uz": "Qatnashish: botda shaxsiy jurnalingizni oching → «🏆 Turnir» → «✅ Qatnashaman».",
-        "ru": "Как участвовать: откройте личный журнал в боте → «🏆 Турнир» → «✅ Участвую».",
-        "en": "How to join: open your personal journal in the bot → «🏆 Tournament» → «✅ Join».",
-    },
-    "w.t_more": {"uz": "To'liq reyting →", "ru": "Полный рейтинг →", "en": "Full ranking →"},
-    "w.t_past": {"uz": "O'tgan turnirlar", "ru": "Прошлые турниры", "en": "Past tournaments"},
-    "w.t_updated": {"uz": "Reyting har 5 daqiqada yangilanadi, ochiq pozitsiyalar joriy narxda.",
-                    "ru": "Рейтинг обновляется каждые 5 минут, открытые позиции — по текущей цене.",
-                    "en": "The ranking updates every 5 minutes; open positions at the current price."},
 
     # --- Menyudagi reyting tugmalari (183) ---
     "menu.top_off": {"uz": "🏆 Topga chiqarish", "ru": "🏆 Вывести в топ", "en": "🏆 Add to top"},
@@ -2704,11 +2610,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "Неверная сумма. Введите снова или нажмите ⏭.",
         "en": "Invalid amount. Enter it again or press ⏭.",
     },
-    "al.saved": {
-        "uz": "✅ Belgilandi: <b>{amt:,.2f}</b>",
-        "ru": "✅ Записано: <b>{amt:,.2f}</b>",
-        "en": "✅ Saved: <b>{amt:,.2f}</b>",
-    },
 
     # --- Jurnalga kiritish (post ostidagi tugmadan) ---
     "jr.not_found": {
@@ -2823,89 +2724,9 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Ochiq veb sahifa (web.py) ---
-    "w.index_title": {
-        "uz": "Ochiq natijalar — Trade Controller",
-        "ru": "Открытые результаты — Trade Controller",
-        "en": "Public results — Trade Controller",
-    },
-    "w.index_h1": {
-        "uz": "Ochiq natijalar", "ru": "Открытые результаты", "en": "Public results",
-    },
-    "w.index_sub": {
-        "uz": ("Bu guruhlar o'z savdo statistikasini ommaga ochgan. Har bir raqam "
-               "bazadan jonli o'qiladi — signal kiritilganda yoziladi, bozor TP yoki "
-               "stopga tekkanda avtomatik yopiladi. Qo'lda tahrirlab bo'lmaydi."),
-        "ru": ("Эти группы открыли свою торговую статистику публично. Каждое число "
-               "читается из базы вживую — записывается при вводе сигнала и "
-               "закрывается автоматически, когда рынок доходит до TP или стопа. "
-               "Вручную это не изменить."),
-        "en": ("These groups have made their trading stats public. Every number is "
-               "read live from the database — written when a signal is entered and "
-               "closed automatically when the market hits a TP or the stop. It "
-               "cannot be edited by hand."),
-    },
     # Sarlavha ATAYLAB "guruhlar" demaydi: pastda ikkita bo'lim bor
     # (yopiq guruhlar / ommaviy kanallar) va kanallar bo'limi ochilganda
     # "guruhlar" sarlavhasi yolg'on bo'lib qolardi.
-    "w.index_top": {
-        "uz": "Top daromad beruvchilar", "ru": "Самые прибыльные",
-        "en": "Top performers",
-    },
-    "w.index_empty": {
-        "uz": "Hozircha ochiq guruh yo'q.", "ru": "Пока нет ни одной публичной группы.",
-        "en": "No public group yet.",
-    },
-    "w.index_note": {
-        "uz": ("Reyting joriy umumiy natija bo'yicha tartiblangan. O'tmishdagi "
-               "natija kelajakni kafolatlamaydi."),
-        "ru": ("Рейтинг отсортирован по текущему общему результату. Прошлые "
-               "результаты не гарантируют будущих."),
-        "en": ("The ranking is sorted by the current overall result. Past results "
-               "do not guarantee future ones."),
-    },
-    "w.signal_word": {"uz": "signal", "ru": "сигналов", "en": "signals"},
-    "w.winrate_word": {"uz": "winrate", "ru": "винрейт", "en": "win rate"},
-    "w.open_chip": {
-        "uz": "{n} ta ochiq", "ru": "{n} открытых", "en": "{n} open",
-    },
-    "w.more": {"uz": "Batafsil →", "ru": "Подробнее →", "en": "Details →"},
-    "w.cta_h3": {
-        "uz": "O'z guruhingizni shu yerda ko'rmoqchimisiz?",
-        "ru": "Хотите видеть здесь свою группу?",
-        "en": "Want to see your own group here?",
-    },
-    "w.cta_p": {
-        "uz": ("Bot signallaringizni avtomatik kuzatadi va statistikani o'zi yig'adi. "
-               "Sahifani ochish uchun uch qadam:"),
-        "ru": ("Бот сам отслеживает ваши сигналы и собирает статистику. Чтобы "
-               "открыть страницу — три шага:"),
-        "en": ("The bot tracks your signals automatically and collects the stats "
-               "itself. Three steps to open your page:"),
-    },
-    "w.cta_1": {
-        "uz": ("Botni guruhingizga qo'shib, admin qiling va guruhda "
-               "<code>/setup</code> yozing"),
-        "ru": ("Добавьте бота в группу, дайте права админа и напишите в группе "
-               "<code>/setup</code>"),
-        "en": ("Add the bot to your group, make it an admin and type "
-               "<code>/setup</code> in the group"),
-    },
-    "w.cta_2": {
-        "uz": "Signallaringizni bot orqali kiriting — u qolganini o'zi bajaradi",
-        "ru": "Вводите сигналы через бота — остальное он сделает сам",
-        "en": "Enter your signals through the bot — it does the rest itself",
-    },
-    "w.cta_3": {
-        "uz": ("Tayyor bo'lgach <code>/public on</code> yozing; moderator tasdiqlagach "
-               "guruhingiz shu ro'yxatda paydo bo'ladi"),
-        "ru": ("Когда будете готовы, напишите <code>/public on</code>; после одобрения "
-               "модератором группа появится в этом списке"),
-        "en": ("When ready, type <code>/public on</code>; once a moderator approves "
-               "it your group appears in this list"),
-    },
-    "w.cta_btn": {
-        "uz": "Botni ochish", "ru": "Открыть бота", "en": "Open the bot",
-    },
     "w.tile_closed": {
         "uz": "Yopilgan signallar", "ru": "Закрытых сигналов", "en": "Closed signals",
     },
@@ -2920,75 +2741,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "w.tile_avg_r": {
         "uz": "O'rtacha R", "ru": "Средний R", "en": "Average R",
     },
-    "w.not_public": {
-        "uz": "Bunday sahifa yo'q yoki u ochiq emas.",
-        "ru": "Такой страницы нет или она не публичная.",
-        "en": "No such page, or it is not public.",
-    },
-    "w.group_title": {
-        "uz": "{name} — natijalar", "ru": "{name} — результаты", "en": "{name} — results",
-    },
-    "w.back_all": {
-        "uz": "← Barcha guruhlar", "ru": "← Все группы", "en": "← All groups",
-    },
-    "w.join_btn": {
-        "uz": "Guruhga qo'shilish →", "ru": "Вступить в группу →", "en": "Join the group →",
-    },
-    "w.equity_h2": {
-        "uz": "Balans o'zgarishi", "ru": "Изменение баланса", "en": "Balance over time",
-    },
-    "w.monthly_h2": {
-        "uz": "Oylik natijalar", "ru": "Результаты по месяцам", "en": "Monthly results",
-    },
-    "w.col_month": {"uz": "Oy", "ru": "Месяц", "en": "Month"},
-    "w.col_trades": {"uz": "Savdo", "ru": "Сделки", "en": "Trades"},
-    "w.col_winrate": {"uz": "Winrate", "ru": "Винрейт", "en": "Win rate"},
-    "w.col_result": {"uz": "Natija", "ru": "Результат", "en": "Result"},
     # "Oxirgi savdolar" oy kesimida — tab yorliqlari.
-    "w.tab_this_month": {
-        "uz": "Hozirgi oy",
-        "ru": "Текущий месяц",
-        "en": "This month",
-    },
-    "w.month_empty": {
-        "uz": "Bu oyda yopilgan savdo yo'q.",
-        "ru": "В этом месяце нет закрытых сделок.",
-        "en": "No trades closed this month.",
-    },
-    "w.open_h2": {
-        "uz": "Hozir ochiq", "ru": "Открыто сейчас", "en": "Open right now",
-    },
-    "w.position_n": {
-        "uz": "Pozitsiya {i}", "ru": "Позиция {i}", "en": "Position {i}",
-    },
-    "w.since": {
-        "uz": "{d} dan beri", "ru": "с {d}", "en": "since {d}",
-    },
-    "w.open_note_member": {
-        "uz": "Siz guruh a'zosisiz — juftlik nomlari faqat sizga ko'rinadi.",
-        "ru": "Вы участник группы — названия пар видны только вам.",
-        "en": "You are a group member — pair names are visible only to you.",
-    },
-    "w.open_note": {
-        "uz": ("Juftlik nomi ko'rsatilmaydi — ochiq savdo guruh a'zolari uchun. "
-               "Foiz joriy bozor narxidan hisoblanadi."),
-        "ru": ("Название пары не показывается — открытая сделка для участников "
-               "группы. Процент считается по текущей рыночной цене."),
-        "en": ("The pair is not shown — an open trade belongs to the group members. "
-               "The percentage is computed from the current market price."),
-    },
-    "w.recent_h2": {
-        "uz": "Oxirgi savdolar", "ru": "Последние сделки", "en": "Recent trades",
-    },
-    "w.no_closed": {
-        "uz": "Hali yopilgan signal yo'q.", "ru": "Закрытых сигналов пока нет.",
-        "en": "No closed signals yet.",
-    },
-    "w.footer_live": {
-        "uz": "Ma'lumot bazadan jonli o'qiladi",
-        "ru": "Данные читаются из базы вживую",
-        "en": "The data is read live from the database",
-    },
 
     # --- Admin panel (faqat super-adminlar ko'radi) ---
     "adm.home": {
@@ -3389,8 +3142,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "st.kind_spot": {"uz": "📊 <b>Spot</b>", "ru": "📊 <b>Спот</b>", "en": "📊 <b>Spot</b>"},
     "st.kind_fut": {"uz": "⚡ <b>Futures</b> (foizlar leveraj bilan)", "ru": "⚡ <b>Фьючерсы</b> (проценты с плечом)",
                     "en": "⚡ <b>Futures</b> (percentages with leverage)"},
-    "w.fut_empty": {"uz": "Hali futures natijalari yo'q.", "ru": "Пока нет фьючерсных результатов.",
-                     "en": "No futures results yet."},
     "top.fut_head": {"uz": "⚡ <b>Futures top</b> (leveraj bilan)", "ru": "⚡ <b>Фьючерсный топ</b> (с плечом)",
                      "en": "⚡ <b>Futures top</b> (with leverage)"},
     "dep.pick": {"uz": "💰 <b>Depozit</b> — {name}\nQaysi depozit?",
@@ -3802,9 +3553,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "adm.role_member": {"uz": "a'zo×{n}", "ru": "участник×{n}", "en": "member×{n}"},
 
     # --- Ulashish kartasi (card.py) — GURUHGA ketadi, ws_lang bilan ---
-    "card.subtitle": {
-        "uz": "Savdo jurnali", "ru": "Журнал сделок", "en": "Trading journal",
-    },
     "card.open": {"uz": "OCHIQ POZITSIYA", "ru": "ОТКРЫТАЯ ПОЗИЦИЯ", "en": "OPEN POSITION"},
     "card.upnl": {"uz": "UNREALIZED PNL · ROI", "ru": "НЕРЕАЛИЗ. PNL · ROI", "en": "UNREALIZED PNL · ROI"},
     "card.pnl": {"uz": "YAKUNIY PNL · ROI", "ru": "ИТОГОВЫЙ PNL · ROI", "en": "REALIZED PNL · ROI"},
@@ -3817,9 +3565,6 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "card.exit": {
         "uz": "Chiqish narxi", "ru": "Цена выхода", "en": "Exit price",
-    },
-    "card.r": {
-        "uz": "Natija (R)", "ru": "Результат (R)", "en": "Result (R)",
     },
     "card.ref_code": {
         "uz": "Taklif kodi", "ru": "Код приглашения", "en": "Invite code",
@@ -3916,20 +3661,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🔓 Открытые сигналы",
         "en": "🔓 Open signals",
     },
-    "menu.equity": {
-        "uz": "📈 Equity",
-        "ru": "📈 Equity",
-        "en": "📈 Equity",
-    },
     "menu.news": {
         "uz": "📰 News Trade AI",
         "ru": "📰 News Trade AI",
         "en": "📰 News Trade AI",
-    },
-    "menu.page": {
-        "uz": "🌐 Ochiq sahifa",
-        "ru": "🌐 Публичная страница",
-        "en": "🌐 Public page",
     },
     "menu.help": {
         "uz": "❓ Yordam",

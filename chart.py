@@ -37,8 +37,6 @@ VP_COLOR = "#d4a636"    # kumush emas, mo''jaz oltin — hajm profili shamlardan
 
 # Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
 TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
-TF_LABELS = {"1m": "1 daqiqa", "5m": "5 daqiqa", "15m": "15 daqiqa",
-             "30m": "30 daqiqa", "1h": "1 soat", "4h": "4 soat", "1d": "1 kun"}
 DEFAULT_TF = "15m"     # tf berilmagan (eski) signallar uchun
 
 SETUP_BARS = 120       # yangi signal grafigida ko'rsatiladigan sham soni

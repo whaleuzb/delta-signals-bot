@@ -2683,6 +2683,10 @@ async def housekeeping(drop_volume: bool = False) -> int:
         r = await c.execute(
             "UPDATE news_events SET profile_data=NULL "
             "WHERE profile_data IS NOT NULL AND event_at < now() - interval '3 days'")
+        # 307: Mini App amallari navbati — bajarilganlari 14 kundan keyin kerak emas
+        # (har bosish bitta qator; jadval cheksiz o'sardi).
+        await c.execute("DELETE FROM app_actions WHERE status <> 'new' "
+                        "AND created_at < now() - interval '14 days'")
         if drop_volume and await c.fetchval("SELECT EXISTS (SELECT 1 FROM volume_snapshots)"):
             await c.execute("TRUNCATE volume_snapshots")
             log.info("Hajm portlashi o'chiq — volume_snapshots bo'shatildi")

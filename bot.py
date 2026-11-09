@@ -64,6 +64,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s", level=logging.INFO
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
+# 307: apscheduler har ishga tushishni INFO'da yozardi — `app_action_job` (2 s) tufayli
+# daqiqasiga ~60 qator shovqin. Faqat ogohlantirish/xatolar qoladi.
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
 log = logging.getLogger("bot")
 
 # token -> {"draft": {...}, "file_id": str, "user": int, "workspace_id": int}
@@ -1335,22 +1338,7 @@ async def cmd_dip_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     txt, kb = await _admin_earn_view()
     await update.effective_message.reply_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb,
                                               disable_web_page_preview=True)
-    return
-    rows = await db.dip_tasks_all()
-    lines, kb = [], []
-    for r in rows:
-        mark = "🟢" if r["active"] else "⚪️"
-        chk = "tekshiriladi" if r["chat_id"] else "tekshirilmaydi"
-        exp = r["expires_at"]
-        if exp is not None and exp <= datetime.now(timezone.utc):
-            mark = "⌛️"
-        till = f" · {exp.astimezone(stats.TZ):%d.%m.%Y} gacha" if exp is not None else ""
-        lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · {r['n']} kishi · {chk}{till}")
-        kb.append([InlineKeyboardButton(("⏸ O'chirish #" if r["active"] else "▶️ Yoqish #") + str(r["id"]),
-                                        callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}")])
-    await update.effective_message.reply_text("<b>DIP Earn vazifalari</b>\n" + "\n".join(lines),
-                                              parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb),
-                                              disable_web_page_preview=True)
+
 
 
 async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -9816,6 +9804,9 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
 # ishga tushsa ham, yangi konteyner shunchaki keyingi tikda xuddi shu
 # so'rovni bazadan qayta qiladi va DAVOM ETADI (hech narsa yo'qolmaydi).
 
+_LIVE_AT: dict[int, float] = {}
+
+
 async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
@@ -9827,6 +9818,15 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for row in rows:
+        # 307: forex/aksiya shamlari Twelve Data'dan (bepul reja — daqiqasiga 8 so'rov).
+        # Har 4 s da yangilash limitni darhol yeb, forex signallari kuzatuvini ham
+        # to'xtatardi — ular 45 s da bir yangilanadi. Oyna tugagach esa darhol
+        # (yakuniy natija yozilishi uchun). Kripto (MEXC) avvalgidek tez.
+        deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
+        if row["market"] != "crypto" and now < deadline:
+            if time.monotonic() - _LIVE_AT.get(row["id"], 0.0) < 45:
+                continue
+            _LIVE_AT[row["id"]] = time.monotonic()
         # Hajm portlashi (surge) uchun bir marta (post vaqtida) hisoblangan
         # Volume/Volume Delta profili bo'lsa — QAYTA SO'RALMAYDI (MEXC
         # tezlik chegarasiga xavf), bazadan o'qilib qayta ishlatiladi,
@@ -9873,9 +9873,9 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await _paced_media_edit(ctx.bot, config.NEWS_CHANNEL_ID, row["message_id"],
                                 photo, buttons, row["caption"])
 
-        deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
         if now >= deadline:
             await db.finalize_news_outcome(row["id"], live_pct)
+            _LIVE_AT.pop(row["id"], None)
 
 
 async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:

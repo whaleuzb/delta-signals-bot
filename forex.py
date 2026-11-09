@@ -138,7 +138,42 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
     return await time_series(_api_symbol(symbol), start_ms, limit, tf, end_ms)
 
 
+# 307: bepul reja daqiqasiga 8 so'rov. 429 dan keyin 60 s hech narsa so'ralmaydi (har
+# urinish limitni yana yeydi va logni to'ldiradi); bir xil so'rov 20 s keshdan beriladi
+# (jonli grafik, Mini App va kuzatuv bir paytda bir xil shamlarni so'raydi).
+_TS_TTL = 20.0
+_ts_cache: dict[tuple, tuple[float, list]] = {}
+_cooldown_until = 0.0
+
+
+def _limited() -> bool:
+    return time.monotonic() < _cooldown_until
+
+
+def _hit_limit() -> None:
+    global _cooldown_until
+    if not _limited():
+        log.warning("Twelve Data rate limit — 60 s kutamiz")
+    _cooldown_until = time.monotonic() + 60
+
+
 async def time_series(api_symbol: str, start_ms: int, limit: int = 500,
+                       tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
+    key = (api_symbol, tf, limit, start_ms // 60_000, (end_ms // 60_000) if end_ms else None)
+    hit = _ts_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _TS_TTL:
+        return hit[1]
+    if _limited():
+        return []
+    out = await _time_series(api_symbol, start_ms, limit, tf, end_ms)
+    if out:
+        if len(_ts_cache) > 300:
+            _ts_cache.clear()
+        _ts_cache[key] = (time.monotonic(), out)
+    return out
+
+
+async def _time_series(api_symbol: str, start_ms: int, limit: int = 500,
                        tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
     """Twelve Data /time_series — forex va AKSIYALAR uchun umumiy.
 
@@ -159,9 +194,12 @@ async def time_series(api_symbol: str, start_ms: int, limit: int = 500,
         params["end_date"] = end.strftime("%Y-%m-%d %H:%M:%S")
     r = await _client.get("/time_series", params=params)
     if r.status_code == 429:
-        log.warning("Twelve Data rate limit — kutamiz")
+        _hit_limit()
         return []
     data = r.json()
+    if isinstance(data, dict) and data.get("code") == 429:     # limit JSON ichida ham keladi
+        _hit_limit()
+        return []
     if not isinstance(data, dict) or data.get("status") == "error":
         # Bozor yopiq (dam olish kuni) yoki boshqa xato bo'lsa ham shu yo'l bilan
         # keladi — bo'sh ro'yxat qaytarish yetarli, tracker keyingi safar davom etadi.
@@ -208,11 +246,20 @@ async def price(api_symbol: str, fresh: bool = False) -> float | None:
         hit = _price_cache.get(symbol)
         if hit and (time.monotonic() - hit[0]) < _PRICE_TTL:
             return hit[1]
+    if _limited():
+        hit = _price_cache.get(symbol)
+        return hit[1] if hit and (time.monotonic() - hit[0]) < 120 else None
     r = await _client.get("/price", params={
         "symbol": symbol, "apikey": config.TWELVE_DATA_API_KEY})
+    if r.status_code == 429:
+        _hit_limit()
+        return None
     if r.status_code != 200:
         return None
     data = r.json()
+    if isinstance(data, dict) and data.get("code") == 429:
+        _hit_limit()
+        return None
     if "price" not in data:
         return None
     price = float(data["price"])

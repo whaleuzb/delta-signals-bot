@@ -29,7 +29,6 @@ import config
 # bu yerda faqat jadval va qoidalar, reyting dipfunded.com/tournament da.
 TOUR_FIRST = datetime(2026, 10, 27, 16, 0, tzinfo=timezone.utc)
 TOUR_PERIOD = timedelta(days=14)
-TOUR_ACCOUNT = 10_000
 TOUR_PRIZES = (100_000, 50_000, 25_000)
 
 

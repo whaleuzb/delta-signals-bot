@@ -14,6 +14,7 @@ Xavfsizlik:
 """
 import asyncio
 import json
+import time
 import logging
 import os
 
@@ -351,8 +352,31 @@ async def api_period(request):
     }, headers=NO_CACHE)
 
 
+# 307: amallar navbatini to'ldirib yuborishdan himoya — har bir odamga daqiqasiga
+# 30 ta amal (oddiy foydalanishda bunga hech qachon yetilmaydi). Har amal botda
+# ish qiladi (ba'zilari rasm chizadi), cheksiz bo'lsa bitta odam botni band qiladi.
+_ACT_LIMIT, _ACT_WINDOW = 30, 60.0
+_act_hits: dict[int, list[float]] = {}
+
+
+def _act_allowed(uid: int) -> bool:
+    now = time.monotonic()
+    hits = [t for t in _act_hits.get(uid, ()) if now - t < _ACT_WINDOW]
+    if len(hits) >= _ACT_LIMIT:
+        _act_hits[uid] = hits
+        return False
+    hits.append(now)
+    _act_hits[uid] = hits
+    if len(_act_hits) > 5000:          # eski yozuvlar xotirani yemasin
+        for k in [k for k, v in _act_hits.items() if not v or now - v[-1] > _ACT_WINDOW]:
+            _act_hits.pop(k, None)
+    return True
+
+
 async def api_act(request):
     body, uid = await _body(request)
+    if not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
     act = str(body.get("action") or "")
     if act in WS_ACTIONS:
         return await _ws_act(body, uid, act)
@@ -723,17 +747,15 @@ T = {
         "bot": "Bot", "open": "Ochiq signallar", "open_sub": "Jonli boshqaruv",
         "deposit": "Depozit", "spot": "Spot", "fut": "Futures", "stats": "Statistika",
         "stats_sub": "Natijalar", "tour": "Turnir", "tour_sub": "Oylik musobaqa",
-        "df": "Dip Funded", "df_sub": "Prop hisoblar", "soon": "Tez orada",
-        "journals": "Jurnallarim", "lang": "Til", "back_bot": "Botga qaytish", "ui_lang": "Ilova tili",
+        "df": "Dip Funded", "df_sub": "Prop hisoblar", "journals": "Jurnallarim", "lang": "Til", "back_bot": "Botga qaytish", "ui_lang": "Ilova tili",
         "top": "Top", "top_sub": "Reyting", "groups": "Guruhlar", "channels": "Kanallar",
         "top_empty": "Hozircha reytingda hech kim yo'q", "sig_w": "signal", "welcome": "Xush kelibsiz",
         "t_live": "Davom etmoqda", "t_soon": "Boshlanishiga", "t_df_sub": "Sovrinli turnir",
         "t_players": "qatnashchi", "t_place": "o'rin", "t_join": "Qatnashish", "t_board": "Reyting",
         "t_own": "TC turniri", "t_empty": "Hali qatnashchi yo'q",
         "not_public": "Sahifa ochiq emas", "subscribe": "Obuna bo'lish", "join": "Qo'shilish",
-        "equity": "Dinamika", "monthly": "Oylar bo'yicha", "position": "Pozitsiya",
-        "hidden_note": "Juftliklar — faqat a'zolarga", "recent": "Yopilgan savdolar",
-        "no_closed": "Hali yopilgan signal yo'q",
+        "equity": "Dinamika", "position": "Pozitsiya",
+        "hidden_note": "Juftliklar — faqat a'zolarga", "no_closed": "Hali yopilgan signal yo'q",
         "s_sig": "Signal", "s_wr": "Winrate", "s_net": "Natija", "s_r": "O'rtacha R", "s_liq": "Likvidatsiya",
         "months": "Oylar", "history": "Tarix", "open_s": "Ochiq",
         "tp_btn": "TP", "tps_title": "Maqsadlar (TP)", "tps_hint": "Bo'sh joy bilan: 110 120 130",
@@ -751,7 +773,7 @@ T = {
         "df_title": "Dip Funded", "df_txt": "Prop hisoblar: savdo, sotish va hisob holati botda. Turnir — Turnir bo'limida.",
         "df_buy": "Prop hisob olish", "df_accs": "Prop hisoblar", "df_none": "Hali prop hisob yo'q",
         "df_nolink": "Telegram Dip Funded akkauntiga ulanmagan", "df_link_btn": "Akkauntni ulash",
-        "df_unav": "Dip Funded hozir javob bermayapti", "df_equity": "Equity", "df_balance": "Balans",
+        "df_unav": "Dip Funded hozir javob bermayapti", "df_balance": "Balans",
         "df_free": "Bo'sh", "df_daily": "Kunlik limit", "df_maxdd": "Maks. zarar", "df_target": "Maqsad",
         "df_days": "Savdo kunlari", "df_pos": "Pozitsiyalar", "df_orders": "Limit buyruqlar",
         "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
@@ -767,17 +789,17 @@ T = {
         "ref_new": "Yangi kod ({mn}–{mx} belgi)", "ref_share_txt": "Trade Controller — signallar natijasini kuzatish boti",
         "man_fill": "Juftlik, stop va TP ni to'ldiring",
         "pairs": "Juftliklar",
-        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_out_ask": "Barcha {n} DIP ni chiqarishga so'rov yuborilsinmi?", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip": "DIP", "dip_rank": "Reyting", "dip_rank_sub": "Eng ko'p DIP yig'ganlar", "dip_refs": "taklif", "dip_you": "Siz", "dip_empty": "Hali hech kim DIP yig'magan", "dip_invite": "Do'st taklif qilish", "dip_more": "Taklif sahifasi", "earn_title": "DIP Earn", "earn_sub": "Vazifalarni bajaring — har biri uchun DIP oling. Obuna bot orqali tekshiriladi va 3, 7 kundan keyin qayta tekshiriladi: chiqib ketsangiz DIP qaytarib olinadi.", "earn_done": "Bajarildi", "earn_check": "Tekshirish", "earn_go": "Bajarish", "earn_people": "kishi", "earn_verified": "tekshiriladi", "earn_empty": "Hozircha vazifalar yo'q", "earn_apply_btn": "Hamkor bo'lish", "earn_apply_title": "Hamkor bo'lish", "earn_apply_sub": "Kanalingiz, guruhingiz yoki botingiz barcha foydalanuvchilarga DIP vazifasi sifatida ko'rinadi.", "earn_price": "Joylashtirish narxi", "earn_once": "1 oy", "earn_aud": "Auditoriya (jonli raqamlar)", "earn_a_users": "Foydalanuvchilar", "earn_a_m30": "30 kunda faol", "earn_a_d7": "7 kunda faol", "earn_a_d1": "Bugun faol", "earn_a_groups": "Signal guruhlari", "earn_a_dip": "DIP yig'uvchilar", "earn_f1": "Hammasi jonli auditoriya — botlar emas, Telegram'dagi haqiqiy treyderlar", "earn_f2": "DIP faqat obuna bo'lgandan keyin beriladi — bot har birini tekshiradi", "earn_f3": "Auditoriya: kripto va forex treyderlar, signal guruhlari egalari va a'zolari", "earn_f4": "Vazifa DIP bo'limida 1 oy davomida barcha foydalanuvchilarga ko'rinadi", "earn_k_channel": "Kanal", "earn_k_group": "Guruh", "earn_note": "Izoh yoki aloqa (ixtiyoriy)", "earn_send": "Ariza yuborish", "earn_need": "Manzilni kiriting", "earn_def_channel": "Kanalga obuna bo'ling va obunani saqlang", "earn_def_group": "Guruhga qo'shiling", "earn_def_bot": "Botni oching va /start bosing", "earn_def_link": "Saytga kiring va tanishib chiqing", "t_upnl": "Unrealized PnL (USDT)", "t_rpnl": "Realized PnL", "t_roe": "ROE", "t_margin": "Marja", "t_notional": "Pozitsiya hajmi", "t_qty": "Miqdor", "t_mark": "Mark narx", "t_avg": "O'rtacha kirish", "t_liq": "Likvidatsiya", "t_closed": "Yopilgan qism", "t_opened": "Ochilgan", "t_risk": "SL'da", "t_reward": "Keyingi TP'da", "t_rr": "R:R", "t_nosize": "Summa kiritilmagan — natija faqat % da. $ uchun «Hajm»ni kiriting", "t_pos": "Pozitsiya", "t_total": "Jami natija", "t_tab_pos": "Pozitsiya", "t_tab_ord": "Buyurtmalar", "t_more": "Batafsil", "t_vol": "Hajm (USDT)", "t_entry_px": "Kirish narxi", "t_now": "Joriy narx", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "Kutilayotgan buyurtma yo'q", "t_lim_add": "Limit (qo'shimcha kirish)", "t_entry_ord": "Limit kirish", "t_tab_hist": "Tarix", "t_created": "Signal yaratildi", "t_open_ev": "Pozitsiya ochildi", "t_no_hist": "Hozircha hodisa yo'q", "t_share": "Ulashish", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
+        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip": "DIP", "dip_rank": "Reyting", "dip_rank_sub": "Eng ko'p DIP yig'ganlar", "dip_refs": "taklif", "dip_you": "Siz", "dip_empty": "Hali hech kim DIP yig'magan", "dip_invite": "Do'st taklif qilish", "earn_title": "DIP Earn", "earn_sub": "Vazifalarni bajaring — har biri uchun DIP oling. Obuna bot orqali tekshiriladi va 3, 7 kundan keyin qayta tekshiriladi: chiqib ketsangiz DIP qaytarib olinadi.", "earn_done": "Bajarildi", "earn_check": "Tekshirish", "earn_go": "Bajarish", "earn_people": "kishi", "earn_verified": "tekshiriladi", "earn_empty": "Hozircha vazifalar yo'q", "earn_apply_btn": "Hamkor bo'lish", "earn_apply_title": "Hamkor bo'lish", "earn_apply_sub": "Kanalingiz, guruhingiz yoki botingiz barcha foydalanuvchilarga DIP vazifasi sifatida ko'rinadi.", "earn_price": "Joylashtirish narxi", "earn_once": "1 oy", "earn_aud": "Auditoriya (jonli raqamlar)", "earn_a_users": "Foydalanuvchilar", "earn_a_m30": "30 kunda faol", "earn_a_d7": "7 kunda faol", "earn_a_d1": "Bugun faol", "earn_a_groups": "Signal guruhlari", "earn_a_dip": "DIP yig'uvchilar", "earn_f1": "Hammasi jonli auditoriya — botlar emas, Telegram'dagi haqiqiy treyderlar", "earn_f2": "DIP faqat obuna bo'lgandan keyin beriladi — bot har birini tekshiradi", "earn_f3": "Auditoriya: kripto va forex treyderlar, signal guruhlari egalari va a'zolari", "earn_f4": "Vazifa DIP bo'limida 1 oy davomida barcha foydalanuvchilarga ko'rinadi", "earn_k_channel": "Kanal", "earn_k_group": "Guruh", "earn_note": "Izoh yoki aloqa (ixtiyoriy)", "earn_send": "Ariza yuborish", "earn_need": "Manzilni kiriting", "earn_def_channel": "Kanalga obuna bo'ling va obunani saqlang", "earn_def_group": "Guruhga qo'shiling", "earn_def_bot": "Botni oching va /start bosing", "earn_def_link": "Saytga kiring va tanishib chiqing", "t_rpnl": "Realized PnL", "t_margin": "Marja", "t_notional": "Pozitsiya hajmi", "t_qty": "Miqdor", "t_liq": "Likvidatsiya", "t_closed": "Yopilgan qism", "t_opened": "Ochilgan", "t_risk": "SL'da", "t_reward": "Keyingi TP'da", "t_rr": "R:R", "t_nosize": "Summa kiritilmagan — natija faqat % da. $ uchun «Hajm»ni kiriting", "t_total": "Jami natija", "t_tab_pos": "Pozitsiya", "t_tab_ord": "Buyurtmalar", "t_more": "Batafsil", "t_vol": "Hajm (USDT)", "t_entry_px": "Kirish narxi", "t_now": "Joriy narx", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "Kutilayotgan buyurtma yo'q", "t_lim_add": "Limit (qo'shimcha kirish)", "t_entry_ord": "Limit kirish", "t_tab_hist": "Tarix", "t_created": "Signal yaratildi", "t_open_ev": "Pozitsiya ochildi", "t_no_hist": "Hozircha hodisa yo'q", "t_share": "Ulashish", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
         "confirm_close": "Pozitsiyani to'liq yopasizmi?", "confirm_cancel": "Limitni bekor qilasizmi?",
         "confirm_pc": "{p}% qismini yopasizmi?", "wait": "Bajarilmoqda…",
-        "pending": "Kutilmoqda", "nows": "Sizda hali jurnal yo'q. Botda /start bosing.",
-        "only_tg": "Bu sahifa Telegram ichida ochiladi.", "personal": "Shaxsiy jurnal",
+        "nows": "Sizda hali jurnal yo'q. Botda /start bosing.",
+        "personal": "Shaxsiy jurnal",
         "channel": "Kanal", "group": "Guruh", "slow": "Bot hozir band — birozdan keyin qayta urinib ko'ring.", "rc_share": "Ulashish", "rc_post": "Postni ochish",
         "pnl_total": "Ochiq natija", "open_n": "{n} ta ochiq",
-        "goto_bot": "Botda ochish", "invested": "Summa", "limit": "Limit",
+        "invested": "Summa", "limit": "Limit",
         "save": "Saqlash", "spot_dep": "Spot depozit", "fut_dep": "Futures depozit",
         "best": "Eng yaxshi pozitsiya", "busy": "Band summa",
     },
@@ -785,17 +807,15 @@ T = {
         "bot": "Бот", "open": "Открытые сигналы", "open_sub": "Живое управление",
         "deposit": "Депозит", "spot": "Спот", "fut": "Фьючерсы", "stats": "Статистика",
         "stats_sub": "Результаты", "tour": "Турнир", "tour_sub": "Ежемесячный конкурс",
-        "df": "Dip Funded", "df_sub": "Проп-счета", "soon": "Скоро",
-        "journals": "Мои журналы", "lang": "Язык", "back_bot": "Вернуться в бот", "ui_lang": "Язык приложения",
+        "df": "Dip Funded", "df_sub": "Проп-счета", "journals": "Мои журналы", "lang": "Язык", "back_bot": "Вернуться в бот", "ui_lang": "Язык приложения",
         "top": "Топ", "top_sub": "Рейтинг", "groups": "Группы", "channels": "Каналы",
         "top_empty": "В рейтинге пока никого", "sig_w": "сигн.", "welcome": "Добро пожаловать",
         "t_live": "Идёт", "t_soon": "До начала", "t_df_sub": "Турнир с призами",
         "t_players": "участн.", "t_place": "место", "t_join": "Участвовать", "t_board": "Рейтинг",
         "t_own": "Турнир TC", "t_empty": "Пока нет участников",
         "not_public": "Страница не открыта", "subscribe": "Подписаться", "join": "Вступить",
-        "equity": "Динамика", "monthly": "По месяцам", "position": "Позиция",
-        "hidden_note": "Пары — только участникам", "recent": "Закрытые сделки",
-        "no_closed": "Пока нет закрытых сигналов",
+        "equity": "Динамика", "position": "Позиция",
+        "hidden_note": "Пары — только участникам", "no_closed": "Пока нет закрытых сигналов",
         "s_sig": "Сигналы", "s_wr": "Винрейт", "s_net": "Итог", "s_r": "Средний R", "s_liq": "Ликвидации",
         "months": "Месяцы", "history": "История", "open_s": "Открытые",
         "tp_btn": "TP", "tps_title": "Цели (TP)", "tps_hint": "Через пробел: 110 120 130",
@@ -813,7 +833,7 @@ T = {
         "df_title": "Dip Funded", "df_txt": "Проп-счета: торговля и состояние счёта в боте. Турнир — во вкладке Турнир.",
         "df_buy": "Купить проп-счёт", "df_accs": "Проп-счета", "df_none": "Пока нет проп-счетов",
         "df_nolink": "Telegram не привязан к Dip Funded", "df_link_btn": "Привязать аккаунт",
-        "df_unav": "Dip Funded сейчас не отвечает", "df_equity": "Equity", "df_balance": "Баланс",
+        "df_unav": "Dip Funded сейчас не отвечает", "df_balance": "Баланс",
         "df_free": "Свободно", "df_daily": "Дневной лимит", "df_maxdd": "Макс. просадка", "df_target": "Цель",
         "df_days": "Торговые дни", "df_pos": "Позиции", "df_orders": "Лимитные ордера",
         "df_term": "Терминал", "df_inbot": "Управлять в боте",
@@ -829,17 +849,17 @@ T = {
         "ref_new": "Новый код ({mn}–{mx} символов)", "ref_share_txt": "Trade Controller — бот для учёта результатов сигналов",
         "man_fill": "Заполните пару, стоп и TP",
         "pairs": "Пары",
-        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_out_ask": "Отправить заявку на вывод всех {n} DIP?", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip": "DIP", "dip_rank": "Рейтинг", "dip_rank_sub": "Больше всего DIP", "dip_refs": "пригл.", "dip_you": "Вы", "dip_empty": "Пока никто не собрал DIP", "dip_invite": "Пригласить друга", "dip_more": "Страница приглашений", "earn_title": "DIP Earn", "earn_sub": "Выполняйте задания — за каждое DIP. Подписка проверяется ботом и повторно через 3 и 7 дней: при отписке DIP списываются.", "earn_done": "Выполнено", "earn_check": "Проверить", "earn_go": "Выполнить", "earn_people": "чел.", "earn_verified": "с проверкой", "earn_empty": "Пока заданий нет", "earn_apply_btn": "Стать партнёром", "earn_apply_title": "Стать партнёром", "earn_apply_sub": "Ваш канал, группа или бот будет виден всем пользователям как DIP-задание.", "earn_price": "Цена размещения", "earn_once": "1 месяц", "earn_aud": "Аудитория (живые цифры)", "earn_a_users": "Пользователи", "earn_a_m30": "Активны 30 дн.", "earn_a_d7": "Активны 7 дн.", "earn_a_d1": "Активны сегодня", "earn_a_groups": "Сигнальные группы", "earn_a_dip": "Собирают DIP", "earn_f1": "Только живая аудитория — не боты, реальные трейдеры в Telegram", "earn_f2": "DIP даются только после подписки — бот проверяет каждого", "earn_f3": "Аудитория: крипто- и форекс-трейдеры, владельцы и участники сигнальных групп", "earn_f4": "Задание видно всем в разделе DIP в течение 1 месяца", "earn_k_channel": "Канал", "earn_k_group": "Группа", "earn_note": "Комментарий или контакт (необяз.)", "earn_send": "Отправить заявку", "earn_need": "Укажите адрес", "earn_def_channel": "Подпишитесь на канал и оставайтесь подписаны", "earn_def_group": "Вступите в группу", "earn_def_bot": "Откройте бота и нажмите /start", "earn_def_link": "Перейдите на сайт и ознакомьтесь", "t_upnl": "Нереализ. PnL (USDT)", "t_rpnl": "Реализ. PnL", "t_roe": "ROE", "t_margin": "Маржа", "t_notional": "Размер позиции", "t_qty": "Кол-во", "t_mark": "Марк. цена", "t_avg": "Ср. вход", "t_liq": "Ликвидация", "t_closed": "Закрыто", "t_opened": "Открыта", "t_risk": "На SL", "t_reward": "На след. TP", "t_rr": "R:R", "t_nosize": "Сумма не указана — результат только в %. Для $ укажите «Объём»", "t_pos": "Позиция", "t_total": "Итог", "t_tab_pos": "Позиция", "t_tab_ord": "Ордера", "t_more": "Подробнее", "t_vol": "Объём (USDT)", "t_entry_px": "Цена входа", "t_now": "Текущая цена", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "Нет ожидающих ордеров", "t_lim_add": "Лимит (доп. вход)", "t_entry_ord": "Лимитный вход", "t_tab_hist": "История", "t_created": "Сигнал создан", "t_open_ev": "Позиция открыта", "t_no_hist": "Пока событий нет", "t_share": "Поделиться", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
+        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip": "DIP", "dip_rank": "Рейтинг", "dip_rank_sub": "Больше всего DIP", "dip_refs": "пригл.", "dip_you": "Вы", "dip_empty": "Пока никто не собрал DIP", "dip_invite": "Пригласить друга", "earn_title": "DIP Earn", "earn_sub": "Выполняйте задания — за каждое DIP. Подписка проверяется ботом и повторно через 3 и 7 дней: при отписке DIP списываются.", "earn_done": "Выполнено", "earn_check": "Проверить", "earn_go": "Выполнить", "earn_people": "чел.", "earn_verified": "с проверкой", "earn_empty": "Пока заданий нет", "earn_apply_btn": "Стать партнёром", "earn_apply_title": "Стать партнёром", "earn_apply_sub": "Ваш канал, группа или бот будет виден всем пользователям как DIP-задание.", "earn_price": "Цена размещения", "earn_once": "1 месяц", "earn_aud": "Аудитория (живые цифры)", "earn_a_users": "Пользователи", "earn_a_m30": "Активны 30 дн.", "earn_a_d7": "Активны 7 дн.", "earn_a_d1": "Активны сегодня", "earn_a_groups": "Сигнальные группы", "earn_a_dip": "Собирают DIP", "earn_f1": "Только живая аудитория — не боты, реальные трейдеры в Telegram", "earn_f2": "DIP даются только после подписки — бот проверяет каждого", "earn_f3": "Аудитория: крипто- и форекс-трейдеры, владельцы и участники сигнальных групп", "earn_f4": "Задание видно всем в разделе DIP в течение 1 месяца", "earn_k_channel": "Канал", "earn_k_group": "Группа", "earn_note": "Комментарий или контакт (необяз.)", "earn_send": "Отправить заявку", "earn_need": "Укажите адрес", "earn_def_channel": "Подпишитесь на канал и оставайтесь подписаны", "earn_def_group": "Вступите в группу", "earn_def_bot": "Откройте бота и нажмите /start", "earn_def_link": "Перейдите на сайт и ознакомьтесь", "t_rpnl": "Реализ. PnL", "t_margin": "Маржа", "t_notional": "Размер позиции", "t_qty": "Кол-во", "t_liq": "Ликвидация", "t_closed": "Закрыто", "t_opened": "Открыта", "t_risk": "На SL", "t_reward": "На след. TP", "t_rr": "R:R", "t_nosize": "Сумма не указана — результат только в %. Для $ укажите «Объём»", "t_total": "Итог", "t_tab_pos": "Позиция", "t_tab_ord": "Ордера", "t_more": "Подробнее", "t_vol": "Объём (USDT)", "t_entry_px": "Цена входа", "t_now": "Текущая цена", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "Нет ожидающих ордеров", "t_lim_add": "Лимит (доп. вход)", "t_entry_ord": "Лимитный вход", "t_tab_hist": "История", "t_created": "Сигнал создан", "t_open_ev": "Позиция открыта", "t_no_hist": "Пока событий нет", "t_share": "Поделиться", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
         "confirm_close": "Закрыть позицию полностью?", "confirm_cancel": "Отменить лимит?",
         "confirm_pc": "Закрыть {p}%?", "wait": "Выполняется…",
-        "pending": "Ожидание", "nows": "У вас ещё нет журнала. Нажмите /start в боте.",
-        "only_tg": "Эта страница открывается внутри Telegram.", "personal": "Личный журнал",
+        "nows": "У вас ещё нет журнала. Нажмите /start в боте.",
+        "personal": "Личный журнал",
         "channel": "Канал", "group": "Группа", "slow": "Бот занят — попробуйте чуть позже.", "rc_share": "Поделиться", "rc_post": "Открыть пост",
         "pnl_total": "Открытый результат", "open_n": "{n} открыто",
-        "goto_bot": "Открыть в боте", "invested": "Сумма", "limit": "Лимит",
+        "invested": "Сумма", "limit": "Лимит",
         "save": "Сохранить", "spot_dep": "Спот депозит", "fut_dep": "Фьючерс депозит",
         "best": "Лучшая позиция", "busy": "В позициях",
     },
@@ -847,17 +867,15 @@ T = {
         "bot": "Bot", "open": "Open signals", "open_sub": "Live controls",
         "deposit": "Deposit", "spot": "Spot", "fut": "Futures", "stats": "Statistics",
         "stats_sub": "Results", "tour": "Tournament", "tour_sub": "Monthly contest",
-        "df": "Dip Funded", "df_sub": "Prop accounts", "soon": "Soon",
-        "journals": "My journals", "lang": "Language", "back_bot": "Back to bot", "ui_lang": "App language",
+        "df": "Dip Funded", "df_sub": "Prop accounts", "journals": "My journals", "lang": "Language", "back_bot": "Back to bot", "ui_lang": "App language",
         "top": "Top", "top_sub": "Ranking", "groups": "Groups", "channels": "Channels",
         "top_empty": "Nobody in the ranking yet", "sig_w": "signals", "welcome": "Welcome",
         "t_live": "Live", "t_soon": "Starts in", "t_df_sub": "Prize tournament",
         "t_players": "players", "t_place": "place", "t_join": "Join", "t_board": "Leaderboard",
         "t_own": "TC tournament", "t_empty": "No players yet",
         "not_public": "Page is not public", "subscribe": "Subscribe", "join": "Join",
-        "equity": "Equity", "monthly": "Monthly", "position": "Position",
-        "hidden_note": "Pairs — members only", "recent": "Closed trades",
-        "no_closed": "No closed signals yet",
+        "equity": "Equity", "position": "Position",
+        "hidden_note": "Pairs — members only", "no_closed": "No closed signals yet",
         "s_sig": "Signals", "s_wr": "Winrate", "s_net": "Result", "s_r": "Avg R", "s_liq": "Liquidations",
         "months": "Months", "history": "History", "open_s": "Open",
         "tp_btn": "TP", "tps_title": "Targets (TP)", "tps_hint": "Space-separated: 110 120 130",
@@ -875,7 +893,7 @@ T = {
         "df_title": "Dip Funded", "df_txt": "Prop accounts: trading and status in the bot. Tournament — in the Tournament tab.",
         "df_buy": "Get a prop account", "df_accs": "Prop accounts", "df_none": "No prop accounts yet",
         "df_nolink": "Telegram is not linked to Dip Funded", "df_link_btn": "Link account",
-        "df_unav": "Dip Funded is not responding", "df_equity": "Equity", "df_balance": "Balance",
+        "df_unav": "Dip Funded is not responding", "df_balance": "Balance",
         "df_free": "Free", "df_daily": "Daily limit", "df_maxdd": "Max loss", "df_target": "Target",
         "df_days": "Trading days", "df_pos": "Positions", "df_orders": "Limit orders",
         "df_term": "Trading terminal", "df_inbot": "Manage in bot",
@@ -891,17 +909,17 @@ T = {
         "ref_new": "New code ({mn}–{mx} chars)", "ref_share_txt": "Trade Controller — signal results tracking bot",
         "man_fill": "Fill in pair, stop and TP",
         "pairs": "Pairs",
-        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_out_ask": "Send a request to withdraw all {n} DIP?", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip": "DIP", "dip_rank": "Ranking", "dip_rank_sub": "Most DIP collected", "dip_refs": "invites", "dip_you": "You", "dip_empty": "No one has collected DIP yet", "dip_invite": "Invite a friend", "dip_more": "Invite page", "earn_title": "DIP Earn", "earn_sub": "Complete tasks — earn DIP for each. Subscriptions are checked by the bot and again after 3 and 7 days: leave and the DIP is taken back.", "earn_done": "Done", "earn_check": "Check", "earn_go": "Start", "earn_people": "people", "earn_verified": "verified", "earn_empty": "No tasks yet", "earn_apply_btn": "Become a partner", "earn_apply_title": "Become a partner", "earn_apply_sub": "Your channel, group or bot is shown to every user as a DIP task.", "earn_price": "Listing price", "earn_once": "1 month", "earn_aud": "Audience (live numbers)", "earn_a_users": "Users", "earn_a_m30": "Active 30d", "earn_a_d7": "Active 7d", "earn_a_d1": "Active today", "earn_a_groups": "Signal groups", "earn_a_dip": "DIP collectors", "earn_f1": "100% live audience — not bots, real traders on Telegram", "earn_f2": "DIP is given only after subscribing — the bot checks everyone", "earn_f3": "Audience: crypto & forex traders, signal group owners and members", "earn_f4": "The task is visible to everyone in the DIP section for 1 month", "earn_k_channel": "Channel", "earn_k_group": "Group", "earn_note": "Note or contact (optional)", "earn_send": "Send application", "earn_need": "Enter the address", "earn_def_channel": "Subscribe to the channel and stay subscribed", "earn_def_group": "Join the group", "earn_def_bot": "Open the bot and press /start", "earn_def_link": "Visit the website and explore it", "t_upnl": "Unrealized PnL (USDT)", "t_rpnl": "Realized PnL", "t_roe": "ROE", "t_margin": "Margin", "t_notional": "Position size", "t_qty": "Qty", "t_mark": "Mark price", "t_avg": "Avg entry", "t_liq": "Liquidation", "t_closed": "Closed part", "t_opened": "Opened", "t_risk": "At SL", "t_reward": "At next TP", "t_rr": "R:R", "t_nosize": "No amount set — result in % only. Set «Size» for $", "t_pos": "Position", "t_total": "Total", "t_tab_pos": "Position", "t_tab_ord": "Orders", "t_more": "Details", "t_vol": "Size (USDT)", "t_entry_px": "Entry price", "t_now": "Last price", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "No pending orders", "t_lim_add": "Limit (add entry)", "t_entry_ord": "Limit entry", "t_tab_hist": "History", "t_created": "Signal created", "t_open_ev": "Position opened", "t_no_hist": "No events yet", "t_share": "Share", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
+        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip": "DIP", "dip_rank": "Ranking", "dip_rank_sub": "Most DIP collected", "dip_refs": "invites", "dip_you": "You", "dip_empty": "No one has collected DIP yet", "dip_invite": "Invite a friend", "earn_title": "DIP Earn", "earn_sub": "Complete tasks — earn DIP for each. Subscriptions are checked by the bot and again after 3 and 7 days: leave and the DIP is taken back.", "earn_done": "Done", "earn_check": "Check", "earn_go": "Start", "earn_people": "people", "earn_verified": "verified", "earn_empty": "No tasks yet", "earn_apply_btn": "Become a partner", "earn_apply_title": "Become a partner", "earn_apply_sub": "Your channel, group or bot is shown to every user as a DIP task.", "earn_price": "Listing price", "earn_once": "1 month", "earn_aud": "Audience (live numbers)", "earn_a_users": "Users", "earn_a_m30": "Active 30d", "earn_a_d7": "Active 7d", "earn_a_d1": "Active today", "earn_a_groups": "Signal groups", "earn_a_dip": "DIP collectors", "earn_f1": "100% live audience — not bots, real traders on Telegram", "earn_f2": "DIP is given only after subscribing — the bot checks everyone", "earn_f3": "Audience: crypto & forex traders, signal group owners and members", "earn_f4": "The task is visible to everyone in the DIP section for 1 month", "earn_k_channel": "Channel", "earn_k_group": "Group", "earn_note": "Note or contact (optional)", "earn_send": "Send application", "earn_need": "Enter the address", "earn_def_channel": "Subscribe to the channel and stay subscribed", "earn_def_group": "Join the group", "earn_def_bot": "Open the bot and press /start", "earn_def_link": "Visit the website and explore it", "t_rpnl": "Realized PnL", "t_margin": "Margin", "t_notional": "Position size", "t_qty": "Qty", "t_liq": "Liquidation", "t_closed": "Closed part", "t_opened": "Opened", "t_risk": "At SL", "t_reward": "At next TP", "t_rr": "R:R", "t_nosize": "No amount set — result in % only. Set «Size» for $", "t_total": "Total", "t_tab_pos": "Position", "t_tab_ord": "Orders", "t_more": "Details", "t_vol": "Size (USDT)", "t_entry_px": "Entry price", "t_now": "Last price", "t_pnl": "P&L (USDT)", "t_roi": "ROI", "t_no_ord": "No pending orders", "t_lim_add": "Limit (add entry)", "t_entry_ord": "Limit entry", "t_tab_hist": "History", "t_created": "Signal created", "t_open_ev": "Position opened", "t_no_hist": "No events yet", "t_share": "Share", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",
         "confirm_close": "Close the whole position?", "confirm_cancel": "Cancel the limit order?",
         "confirm_pc": "Close {p}%?", "wait": "Working…",
-        "pending": "Pending", "nows": "No journal yet. Press /start in the bot.",
-        "only_tg": "Open this page inside Telegram.", "personal": "Personal journal",
+        "nows": "No journal yet. Press /start in the bot.",
+        "personal": "Personal journal",
         "channel": "Channel", "group": "Group", "slow": "Bot is busy — try again shortly.", "rc_share": "Share", "rc_post": "Open post",
         "pnl_total": "Open result", "open_n": "{n} open",
-        "goto_bot": "Open in bot", "invested": "Size", "limit": "Limit",
+        "invested": "Size", "limit": "Limit",
         "save": "Save", "spot_dep": "Spot deposit", "fut_dep": "Futures deposit",
         "best": "Best position", "busy": "In positions",
     },
