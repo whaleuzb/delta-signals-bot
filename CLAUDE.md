@@ -7793,3 +7793,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Telegram rasmni URL bo'yicha keshlaydi, shuning uchun `_app_refshare` dagi URL `invite.jpg?v=2` qilindi.
 - `ref.share_caption` ga "💎 Taklif uchun DIP token — Dip Funded tokeni" qatori (uz/ru/en).
 - Rasmdagi "+5 DIP" qattiq yozilgan: `DIP_PER_REF` o'zgarsa rasmni ham yangilash kerak.
+
+## 305. Yopilish xabari — bitta yangi karta (albom yo'q)
+- Foydalanuvchi: "yopilgan xabar kartasi ham hozirgi yangilangan kartaga o'zgartir. Ikkita albom o'rniga hozirgi yuborilsin."
+- `card.open_card(..., closed=True, r_multiple=...)`: chip "● YOPILGAN SAVDO", sarlavha `card.pnl` ("YAKUNIY PNL · ROI"), narxlar qatorida "Chiqish narxi", % ostida "$ · +1.31R".
+- `bot._card_candles(sig, closed)` — umumiy shamlar yordamchisi (ochiq karta ham shundan foydalanadi). Yopilganda TF savdo davri ≤50 shamga sig'adigan eng kichigi (5m/15m/1h/4h/1d), oyna yopilish vaqti + 2 shamda tugaydi.
+- `build_pnl_card(..., bot=)` endi `open_card(closed=True)` chiqaradi (eski `card.pnl_card` ishlatilmaydi, lekin o'chirilmadi); `/card` buyrug'i ham yangi karta beradi.
+- `send_close_result`: `send_media_group` yo'q — BITTA `send_photo` (yangi karta + matn). Karta chiqmasa — eski `chart.signal_chart`, u ham bo'lmasa oddiy matn.
+- Sinov: `test_305.py` 5/5 (albom yo'q, bitta rasm, 15m shamlar, PNG, kartasiz — grafik).

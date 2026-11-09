@@ -352,8 +352,10 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
               money: float | None, leverage: int | None, sl: float | None, tp: float | None,
               candles: list, tf: str | None, username: str | None, ws_name: str,
               logo: bytes | None, qr_url: str, qr_code: str | None, sig_id: int | None,
-              when: datetime, lang: str | None = None, bot_logo: bytes | None = None) -> io.BytesIO:
-    """Ochiq (yopilmagan) pozitsiya kartasi: Unrealized PnL (ROI), grafik, kirish/joriy/SL/TP, QR."""
+              when: datetime, lang: str | None = None, bot_logo: bytes | None = None,
+              closed: bool = False, r_multiple: float | None = None) -> io.BytesIO:
+    """Pozitsiya kartasi: ochiq (Unrealized PnL) yoki `closed=True` — yopilgan savdo (305),
+    grafik, kirish/joriy(chiqish)/SL/TP, QR."""
     acc = LIME if pnl_pct >= 0 else RED
     img = Image.new("RGBA", (OW, OH), "#050506")
     _blob(img, (-260, -320, 760, 520), "#C8CCD6", 46, 30)
@@ -370,7 +372,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     d = ImageDraw.Draw(img, "RGBA")
     bx = P + 60 + 18
     _tracked(d, (bx, P), "TRADE CONTROLLER", _f(24, bold=True), TXT, spacing=4.0)
-    lab = i18n.t("card.open", lang)
+    lab = i18n.t("card.closed" if closed else "card.open", lang)
     fch = _f(21, bold=True)
     w = d.textlength("●  " + lab, font=fch) + 36
     _chip(img, (OW - P - w, P - 6), "●  " + lab, fch, "#050506", acc)
@@ -392,7 +394,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
 
     # Unrealized PnL
     y = 256
-    _tracked(d, (P, y), i18n.t("card.upnl", lang), _f(22, bold=True), MUTED, spacing=2.4)
+    _tracked(d, (P, y), i18n.t("card.pnl" if closed else "card.upnl", lang), _f(22, bold=True), MUTED, spacing=2.4)
     pct = f"{pnl_pct:+.2f}%"
     size = 124
     fb = _f(size, bold=True)
@@ -400,9 +402,13 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
         size -= 6
         fb = _f(size, bold=True)
     d.text((P, y + 36), pct, font=fb, fill=acc)
+    parts = []
     if money is not None:
-        m = f"{'+' if money >= 0 else '−'}${abs(money):,.2f}"
-        d.text((P + 4, y + 36 + size + 14), m, font=_f(34, bold=True), fill=TXT)
+        parts.append(f"{'+' if money >= 0 else '−'}${abs(money):,.2f}")
+    if r_multiple is not None:
+        parts.append(f"{r_multiple:+.2f}R")
+    if parts:
+        d.text((P + 4, y + 36 + size + 14), "  ·  ".join(parts), font=_f(34, bold=True), fill=TXT)
 
     # Grafik paneli
     gx0, gy0, gx1, gy1 = P, 560, OW - P, 930
@@ -464,7 +470,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     # Narxlar qatori
     y = 966
     cols = [(i18n.t("card.entry", lang), _fmt_price(entry), TXT),
-            (i18n.t("card.mark", lang), _fmt_price(price), TXT),
+            (i18n.t("card.exit" if closed else "card.mark", lang), _fmt_price(price), TXT),
             ("SL", _fmt_price(sl) if sl else "—", RED if sl else MUTED),
             ("TP", _fmt_price(tp) if tp else "—", LIME if tp else MUTED)]
     cw = (OW - 2 * P) / 4

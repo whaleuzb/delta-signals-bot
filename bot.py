@@ -1368,6 +1368,31 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
+_TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+
+
+async def _card_candles(sig, closed: bool = False) -> tuple[list, str]:
+    """301/305: ulashish kartasi uchun shamlar. Ochiq — signal `chart_tf` (yo'q bo'lsa 1h)
+    bo'yicha oxirgi 70 sham. Yopilgan — savdo davri sig'adigan eng kichik TF (5m dan
+    boshlab, ≤50 sham), oyna yopilish vaqtida tugaydi. Xato bo'lsa — bo'sh ro'yxat."""
+    tf = sig["chart_tf"] if sig["chart_tf"] in _TF_MS else "1h"
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if closed and sig["closed_at"]:
+        end_ms = int(sig["closed_at"].timestamp() * 1000)
+        t0 = sig["opened_at"] or sig["created_at"]
+        span = max(0, end_ms - int(t0.timestamp() * 1000)) if t0 else 0
+        tf = next((k for k in ("5m", "15m", "1h", "4h", "1d") if span / _TF_MS[k] <= 50), "1d")
+        end_ms += 2 * _TF_MS[tf]
+    tf_ms = _TF_MS[tf]
+    try:
+        cs = await asyncio.wait_for(tracker.provider(sig["market"]).klines(
+            sig["symbol"], end_ms - 70 * tf_ms, limit=80, tf=tf, end_ms=end_ms), 10)
+        return [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs], tf
+    except Exception:
+        log.warning("Ulashish kartasi: shamlar olinmadi (#%s)", sig["id"], exc_info=True)
+        return [], tf
+
+
 _BOT_LOGO: dict = {"at": 0.0, "data": None}
 
 
@@ -1433,16 +1458,7 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
     except Exception:
         u = None
     # 301: OCHIQ pozitsiya — yangi uslubdagi karta, shamli grafik bilan (Unrealized PnL).
-    tf = sig["chart_tf"] if sig["chart_tf"] in ("1m", "5m", "15m", "1h", "4h", "1d") else "1h"
-    tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}[tf]
-    candles = []
-    try:
-        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-        cs = await asyncio.wait_for(tracker.provider(sig["market"]).klines(
-            sig["symbol"], now_ms - 70 * tf_ms, limit=80, tf=tf, end_ms=now_ms), 10)
-        candles = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs]
-    except Exception:
-        log.warning("Ulashish kartasi: shamlar olinmadi (#%s)", sig["id"], exc_info=True)
+    candles, tf = await _card_candles(sig)
     tps = [float(x) for x in (sig["tps"] or [])]
     nxt = tps[min(int(sig["tp_hit"] or 0), len(tps) - 1)] if tps else None
     alloc = float(sig["alloc_amount"]) if sig["alloc_amount"] is not None else None
@@ -1752,7 +1768,7 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
 
 
 async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None,
-                         show_id: bool = True):
+                         show_id: bool = True, bot=None):
     """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
 
     Grafik (`chart.signal_chart`) tahlil uchun — unda shamlar, darajalar,
@@ -1787,15 +1803,22 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         except Exception:
             log.warning("Karta: muallif o'qilmadi (#%s)", sig["id"], exc_info=True)
 
-    return card.pnl_card(
-        symbol=sig["symbol"], side=sig["side"],
-        entry=float(sig["entry"]), exit_price=float(sig["exit_price"]),
-        pnl_pct=float(sig["pnl_pct"]) * lev(sig), leverage=lev(sig),
-        r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
-        closed_at=sig["closed_at"].astimezone(stats.TZ),
-        username=username, ws_name=ws["name"], logo=logo,
-        qr_url=qr_url, sig_id=sig["id"] if show_id else None, market=sig["market"],
-        qr_code=code, lang=ws_lang(ws))
+    # 305: yangi uslubdagi karta (ochiq pozitsiya kartasi bilan bir xil), shamli grafik bilan.
+    candles, tf = await _card_candles(sig, closed=True)
+    L = lev(sig)
+    pnl = float(sig["pnl_pct"]) * L
+    alloc = float(sig["alloc_amount"]) if sig["alloc_amount"] is not None else None
+    tps = [float(x) for x in (sig["tps"] or [])]
+    tp = tps[min(max(int(sig["tp_hit"] or 0) - 1, 0), len(tps) - 1)] if tps else None
+    return card.open_card(
+        symbol=sig["symbol"], side=sig["side"], entry=float(sig["entry"]),
+        price=float(sig["exit_price"]), pnl_pct=pnl, money=(pnl / 100 * alloc) if alloc else None,
+        leverage=L, sl=float(sig["sl"]) if sig["sl"] is not None else None, tp=tp,
+        candles=candles, tf=tf, username=username, ws_name=ws["name"], logo=logo,
+        qr_url=qr_url, qr_code=code, sig_id=sig["id"] if show_id else None,
+        when=sig["closed_at"].astimezone(stats.TZ), lang=ws_lang(ws),
+        bot_logo=(await _bot_logo(bot)) if bot else None, closed=True,
+        r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None)
 
 
 async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:
@@ -1809,7 +1832,7 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
     "vaqtidan oldin yopilgan signalda natija kartasi kelmayabti").
     Shu sabab uchala yo'l endi SHU funksiyani chaqiradi.
 
-    Hech narsa chiqmasa ham xabar KETADI: albom -> bitta rasm -> oddiy matn.
+    305: albom yo'q — bitta rasm (yangi karta, bo'lmasa grafik), u ham bo'lmasa oddiy matn.
         try:
         await db.add_signal_event(sig["id"], txt)      # 300: terminal "Tarix"
     except Exception:
@@ -1819,37 +1842,19 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
     photo = share = None
     show_id = ws["type"] != "group"      # 220: guruh/kanalda raqam yo'q
     txt = pub(ws, txt)
-    try:
-        photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username, show_id=show_id)
-    except Exception:
-        log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
-    # Karta grafikdan MUSTAQIL: biri chiqmasa ikkinchisi baribir ketadi.
+    # 305: ALBOM o'rniga BITTA rasm — yangi uslubdagi natija kartasi (shamli grafik,
+    # kirish/chiqish, TP/SL, QR hammasi ichida). Karta chiqmasa — eski tahliliy grafik.
     try:
         share = await build_pnl_card(sig, ws, ctx.bot.username, ref_uid=ref_uid,
-                                     show_id=show_id)
+                                     show_id=show_id, bot=ctx.bot)
     except Exception:
         log.warning("Ulashish kartasi yasalmadi (#%s)", sid, exc_info=True)
-
-    # Ikkalasi ham bo'lsa bitta ALBOM: bir bildirishnoma, ikki rasm.
-    #
-    # ⚠️ InputMediaPhoto ga XOM BytesIO beriladi, tayyor InputFile EMAS —
-    # `_paced_media_edit()` dagi bilan AYNI sabab: InputMediaPhoto o'zi
-    # ichida `parse_file_input(..., attach=True)` chaqirib faylni
-    # "attach://…" havolasi bilan bog'laydi, lekin FAQAT o'zi bytes/IO
-    # obyektini o'rasa. Oldindan InputFile() bilan o'ralgan bo'lsa
-    # parse_file_input uni o'zgarishsiz qaytaradi, `attach_uri` None
-    # qolib ketadi va Telegram albomni rad etadi ("media not found") —
-    # natijada pastdagi `except` ishlab, faqat BITTA rasm ketardi, ya'ni
-    # ulashish kartasi umuman ko'rinmasdi. Fayl nomi endi `filename=`
-    # orqali beriladi.
-    album = None
-    if photo and share:
-        photo.seek(0)
-        share.seek(0)
-        album = [InputMediaPhoto(photo, filename="signal.png", caption=txt,
-                                  parse_mode=ParseMode.HTML),
-                 InputMediaPhoto(share, filename="natija.png")]
-    single = photo or share
+    if share is None:
+        try:
+            photo = await chart.signal_chart(sig, ws["name"], ctx.bot.username, show_id=show_id)
+        except Exception:
+            log.warning("Grafik yasalmadi (#%s)", sid, exc_info=True)
+    single = share or photo
 
     if ws["type"] == "group" and ws["group_chat_id"]:
         chat_id, thread_id = ws["group_chat_id"], ws["group_topic_id"]
@@ -1865,18 +1870,11 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
 
     msg = None
     try:
-        if album:
-            try:
-                msgs = await ctx.bot.send_media_group(chat_id, album, **kw)
-                msg = msgs[0] if msgs else None
-            except Exception:
-                log.warning("Albom yuborilmadi (#%s), bitta rasmga o'tamiz", sid,
-                            exc_info=True)
-        if msg is None and single:
+        if single:
             single.seek(0)
-            msg = await ctx.bot.send_photo(chat_id, InputFile(single, "signal.png"),
+            msg = await ctx.bot.send_photo(chat_id, InputFile(single, "natija.png"),
                                             caption=txt, parse_mode=ParseMode.HTML, **kw)
-        elif msg is None:
+        else:
             msg = await ctx.bot.send_message(chat_id, txt, parse_mode=ParseMode.HTML, **kw)
     except Exception:
         log.exception("Natija xabari yuborilmadi (#%s)", sid)
@@ -11069,7 +11067,7 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             # QR — buyruqni bergan odamning O'Z taklif havolasi: kartani
             # aynan u ulashadi, demak taklif ham unga yozilishi kerak.
             img = await build_pnl_card(sig, ws, ctx.bot.username,
-                                       ref_uid=update.effective_user.id)
+                                       ref_uid=update.effective_user.id, bot=ctx.bot)
         except Exception:
             log.exception("Karta yasalmadi (#%s)", sid)
             img = None

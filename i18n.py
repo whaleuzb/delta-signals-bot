@@ -3804,6 +3804,7 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "card.open": {"uz": "OCHIQ POZITSIYA", "ru": "ОТКРЫТАЯ ПОЗИЦИЯ", "en": "OPEN POSITION"},
     "card.upnl": {"uz": "UNREALIZED PNL · ROI", "ru": "НЕРЕАЛИЗ. PNL · ROI", "en": "UNREALIZED PNL · ROI"},
+    "card.pnl": {"uz": "YAKUNIY PNL · ROI", "ru": "ИТОГОВЫЙ PNL · ROI", "en": "REALIZED PNL · ROI"},
     "card.mark": {"uz": "Joriy narx", "ru": "Текущая цена", "en": "Mark price"},
     "card.closed": {
         "uz": "YOPILGAN SAVDO", "ru": "СДЕЛКА ЗАКРЫТА", "en": "CLOSED TRADE",
