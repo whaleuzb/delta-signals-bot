@@ -903,10 +903,12 @@ async def _app_newsig(ctx, uid: int, lang, a) -> tuple[bool, str]:
     err = parsing.validate(d, lang)
     if err:
         return False, err
+    # 281: taymfreym ilovada tanlanadi (sehrgardagi kabi), standart 1h.
+    tf = f.get("tf") if f.get("tf") in TF_CHOICES else "1h"
     # Guruh posti uchun bot grafigi (sehrgardagi "📈 Bot grafikni aniqlasin").
     photo = None
     try:
-        buf = await asyncio.wait_for(chart.setup_chart(d, ws["name"], ctx.bot.username, tf="1h"), 12)
+        buf = await asyncio.wait_for(chart.setup_chart(d, ws["name"], ctx.bot.username, tf=tf), 12)
         photo = buf.getvalue() if buf else None
     except Exception:
         log.warning("Mini App signali: grafik yasalmadi", exc_info=True)
@@ -915,7 +917,7 @@ async def _app_newsig(ctx, uid: int, lang, a) -> tuple[bool, str]:
         uname, fname = ch.username, ch.first_name
     except Exception:
         uname = fname = None
-    sig_id = await publish_signal(ctx, ws, d, uid, uname, fname, chart_tf="1h", photo=photo)
+    sig_id = await publish_signal(ctx, ws, d, uid, uname, fname, chart_tf=tf, photo=photo)
     msg = i18n.t("app.ns_ok", lang, sid=sig_id, sym=sym)
     # Hajm (summa) — berilgan bo'lsa va egasi bo'lsa, bo'sh depozitdan oshmasa.
     w = wsx(ws, d)

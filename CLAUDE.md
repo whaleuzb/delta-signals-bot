@@ -7584,3 +7584,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      Spot depozit → guruh statistikasi (spot) `openStats(id,'spot')`; Futures
      depozit → statistika (futures); Eng yaxshi pozitsiya → Signallar va shu
      signal kartasiga silliq aylantirib, yorug'lik bilan belgilaydi (`goSig`).
+281. **Ilovada signal kiritishda taymfreym** (1m/5m/15m/1h/4h/1d, standart
+     1h; `NS.tf` → `args.tf` → `_app_newsig`: `TF_CHOICES` dan, guruh posti
+     grafigi va `chart_tf` shu taymda — avval qattiq "1h" edi). **Ochiq
+     signallardagi kichik grafik** (`webapp._spark`) signalning `chart_tf` i
+     bo'lsa shu taymda oxirgi 110 sham (`_TF_MS`), bo'lmasa avvalgidek
+     avtomatik. Signal kartasida taym belgisi (`i.tf`, `/api/app/open` → "tf").

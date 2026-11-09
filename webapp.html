@@ -457,7 +457,7 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  if(i.can_size)a+=B('',"askSize("+sid+")",'$ '+esc(t('size_btn')));
  a+=B('d full',"act("+sid+",'close')",esc(pend?t('cancel'):t('close')));
  var lims=i.adds&&i.adds.length?'<div class="tps" style="display:flex;justify-content:space-between;align-items:center"><span><b>'+esc(t('lims'))+'</b>'+i.adds.map(fp).join(' · ')+'</span><span class="r" style="cursor:pointer;font-weight:700" onclick="act('+sid+',\'limx\')">'+esc(t('cancel'))+'</span></div>':'';
- return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
+ return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
  +'<div class="spk" id="k'+i.id+'">'+spark(i,false)+'</div><div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
  +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+lims+'<div class="acts">'+a+'</div></div>'}
 function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return f=='all'||(f=='long'&&i.side=='LONG')||(f=='short'&&i.side=='SHORT')||(f=='limit'&&i.status=='PENDING')});
@@ -667,6 +667,7 @@ function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(func
   h+=lb(t('ns_side'))+nsSeg('sd',[['LONG','LONG'],['SHORT','SHORT']],NS.side,'nsSide')}
  h+=lb(t('ns_entry_mode'))+nsSeg('m',[['market',t('ns_market')],['limit',t('ns_limit')]],NS.mode,'nsMode');
  if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal');
+ NS.tf=NS.tf||'1h';h+=lb(t('ns_tf'))+'<div class="chips" style="flex-wrap:wrap">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(NS.tf==x?' on':'')+'" onclick="nsSet(\'tf\',\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal')+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal');
  var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount')+' · '+f0(dep))+fi('amount','',NS.amount,'decimal');
  h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('ns_send'))+'</button>';
@@ -675,7 +676,7 @@ function nsKind(k){nsSet('kind',k)}function nsSide(k){nsSet('side',k)}function n
 function nsSend(){nsKeep();var b=document.getElementById('ns_go');
  var sl=num(NS.sl),tps=nums(NS.tps);if(!NS.sym||!sl||!tps.length||(NS.mode=='limit'&&!num(NS.entry))){haptic('error');toast(esc(t('man_fill')));return}
  b.disabled=true;toast(esc(t('wait')));
- api('act',{action:'newsig',args:{ws:NS.ws||S.cur,sym:NS.sym,kind:NS.kind,lev:NS.lev,side:NS.kind=='fut'?NS.side:'LONG',mode:NS.mode,entry:num(NS.entry),sl:sl,tps:tps,amount:num(NS.amount)}})
+ api('act',{action:'newsig',args:{ws:NS.ws||S.cur,sym:NS.sym,kind:NS.kind,lev:NS.lev,side:NS.kind=='fut'?NS.side:'LONG',mode:NS.mode,tf:NS.tf||'1h',entry:num(NS.entry),sl:sl,tps:tps,amount:num(NS.amount)}})
  .then(function(r){b.disabled=false;if(r.pending){toast(esc(t('slow')));return}toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
   if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';S.cur=NS.ws||S.cur;closeGroup();S.tab='home';go('signals');load()}}).catch(function(){b.disabled=false;toast('Error')})}
 

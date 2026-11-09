@@ -116,7 +116,7 @@ async def api_open(request):
             "adds": [float(a["price"]) for a in adds],
             "usd": alloc is not None, "can_size": alloc is None and dep_k is not None,
             "id": r["id"], "symbol": r["symbol"], "side": r["side"], "lev": L,
-            "status": r["status"], "market": r["market"],
+            "status": r["status"], "market": r["market"], "tf": r["chart_tf"],
             "entry": entry, "sl": _f(r["sl"]),
             "tps": [float(t) for t in (r["tps"] or [])], "tp_hit": r["tp_hit"] or 0,
             "price": price, "live": live, "alloc": alloc,
@@ -133,6 +133,8 @@ _SPARK: dict[tuple, tuple[float, list]] = {}
 _SPARK_SEM = asyncio.Semaphore(3)
 _TFS = (("5m", 300_000), ("15m", 900_000), ("1h", 3_600_000),
         ("4h", 14_400_000), ("1d", 86_400_000))
+# 281: signalga taymfreym tanlangan bo'lsa (`chart_tf`) — kichik grafik shu taymda.
+_TF_MS = {"1m": 60_000, **dict(_TFS)}
 
 
 def _spark_tf(start_ms: int, now_ms: int) -> tuple[str, int]:
@@ -147,7 +149,11 @@ async def _spark(r) -> list | None:
     import time as _t
     now = int(_t.time() * 1000)
     t0 = r["opened_at"] or r["created_at"]
-    tf, begin = _spark_tf(int(t0.timestamp() * 1000), now)
+    tf = r.get("chart_tf") if hasattr(r, "get") else None
+    if tf in _TF_MS:
+        begin = now - 110 * _TF_MS[tf]
+    else:
+        tf, begin = _spark_tf(int(t0.timestamp() * 1000), now)
     key = (r["market"], r["symbol"], tf)
     ttl = 120 if r["market"] in ("crypto", "futures", None) else 600
     hit = _SPARK.get(key)
@@ -654,7 +660,7 @@ T = {
         "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
         "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
         "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
-        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_sl": "Stop (SL)",
+        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "ns_sl": "Stop (SL)",
         "ns_tps": "Maqsadlar (TP) — bo'sh joy bilan", "ns_amount": "Summa, $ (ixtiyoriy)",
         "ns_send": "Signal berish", "ns_where": "Qayerga",
         "ref_title": "Taklif qilish", "ref_sub": "Do'stlaringizni taklif qiling — DIP yig'ing", "ref_code": "Taklif kodingiz",
@@ -716,7 +722,7 @@ T = {
         "df_term": "Терминал", "df_inbot": "Управлять в боте",
         "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
         "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
-        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_sl": "Стоп (SL)",
+        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "ns_sl": "Стоп (SL)",
         "ns_tps": "Цели (TP) — через пробел", "ns_amount": "Сумма, $ (необязательно)",
         "ns_send": "Отправить сигнал", "ns_where": "Куда",
         "ref_title": "Пригласить", "ref_sub": "Приглашайте друзей — копите DIP", "ref_code": "Ваш код",
@@ -778,7 +784,7 @@ T = {
         "df_term": "Trading terminal", "df_inbot": "Manage in bot",
         "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
         "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
-        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_sl": "Stop (SL)",
+        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "ns_sl": "Stop (SL)",
         "ns_tps": "Targets (TP) — space-separated", "ns_amount": "Size, $ (optional)",
         "ns_send": "Send signal", "ns_where": "Where",
         "ref_title": "Invite", "ref_sub": "Invite friends — earn DIP", "ref_code": "Your code",
