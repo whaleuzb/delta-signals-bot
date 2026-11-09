@@ -982,9 +982,66 @@ async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
     code, link = await referral_token(uid, ctx.bot.username)
     return True, json.dumps({"code": code, "link": link, "count": count,
                              "dip": await db.dip_balance(uid), "dip_per": config.DIP_PER_REF,
+                             "dip_min": config.DIP_MIN_OUT, "dip_pend": await db.dip_pending(uid),
                              "can_pick": can_pick_ref_code(uid, count),
                              "need": max(0, config.REF_CUSTOM_MIN - count),
                              "min": REF_CODE_MIN, "max": REF_CODE_MAX})
+
+
+async def _app_dipout(ctx, uid: int, lang) -> tuple[bool, str]:
+    """263: DIP tokenlarni chiqarish — faqat balans `DIP_MIN_OUT` (3000) dan
+    oshganda. Butun balans so'rovga o'tadi, adminlarga tasdiqlash tugmalari."""
+    r = await db.dip_withdraw_request(uid, config.DIP_MIN_OUT)
+    if r == "pending":
+        return False, i18n.t("dip.out_pending", lang)
+    if r == "low":
+        return False, i18n.t("dip.out_low", lang, min=f"{config.DIP_MIN_OUT:g}",
+                             bal=f"{await db.dip_balance(uid):g}")
+    wid, amount = r
+    try:
+        ch = await ctx.bot.get_chat(uid)
+        who = html.escape(ch.full_name or str(uid)) + (f" (@{ch.username})" if ch.username else "")
+    except Exception:
+        who = str(uid)
+    text = (f"💎 <b>DIP chiqarish so'rovi #{wid}</b>\n"
+            f"Kim: <a href=\"tg://user?id={uid}\">{who}</a> · <code>{uid}</code>\n"
+            f"Summa: <b>{amount:g} DIP</b> (≈ ${amount / 100:,.2f})\n"
+            f"Taklif qilganlari: {await db.count_referrals(uid)}")
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Bajarildi", callback_data=f"dipw:ok:{wid}", api_kwargs={"style": "success"}),
+        InlineKeyboardButton("❌ Rad etish", callback_data=f"dipw:no:{wid}", api_kwargs={"style": "danger"})]])
+    for admin in config.ADMIN_IDS:
+        try:
+            await ctx.bot.send_message(admin, text, parse_mode=ParseMode.HTML, reply_markup=kb)
+        except Exception as e:
+            log.warning("DIP so'rovi adminga yuborilmadi (%s): %s", admin, e)
+    return True, i18n.t("dip.out_sent", lang, n=f"{amount:g}")
+
+
+async def on_dip_withdraw(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """263: admin DIP chiqarish so'rovini bajardi / rad etdi."""
+    q = update.callback_query
+    if not is_admin(q.from_user.id):
+        await q.answer()
+        return
+    _, act, wid = q.data.split(":")
+    r = await db.dip_withdraw_finish(int(wid), act == "ok")
+    if not r:
+        await q.answer("Allaqachon hal qilingan", show_alert=True)
+        return
+    await q.answer("OK")
+    mark = "✅ Bajarildi" if act == "ok" else "❌ Rad etildi"
+    try:
+        await q.edit_message_text(q.message.text_html + f"\n\n<b>{mark}</b>", parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+    ulang = await user_lang(r["user_id"])
+    try:
+        await ctx.bot.send_message(r["user_id"], i18n.t(
+            "dip.out_done" if act == "ok" else "dip.out_rejected", ulang, n=f"{float(r['amount']):g}"),
+            parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
 
 
 async def _app_exec(ctx, a) -> tuple[bool, str]:
@@ -1003,6 +1060,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_ref(ctx, uid, lang, a)
     if a["action"] == "refshare":
         return await _app_refshare(ctx, uid, lang)
+    if a["action"] == "dipout":
+        return await _app_dipout(ctx, uid, lang)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -10615,6 +10674,7 @@ def main() -> None:
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
+    app.add_handler(CallbackQueryHandler(on_dip_withdraw, pattern=r"^dipw:(ok|no):\d+$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_signal_copy, pattern=r"^sigcopy:"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))

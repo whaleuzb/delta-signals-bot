@@ -233,6 +233,8 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .dipglass .db small{font-size:16px;font-weight:700;opacity:.75;margin-left:4px}
 .dipglass .du{font-size:15px;font-weight:700;color:var(--g);margin-top:6px}
 .dipglass .coin{position:absolute;top:18px;right:18px;color:#fff;opacity:.92}
+.dbar{height:8px;border-radius:99px;background:rgba(255,255,255,.08);margin-top:10px;overflow:hidden}
+.dbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,rgba(46,204,143,.55),var(--g))}
 .dippill{align-self:center;margin-top:16px;border-radius:999px;padding:7px 14px;font-size:11px;font-weight:700;color:#fff;
  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -588,7 +590,7 @@ function openRef(){tick();S.page={id:'ref'};var p=document.getElementById('page'
 function refRender(d){var p=document.getElementById('page');S.ref=d;
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('gift',22)+'</div><div><h2>'+esc(t('ref_title'))+'</h2><div class="rs">'+esc(t('ref_sub'))+'</div></div></div>';
  var per=(d.dip_per||5);
- h+=dipCard(+d.dip||0,per);
+ h+=dipCard(+d.dip||0,per)+dipOut(d);
  h+='<div class="tiles"><div class="tile2 glass rise"><div class="k">'+esc(t('ref_count'))+'</div><div class="v">'+d.count+'</div></div><div class="tile2 glass rise"><div class="k">'+esc(t('ref_code'))+'</div><div class="v" style="font-size:17px">'+esc(d.code||'—')+'</div></div></div>';
  if(d.link){h+='<div class="tile2 glass rise" style="margin-bottom:10px"><div class="k">'+esc(t('ref_link'))+'</div><div style="font-size:13px;font-weight:600;margin-top:6px;word-break:break-all">'+esc(d.link)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="refCopy()">'+ic('copy',14)+' '+esc(t('ref_copy'))+'</button><button class="btn p" onclick="refShare()">'+esc(t('ref_share'))+'</button></div></div>'}
@@ -601,6 +603,20 @@ function dipCard(bal,per){return'<div class="dipcard rise"><div class="dipglass"
  +'<div class="db">'+bal.toLocaleString('en-US',{maximumFractionDigits:2})+'<small>DIP</small></div><div class="du">≈ $'+(bal/100).toFixed(2)+'</div>'
  +'<div class="dippill">1000 DIP = $10</div></div></div>'
  +'<div class="rs rise" style="margin:-2px 4px 12px;text-align:center">'+esc(t('dip_note').replace('1000 DIP = $10 · ',''))+'</div>'}
+/* 263: tokenlarni chiqarish — faqat balans dip_min (3000) dan oshganda */
+function dipOut(d){var bal=+d.dip||0,mn=+d.dip_min||3000,pend=+d.dip_pend||0,fmt=function(x){return x.toLocaleString('en-US',{maximumFractionDigits:2})};
+ var h='<div class="tile2 glass rise dipout" style="margin-bottom:12px">';
+ if(pend>0)return h+'<div class="k">'+esc(t('dip_out'))+'</div><div style="font-size:14px;font-weight:700;margin-top:6px">'+esc(t('dip_out_pend').replace('{n}',fmt(pend)))+'</div></div>';
+ var ok=bal>=mn,pc=Math.min(100,bal/mn*100);
+ h+='<div style="display:flex;justify-content:space-between;align-items:baseline"><div class="k">'+esc(t('dip_out'))+'</div><div class="k">'+fmt(Math.min(bal,mn))+' / '+fmt(mn)+'</div></div>'
+  +'<div class="dbar"><i style="width:'+pc.toFixed(1)+'%"></i></div>';
+ if(!ok)h+='<div class="rs" style="margin-top:8px">'+esc(t('dip_out_lock').replace('{min}',fmt(mn)).replace('{n}',fmt(mn-bal)))+'</div>';
+ return h+'<button class="btn p full" style="margin-top:10px;padding:12px;font-size:14px;width:100%"'+(ok?' onclick="dipWithdraw()"':' disabled')+'>'+esc(t('dip_out'))+'</button></div>'}
+function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0;
+ confirmBox(t('dip_out_ask').replace('{n}',bal.toLocaleString('en-US',{maximumFractionDigits:2})),function(){
+  toast(esc(t('wait')));api('act',{action:'dipout'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}
+   toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
+   if(r.ok){d.dip_pend=bal;d.dip=0;refRender(d)}}).catch(function(){toast('Error')})})}
 function refCopy(){var l=S.ref&&S.ref.link;if(!l)return;try{navigator.clipboard.writeText(l).then(function(){toast(esc(t('ref_copied')));haptic('success')})}catch(e){var i=document.createElement('textarea');i.value=l;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();toast(esc(t('ref_copied')))}}
 /* 259: rasm + matn + "Botni ochish" tugmali post (Telegram shareMessage);
    eski ilovalarda — oddiy havola ulashish */

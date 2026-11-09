@@ -557,6 +557,18 @@ CREATE TABLE IF NOT EXISTS dip_ledger (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS dip_ledger_ref ON dip_ledger (ref_user) WHERE reason = 'referral';
 CREATE INDEX IF NOT EXISTS dip_ledger_user ON dip_ledger (user_id);
+-- 263: DIP chiqarish so'rovlari. So'rov paytida butun balans ledger'dan
+-- ayriladi (reason='withdraw'); admin rad etsa qaytariladi ('withdraw_refund').
+-- Bitta odamda bir vaqtda faqat bitta kutilayotgan so'rov.
+CREATE TABLE IF NOT EXISTS dip_withdrawals (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL,
+    amount     NUMERIC NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    done_at    TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS dip_wd_pending ON dip_withdrawals (user_id) WHERE status = 'pending';
 """
 
 
@@ -1068,6 +1080,46 @@ async def dip_balance(user_id: int) -> float:
     async with pool().acquire() as c:
         v = await c.fetchval("SELECT COALESCE(SUM(amount), 0) FROM dip_ledger WHERE user_id=$1", user_id)
     return float(v or 0)
+
+
+async def dip_pending(user_id: int) -> float:
+    """263: kutilayotgan chiqarish so'rovi summasi (yo'q bo'lsa 0)."""
+    async with pool().acquire() as c:
+        v = await c.fetchval("SELECT amount FROM dip_withdrawals WHERE user_id=$1 AND status='pending'", user_id)
+    return float(v or 0)
+
+
+async def dip_withdraw_request(user_id: int, min_amount: float):
+    """263: butun balansni chiqarishga so'rov. Natija: (id, summa) yoki
+    "pending" (oldingi so'rov kutilmoqda) yoki "low" (balans yetmaydi)."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            await c.execute("SELECT pg_advisory_xact_lock(7262, ($1::bigint % 2000000000)::int)", user_id)
+            if await c.fetchval("SELECT 1 FROM dip_withdrawals WHERE user_id=$1 AND status='pending'", user_id):
+                return "pending"
+            bal = await c.fetchval("SELECT COALESCE(SUM(amount), 0) FROM dip_ledger WHERE user_id=$1", user_id)
+            if float(bal or 0) < min_amount:
+                return "low"
+            wid = await c.fetchval(
+                "INSERT INTO dip_withdrawals (user_id, amount) VALUES ($1,$2) RETURNING id", user_id, bal)
+            await c.execute(
+                "INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'withdraw')", user_id, -bal)
+    return wid, float(bal)
+
+
+async def dip_withdraw_finish(wid: int, ok: bool):
+    """263: admin qarori. Kutilayotgan bo'lsa yozuvni qaytaradi, aks holda None.
+    Rad etilsa DIP balansga qaytariladi."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            r = await c.fetchrow(
+                "UPDATE dip_withdrawals SET status=$2, done_at=now() WHERE id=$1 AND status='pending' "
+                "RETURNING id, user_id, amount", wid, "done" if ok else "rejected")
+            if r and not ok:
+                await c.execute(
+                    "INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'withdraw_refund')",
+                    r["user_id"], r["amount"])
+    return r
 
 
 async def referral_stats(limit: int = 10) -> tuple[int, list[asyncpg.Record]]:

@@ -1634,6 +1634,31 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "💎 Ваш баланс DIP: <b>{bal} DIP</b> (+{n} DIP за каждое приглашение)",
         "en": "💎 Your DIP balance: <b>{bal} DIP</b> (+{n} DIP per invite)",
     },
+    "dip.out_low": {
+        "uz": "Tokenlarni chiqarish {min} DIP dan boshlab ochiladi. Hozir: {bal} DIP",
+        "ru": "Вывод токенов доступен от {min} DIP. Сейчас: {bal} DIP",
+        "en": "Token withdrawal unlocks at {min} DIP. Now: {bal} DIP",
+    },
+    "dip.out_pending": {
+        "uz": "Oldingi chiqarish so'rovingiz hali ko'rib chiqilmoqda",
+        "ru": "Ваша предыдущая заявка на вывод ещё рассматривается",
+        "en": "Your previous withdrawal request is still being reviewed",
+    },
+    "dip.out_sent": {
+        "uz": "✅ {n} DIP chiqarish so'rovi yuborildi. Admin ko'rib chiqib siz bilan bog'lanadi.",
+        "ru": "✅ Заявка на вывод {n} DIP отправлена. Админ рассмотрит и свяжется с вами.",
+        "en": "✅ Request to withdraw {n} DIP sent. The admin will review it and contact you.",
+    },
+    "dip.out_done": {
+        "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",
+        "ru": "✅ Ваша заявка на вывод {n} DIP выполнена.",
+        "en": "✅ Your request to withdraw {n} DIP is complete.",
+    },
+    "dip.out_rejected": {
+        "uz": "❌ {n} DIP chiqarish so'rovingiz rad etildi. DIP balansingizga qaytarildi.",
+        "ru": "❌ Заявка на вывод {n} DIP отклонена. DIP возвращены на баланс.",
+        "en": "❌ Your request to withdraw {n} DIP was rejected. The DIP was returned to your balance.",
+    },
     "ref.share_caption": {
         "uz": ("🚀 <b>Trade Controller</b> — signallaringiz natijasini avtomatik kuzatadigan bot\n\n"
                "✅ TP va stop avtomatik kuzatiladi\n📊 Natija % va $ da, statistika va hisobotlar\n"

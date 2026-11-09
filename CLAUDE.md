@@ -7452,3 +7452,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      muzli shisha panel (`.dipglass`, blur 22px), SVG tanga (`dipCoin`),
      katta "DIP Token" sarlavhasi, balans, "≈ $" (bal/100) va "1000 DIP = $10"
      tabletkasi. Funksiya: `dipCard(bal, per)`; `refRender` ichida chaqiriladi.
+263. **DIP tokenlarni chiqarish** — faqat balans `config.DIP_MIN_OUT` (standart
+     3000) ga yetganda. Ilova (Taklif sahifasi, DIP kartasi tagida `dipOut`):
+     progress chizig'i "135 / 3,000", 3000 gacha tugma o'chiq va "yana N DIP"
+     yoziladi; yetgach tugma yoqiladi → tasdiq → `dipout` amali. Bot
+     `_app_dipout`: `db.dip_withdraw_request` (advisory lock; butun balans
+     `dip_withdrawals` ga 'pending' bo'lib yoziladi va ledger'dan ayriladi;
+     bir vaqtda bitta so'rov) → adminlarga "✅ Bajarildi / ❌ Rad etish"
+     (`dipw:ok|no:<id>`, `on_dip_withdraw`). Rad etilsa DIP qaytariladi
+     ('withdraw_refund'), har ikki holatda foydalanuvchiga xabar. Chiqarishni
+     (Dip Funded'ga o'tkazish / token) hozircha admin qo'lda bajaradi.

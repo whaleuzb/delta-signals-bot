@@ -288,3 +288,5 @@ RESULTLINK_CHAT_ID = int(_rl) if _rl.lstrip("-").isdigit() else None
 
 # 261: har bir taklif uchun DIP (Dip Funded DIP bilan bir xil qiymat).
 DIP_PER_REF = float(os.getenv("DIP_PER_REF", "5"))
+# 263: tokenlarni chiqarish shu balansdan boshlab ochiladi.
+DIP_MIN_OUT = float(os.getenv("DIP_MIN_OUT", "3000"))
