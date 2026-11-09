@@ -7859,3 +7859,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `cmd_start` `nws_` → `_news_share`: bosgan odamga postning NUSXASI (`copy_message` — rasm va matn bilan) + tugmalar: "🚀 Botni ochish" (UNING taklif havolasi, `referral_token`) va "↗️ Do'stlarga yuborish" (`t.me/share/url?url=<taklif havolasi>&text=<post havolasi + bot tavsifi>`). Keyin yo'riqnoma (`nws.share_hint`): uzating yoki tugmani bosing, har kirgan uchun +DIP. Post topilmasa — havolali matn + o'sha tugmalar.
 - i18n: `nws.share_btn`, `nws.share_text`, `nws.share_hint`.
 - Sinov: `test_311.py` 7/7.
+
+## 312. Terminal grafigi: yorliqlar ustma-ust tushmaydi, ingichkaroq uslub
+- Foydalanuvchi (XAUUSDT 100x skrinshoti, Kirish/SL/LIQ yorliqlari ustma-ust): "Limitlar bir-birini ustiga chiqib ko'rinmay qolyabti. Shriftini kichiklashtir va raqamlarni ham kichikroq qil. Liniyalarni ham ingichka va rangini detalini kamaytir."
+- `termSvg`: chiziq o'z narxida, YORLIQ alohida (`ly`): narx bo'yicha saralanib kamida 15px oraliqqa suriladi, pastdan sig'masa yuqoriga; surilgan yorliq chiziqqa ingichka bog'lovchi bilan. Chetga mahkamlanganlar (oynadan tashqari) 16px qadam bilan; `termBind` hit-testi ham shu qadamga moslandi (9+16k).
+- Uslub: yorliq shrifti 10→8.5 (600), balandligi 18→14, ramka .6; chiziq 1.2→.8, shaffoflik .62 (sudralayotgani 1.4/1); sudrash tutqichi 30×18→22×14; o'q raqamlari 9→8, narx yorlig'i 9.5→8.5 (14px).
+- Signal terminali ham, Dip Funded terminali ham (bitta `termSvg`) shu bilan.
