@@ -536,9 +536,9 @@ function termSvg(i,g){var L=termLines(i,g),sc=termScale(g,L,i),c=g.c||[],W=TER.W
     +'<rect x="'+(cx-bw*.35).toFixed(1)+'" y="'+Math.min(Y(x[1]),Y(x[4]))+'" width="'+Math.max(1,bw*.7).toFixed(1)+'" height="'+Math.max(1,Math.abs(Y(x[1])-Y(x[4]))).toFixed(1)+'" fill="'+col+'" opacity="'+(up?.85:.8)+'"/>'});
   /* 317: kirish/chiqish belgilari — aniq vaqt va narx nuqtasida (xarid ▲ yashil ostida, sotuv ▼ qizil ustida) */
   termMarks(i).forEach(function(m){var k=-1;for(var j=n-1;j>=0;j--){if(c[j][0]<=m.t){k=j;break}}if(k<0||k<win.L-1||k>win.R+1)return;
-   var mx=(k-win.L+.5)*bw,my=+Y(m.p),s=4.2,col=m.buy?'#c2f23a':'#ff5c5c';
+   var mx=(k-win.L+.5)*bw,my=+Y(m.p),s=4.2,col=m.buy?'#ffffff':'#ffc83d';
    o+=(m.buy?'<path d="M'+mx.toFixed(1)+' '+(my+1.5).toFixed(1)+'l'+s+' '+(s*1.6).toFixed(1)+'h-'+(2*s)+'z"':'<path d="M'+mx.toFixed(1)+' '+(my-1.5).toFixed(1)+'l'+s+' -'+(s*1.6).toFixed(1)+'h-'+(2*s)+'z"')+' fill="'+col+'" stroke="#050506" stroke-width=".8"/>'
-    +'<circle cx="'+mx.toFixed(1)+'" cy="'+my.toFixed(1)+'" r="1.6" fill="#fff" opacity=".85"/>'})}
+    +'<circle cx="'+mx.toFixed(1)+'" cy="'+my.toFixed(1)+'" r="1.8" fill="#050506" stroke="'+col+'" stroke-width=".9"/>'})}
  o+='<!--L-->'+ax;
  /* 291: vaqt o'qi (pastda) — surib siqish/yoyish */
  var ty=TER.H;o+='<rect x="0" y="'+ty+'" width="'+W+'" height="'+TER.AX+'" fill="rgba(255,255,255,.03)"/><line x1="0" x2="'+W+'" y1="'+ty+'" y2="'+ty+'" stroke="rgba(255,255,255,.1)"/>'

@@ -288,11 +288,11 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
             if k is None or not mp:
                 continue
             mx, my, z = ix0 + (k + .5) * bw, Y(mp), 11
-            colm = LIME if buy else RED
+            colm = "#FFFFFF" if buy else "#FFC83D"     # 319: shamlardan farqli — xarid oq, sotuv sariq
             tri = ([(mx, my + 3), (mx + z, my + 3 + z * 1.6), (mx - z, my + 3 + z * 1.6)] if buy else
                    [(mx, my - 3), (mx + z, my - 3 - z * 1.6), (mx - z, my - 3 - z * 1.6)])
             d.polygon(tri, fill=colm, outline="#050506")
-            d.ellipse((mx - 4, my - 4, mx + 4, my + 4), fill="#FFFFFF", outline="#050506")
+            d.ellipse((mx - 4, my - 4, mx + 4, my + 4), fill="#050506", outline=colm, width=2)
         # Chiziqlar — 312: ingichka va bosiqroq (rang fonga aralashtiriladi)
         for v, col, lb in lvl:
             yy = Y(v)
