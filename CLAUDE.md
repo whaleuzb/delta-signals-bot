@@ -7836,3 +7836,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Ko'chirish: `bot.migrate_td_signals` (ishga tushgandan 40 s keyin, bir marta) ochiq forex/aksiya signallarini MEXC ekvivalentiga o'tkazadi — `db.move_signal_to_mexc` (symbol + `market='crypto'`, `last_checked_ms` saqlanadi → kuzatuv shu joydan MEXC shamlari bilan davom etadi). Forex faqat metall bo'lsa, aksiya — metall yoki aksiya tokeni; `resolve(probe=True)` ATAYLAB ishlatilmaydi (EURUSD tasodifiy tokenga bog'lanmasin). O'tkazilmaganlar adminlarga ro'yxat bilan ("qo'lda yoping").
 - Railway'dagi `TWELVE_DATA_API_KEY` o'zgaruvchisi endi o'qilmaydi — o'chirib qo'yish mumkin (zararsiz).
 - Sinov: `test_308.py` 11/11; test_307 (qolgan qismi) 3/3; test_app 44, test_term 18, test_earn 16, test_adm_earn 14, test_adm299 7, test_dipout 27, test_300 17, test_305 9, test_tracker ✅.
+
+## 309. Likvidatsiya narxi grafikda
+- Foydalanuvchi: "likvidatsiya narxini ham chartda ko'rsat".
+- Formula avvalgidek `parsing.liq_price` (izolyatsiyalangan, soddalashtirilgan): LONG entry·(1−1/x), SHORT entry·(1+1/x); faqat leveraj > 1.
+- Terminal (`webapp.html` `termLines`): `{k:'liq', c:'#ff9f43', lb:'LIQ', dr:false, ns:true}` — surilmaydi; `ns` — `termScale` uni hisobga olmaydi (aks holda 10x da shamlar siqilib ketardi). Oynadan tashqarida bo'lsa mavjud mexanizm bilan chetda "▲/▼ LIQ narx" yorlig'i; siqilganda/surilganda nuqtali to'q sariq chiziq.
+- Ulashish/natija kartasi (`card.open_card(..., liq=)`): LIQ masshtabga kirmaydi; panel ichida bo'lsa nuqtali chiziq, tashqarida — yorliq chetga mahkamlanadi ("▲/▼ LIQ"). Bot `_app_sigshare` va `build_pnl_card` `liq` ni uzatadi.
+- Yorliqlar pastdan sig'masa endi FAQAT keraklilari yuqoriga suriladi (avval hammasi surilib, TP yorlig'i chizig'idan uzoqlashardi).

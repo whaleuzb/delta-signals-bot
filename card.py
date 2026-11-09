@@ -125,6 +125,7 @@ def _fmt_price(x: float) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 LIME = "#C2F23A"
 RED = "#FF5C5C"
+ORANGE = "#FF9F43"
 OW, OH = 1080, 1420
 
 
@@ -184,7 +185,8 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
               candles: list, tf: str | None, username: str | None, ws_name: str,
               logo: bytes | None, qr_url: str, qr_code: str | None, sig_id: int | None,
               when: datetime, lang: str | None = None, bot_logo: bytes | None = None,
-              closed: bool = False, r_multiple: float | None = None) -> io.BytesIO:
+              closed: bool = False, r_multiple: float | None = None,
+              liq: float | None = None) -> io.BytesIO:
     """Pozitsiya kartasi: ochiq (Unrealized PnL) yoki `closed=True` — yopilgan savdo (305),
     grafik, kirish/joriy(chiqish)/SL/TP, QR."""
     acc = LIME if pnl_pct >= 0 else RED
@@ -247,8 +249,10 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     d = ImageDraw.Draw(img, "RGBA")
     cs = [c for c in (candles or []) if c and len(c) >= 5][-64:]
     fl = _f(19, bold=True)
-    lvl = [(v, c, lb) for v, c, lb in ((tp, LIME, "TP"), (sl, RED, "SL"), (entry, "#D8D8DC", "IN")) if v]
-    lw = max([d.textlength(f"{lb} {_fmt_price(v)}", font=fl) for v, _c, lb in lvl] or [0]) + 16
+    # 309: LIQ — masshtabga kirmaydi (uzoqda bo'lsa yorliq chetda "▲/▼ LIQ").
+    lvl = [(v, c, lb) for v, c, lb in ((tp, LIME, "TP"), (sl, RED, "SL"), (entry, "#D8D8DC", "IN"),
+                                       (liq, ORANGE, "LIQ")) if v]
+    lw = max([d.textlength(("▼ " if lb == "LIQ" else "") + f"{lb} {_fmt_price(v)}", font=fl) for v, _c, lb in lvl] or [0]) + 16
     ix0, iy0, ix1, iy1 = gx0 + 26, gy0 + 28, gx1 - 22 - lw - 10, gy1 - 28
     if cs:
         levels = [entry, price] + [v for v in (sl, tp) if v]
@@ -271,6 +275,13 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
         # Chiziqlar
         for v, col, lb in lvl:
             yy = Y(v)
+            if lb == "LIQ":
+                if iy0 <= yy <= iy1:
+                    xx = ix0
+                    while xx < ix1:
+                        d.line((xx, yy, min(xx + 4, ix1), yy), fill=col, width=2)
+                        xx += 10
+                continue
             if lb == "IN":
                 xx = ix0
                 while xx < ix1:
@@ -279,16 +290,22 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
             else:
                 d.line((ix0, yy, ix1, yy), fill=col, width=2)
         # Yorliqlar: panel ichida, bir-biriga tegmasin
-        tags = sorted([[Y(v), v, col, lb] for v, col, lb in lvl], key=lambda t: t[0])
+        def _ty(v, lb):
+            yy = Y(v)
+            return min(max(yy, iy0), iy1) if lb == "LIQ" else yy
+        tags = sorted([[_ty(v, lb), v, col, lb] for v, col, lb in lvl], key=lambda t: t[0])
         for k in range(1, len(tags)):
             tags[k][0] = max(tags[k][0], tags[k - 1][0] + 34)
-        over = tags[-1][0] + 17 - (gy1 - 8) if tags else 0
-        if over > 0:
-            for t in tags:
-                t[0] -= over
+        # Pastdan sig'masa — faqat kerakli yorliqlar yuqoriga suriladi (qolganlari o'z chizig'ida).
+        if tags:
+            tags[-1][0] = min(tags[-1][0], gy1 - 8 - 17)
+            for k in range(len(tags) - 2, -1, -1):
+                tags[k][0] = min(tags[k][0], tags[k + 1][0] - 34)
         lx = ix1 + 10
         for yy, v, col, lb in tags:
             t = f"{lb} {_fmt_price(v)}"
+            if lb == "LIQ" and not (iy0 <= Y(v) <= iy1):
+                t = ("▲ " if Y(v) < iy0 else "▼ ") + t
             d.rounded_rectangle((lx, yy - 15, lx + lw, yy + 15), radius=9, fill="#0A0A0C", outline=col, width=2)
             d.text((lx + 8, yy - 11), t, font=fl, fill=col)
         py = Y(price)

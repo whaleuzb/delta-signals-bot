@@ -1453,7 +1453,8 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                          sl=float(sig["sl"]) if sig["sl"] is not None else None, tp=nxt, candles=candles, tf=tf,
                          username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
                          qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang,
-                         bot_logo=await _bot_logo(ctx.bot))
+                         bot_logo=await _bot_logo(ctx.bot),
+                         liq=parsing.liq_price(sig["side"], float(sig["entry"]), L))
     img = Image.open(buf).convert("RGB")
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=88)
@@ -1851,7 +1852,8 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         qr_url=qr_url, qr_code=code, sig_id=sig["id"] if show_id else None,
         when=sig["closed_at"].astimezone(stats.TZ), lang=ws_lang(ws),
         bot_logo=(await _bot_logo(bot)) if bot else None, closed=True,
-        r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None)
+        r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
+        liq=parsing.liq_price(sig["side"], float(sig["entry"]), L))
 
 
 async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:
