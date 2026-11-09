@@ -569,6 +569,11 @@ CREATE TABLE IF NOT EXISTS dip_withdrawals (
     done_at    TIMESTAMPTZ
 );
 CREATE UNIQUE INDEX IF NOT EXISTS dip_wd_pending ON dip_withdrawals (user_id) WHERE status = 'pending';
+-- 264: qayerga: 'df' (Dip Funded DIP balansi) yoki 'usdt' (hamyon, komissiya bilan).
+ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS dest TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS network TEXT;
+ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS fee NUMERIC NOT NULL DEFAULT 0;
 """
 
 
@@ -1089,9 +1094,11 @@ async def dip_pending(user_id: int) -> float:
     return float(v or 0)
 
 
-async def dip_withdraw_request(user_id: int, min_amount: float):
-    """263: butun balansni chiqarishga so'rov. Natija: (id, summa) yoki
-    "pending" (oldingi so'rov kutilmoqda) yoki "low" (balans yetmaydi)."""
+async def dip_withdraw_request(user_id: int, min_amount: float, dest: str = "manual",
+                               network: str | None = None, address: str | None = None,
+                               fee_pct: float = 0):
+    """263/264: butun balansni chiqarishga so'rov. Natija: (id, summa, komissiya)
+    yoki "pending" (oldingi so'rov kutilmoqda) yoki "low" (balans yetmaydi)."""
     async with pool().acquire() as c:
         async with c.transaction():
             await c.execute("SELECT pg_advisory_xact_lock(7262, ($1::bigint % 2000000000)::int)", user_id)
@@ -1100,11 +1107,18 @@ async def dip_withdraw_request(user_id: int, min_amount: float):
             bal = await c.fetchval("SELECT COALESCE(SUM(amount), 0) FROM dip_ledger WHERE user_id=$1", user_id)
             if float(bal or 0) < min_amount:
                 return "low"
+            fee = (bal * _d(fee_pct) / 100).quantize(_d("0.01"))
             wid = await c.fetchval(
-                "INSERT INTO dip_withdrawals (user_id, amount) VALUES ($1,$2) RETURNING id", user_id, bal)
+                "INSERT INTO dip_withdrawals (user_id, amount, dest, network, address, fee) "
+                "VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", user_id, bal, dest, network, address, fee)
             await c.execute(
                 "INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'withdraw')", user_id, -bal)
-    return wid, float(bal)
+    return wid, float(bal), float(fee)
+
+
+async def dip_withdrawal(wid: int):
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM dip_withdrawals WHERE id=$1", wid)
 
 
 async def dip_withdraw_finish(wid: int, ok: bool):
@@ -1114,7 +1128,7 @@ async def dip_withdraw_finish(wid: int, ok: bool):
         async with c.transaction():
             r = await c.fetchrow(
                 "UPDATE dip_withdrawals SET status=$2, done_at=now() WHERE id=$1 AND status='pending' "
-                "RETURNING id, user_id, amount", wid, "done" if ok else "rejected")
+                "RETURNING id, user_id, amount, dest, network, address, fee", wid, "done" if ok else "rejected")
             if r and not ok:
                 await c.execute(
                     "INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'withdraw_refund')",

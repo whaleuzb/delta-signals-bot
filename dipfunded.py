@@ -151,6 +151,12 @@ def _result(r: httpx.Response) -> dict:
     raise Unavailable(f"HTTP {r.status_code}")
 
 
+async def dip_credit(tg_id: int, ref: int, dip: float) -> dict:
+    """264: TC'da yig'ilgan DIP'ni Dip Funded DIP balansiga o'tkazish.
+    `ref` — TC chiqarish so'rovi raqami (DF tomonda idempotent)."""
+    return await _req("POST", "/dip/credit", tg_id, {"ref": ref, "dip": dip})
+
+
 async def accounts(tg_id: int) -> dict:
     return await _req("GET", "/accounts", tg_id)
 

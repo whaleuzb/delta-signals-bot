@@ -7462,3 +7462,16 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (`dipw:ok|no:<id>`, `on_dip_withdraw`). Rad etilsa DIP qaytariladi
      ('withdraw_refund'), har ikki holatda foydalanuvchiga xabar. Chiqarishni
      (Dip Funded'ga o'tkazish / token) hozircha admin qo'lda bajaradi.
+264. **DIP chiqarish yo'llari** — Dip Funded hisobiga yoki USDT qilib hamyonga.
+     Ilovada "Tokenlarni chiqarish" (≥3000) → sheet `dipWithdraw`:
+     (1) **Dip Funded** — komissiyasiz, darhol: `dipfunded.dip_credit(tg_id,
+     ref=wid, dip)` → DF `POST /api/tc/dip/credit` (delta-prop tcapi.py; DF
+     ledger'ga reason='tc', note='tc:<wid>' — idempotent; CSRF_EXEMPT'da).
+     NotLinked → so'rov rad, DIP qaytadi, "kabinetda Telegram'ni ulang".
+     Tarmoq xatosi → so'rov 'pending' qoladi, adminlarga "🔁 Qayta o'tkazish"
+     (`dipw:retry:<id>`, xuddi shu ref bilan — ikki marta yozilmaydi).
+     (2) **USDT** — TRC20 (T…, 34) yoki BEP20 (0x+40 hex) manzil tekshiriladi;
+     tokenlardan `config.DIP_USDT_FEE_PCT` (10%) komissiya: 3000 DIP → 2700 →
+     27.00 USDT. Adminlarga manzil/tarmoq/summa + "✅ To'landi / ❌ Rad etish";
+     to'lovni admin qo'lda qiladi. Rad etilsa butun summa (komissiya ham)
+     qaytadi. `dip_withdrawals`: dest, network, address, fee ustunlari.

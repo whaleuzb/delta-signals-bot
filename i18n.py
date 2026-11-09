@@ -1649,6 +1649,36 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "✅ Заявка на вывод {n} DIP отправлена. Админ рассмотрит и свяжется с вами.",
         "en": "✅ Request to withdraw {n} DIP sent. The admin will review it and contact you.",
     },
+    "dip.df_done": {
+        "uz": "✅ {n} DIP Dip Funded hisobingizga o'tkazildi. Dip Funded'dagi DIP balansingiz: <b>{bal} DIP</b>",
+        "ru": "✅ {n} DIP переведены на ваш счёт Dip Funded. Баланс DIP в Dip Funded: <b>{bal} DIP</b>",
+        "en": "✅ {n} DIP moved to your Dip Funded account. Your Dip Funded DIP balance: <b>{bal} DIP</b>",
+    },
+    "dip.df_nolink": {
+        "uz": "Dip Funded'da Telegram ulanmagan. dipfunded.com kabinetida Telegram'ni ulang, so'ng qayta urining: {url}",
+        "ru": "Telegram не привязан к Dip Funded. Привяжите его в кабинете dipfunded.com и повторите: {url}",
+        "en": "Telegram isn't linked on Dip Funded. Link it in your dipfunded.com dashboard and try again: {url}",
+    },
+    "dip.df_later": {
+        "uz": "Dip Funded hozir javob bermayapti. So'rovingiz saqlandi — admin o'tkazib beradi.",
+        "ru": "Dip Funded сейчас не отвечает. Заявка сохранена — админ проведёт её.",
+        "en": "Dip Funded isn't responding right now. Your request is saved — the admin will complete it.",
+    },
+    "dip.bad_addr": {
+        "uz": "Hamyon manzili noto'g'ri. TRC20 — T bilan, BEP20 — 0x bilan boshlanadi.",
+        "ru": "Неверный адрес кошелька. TRC20 начинается с T, BEP20 — с 0x.",
+        "en": "Invalid wallet address. TRC20 starts with T, BEP20 with 0x.",
+    },
+    "dip.usdt_sent": {
+        "uz": "✅ So'rov yuborildi: {usdt} USDT ({net}). Komissiya: {fee} DIP. Admin to'lagach xabar keladi.",
+        "ru": "✅ Заявка отправлена: {usdt} USDT ({net}). Комиссия: {fee} DIP. После выплаты придёт сообщение.",
+        "en": "✅ Request sent: {usdt} USDT ({net}). Fee: {fee} DIP. You'll be notified once paid.",
+    },
+    "dip.usdt_done": {
+        "uz": "✅ <b>{usdt} USDT</b> hamyoningizga yuborildi ({net}):\n<code>{addr}</code>",
+        "ru": "✅ <b>{usdt} USDT</b> отправлены на ваш кошелёк ({net}):\n<code>{addr}</code>",
+        "en": "✅ <b>{usdt} USDT</b> sent to your wallet ({net}):\n<code>{addr}</code>",
+    },
     "dip.out_done": {
         "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",
         "ru": "✅ Ваша заявка на вывод {n} DIP выполнена.",

@@ -612,11 +612,20 @@ function dipOut(d){var bal=+d.dip||0,mn=+d.dip_min||3000,pend=+d.dip_pend||0,fmt
   +'<div class="dbar"><i style="width:'+pc.toFixed(1)+'%"></i></div>';
  if(!ok)h+='<div class="rs" style="margin-top:8px">'+esc(t('dip_out_lock').replace('{min}',fmt(mn)).replace('{n}',fmt(mn-bal)))+'</div>';
  return h+'<button class="btn p full" style="margin-top:10px;padding:12px;font-size:14px;width:100%"'+(ok?' onclick="dipWithdraw()"':' disabled')+'>'+esc(t('dip_out'))+'</button></div>'}
-function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0;
- confirmBox(t('dip_out_ask').replace('{n}',bal.toLocaleString('en-US',{maximumFractionDigits:2})),function(){
-  toast(esc(t('wait')));api('act',{action:'dipout'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}
-   toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
-   if(r.ok){d.dip_pend=bal;d.dip=0;refRender(d)}}).catch(function(){toast('Error')})})}
+function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0,fp=+d.dip_fee||10,fee=Math.round(bal*fp)/100,fm=function(x){return x.toLocaleString('en-US',{maximumFractionDigits:2})};S.dnet=S.dnet||'TRC20';
+ var h='<h4>'+esc(t('dip_out'))+'</h4><p>'+fm(bal)+' DIP ≈ $'+(bal/100).toFixed(2)+'</p>';
+ if(d.dip_df)h+='<div class="tile2 glass" style="margin-bottom:10px"><div class="k">'+esc(t('dip_to_df'))+'</div><div class="v" style="font-size:18px">'+fm(bal)+' DIP</div><div class="rs" style="margin-top:4px">'+esc(t('dip_to_df_s'))+'</div>'
+  +'<button class="btn p" style="margin-top:10px" onclick="dipGo(\'df\')">'+esc(t('dip_move'))+'</button></div>';
+ h+='<div class="tile2 glass"><div class="k">'+esc(t('dip_to_usdt'))+'</div><div class="v" style="font-size:18px">'+esc(t('dip_get'))+' '+((bal-fee)/100).toFixed(2)+' USDT</div><div class="rs" style="margin-top:4px">'+esc(t('dip_fee_s').replace('{p}',fm(fp)).replace('{n}',fm(fee)))+'</div>'
+  +'<div style="display:flex;gap:8px;margin-top:10px">'+['TRC20','BEP20'].map(function(n){return'<button class="btn'+(S.dnet==n?' p':'')+'" style="margin:0" onclick="S.dnet=\''+n+'\';dipWithdraw()">'+n+'</button>'}).join('')+'</div>'
+  +'<input id="dip_addr" autocomplete="off" spellcheck="false" placeholder="'+esc(t('dip_addr'))+' ('+S.dnet+')" value="'+esc(S.daddr||'')+'" oninput="S.daddr=this.value" style="margin:10px 0 0;font-size:14px;padding:11px 12px">'
+  +'<button class="btn p" style="margin-top:10px" onclick="dipGo(\'usdt\')">'+esc(t('dip_send'))+'</button></div>';
+ sheetOpen(h)}
+function dipGo(dest){var d=S.ref,bal=+d.dip||0,args={dest:dest};
+ if(dest=='usdt'){args.net=S.dnet;args.addr=(S.daddr||'').trim();if(!args.addr){toast(esc(t('dip_addr')));return}}
+ toast(esc(t('wait')));api('act',{action:'dipout',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}
+  toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
+  if(r.ok){sheetClose();d.dip=0;d.dip_pend=dest=='usdt'?bal:0;S.daddr='';refRender(d)}}).catch(function(){toast('Error')})}
 function refCopy(){var l=S.ref&&S.ref.link;if(!l)return;try{navigator.clipboard.writeText(l).then(function(){toast(esc(t('ref_copied')));haptic('success')})}catch(e){var i=document.createElement('textarea');i.value=l;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();toast(esc(t('ref_copied')))}}
 /* 259: rasm + matn + "Botni ochish" tugmali post (Telegram shareMessage);
    eski ilovalarda — oddiy havola ulashish */

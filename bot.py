@@ -983,63 +983,153 @@ async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
     return True, json.dumps({"code": code, "link": link, "count": count,
                              "dip": await db.dip_balance(uid), "dip_per": config.DIP_PER_REF,
                              "dip_min": config.DIP_MIN_OUT, "dip_pend": await db.dip_pending(uid),
+                             "dip_fee": config.DIP_USDT_FEE_PCT, "dip_df": dipfunded.enabled(),
                              "can_pick": can_pick_ref_code(uid, count),
                              "need": max(0, config.REF_CUSTOM_MIN - count),
                              "min": REF_CODE_MIN, "max": REF_CODE_MAX})
 
 
-async def _app_dipout(ctx, uid: int, lang) -> tuple[bool, str]:
-    """263: DIP tokenlarni chiqarish — faqat balans `DIP_MIN_OUT` (3000) dan
-    oshganda. Butun balans so'rovga o'tadi, adminlarga tasdiqlash tugmalari."""
-    r = await db.dip_withdraw_request(uid, config.DIP_MIN_OUT)
-    if r == "pending":
-        return False, i18n.t("dip.out_pending", lang)
-    if r == "low":
-        return False, i18n.t("dip.out_low", lang, min=f"{config.DIP_MIN_OUT:g}",
-                             bal=f"{await db.dip_balance(uid):g}")
-    wid, amount = r
+USDT_NETS = {"TRC20": re.compile(r"^T[1-9A-HJ-NP-Za-km-z]{33}$"),
+             "BEP20": re.compile(r"^0x[0-9a-fA-F]{40}$")}
+
+
+async def _dip_who(ctx, uid: int) -> str:
     try:
         ch = await ctx.bot.get_chat(uid)
         who = html.escape(ch.full_name or str(uid)) + (f" (@{ch.username})" if ch.username else "")
     except Exception:
         who = str(uid)
-    text = (f"💎 <b>DIP chiqarish so'rovi #{wid}</b>\n"
-            f"Kim: <a href=\"tg://user?id={uid}\">{who}</a> · <code>{uid}</code>\n"
-            f"Summa: <b>{amount:g} DIP</b> (≈ ${amount / 100:,.2f})\n"
-            f"Taklif qilganlari: {await db.count_referrals(uid)}")
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Bajarildi", callback_data=f"dipw:ok:{wid}", api_kwargs={"style": "success"}),
-        InlineKeyboardButton("❌ Rad etish", callback_data=f"dipw:no:{wid}", api_kwargs={"style": "danger"})]])
+    return f'<a href="tg://user?id={uid}">{who}</a> · <code>{uid}</code>'
+
+
+async def _dip_admins(ctx, text: str, kb=None) -> None:
     for admin in config.ADMIN_IDS:
         try:
-            await ctx.bot.send_message(admin, text, parse_mode=ParseMode.HTML, reply_markup=kb)
+            await ctx.bot.send_message(admin, text, parse_mode=ParseMode.HTML, reply_markup=kb,
+                                       disable_web_page_preview=True)
         except Exception as e:
-            log.warning("DIP so'rovi adminga yuborilmadi (%s): %s", admin, e)
-    return True, i18n.t("dip.out_sent", lang, n=f"{amount:g}")
+            log.warning("DIP xabari adminga yuborilmadi (%s): %s", admin, e)
+
+
+async def _dip_df_send(ctx, wid: int, uid: int, amount: float, lang) -> tuple[bool, str]:
+    """264: Dip Funded'ga o'tkazish. DF tomonda `ref`=wid bo'yicha idempotent —
+    tarmoq xatosida qayta urinish ikki marta yozmaydi. Natija (ok, matn):
+    ok=None — noaniq (so'rov kutilmoqda qoladi, admin qayta urinadi)."""
+    try:
+        r = await dipfunded.dip_credit(uid, wid, amount)
+    except dipfunded.NotLinked:
+        await db.dip_withdraw_finish(wid, False)          # DF hech narsa yozmagan — qaytaramiz
+        return False, i18n.t("dip.df_nolink", lang, url=dipfunded.site_url("/dashboard"))
+    except Exception as e:
+        log.warning("DIP Dip Funded'ga o'tmadi (#%s): %s", wid, e)
+        return None, i18n.t("dip.df_later", lang)
+    await db.dip_withdraw_finish(wid, True)
+    return True, i18n.t("dip.df_done", lang, n=f"{amount:g}", bal=f"{float(r.get('balance') or 0):g}")
+
+
+async def _app_dipout(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """263/264: DIP tokenlarni chiqarish — faqat balans `DIP_MIN_OUT` (3000)
+    dan oshganda. Ikki yo'l: 'df' — Dip Funded DIP balansiga (darhol, API
+    orqali, komissiyasiz); 'usdt' — hamyonga, tokenlardan `DIP_USDT_FEE_PCT`
+    (10%) komissiya olib qolinadi, adminlar qo'lda to'laydi."""
+    try:
+        f = json.loads(a["args"] or "{}")
+    except Exception:
+        f = {}
+    dest = f.get("dest")
+    net = str(f.get("net") or "").upper()
+    addr = str(f.get("addr") or "").strip()
+    if dest == "df":
+        if not dipfunded.enabled():
+            return False, i18n.t("dip.df_later", lang)
+    elif dest == "usdt":
+        if net not in USDT_NETS:
+            return False, i18n.t("dip.bad_addr", lang)
+        if not USDT_NETS[net].match(addr):
+            return False, i18n.t("dip.bad_addr", lang)
+    else:
+        return False, "?"
+    fee_pct = config.DIP_USDT_FEE_PCT if dest == "usdt" else 0
+    r = await db.dip_withdraw_request(uid, config.DIP_MIN_OUT, dest,
+                                      net if dest == "usdt" else None,
+                                      addr if dest == "usdt" else None, fee_pct)
+    if r == "pending":
+        return False, i18n.t("dip.out_pending", lang)
+    if r == "low":
+        return False, i18n.t("dip.out_low", lang, min=f"{config.DIP_MIN_OUT:g}",
+                             bal=f"{await db.dip_balance(uid):g}")
+    wid, amount, fee = r
+    who = await _dip_who(ctx, uid)
+    if dest == "df":
+        ok, msg = await _dip_df_send(ctx, wid, uid, amount, lang)
+        if ok:
+            await _dip_admins(ctx, f"💎 DIP → Dip Funded #{wid}\nKim: {who}\nSumma: <b>{amount:g} DIP</b> — avtomatik o'tkazildi ✅")
+        elif ok is None:
+            await _dip_admins(ctx, f"⚠️ <b>DIP → Dip Funded #{wid}</b> o'tmadi (Dip Funded javob bermadi)\n"
+                                   f"Kim: {who}\nSumma: <b>{amount:g} DIP</b>", InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔁 Qayta o'tkazish", callback_data=f"dipw:retry:{wid}", api_kwargs={"style": "primary"}),
+                InlineKeyboardButton("❌ Rad etish", callback_data=f"dipw:no:{wid}", api_kwargs={"style": "danger"})]]))
+        return bool(ok), msg
+    usdt = (amount - fee) / 100
+    text = (f"💵 <b>DIP → USDT so'rovi #{wid}</b>\n"
+            f"Kim: {who}\n"
+            f"Tokenlar: <b>{amount:g} DIP</b> (komissiya {fee:g} DIP = {fee_pct:g}%)\n"
+            f"To'lanadi: <b>{usdt:,.2f} USDT</b> · {net}\n"
+            f"Hamyon: <code>{html.escape(addr)}</code>\n"
+            f"Taklif qilganlari: {await db.count_referrals(uid)}")
+    await _dip_admins(ctx, text, InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ To'landi", callback_data=f"dipw:ok:{wid}", api_kwargs={"style": "success"}),
+        InlineKeyboardButton("❌ Rad etish", callback_data=f"dipw:no:{wid}", api_kwargs={"style": "danger"})]]))
+    return True, i18n.t("dip.usdt_sent", lang, usdt=f"{usdt:,.2f}", net=net, fee=f"{fee:g}")
 
 
 async def on_dip_withdraw(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """263: admin DIP chiqarish so'rovini bajardi / rad etdi."""
+    """263/264: admin qarori — USDT to'landi / rad etish / Dip Funded'ga qayta urinish."""
     q = update.callback_query
     if not is_admin(q.from_user.id):
         await q.answer()
         return
     _, act, wid = q.data.split(":")
-    r = await db.dip_withdraw_finish(int(wid), act == "ok")
+    wid = int(wid)
+    w = await db.dip_withdrawal(wid)
+    if not w or w["status"] != "pending":
+        await q.answer("Allaqachon hal qilingan", show_alert=True)
+        return
+    ulang = await user_lang(w["user_id"])
+    amount = float(w["amount"])
+    if act == "retry":
+        ok, msg = await _dip_df_send(ctx, wid, w["user_id"], amount, ulang)
+        if ok is None:
+            await q.answer("Dip Funded hali javob bermayapti", show_alert=True)
+            return
+        await q.answer("OK")
+        mark = "✅ O'tkazildi" if ok else "❌ Dip Funded'da Telegram ulanmagan — DIP qaytarildi"
+        try:
+            await q.edit_message_text(q.message.text_html + f"\n\n<b>{mark}</b>", parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+        try:
+            await ctx.bot.send_message(w["user_id"], msg, parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+        return
+    r = await db.dip_withdraw_finish(wid, act == "ok")
     if not r:
         await q.answer("Allaqachon hal qilingan", show_alert=True)
         return
     await q.answer("OK")
-    mark = "✅ Bajarildi" if act == "ok" else "❌ Rad etildi"
+    mark = ("✅ To'landi" if act == "ok" else "❌ Rad etildi")
     try:
         await q.edit_message_text(q.message.text_html + f"\n\n<b>{mark}</b>", parse_mode=ParseMode.HTML)
     except Exception:
         pass
-    ulang = await user_lang(r["user_id"])
+    if act == "ok" and r["dest"] == "usdt":
+        text = i18n.t("dip.usdt_done", ulang, usdt=f"{(amount - float(r['fee'])) / 100:,.2f}",
+                      net=r["network"] or "", addr=html.escape(r["address"] or ""))
+    else:
+        text = i18n.t("dip.out_done" if act == "ok" else "dip.out_rejected", ulang, n=f"{amount:g}")
     try:
-        await ctx.bot.send_message(r["user_id"], i18n.t(
-            "dip.out_done" if act == "ok" else "dip.out_rejected", ulang, n=f"{float(r['amount']):g}"),
-            parse_mode=ParseMode.HTML)
+        await ctx.bot.send_message(r["user_id"], text, parse_mode=ParseMode.HTML)
     except Exception:
         pass
 
@@ -1061,7 +1151,7 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
     if a["action"] == "refshare":
         return await _app_refshare(ctx, uid, lang)
     if a["action"] == "dipout":
-        return await _app_dipout(ctx, uid, lang)
+        return await _app_dipout(ctx, uid, lang, a)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -10674,7 +10764,7 @@ def main() -> None:
     app.add_handler(CommandHandler("top", cmd_top))
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
-    app.add_handler(CallbackQueryHandler(on_dip_withdraw, pattern=r"^dipw:(ok|no):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_dip_withdraw, pattern=r"^dipw:(ok|no|retry):\d+$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_signal_copy, pattern=r"^sigcopy:"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))

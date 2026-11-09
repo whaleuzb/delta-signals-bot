@@ -290,3 +290,5 @@ RESULTLINK_CHAT_ID = int(_rl) if _rl.lstrip("-").isdigit() else None
 DIP_PER_REF = float(os.getenv("DIP_PER_REF", "5"))
 # 263: tokenlarni chiqarish shu balansdan boshlab ochiladi.
 DIP_MIN_OUT = float(os.getenv("DIP_MIN_OUT", "3000"))
+# 264: USDT qilib hamyonga chiqarishda tokenlardan olib qolinadigan komissiya (%).
+DIP_USDT_FEE_PCT = float(os.getenv("DIP_USDT_FEE_PCT", "10"))
