@@ -568,7 +568,15 @@ function refRender(d){var p=document.getElementById('page');S.ref=d;
  else h+='<div class="rs rise" style="margin:6px 4px">'+esc(t('ref_need').replace('{n}',d.need))+'</div>';
  p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*50)+'ms'});setTimeout(countUp,80)}
 function refCopy(){var l=S.ref&&S.ref.link;if(!l)return;try{navigator.clipboard.writeText(l).then(function(){toast(esc(t('ref_copied')));haptic('success')})}catch(e){var i=document.createElement('textarea');i.value=l;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();toast(esc(t('ref_copied')))}}
-function refShare(){var l=S.ref&&S.ref.link;if(!l)return;openLink('https://t.me/share/url?url='+encodeURIComponent(l)+'&text='+encodeURIComponent(t('ref_share_txt')))}
+/* 259: rasm + matn + "Botni ochish" tugmali post (Telegram shareMessage);
+   eski ilovalarda — oddiy havola ulashish */
+function refShareUrl(l){openLink('https://t.me/share/url?url='+encodeURIComponent(l)+'&text='+encodeURIComponent(t('ref_share_txt')))}
+function refShare(){var l=S.ref&&S.ref.link;if(!l)return;
+ if(!(tg&&tg.shareMessage&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0'))){refShareUrl(l);return}
+ toast(esc(t('wait')));
+ api('act',{action:'refshare'}).then(function(r){var d=null;try{d=JSON.parse(r.msg)}catch(e){}
+  if(r.ok&&d&&d.id){document.getElementById('toast').classList.remove('show');try{tg.shareMessage(d.id,function(sent){if(sent)haptic('success')})}catch(e){refShareUrl(l)}}
+  else refShareUrl(l)}).catch(function(){refShareUrl(l)})}
 function refSave(){var c=(document.getElementById('ref_in').value||'').trim();if(!c)return;toast(esc(t('wait')));
  api('act',{action:'refcode',args:{code:c}}).then(function(r){if(r.ok){var d=null;try{d=JSON.parse(r.msg)}catch(e){}if(d){refRender(d);haptic('success');toast('✓')}}else{haptic('error');toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))))}})}
 function dfSheet(){sheetOpen('<h4>'+esc(t('df_title'))+'</h4><p>'+esc(t('df_txt'))+'</p>'

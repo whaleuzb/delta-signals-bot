@@ -28,7 +28,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
-WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -220,7 +220,7 @@ async def _ws_act(body, uid: int, act: str):
             raise web.HTTPForbidden()
         aid = await db.app_action_add(uid, 0, act, None, json.dumps(f)[:2000])
         return await _wait_action(aid)
-    if act in ("ref", "refcode"):
+    if act in ("ref", "refcode", "refshare"):
         args = json.dumps({"code": str((body.get("args") or {}).get("code") or "")[:20]}) \
             if act == "refcode" else None
         aid = await db.app_action_add(uid, 0, act, None, args)
@@ -525,6 +525,16 @@ async def api_tour(request):
     return web.json_response({"df": df, "own": own}, headers=NO_CACHE)
 
 
+_INVITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "invite.jpg")
+
+
+async def invite_jpg(request):
+    """259: taklif posti rasmi (Telegram `InlineQueryResultPhoto` — faqat JPEG URL)."""
+    with open(_INVITE, "rb") as fh:
+        return web.Response(body=fh.read(), content_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def app_page(request):
     # 252: bot nomi sahifaga yoziladi — Telegram tashqarisida (brauzer,
     # to'lov boti) ochilganda ham "Botni ochish" havolasi ishlasin.
@@ -535,6 +545,7 @@ async def app_page(request):
 def routes() -> list:
     return [
         web.get("/app", app_page),
+        web.get("/invite.jpg", invite_jpg),
         web.post("/api/app/me", api_me),
         web.post("/api/app/open", api_open),
         web.post("/api/app/act", api_act),

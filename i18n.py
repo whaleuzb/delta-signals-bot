@@ -1624,6 +1624,21 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # --- Taklif (referal) ---
+    "ref.share_caption": {
+        "uz": ("🚀 <b>Trade Controller</b> — signallaringiz natijasini avtomatik kuzatadigan bot\n\n"
+               "✅ TP va stop avtomatik kuzatiladi\n📊 Natija % va $ da, statistika va hisobotlar\n"
+               "🏆 Top reyting, turnirlar va Dip Funded\n📱 Qulay ilova\n\n"
+               "Men foydalanyapman — siz ham sinab ko'ring 👇"),
+        "ru": ("🚀 <b>Trade Controller</b> — бот, который автоматически ведёт результаты ваших сигналов\n\n"
+               "✅ TP и стоп отслеживаются автоматически\n📊 Результат в % и $, статистика и отчёты\n"
+               "🏆 Топ-рейтинг, турниры и Dip Funded\n📱 Удобное приложение\n\n"
+               "Я пользуюсь — попробуйте и вы 👇"),
+        "en": ("🚀 <b>Trade Controller</b> — the bot that tracks your signal results automatically\n\n"
+               "✅ TP and stop tracked automatically\n📊 Results in % and $, stats and reports\n"
+               "🏆 Top ranking, tournaments and Dip Funded\n📱 Handy app\n\n"
+               "I use it — give it a try 👇"),
+    },
+    "ref.share_btn": {"uz": "🚀 Botni ochish", "ru": "🚀 Открыть бота", "en": "🚀 Open the bot"},
     "ref.head": {
         "uz": "🎁 Do'stlaringizni taklif qiling!",
         "ru": "🎁 Приглашайте друзей!",

@@ -7422,3 +7422,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      "Taklif qilish": son, kod, havola (nusxa / Telegram ulashish), o'z
      kodini tanlash (`ref`/`refcode`, `_app_ref` — bot bilan bir xil
      tekshiruv). Guruh sahifasi qatlami endi to'liq qora (orqa ko'rinmaydi).
+259. **Taklif havolasi — rasmli va tugmali post bilan ulashiladi.** Ilovada
+     "Ulashish" → `refshare` amali: bot `save_prepared_inline_message`
+     (InlineQueryResultPhoto: `WEB_URL/invite.jpg` — JPEG bo'lishi SHART,
+     `static/invite.jpg`, 1280×800; matn `ref.share_caption`; tugma
+     `ref.share_btn` → shaxsiy referal havola) qiladi, ilova
+     `tg.shareMessage(id)` bilan Telegram chat tanlash oynasini ochadi.
+     Bot API 8.0'dan eski ilovada yoki xatoda — oddiy `t.me/share/url`.
+     Rasm o'zgarsa `?v=` raqamini oshiring (Telegram keshlaydi).

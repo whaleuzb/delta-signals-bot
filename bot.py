@@ -935,6 +935,30 @@ async def _app_newsig(ctx, uid: int, lang, a) -> tuple[bool, str]:
     return True, msg
 
 
+async def _app_refshare(ctx, uid: int, lang) -> tuple[bool, str]:
+    """259: taklif posti (rasm + matn + "Botni ochish" tugmasi) — Mini App
+    `shareMessage` orqali ulashadi (Bot API `savePreparedInlineMessage`)."""
+    _code, link = await referral_token(uid, ctx.bot.username)
+    if not link or not config.WEB_URL:
+        return False, i18n.t("ref.no_link", lang)
+    from telegram import InlineQueryResultPhoto
+    import uuid as _uuid
+    res = InlineQueryResultPhoto(
+        id=_uuid.uuid4().hex[:32], photo_url=f"{config.WEB_URL}/invite.jpg?v=1",
+        thumbnail_url=f"{config.WEB_URL}/invite.jpg?v=1", photo_width=1280, photo_height=800,
+        caption=i18n.t("ref.share_caption", lang), parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("ref.share_btn", lang), url=link, api_kwargs={"style": "success"})]]))
+    try:
+        pm = await ctx.bot.save_prepared_inline_message(
+            user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True,
+            allow_channel_chats=True)
+    except Exception as e:
+        log.warning("Taklif posti tayyorlanmadi: %s", e)
+        return False, json.dumps({"link": link})
+    return True, json.dumps({"id": pm.id, "link": link})
+
+
 async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
     """258: taklif (referal) — kod, havola, son; o'z kodini tanlash."""
     count = await db.count_referrals(uid)
@@ -976,6 +1000,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_newsig(ctx, uid, lang, a)
     if a["action"] in ("ref", "refcode"):
         return await _app_ref(ctx, uid, lang, a)
+    if a["action"] == "refshare":
+        return await _app_refshare(ctx, uid, lang)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
