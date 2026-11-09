@@ -7915,3 +7915,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "wallet bo'limini qo'shaylik, ichiga kirganda tez orada yozuvi chiqsin. bosh va signallar orasiga joylashtir".
 - `TABS`/`nav()`: `wallet` Bosh va Signallar orasida (belgi `wallet`). Endi DIP tangasining chap va o'ng tomonida 3 tadan tugma — chap tugmalarni kengaytiruvchi `flex:1.5` qoidasi olib tashlandi (tanga o'rtada, tekshirildi).
 - `walletView(v)` — sarlavha + shisha karta: hamyon belgisi, "Tez orada", qisqa izoh (`w_txt`). Tarjimalar: `wallet`, `w_soon`, `w_sub`, `w_txt`.
+
+## 322. Ulashilgan kartaning yarmi kulrang chiqishi
+- Foydalanuvchi (chatga ulashilgan MOVRUSDT kartasi, pastki qismi kulrang): "Rasm yari yo'q".
+- Sabab: Telegram rasmni bizning `/sc/<key>.jpg` dan yuklaydi; oddiy (baseline) JPEG yuqoridan pastga chiziladi — yuklash sekin/uzilgan bo'lsa pastki qismi kulrang qoladi; `thumbnail_url` ham to'liq rasm edi (tez preview yo'q).
+- `bot._share_store(img)` → (url, thumb_url): asosiy rasm progressiv JPEG (q86, optimize — butun karta darhol xira ko'rinib tiniqlashadi, ~140→112 KB) + 360px miniatyura (`<key>t`, ~22 KB) `thumbnail_url` uchun. `_app_sigshare` va `_app_rcard` shundan foydalanadi.

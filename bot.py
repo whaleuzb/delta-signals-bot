@@ -1354,6 +1354,24 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
+async def _share_store(img) -> tuple[str, str]:
+    """322: ulashish rasmi — progressiv JPEG (sekin tarmoqda ham butun karta darhol xira
+    ko'rinib, keyin tiniqlashadi; avval yarmi kulrang qolardi) + kichik miniatyura
+    (360px, `thumbnail_url` — Telegram uni bir zumda ko'rsatadi). (url, thumb_url)."""
+    import secrets as _sec
+    key = _sec.token_urlsafe(10)
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=86, optimize=True, progressive=True)
+    th = img.copy()
+    th.thumbnail((360, 360 * img.height // max(1, img.width)))
+    tout = io.BytesIO()
+    th.save(tout, format="JPEG", quality=80, optimize=True)
+    await db.share_image_put(key, out.getvalue())
+    await db.share_image_put(key + "t", tout.getvalue())
+    base = f"{config.WEB_URL}/sc/{key}"
+    return base + ".jpg", base + "t.jpg"
+
+
 async def _card_marks(sig, closed: bool = False) -> list:
     """317/320: kartadagi belgilar: (ms, narx, xaridmi) — kirish, bajarilgan qo'shimcha
     limitlar (kirish tomoni), qisman sotishlar (chiqish tomoni), yopilganda chiqish."""
@@ -1475,19 +1493,14 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                          liq=parsing.liq_price(sig["side"], float(sig["entry"]), L),
                          marks=await _card_marks(sig))
     img = Image.open(buf).convert("RGB")
-    out = io.BytesIO()
-    img.save(out, format="JPEG", quality=88)
-    import secrets as _sec
-    key = _sec.token_urlsafe(10)
-    await db.share_image_put(key, out.getvalue())
+    url, thumb = await _share_store(img)
     from telegram import InlineQueryResultPhoto
     import uuid as _uuid
     side = sig["side"] + (f" {L}x" if L > 1 else "")
     cap = i18n.t("share.caption", lang, sym=html.escape(sig["symbol"]), side=side,
                  pnl=f"{'+' if pnl >= 0 else ''}{pnl:.2f}", ws=html.escape(ws["name"]))
-    url = f"{config.WEB_URL}/sc/{key}.jpg"
     res = InlineQueryResultPhoto(
-        id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=url, photo_width=img.width, photo_height=img.height,
+        id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=thumb, photo_width=img.width, photo_height=img.height,
         caption=cap, parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
             i18n.t("share.btn", lang), url=link, api_kwargs={"style": "success"})]]))
@@ -1514,12 +1527,7 @@ async def _app_rcard(ctx, uid: int, lang, sig) -> tuple[bool, str]:
     if buf is None:
         return False, i18n.t("ref.no_link", lang)
     img = Image.open(buf).convert("RGB")
-    out = io.BytesIO()
-    img.save(out, format="JPEG", quality=88)
-    import secrets as _sec
-    key = _sec.token_urlsafe(10)
-    await db.share_image_put(key, out.getvalue())
-    url = f"{config.WEB_URL}/sc/{key}.jpg"
+    url, thumb = await _share_store(img)
     _code, link = await referral_token(uid, ctx.bot.username)
     res_d = {"img": url, "link": link}
     if link:
@@ -1531,7 +1539,7 @@ async def _app_rcard(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                      side=sig["side"] + (f" {L}x" if L > 1 else ""),
                      pnl=f"{'+' if pnl >= 0 else ''}{pnl:.2f}", ws=html.escape(ws["name"]))
         res = InlineQueryResultPhoto(
-            id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=url, photo_width=img.width,
+            id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=thumb, photo_width=img.width,
             photo_height=img.height, caption=cap, parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
                 i18n.t("share.btn", lang), url=link, api_kwargs={"style": "success"})]]))
