@@ -16,7 +16,10 @@
 html{background:#050506}
 html,body{color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Roboto,sans-serif;
  font-size:13px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-feature-settings:'ss01','cv11';overscroll-behavior:none}
-body{background:transparent;padding:calc(var(--top) + 10px) 14px calc(168px + max(env(safe-area-inset-bottom,0px),var(--bot,0px)));min-height:100vh;overflow-x:hidden}
+body{background:transparent;padding:calc(var(--top) + 10px) 14px 20px;min-height:100vh;overflow-x:clip}
+/* 292: iOS'da overflow-x:hidden body'ni ichki aylantiriladigan blokka aylantiradi — u yerda pastki
+   padding e'tiborsiz qolardi va window scroll hodisasi kelmasdi; clip — blok yaratmaydi. Qo'shimcha: oxirida haqiqiy bo'sh joy. */
+.endsp{height:calc(150px + max(env(safe-area-inset-bottom,0px),var(--bot,0px)))}
 svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;flex:none}
 
 /* ---- FON: yulduzlar (canvas) + tumanlik + donadorlik + chetdagi nur ---- */
@@ -394,6 +397,7 @@ function render(){nav();pill();var v=document.getElementById('view');var w=cur()
  else if(!w)noWs(v);else if(S.tab=='signals')signals(v,w);else home(v,w);
  var k=0;v.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(k++*60)+'ms'});
  if(S.anim){setTimeout(countUp,80)}
+ v.insertAdjacentHTML('beforeend','<div class="endsp"></div>');
  S.anim=false;S.dir='';bindSlider()}
 
 /* ---- bosh sahifa: slayder + kartalar ---- */
@@ -471,9 +475,10 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh" style="cursor:pointer" onclick="openTerm('+i.id+')"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
  +'<div class="spk" id="k'+i.id+'" style="cursor:pointer" onclick="openTerm('+i.id+')">'+spark(i,false)+'</div><div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
  +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+lims+'<div class="acts">'+a+'</div></div>'}
-(function(){var ly=0,tk=0;addEventListener('scroll',function(){if(tk)return;tk=1;requestAnimationFrame(function(){tk=0;var y=scrollY,n=document.getElementById('nav');if(!n)return;
- var bottom=innerHeight+y>=document.documentElement.scrollHeight-4;
- if(y<60||(y<ly-6&&!bottom))n.classList.remove('hid');else if(y>ly+6||bottom)n.classList.add('hid');ly=y})},{passive:true})})();
+(function(){var ly=0,tk=0;document.addEventListener('scroll',function(e){var tg_=e.target;if(tg_&&tg_.id=='page'||(tg_&&tg_.closest&&tg_.closest('#page,.slider,#sheet')))return;if(tk)return;tk=1;requestAnimationFrame(function(){tk=0;
+ var se=document.scrollingElement||document.documentElement,b=document.body,y=Math.max(scrollY,se.scrollTop,b.scrollTop),n=document.getElementById('nav');if(!n)return;
+ var sh=Math.max(se.scrollHeight,b.scrollHeight),bottom=innerHeight+y>=sh-4;
+ if(y<60||(y<ly-6&&!bottom))n.classList.remove('hid');else if(y>ly+6||bottom)n.classList.add('hid');ly=y})},{passive:true,capture:true})})();
 /* 289: signal terminali — shamli grafik (SVG), taymfreym, TP/SL/kirish/limit chiziqlarini surish */
 var TER={W:360,H:330,PR:58,AX:24};
 function openTerm(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;tick();S.page={id:'term',sig:id,tf:i.tf||'1h',c:null,adds:[],drag:null,pend:null};termRender();pageShow();termLoad()}

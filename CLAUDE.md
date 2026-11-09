@@ -7667,3 +7667,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      shamlar siqiladi (ko'proq sham), o'ngga — yoyiladi (`g.tz`). O'ngdagi
      narx o'qini yuqori/pastga surish — vertikal masshtab (`g.ys`,
      0.2…8; `termScale` markaz atrofida). Ikki marta bosish hammasini tiklaydi.
+292. **iPhone: bosh sahifa oxiri (Dip Funded) — 3-urinish.** Loglar bo'yicha
+     yangi versiya ochilgan, lekin karta baribir menyu ostida edi. Ehtimoliy
+     sabab: `body{overflow-x:hidden}` iOS WebKit'da body'ni ichki aylantiriladigan
+     blokka aylantiradi — u yerda pastki padding e'tiborsiz qoladi va window
+     `scroll` kelmaydi (288/289 ishlamagan). Endi: `overflow-x:clip` (blok
+     yaratmaydi); har bir bo'lim oxiriga haqiqiy bo'sh element `.endsp`
+     (150px + xavfsiz zona); menyuni yashirish `document` darajasida
+     `capture` bilan istalgan aylantiruvchidan (`#page`, slayder, sheet
+     bundan mustasno) va `max(scrollY, scrollingElement, body).scrollTop`.
