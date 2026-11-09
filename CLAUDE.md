@@ -7611,3 +7611,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      juftliklar yo'q — `api_group` `syms` ni faqat egasiga beradi. O'z
      statistikasida (`perHtml`) "Juftliklar · N" tugmasi — bosilsa ro'yxat
      ochiladi/yopiladi (`togPairs`, `g.showPairs`).
+284. **Oq effektlar kamaytirildi, urg'u shaffof shishada.** `--glass` oq
+     gradientlari ~2 baravar past (.06/.018/.01), asos .30; `.glass` hoshiyasi
+     .13, yuqori chiziq .16; frosted kartalar: `brightness(1.12)` olib
+     tashlandi (`saturate(1.15)` qoldi), oq tus .012, chetdagi nurlar
+     yengilroq; `::after` yaltirashi .045; tumanlik `.neb.a` .22.
