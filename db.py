@@ -602,6 +602,26 @@ ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS logo BYTEA;
 ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS logo_at TIMESTAMPTZ;
 ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS note TEXT;
+-- 300: Earn — obunani 3 va 7 kundan keyin qayta tekshirish (chiqib ketganlardan DIP qaytariladi).
+ALTER TABLE dip_task_done ADD COLUMN IF NOT EXISTS checks INT NOT NULL DEFAULT 0;
+ALTER TABLE dip_task_done ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+-- 300: hamkorlarga eslatma va haftalik hisobot.
+ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS remind_sent BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE dip_tasks ADD COLUMN IF NOT EXISTS report_at TIMESTAMPTZ;
+-- 300: signal tarixi (terminal "Tarix" yorlig'i) — guruhga ketgan hodisalar matni.
+CREATE TABLE IF NOT EXISTS signal_events (
+    id        BIGSERIAL PRIMARY KEY,
+    signal_id BIGINT NOT NULL,
+    at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    text      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS signal_events_sig ON signal_events (signal_id, at);
+-- 300: ulashish rasmlari (Telegram InlineQueryResultPhoto faqat URL qabul qiladi).
+CREATE TABLE IF NOT EXISTS share_images (
+    key  TEXT PRIMARY KEY,
+    img  BYTEA NOT NULL,
+    at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 -- 282: Earn'ga joylashtirish arizalari (narx `config.DIP_PLACE_PRICE` USDT).
 CREATE TABLE IF NOT EXISTS dip_apps (
     id         BIGSERIAL PRIMARY KEY,
@@ -1308,6 +1328,133 @@ async def audience_stats() -> dict:
         dip = await c.fetchval("SELECT COUNT(DISTINCT user_id) FROM dip_ledger WHERE amount > 0")
     return {"users": r["users"], "m30": r["m30"], "d7": r["d7"], "d1": r["d1"],
             "groups": groups or 0, "dip": dip or 0}
+
+
+# ─── 300: signal tarixi, Earn qayta tekshiruvi, hamkor hisobotlari, ulashish rasmlari, zaxira ───
+
+async def add_signal_event(sig_id: int, text: str) -> None:
+    import re as _re
+    plain = _re.sub(r"<[^>]+>", "", text or "").strip()
+    if not plain:
+        return
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO signal_events (signal_id, text) VALUES ($1,$2)", sig_id, plain[:600])
+
+
+async def signal_events(sig_id: int) -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT at, text FROM signal_events WHERE signal_id=$1 ORDER BY at, id", sig_id)
+
+
+async def earn_recheck_targets(limit: int = 200) -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            SELECT d.task_id, d.user_id, d.reward, d.checks, t.chat_id, t.title
+            FROM dip_task_done d JOIN dip_tasks t ON t.id = d.task_id
+            WHERE t.chat_id IS NOT NULL AND d.revoked_at IS NULL AND (
+                  (d.checks = 0 AND d.at < now() - interval '3 days') OR
+                  (d.checks = 1 AND d.at < now() - interval '7 days'))
+            ORDER BY d.at LIMIT $1""", limit)
+
+
+async def earn_mark_checked(task_id: int, user_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_task_done SET checks = checks + 1 WHERE task_id=$1 AND user_id=$2",
+                        task_id, user_id)
+
+
+async def earn_revoke(task_id: int, user_id: int) -> float | None:
+    """Obunadan chiqqan — DIP qaytariladi (bir marta). Qaytarilgan miqdor yoki None."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            r = await c.fetchval(
+                "UPDATE dip_task_done SET revoked_at=now() WHERE task_id=$1 AND user_id=$2 AND revoked_at IS NULL "
+                "RETURNING reward", task_id, user_id)
+            if r is None:
+                return None
+            await c.execute("INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'task_revoke')",
+                            user_id, -r)
+    return float(r)
+
+
+async def partner_remind_targets() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            SELECT t.id, t.title, t.expires_at, a.user_id FROM dip_tasks t JOIN dip_apps a ON a.id = t.app_id
+            WHERE t.active AND NOT t.remind_sent AND t.expires_at IS NOT NULL
+              AND t.expires_at > now() AND t.expires_at < now() + interval '3 days'""")
+
+
+async def partner_report_targets() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            SELECT t.id, t.title, t.expires_at, a.user_id,
+                   (SELECT COUNT(*) FROM dip_task_done d WHERE d.task_id=t.id AND d.revoked_at IS NULL) AS total,
+                   (SELECT COUNT(*) FROM dip_task_done d WHERE d.task_id=t.id AND d.revoked_at IS NULL
+                      AND d.at > now() - interval '7 days') AS week
+            FROM dip_tasks t JOIN dip_apps a ON a.id = t.app_id
+            WHERE t.active AND (t.expires_at IS NULL OR t.expires_at > now())
+              AND COALESCE(t.report_at, t.created_at) < now() - interval '7 days'""")
+
+
+async def dip_task_mark(task_id: int, *, remind: bool | None = None, report: bool = False) -> None:
+    async with pool().acquire() as c:
+        if remind is not None:
+            await c.execute("UPDATE dip_tasks SET remind_sent=$2 WHERE id=$1", task_id, remind)
+        if report:
+            await c.execute("UPDATE dip_tasks SET report_at=now() WHERE id=$1", task_id)
+
+
+async def dip_task_extend(task_id: int, days: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_tasks SET expires_at = GREATEST(COALESCE(expires_at, now()), now()) "
+                        "+ make_interval(days => $2::int), remind_sent=FALSE, active=TRUE WHERE id=$1", task_id, days)
+
+
+async def share_image_put(key: str, img: bytes) -> None:
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO share_images (key, img) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE "
+                        "SET img=EXCLUDED.img, at=now()", key, img)
+        await c.execute("DELETE FROM share_images WHERE at < now() - interval '30 days'")
+
+
+async def share_image_get(key: str) -> bytes | None:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT img FROM share_images WHERE key=$1", key)
+
+
+async def dip_journal(limit: int = 30) -> tuple[dict, list[asyncpg.Record]]:
+    async with pool().acquire() as c:
+        tot = await c.fetchrow("""
+            SELECT COALESCE(SUM(amount) FILTER (WHERE amount > 0 AND reason NOT IN ('withdraw_refund')), 0) AS given,
+                   COALESCE(-SUM(amount) FILTER (WHERE reason = 'withdraw'), 0)
+                     - COALESCE(SUM(amount) FILTER (WHERE reason = 'withdraw_refund'), 0) AS out,
+                   COALESCE(-SUM(amount) FILTER (WHERE reason = 'task_revoke'), 0) AS revoked,
+                   COALESCE(SUM(amount), 0) AS balance, COUNT(DISTINCT user_id) AS holders
+            FROM dip_ledger""")
+        rows = await c.fetch("""
+            SELECT l.user_id, l.amount, l.reason, l.created_at, u.username, u.first_name
+            FROM dip_ledger l LEFT JOIN users u ON u.user_id = l.user_id
+            ORDER BY l.id DESC LIMIT $1""", limit)
+    return dict(tot), rows
+
+
+async def backup_rows() -> dict:
+    """300: DIP va taklif jadvallari zaxirasi (rasmlarsiz)."""
+    q = {
+        "dip_ledger": "SELECT * FROM dip_ledger ORDER BY id",
+        "dip_withdrawals": "SELECT * FROM dip_withdrawals ORDER BY id",
+        "dip_tasks": "SELECT id, kind, title, url, chat_id, reward, active, app_id, created_at, expires_at, note FROM dip_tasks ORDER BY id",
+        "dip_task_done": "SELECT * FROM dip_task_done",
+        "dip_apps": "SELECT * FROM dip_apps ORDER BY id",
+        "referrals": "SELECT * FROM referrals",
+        "users": "SELECT user_id, username, first_name, first_seen, last_seen FROM users",
+    }
+    out = {}
+    async with pool().acquire() as c:
+        for k, sql in q.items():
+            out[k] = [dict(r) for r in await c.fetch(sql)]
+    return out
 
 
 async def dip_pending(user_id: int) -> float:

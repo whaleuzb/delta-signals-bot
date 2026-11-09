@@ -59,6 +59,8 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
    (faqat bosilganda ishlaydi — doimiy animatsiya yo'q, 257) */
 .glass{transition:transform .25s var(--ease),border-color .35s,box-shadow .35s}
 .glass.tap{border-color:rgba(194,242,58,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 1px rgba(194,242,58,.12),0 14px 34px rgba(0,0,0,.4)}
+.hist{margin-top:10px}.hrow{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.hdot{width:8px;height:8px;border-radius:50%;background:var(--g);margin-top:5px;flex:none;box-shadow:0 0 0 3px rgba(194,242,58,.15)}
 .ttabs{display:flex;gap:18px;border-bottom:1px solid rgba(255,255,255,.08);margin:-2px 0 0}
 .ttabs a{padding:4px 0 10px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .ttabs a.on{color:var(--ink);border-bottom-color:var(--ink)}
@@ -582,6 +584,10 @@ var COINS=__COINS__;
 function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase().replace(/(USDT|USDC|BUSD|USD|PERP)$/,'').toLowerCase();
  if(COINS.indexOf(b)>=0)return'<img src="/coins/'+b+'.svg" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none">';
  return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>'}
+/* 300: natijani ulashish — rasm + matn + "Botni ochish" (referal ulashishdek) */
+function sigShare(id){toast(esc(t('wait')));api('act',{sig:id,action:'share'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg)}catch(e){}
+ if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
+ if(d&&d.link){refShareUrl(d.link);return}toast(esc(noEmoji(String(r.msg||'Error').replace(/<[^>]+>/g,''))))}).catch(function(){toast('Error')})}
 function termTab(k){var g=S.page;if(!g||g.ttab==k)return;g.ttab=k;tick();termRender()}
 function termMore(){var g=S.page;g.more=!g.more;tick();termRender()}
 function tpslSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt,dis){return'<button class="btn '+cls+'" style="margin:0" '+(dis?'disabled ':'')+'onclick="sheetClose();'+on+'">'+txt+'</button>'};
@@ -596,11 +602,17 @@ function termInfo(i){var g=S.page,L=i.lev||1,dir=i.side=='LONG'?1:-1,pend=i.stat
  var risk=i.sl!=null?pAt(+i.sl):null,rew=nextTp!=null?pAt(+nextTp):null,rr=(risk!=null&&rew!=null&&risk<0)?(rew/-risk):null;
  var liq=L>1?e*(1-dir/L):null,note=al?(al*L):null,qty=note?note/e:null,vol=qty&&pr?qty*pr:note;
  var it=function(k,v,c){return'<div class="mci"><span>'+esc(t(k))+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
- var tabs='<div class="ttabs">'+[['pos',t('t_tab_pos')+(pend?'':' (1)')],['ord',t('t_tab_ord')+(nOrd?' ('+nOrd+')':'')]].map(function(x){return'<a class="'+(g.ttab==x[0]?'on':'')+'" onclick="termTab(\''+x[0]+'\')">'+esc(x[1])+'</a>'}).join('')+'</div>';
+ var tabs='<div class="ttabs">'+[['pos',t('t_tab_pos')+(pend?'':' (1)')],['ord',t('t_tab_ord')+(nOrd?' ('+nOrd+')':'')],['hist',t('t_tab_hist')]].map(function(x){return'<a class="'+(g.ttab==x[0]?'on':'')+'" onclick="termTab(\''+x[0]+'\')">'+esc(x[1])+'</a>'}).join('')+'</div>';
  var h='<div class="tile2 glass" style="margin-top:10px;padding:14px 14px 12px">'+tabs;
  if(g.ttab=='ord'){var rows=[];if(pend)rows.push([t('t_entry_ord'),fp(e),"act("+i.id+",'close')"]);(i.adds||[]).forEach(function(p){rows.push([t('t_lim_add'),fp(p),"act("+i.id+",'limx')"])});
   h+=rows.length?rows.map(function(r){return'<div class="ordrow"><div>'+coinIc(i.symbol,20)+'<div><b>'+esc(i.symbol)+'</b><span class="rs">'+esc(r[0])+'</span></div></div><b>'+r[1]+'</b><button class="btn d" style="flex:none;width:auto;margin:0;padding:8px 12px" onclick="'+r[2]+'">'+esc(t('cancel'))+'</button></div>'}).join('')
    :'<div class="rs" style="text-align:center;padding:18px 0">'+esc(t('t_no_ord'))+'</div>';
+  return h+'</div>'}
+ if(g.ttab=='hist'){if(!g.hist||g.hist.sig!=i.id){h+='<div class="spk" style="margin-top:12px"><div class="sk"></div></div>';api('sighist',{sig:i.id}).then(function(d){if(S.page!==g)return;d.sig=i.id;g.hist=d;termRender()}).catch(function(){});return h+'</div>'}
+  var E=[];if(g.hist.created)E.push({at:g.hist.created,text:t('t_created')});if(g.hist.opened)E.push({at:g.hist.opened,text:t('t_open_ev')});
+  (g.hist.events||[]).forEach(function(x){E.push(x)});E.sort(function(a,b){return a.at<b.at?1:-1});
+  h+=E.length?'<div class="hist">'+E.map(function(x){var d=new Date(x.at);return'<div class="hrow"><span class="hdot"></span><div><div class="rs">'+('0'+d.getDate()).slice(-2)+'.'+('0'+(d.getMonth()+1)).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+'</div><div style="font-size:13px;line-height:1.4;margin-top:2px">'+esc(x.text)+'</div></div></div>'}).join('')+'</div>'
+   :'<div class="rs" style="text-align:center;padding:18px 0">'+esc(t('t_no_hist'))+'</div>';
   return h+'</div>'}
  h+='<div style="display:flex;align-items:center;gap:9px;margin:12px 0 12px">'+coinIc(i.symbol,26)+'<b style="font-size:17px;letter-spacing:-.01em">'+esc(i.symbol)+'</b><span class="b bx">'+(L>1?'Futures '+L+'x':'Spot')+'</span>'+(L>1||dir<0?'<span class="b '+(dir>0?'bl':'bs')+'">'+i.side+'</span>':'')+'</div>';
  if(!pend)h+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px"><div><span class="rs">'+esc(t('t_pnl'))+'</span><div class="'+cl(un)+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+(uM!=null?sg(uM):'—')+'</div></div>'
@@ -613,6 +625,7 @@ function termInfo(i){var g=S.page,L=i.lev||1,dir=i.side=='LONG'?1:-1,pend=i.stat
   if(!pend)h+=it('t_closed',Math.round((i.filled||0)*100)+'%')+it('t_rpnl',re?(al?sg(rM):fpc(re)):'0',cl(re||null))+it('t_total',tot!=null?(al?sg(mo(tot)):fpc(tot)):'—',cl(tot))+it('t_opened',i.opened?rel(i.opened):'—');
   h+='</div>';if(!al&&!pend)h+='<div class="rs" style="margin-top:10px">'+esc(t('t_nosize'))+'</div>'}
  h+='<div class="mcb">'+(pend?'<button class="btn" onclick="askEntry('+i.id+')">'+ic('pen',13)+' '+esc(t('entry_btn'))+'</button>':'<button class="btn" onclick="tpslSheet('+i.id+')">TP/SL</button>')
+  +(pend?'':'<button class="btn" onclick="sigShare('+i.id+')">'+esc(t('t_share'))+'</button>')
   +'<button class="btn" onclick="termMore()">'+esc(t('t_more'))+' '+(g.more?'▴':'▾')+'</button>'
   +'<button class="btn" onclick="'+(pend?"act("+i.id+",'close')":"sellSheet("+i.id+")")+'">'+esc(pend?t('cancel'):t('close'))+'</button></div>';
  return h+'</div>'}

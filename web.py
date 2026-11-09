@@ -373,6 +373,15 @@ async def task_logo_png(request):
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
+async def share_jpg(request):
+    """300: signal natijasini ulashish rasmi (bot yaratadi, bazada 30 kun)."""
+    data = await db.share_image_get(request.match_info["key"])
+    if not data:
+        raise web.HTTPNotFound()
+    return web.Response(body=bytes(data), content_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def mini_png(request):
     """Bitta yopilgan savdoning kichik grafigi.
 
@@ -456,6 +465,7 @@ def build_app() -> web.Application:
         web.get(r"/g/{wid:\d+}/logo.png", logo_png),
         web.get(r"/av/{key:[A-Za-z0-9_-]{8,20}}.jpg", avatar_jpg),
         web.get(r"/tl/{tid:\d+}.png", task_logo_png),
+        web.get(r"/sc/{key:[A-Za-z0-9_-]{8,20}}.jpg", share_jpg),
         web.get(r"/s/{sid:\d+}/mini.png", mini_png),
     ])
     # 238: Mini App (bosh sahifa + ochiq signallar boshqaruvi).

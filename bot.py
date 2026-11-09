@@ -15,7 +15,7 @@ import re
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as dtime
 from urllib.parse import urlencode
 
 import asyncpg
@@ -1368,6 +1368,63 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
+async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
+    """300: signal natijasini ulashish — rasm (pnl kartasi, jonli narx bilan) + matn + tugma
+    (taklif havolasi), referal ulashishdek `savePreparedInlineMessage` + `shareMessage`."""
+    ws = await db.get_workspace(sig["workspace_id"])
+    code, link = await referral_token(uid, ctx.bot.username)
+    if not link or not config.WEB_URL:
+        return False, i18n.t("ref.no_link", lang)
+    L = lev(sig)
+    price = await safe_last_price(sig["market"], sig["symbol"], fresh=True)
+    if sig["status"] in ("CLOSED", "TP", "SL", "BE") or sig["exit_price"] is not None and sig["closed_at"]:
+        ex, pnl = float(sig["exit_price"]), float(sig["pnl_pct"] or 0) * L
+    elif price:
+        filled = float(sig["filled_pct"] or 0)
+        realized = float(sig["realized_pct"] or 0)
+        ex = float(price)
+        pnl = (realized + max(0.0, 1 - filled) * tracker.pnl_at(sig["side"], float(sig["entry"]), ex)) * L
+    else:
+        return False, i18n.t("man.add_no_price", lang)
+    logo = None
+    try:
+        logo = await db.workspace_logo(ws["id"])
+    except Exception:
+        pass
+    try:
+        u = await db.get_user(sig["author_id"]) if sig["author_id"] else None
+    except Exception:
+        u = None
+    buf = card.pnl_card(symbol=sig["symbol"], side=sig["side"], entry=float(sig["entry"]), exit_price=ex,
+                        pnl_pct=pnl, leverage=L, r_multiple=None, closed_at=datetime.now(stats.TZ),
+                        username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
+                        qr_url=link, sig_id=sig["id"], market=sig["market"], qr_code=code, lang=lang)
+    img = Image.open(buf).convert("RGB")
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=88)
+    import secrets as _sec
+    key = _sec.token_urlsafe(10)
+    await db.share_image_put(key, out.getvalue())
+    from telegram import InlineQueryResultPhoto
+    import uuid as _uuid
+    side = sig["side"] + (f" {L}x" if L > 1 else "")
+    cap = i18n.t("share.caption", lang, sym=html.escape(sig["symbol"]), side=side,
+                 pnl=f"{'+' if pnl >= 0 else ''}{pnl:.2f}", ws=html.escape(ws["name"]))
+    url = f"{config.WEB_URL}/sc/{key}.jpg"
+    res = InlineQueryResultPhoto(
+        id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=url, photo_width=img.width, photo_height=img.height,
+        caption=cap, parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("share.btn", lang), url=link, api_kwargs={"style": "success"})]]))
+    try:
+        pm = await ctx.bot.save_prepared_inline_message(
+            user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True, allow_channel_chats=True)
+    except Exception as e:
+        log.warning("Natija posti tayyorlanmadi: %s", e)
+        return False, json.dumps({"link": link})
+    return True, json.dumps({"id": pm.id, "link": link})
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -1446,6 +1503,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
     if not ws or not await can_manage_signal(ctx.bot, uid, ws, sig):
         return False, i18n.t("man.no_right", lang)
     act, arg = a["action"], (float(a["arg"]) if a["arg"] is not None else None)
+    if act == "share":
+        return await _app_sigshare(ctx, uid, lang, sig)
     if act == "be":
         err = await act_be(ctx, ws, sig, lang)
         return (False, err) if err else (True, i18n.t("app.be_ok", lang))
@@ -1698,7 +1757,11 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
     Shu sabab uchala yo'l endi SHU funksiyani chaqiradi.
 
     Hech narsa chiqmasa ham xabar KETADI: albom -> bitta rasm -> oddiy matn.
-    """
+        try:
+        await db.add_signal_event(sig["id"], txt)      # 300: terminal "Tarix"
+    except Exception:
+        log.warning("Signal hodisasi yozilmadi (#%s)", sig["id"])
+"""
     sid = sig["id"]
     photo = share = None
     show_id = ws["type"] != "group"      # 220: guruh/kanalda raqam yo'q
@@ -2849,6 +2912,10 @@ async def handle_add_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bo
 
 async def notify_group(ctx, ws, sig, text: str) -> None:
     """O'zgarishni guruhga — asl signal postiga javob qilib yozadi."""
+    try:
+        await db.add_signal_event(sig["id"], text)     # 300: terminal "Tarix"
+    except Exception:
+        log.warning("Signal hodisasi yozilmadi (#%s)", sig["id"])
     if ws["type"] == "group" and ws["group_chat_id"]:
         try:
             await ctx.bot.send_message(
@@ -3881,6 +3948,141 @@ async def dip_task_logo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     for r in rows:
         await refresh_task_logo(ctx.bot, r)
+
+
+async def earn_recheck_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """300: Earn — obuna 3 va 7 kundan keyin qayta tekshiriladi; chiqib ketgan bo'lsa DIP qaytariladi.
+    Telegram xatosi bo'lsa (bot adminlikdan olingan va h.k.) — hech narsa qilinmaydi, keyin qayta."""
+    try:
+        rows = await db.earn_recheck_targets()
+    except Exception:
+        log.exception("Earn qayta tekshiruvi: o'qilmadi")
+        return
+    for r in rows:
+        try:
+            m = await ctx.bot.get_chat_member(r["chat_id"], r["user_id"])
+        except Exception as e:
+            log.info("Earn qayta tekshiruv (#%s %s): %s", r["task_id"], r["user_id"], e)
+            continue
+        if m.status in ("member", "administrator", "creator", "restricted"):
+            await db.earn_mark_checked(r["task_id"], r["user_id"])
+            continue
+        amt = await db.earn_revoke(r["task_id"], r["user_id"])
+        if amt:
+            try:
+                ul = await user_lang(r["user_id"])
+                await ctx.bot.send_message(r["user_id"], i18n.t("earn.revoked", ul, n=f"{amt:g}",
+                                                                 title=html.escape(r["title"])), parse_mode=ParseMode.HTML)
+            except Exception:
+                pass
+
+
+async def partner_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """300: hamkorlarga (Earn arizasi orqali joylashganlar) — muddat tugashidan 3 kun oldin
+    eslatma ("Uzaytirish" tugmasi) va haftalik hisobot."""
+    try:
+        for r in await db.partner_remind_targets():
+            ul = await user_lang(r["user_id"])
+            try:
+                await ctx.bot.send_message(
+                    r["user_id"], i18n.t("earn.p_remind", ul, title=html.escape(r["title"]),
+                                         date=f"{r['expires_at'].astimezone(stats.TZ):%d.%m.%Y}",
+                                         price=f"{config.DIP_PLACE_PRICE:g}"),
+                    parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                        i18n.t("earn.p_extend", ul), callback_data=f"dipext:{r['id']}", api_kwargs={"style": "success"})]]))
+            except Exception:
+                pass
+            await db.dip_task_mark(r["id"], remind=True)
+        for r in await db.partner_report_targets():
+            ul = await user_lang(r["user_id"])
+            till = f"{r['expires_at'].astimezone(stats.TZ):%d.%m.%Y}" if r["expires_at"] else "∞"
+            try:
+                await ctx.bot.send_message(r["user_id"], i18n.t("earn.p_report", ul, title=html.escape(r["title"]),
+                                                                week=r["week"], total=r["total"], till=till),
+                                           parse_mode=ParseMode.HTML)
+            except Exception:
+                pass
+            await db.dip_task_mark(r["id"], report=True)
+    except Exception:
+        log.exception("Hamkor eslatma/hisobot siklida xato")
+
+
+async def on_dip_extend(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """300: hamkor "Uzaytirish" bosdi → adminlarga so'rov; admin "+30 kun" → muddat uzayadi."""
+    q = update.callback_query
+    parts = q.data.split(":")
+    if parts[0] == "dipext":
+        t_ = await db.dip_task_get(int(parts[1]))
+        if not t_:
+            await q.answer()
+            return
+        ul = await user_lang(q.from_user.id)
+        await q.answer(i18n.t("earn.p_ext_sent", ul), show_alert=True)
+        who = await _dip_who(ctx, q.from_user.id)
+        await _dip_admins(ctx, f"🔁 <b>Earn uzaytirish so'rovi</b>\nVazifa #{t_['id']}: {html.escape(t_['title'])}\n"
+                               f"Kim: {who}\nNarx: {config.DIP_PLACE_PRICE:g} USDT / {config.DIP_PLACE_DAYS} kun",
+                          InlineKeyboardMarkup([[InlineKeyboardButton(
+                              f"✅ +{config.DIP_PLACE_DAYS} kun", callback_data=f"dipextok:{t_['id']}:{q.from_user.id}",
+                              api_kwargs={"style": "success"})]]))
+        return
+    if not is_admin(q.from_user.id):
+        await q.answer()
+        return
+    tid, puid = int(parts[1]), int(parts[2])
+    await db.dip_task_extend(tid, config.DIP_PLACE_DAYS)
+    t_ = await db.dip_task_get(tid)
+    await q.answer("OK")
+    try:
+        await q.edit_message_text(q.message.text_html + f"\n\n<b>✅ Uzaytirildi: {t_['expires_at'].astimezone(stats.TZ):%d.%m.%Y} gacha</b>",
+                                  parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+    try:
+        ul = await user_lang(puid)
+        await ctx.bot.send_message(puid, i18n.t("earn.p_extended", ul, title=html.escape(t_["title"]),
+                                                date=f"{t_['expires_at'].astimezone(stats.TZ):%d.%m.%Y}"),
+                                   parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+
+
+async def backup_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """300: kunlik zaxira — DIP va taklif jadvallari JSON (gzip) adminlarga hujjat sifatida."""
+    import gzip
+    try:
+        data = await db.backup_rows()
+    except Exception:
+        log.exception("Zaxira: o'qilmadi")
+        return
+    raw = gzip.compress(json.dumps(data, default=str, ensure_ascii=False).encode())
+    name = f"tc-dip-backup-{datetime.now(stats.TZ):%Y%m%d-%H%M}.json.gz"
+    cap = (f"📦 Kunlik zaxira (DIP, takliflar, foydalanuvchilar)\n"
+           + " · ".join(f"{k}: {len(v)}" for k, v in data.items()))
+    for admin in config.ADMIN_IDS:
+        try:
+            await ctx.bot.send_document(admin, InputFile(io.BytesIO(raw), filename=name), caption=cap,
+                                        disable_notification=True)
+        except Exception as e:
+            log.warning("Zaxira adminga yuborilmadi (%s): %s", admin, e)
+
+
+async def _admin_diplog_view() -> tuple[str, InlineKeyboardMarkup]:
+    tot, rows = await db.dip_journal(30)
+    R = {"referral": "taklif", "task": "Earn", "task_revoke": "Earn qaytarildi", "withdraw": "chiqarish",
+         "withdraw_refund": "chiqarish qaytdi", "test": "test"}
+    lines = ["<b>💎 DIP jurnali</b>", "",
+             f"Berilgan: <b>{float(tot['given']):g}</b> · Chiqarilgan: <b>{float(tot['out']):g}</b> · "
+             f"Qaytarilgan: <b>{float(tot['revoked']):g}</b>",
+             f"Jami balanslar: <b>{float(tot['balance']):g} DIP</b> (≈ ${float(tot['balance']) / 100:,.2f}) · "
+             f"{tot['holders']} kishi", "", "<b>Oxirgi 30 harakat:</b>"]
+    for r in rows:
+        who = ("@" + r["username"]) if r["username"] else (r["first_name"] or str(r["user_id"]))
+        a = float(r["amount"])
+        lines.append(f"{r['created_at'].astimezone(stats.TZ):%d.%m %H:%M} · {html.escape(who)} · "
+                     f"<b>{'+' if a >= 0 else ''}{a:g}</b> · {R.get(r['reason'], r['reason'])}")
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("📦 Zaxirani hozir yuborish", callback_data="adm:backup")],
+                               [InlineKeyboardButton("⬅️ Orqaga", callback_data="adm:home")]])
+    return "\n".join(lines), kb
 
 
 async def dip_avatar_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -6753,6 +6955,10 @@ async def poll_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             txt = i18n.t(key, lang, sid=sid, sym=sym) if key else ""
         if not txt:
             continue
+        try:
+            await db.add_signal_event(sid, txt)        # 300: terminal "Tarix"
+        except Exception:
+            log.warning("Signal hodisasi yozilmadi (#%s)", sid)
 
         sig = await db.get_signal(sid)
 
@@ -8075,6 +8281,7 @@ def admin_home_kb(lang: str | None = None) -> InlineKeyboardMarkup:
          InlineKeyboardButton(i18n.t("adm.btn_pdf_channels", lang), callback_data="adm:pdfc")],
         [InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu"),
          InlineKeyboardButton("📣 Earn vazifalari", callback_data="adm:earn")],
+        [InlineKeyboardButton("💎 DIP jurnali", callback_data="adm:diplog")],
     ])
 
 
@@ -8445,6 +8652,11 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "home":
         await q.edit_message_text(i18n.t("adm.home", lang), parse_mode=ParseMode.HTML,
                                    reply_markup=admin_home_kb(lang))
+    elif action == "diplog":
+        txt, kb = await _admin_diplog_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action == "backup":
+        await backup_job(ctx)
     elif action == "earn":
         AWAITING_EARN.pop(q.from_user.id, None)
         txt, kb = await _admin_earn_view()
@@ -11279,6 +11491,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_dip_withdraw, pattern=r"^dipw:(ok|no|retry):\d+$"))
     app.add_handler(CallbackQueryHandler(on_dip_app, pattern=r"^dipapp:(ok|no):\d+:\d+$"))
     app.add_handler(CallbackQueryHandler(on_dip_task_toggle, pattern=r"^dipt:(on|off):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_dip_extend, pattern=r"^(dipext:\d+|dipextok:\d+:\d+)$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_signal_copy, pattern=r"^sigcopy:"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))
@@ -11382,6 +11595,9 @@ def main() -> None:
     app.job_queue.run_repeating(dip_avatar_job, interval=900, first=120)
     app.job_queue.run_repeating(dip_task_logo_job, interval=1800, first=45)
     app.job_queue.run_repeating(verify_tasks_job, interval=600, first=30)
+    app.job_queue.run_repeating(earn_recheck_job, interval=3600, first=300)
+    app.job_queue.run_repeating(partner_job, interval=6 * 3600, first=600)
+    app.job_queue.run_daily(backup_job, time=dtime(hour=3, minute=17, tzinfo=stats.TZ))
     app.job_queue.run_repeating(app_action_job, interval=2, first=15)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)

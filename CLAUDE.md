@@ -7742,3 +7742,29 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `verify_tasks_job` (10 daqiqada, ishga tushganda 30s) — keyinroq admin
      qilingan kanallarni avtomatik "tekshiriladi" qiladi. Bot/havola
      vazifalari tekshiruvsiz qoladi.
+300. **To'plam: Earn qayta tekshiruvi, hamkorlar, natijani ulashish, signal
+     tarixi, zaxira.**
+     *(1) Earn:* `dip_task_done.checks/revoked_at`; `earn_recheck_job`
+     (soatda) obunani 3 va 7 kundan keyin qayta tekshiradi — chiqib ketgan
+     bo'lsa `earn_revoke` (ledger reason='task_revoke', bir marta) va
+     foydalanuvchiga xabar; Telegram xatosida hech narsa qilinmaydi. Ilova
+     matni: "3, 7 kundan keyin qayta tekshiriladi".
+     *(3) Hamkorlar* (ariza orqali joylashganlar, `dip_tasks.app_id`):
+     `partner_job` (6 soatda) — tugashidan 3 kun oldin eslatma + "🔁
+     Uzaytirish" (`dipext:` → adminlarga so'rov → "✅ +30 kun" `dipextok:`
+     → `dip_task_extend`, hamkorga xabar); haftalik hisobot (7 kunda
+     qo'shilganlar, jami tekshirilgan). `remind_sent`, `report_at`.
+     *(4) Ulashish:* terminal kartasida "Ulashish" → `share` amali
+     (`_app_sigshare`): `card.pnl_card` jonli narx bilan → JPEG
+     `share_images` (30 kun) → `GET /sc/<key>.jpg` → InlineQueryResultPhoto
+     (matn `share.caption`, tugma "🚀 Botni ochish" — ulashuvchining taklif
+     havolasi) → `save_prepared_inline_message` → `tg.shareMessage`
+     (referal ulashishdek).
+     *(5) Tarix:* `signal_events` — `notify_group`, `poll_job` hodisalari va
+     `send_close_result` matni (teglarsiz) yoziladi; `POST /api/app/sighist`;
+     terminalda "Tarix" yorlig'i (yaratildi/ochildi + hodisalar, yangisi
+     tepada). Eski signallarda faqat yaratildi/ochildi.
+     *(10) Zaxira:* `backup_job` har kuni 03:17 (Toshkent) — DIP jadvallari,
+     takliflar, foydalanuvchilar JSON.gz hujjat adminlarga; admin panel
+     "💎 DIP jurnali" (`adm:diplog`): berilgan/chiqarilgan/qaytarilgan, jami
+     balans, oxirgi 30 harakat, "📦 Zaxirani hozir yuborish".
