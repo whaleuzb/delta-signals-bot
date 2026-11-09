@@ -372,7 +372,7 @@ async def process(sig) -> list[dict]:
             filled += share
             tp_hit += 1
             events.append({"type": "TP", "n": tp_hit, "price": price,
-                           "share": share, "running": realized})
+                           "share": share, "running": realized, "at_ms": c.close_ms})
 
             # `tp_hit < len(tps)` SHART: aks holda YAGONA (yoki oxirgi) TP
             # TP1'ning o'zida bajarilganda ham (pozitsiya SHU YERDA 100%
@@ -432,6 +432,14 @@ async def process(sig) -> list[dict]:
         # Qator orada o'zgargan — hech narsa yozilmadi, hodisalar ham
         # yuborilmasin (keyingi siklda yangi holat bilan qaytadan).
         return []
+    # 320: TP tegishlari — grafikda sotuv belgisi (vaqt va narx)
+    for e in events:
+        if e.get("type") == "TP" and e.get("share", 0) > 0:
+            try:
+                await db.add_fill(sig["id"], datetime.fromtimestamp(e["at_ms"] / 1000, timezone.utc),
+                                  float(e["price"]), float(e["share"]), "tp")
+            except Exception:
+                log.warning("TP belgisi yozilmadi (#%s)", sig["id"], exc_info=True)
     # 228: likvidatsiya alohida belgilanadi (hisobotlarda "💥 Likvidatsiya").
     if any(e.get("liq") for e in events):
         await db.mark_liquidated(sig["id"])
@@ -568,6 +576,10 @@ async def partial_close(sig_id: int, portion: float, _retry: bool = False) -> di
         log.info("Qisman yopish paytida qator o'zgargan (#%s) — qayta urinamiz", sig_id)
         return await partial_close(sig_id, portion, _retry=True)
 
+    try:   # 320: qo'lda qisman yopish — grafikda sotuv belgisi
+        await db.add_fill(sig_id, datetime.now(timezone.utc), float(price), float(share), "manual")
+    except Exception:
+        log.warning("Qisman yopish belgisi yozilmadi (#%s)", sig_id, exc_info=True)
     return {"type": "PARTIAL_CLOSE", "signal_id": sig_id,
             "workspace_id": sig["workspace_id"], "symbol": sig["symbol"],
             "share": share, "price": price, "running": round(realized, 4),

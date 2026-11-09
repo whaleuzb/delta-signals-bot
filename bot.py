@@ -1354,10 +1354,16 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
-def _card_marks(sig, closed: bool = False) -> list:
-    """317: kartadagi kirish (va yopilganda chiqish) belgilari: (ms, narx, xaridmi)."""
+async def _card_marks(sig, closed: bool = False) -> list:
+    """317/320: kartadagi belgilar: (ms, narx, xaridmi) — kirish, bajarilgan qo'shimcha
+    limitlar (kirish tomoni), qisman sotishlar (chiqish tomoni), yopilganda chiqish."""
     long_ = sig["side"] == "LONG"
     out = []
+    try:
+        for m in await db.signal_marks(sig["id"]):
+            out.append((int(m["at"].timestamp() * 1000), m["price"], long_ if m["kind"] == "add" else not long_))
+    except Exception:
+        log.warning("Karta belgilari o'qilmadi (#%s)", sig["id"], exc_info=True)
     ef = sig["entry_first"] if sig["entry_first"] is not None else sig["entry"]
     if sig["opened_at"]:
         out.append((int(sig["opened_at"].timestamp() * 1000), float(ef), long_))
@@ -1467,7 +1473,7 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                          qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang,
                          bot_logo=await _bot_logo(ctx.bot),
                          liq=parsing.liq_price(sig["side"], float(sig["entry"]), L),
-                         marks=_card_marks(sig))
+                         marks=await _card_marks(sig))
     img = Image.open(buf).convert("RGB")
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=88)
@@ -1925,7 +1931,7 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         bot_logo=(await _bot_logo(bot)) if bot else None, closed=True,
         r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
         liq=parsing.liq_price(sig["side"], float(sig["entry"]), L),
-        marks=_card_marks(sig, closed=True))
+        marks=await _card_marks(sig, closed=True))
 
 
 async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:

@@ -503,7 +503,9 @@ function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=nu
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
 function termMarks(i){var M=[];
  if(i.df){var s=S.dfs;(s&&s.trades||[]).forEach(function(z){if(z.symbol==i.symbol&&z.ts)M.push({t:z.ts*1000,p:+z.price,buy:String(z.side).toLowerCase()=='buy'})});return M}
- if(i.opened&&i.status!='PENDING')M.push({t:Date.parse(i.opened),p:+(i.entry_first||i.entry),buy:i.side=='LONG'});return M}
+ if(i.opened&&i.status!='PENDING')M.push({t:Date.parse(i.opened),p:+(i.entry_first||i.entry),buy:i.side=='LONG'});
+ /* 320: qo'shimcha limitlar (kirish tomoni) va qisman sotishlar (chiqish tomoni) */
+ (i.marks||[]).forEach(function(m){if(m.t)M.push({t:Date.parse(m.t),p:+m.p,buy:(m.k=='add')==(i.side=='LONG')})});return M}
 function termLines(i,g){if(i.df)return dfLines(i,g);var L=[],pend=i.status=='PENDING';
  /* 316: TP/SL da kutilayotgan natija ($, summa yo'q bo'lsa %), kirishda — unrealized */
  var e=+i.entry,dir=i.side=='LONG'?1:-1,lv=i.lev||1,al=i.alloc,rest=Math.max(0,1-(i.filled||0)),

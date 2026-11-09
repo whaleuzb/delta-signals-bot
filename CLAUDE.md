@@ -7903,3 +7903,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Karta: `open_card(..., marks=[(ms, narx, xaridmi)])` — `bot._card_marks(sig, closed)`: kirish (`opened_at`, `entry_first`) va yopilganda chiqish (`closed_at`, `exit_price`, teskari tomon). Karta yorliqlari ham ramkasiz.
 - 318: foydalanuvchi "yopilgan kartada tp sl liquidation avg price shart emas. Faqat kirib chiqilgan joylari belgisi ko'rinsa yetadi." — `open_card(closed=True)`: daraja chiziqlari/yorliqlari (TP/SL/IN/LIQ) va joriy narx nuqtasi yo'q; masshtab faqat shamlar + kirish/chiqish narxlari; yorliq ustuni yo'q — shamlar panelning ~94% kengligida. Ochiq karta o'zgarmagan.
 - 319: foydalanuvchi "belgilar rangi sham bilan bir xil bo'lib ko'rinmay qolyapti. oq va sariq ranglarni qo'y" — belgilar: xarid oq, sotuv sariq (#FFC83D), markazda qora nuqta belgi rangida halqa bilan; ilova terminallari va karta birga.
+
+## 320. Grafik belgilari: qo'shimcha limitlar va qisman sotishlar
+- Foydalanuvchi: "qo'shimcha limit tarixi ham belgilar bo'lsin, shuningdek bir qismi sotilsa ham o'sha narxga belgi qo'yilsin".
+- Qo'shimcha limitlar: `signal_adds` (status FILLED, `filled_at`, `price`) — eski ma'lumot ham bor.
+- Qisman sotishlar ilgari vaqt/narx bilan saqlanmasdi → yangi jadval `signal_fills` (signal_id, at, price, share, kind tp|manual). Yoziladi: `tracker.process` — TP tegishi (sham `close_ms`, TP narxi; TP hodisasiga `at_ms` qo'shildi), saqlash muvaffaqiyatli bo'lgandan keyin; `tracker.partial_close` — joriy narx, hozirgi vaqt. Faqat bundan keyingilar uchun.
+- `db.signal_marks(sig_id)` → [{at, price, kind: add|fill}]. `/api/app/open` elementida `marks`; `termMarks` — add = kirish tomoni, fill = chiqish tomoni (LONG: kirish ▲ oq, chiqish ▼ sariq; SHORT teskari). Karta: `bot._card_marks` (endi async) shu belgilarni ham qo'shadi.
+- Sinov: `test_320.py` 4/4; test_tracker ✅.

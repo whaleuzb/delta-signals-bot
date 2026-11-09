@@ -616,6 +616,16 @@ CREATE TABLE IF NOT EXISTS signal_events (
     text      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS signal_events_sig ON signal_events (signal_id, at);
+-- 320: qisman sotishlar (TP tegishi, qo'lda qisman yopish) — grafik belgilari uchun vaqt va narx.
+CREATE TABLE IF NOT EXISTS signal_fills (
+    id        BIGSERIAL PRIMARY KEY,
+    signal_id BIGINT NOT NULL,
+    at        TIMESTAMPTZ NOT NULL,
+    price     NUMERIC NOT NULL,
+    share     NUMERIC,
+    kind      TEXT NOT NULL            -- tp | manual
+);
+CREATE INDEX IF NOT EXISTS signal_fills_sig ON signal_fills (signal_id, at);
 -- 300: ulashish rasmlari (Telegram InlineQueryResultPhoto faqat URL qabul qiladi).
 -- 315: News Trade postini ulashish (Mini App shareMessage) — post rasmi va matni.
 CREATE TABLE IF NOT EXISTS news_share (
@@ -1423,6 +1433,24 @@ async def share_image_put(key: str, img: bytes) -> None:
         await c.execute("INSERT INTO share_images (key, img) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE "
                         "SET img=EXCLUDED.img, at=now()", key, img)
         await c.execute("DELETE FROM share_images WHERE at < now() - interval '30 days'")
+
+
+async def add_fill(sig_id: int, at, price: float, share: float | None, kind: str) -> None:
+    """320: qisman sotish belgisi (grafik)."""
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO signal_fills (signal_id, at, price, share, kind) VALUES ($1,$2,$3,$4,$5)",
+                        sig_id, at, price, share, kind)
+
+
+async def signal_marks(sig_id: int) -> list[dict]:
+    """320: grafik belgilari — bajarilgan qo'shimcha limitlar (kirish tomoni) va
+    qisman sotishlar (chiqish tomoni): [{"at": datetime, "price": float, "kind": "add"|"fill"}]."""
+    async with pool().acquire() as c:
+        adds = await c.fetch("SELECT filled_at AS at, price FROM signal_adds WHERE signal_id=$1 "
+                             "AND status='FILLED' AND filled_at IS NOT NULL", sig_id)
+        fills = await c.fetch("SELECT at, price FROM signal_fills WHERE signal_id=$1", sig_id)
+    return ([{"at": r["at"], "price": float(r["price"]), "kind": "add"} for r in adds] +
+            [{"at": r["at"], "price": float(r["price"]), "kind": "fill"} for r in fills])
 
 
 async def news_share_put(msg_id: int, file_id: str | None, body: str) -> None:

@@ -128,6 +128,7 @@ async def api_open(request):
             "unreal": unreal, "real": realized * L if r["status"] == "ACTIVE" else 0.0,
             "opened": r["opened_at"].isoformat() if r["opened_at"] else None,
             "entry_first": float(r["entry_first"]) if r["entry_first"] is not None else None,
+            "marks": [{"t": _iso(m["at"]), "p": m["price"], "k": m["kind"]} for m in await db.signal_marks(r["id"])],
         })
     return web.json_response({"ws": ws["id"], "items": out}, headers=NO_CACHE)
 
