@@ -7639,3 +7639,18 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      max(env(safe-area-inset-bottom), var(--bot)))`; `--bot` init'da Telegram
      `safeAreaInset.bottom + contentSafeAreaInset.bottom` dan (Telegram iOS
      webview'da `env()` 0 bo'lishi mumkin).
+289. **Signal terminali + menyu aylantirganda yashirinadi.**
+     *Terminal:* signal kartasining sarlavhasi yoki kichik grafigi bosilsa
+     `openTerm(id)` — o'z SVG shamli grafigi (kutubxonasiz, `termSvg`),
+     taymfreym tugmalari (1m…1d; `tf` amali → `db.set_chart_tf`, signal
+     `chart_tf` saqlanadi), chiziqlar: kirish (PENDING bo'lsa suriladi), SL,
+     TP1..N (urilganlari ✓, surilmaydi), kutilayotgan limitlar. Chiziqni
+     barmoq bilan surish (`termBind`, pointer events, `touch-action:none`) →
+     "eski → yangi" paneli → Saqlash: `sl` / `tps` (ro'yxatdagi shu TP
+     almashtiriladi) / `entry` / yangi `limmv` (`db.move_pending_add`,
+     `addlim_check`, guruhga "↕️ qo'shimcha limit a → b"). Shamlar: `POST
+     /api/app/candles` (egasi; 160 sham, 30s kesh, `adds`). Terminal ochiq
+     bo'lsa narx 15 soniyada yangilanadi.
+     *Menyu:* pastga aylantirganda `.nav.hid` (tanga bilan birga yashirinadi),
+     yuqoriga — qaytadi; sahifa oxirida yashirin. iPhone'da oxirgi karta
+     (Dip Funded) menyu ostida qolardi (288 yetmadi).

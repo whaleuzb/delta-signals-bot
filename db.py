@@ -1624,6 +1624,21 @@ async def signal_adds(sig_id: int, status: str | None = None) -> list[asyncpg.Re
         return await c.fetch("SELECT * FROM signal_adds WHERE signal_id=$1 ORDER BY id", sig_id)
 
 
+async def move_pending_add(sig_id: int, old: float, new: float) -> bool:
+    """289: terminalda limit chizig'i surildi — shu narxdagi kutilayotgan limit yangi narxga."""
+    async with pool().acquire() as c:
+        r = await c.execute(
+            "UPDATE signal_adds SET price=$3 WHERE id = (SELECT id FROM signal_adds WHERE signal_id=$1 "
+            "AND status='PENDING' AND kind='LIMIT' ORDER BY abs(price - $2) LIMIT 1) "
+            "AND abs(price - $2) <= greatest(abs($2) * 0.000001, 1e-12)", sig_id, _d(old), _d(new))
+    return r.endswith(" 1")
+
+
+async def set_chart_tf(sig_id: int, tf: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET chart_tf=$2 WHERE id=$1", sig_id, tf)
+
+
 async def cancel_pending_adds(sig_id: int) -> int:
     async with pool().acquire() as c:
         r = await c.execute("UPDATE signal_adds SET status='CANCELLED' "

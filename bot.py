@@ -1446,6 +1446,23 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
             return False, err
         ok, txt = await act_addlim(ctx, uid, sig, ws, prices, units, lang)
         return (True, i18n.t("man.addlim_done", lang, lst=txt)) if ok else (False, txt)
+    # 289: terminal — taymfreymni almashtirish va limit chizig'ini surish.
+    if act == "tf" and isinstance(args, dict) and args.get("tf") in TF_CHOICES:
+        await db.set_chart_tf(sig["id"], args["tf"])
+        return True, args["tf"]
+    if act == "limmv" and isinstance(args, dict):
+        try:
+            old, new = float(args["from"]), float(args["to"])
+        except Exception:
+            return False, i18n.t("man.bad_format", lang)
+        err = await addlim_check(sig, [new], lang)
+        if err:
+            return False, err
+        if not await db.move_pending_add(sig["id"], old, new):
+            return False, i18n.t("man.gone", lang)
+        await notify_group(ctx, ws, sig, tw("ev.add_lim_mv", ws, sid=sig["id"], sym=sig["symbol"],
+                                            a=fmt_price(old), b=fmt_price(new)))
+        return True, i18n.t("app.limmv_ok", lang, a=fmt_price(old), b=fmt_price(new))
     if act == "limx":
         n = await db.cancel_pending_adds(sig["id"])
         if n:

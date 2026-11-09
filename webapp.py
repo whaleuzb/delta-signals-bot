@@ -27,7 +27,7 @@ import tracker
 log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
-ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
+ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv")
 WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply")       # 254: signalga emas, workspace/odamga
 
 
@@ -183,6 +183,44 @@ async def _spark(r) -> list | None:
                 _SPARK.clear()
             _SPARK[key] = (_t.monotonic(), out)
         return out
+
+
+_CANDLES: dict = {}
+
+
+async def api_candles(request):
+    """289: signal terminali — shamlar (egasi/boshqaruvchisi). 30 soniya kesh."""
+    import time as _t
+    body, uid = await _body(request)
+    try:
+        sig = await db.get_signal(int(body.get("sig")))
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not _can(ws, uid):
+        raise web.HTTPForbidden()
+    tf = body.get("tf") if body.get("tf") in _TF_MS else (sig["chart_tf"] if sig["chart_tf"] in _TF_MS else "1h")
+    key = (sig["market"], sig["symbol"], tf)
+    hit = _CANDLES.get(key)
+    if hit and _t.monotonic() - hit[0] < 30:
+        rows = hit[1]
+    else:
+        now = int(_t.time() * 1000)
+        try:
+            cs = await tracker.provider(sig["market"]).klines(
+                sig["symbol"], now - 160 * _TF_MS[tf], limit=200, tf=tf, end_ms=now)
+        except Exception:
+            log.warning("Terminal shamlari olinmadi (%s %s)", sig["symbol"], tf, exc_info=True)
+            cs = []
+        rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs][-160:]
+        if rows:
+            if len(_CANDLES) > 300:
+                _CANDLES.clear()
+            _CANDLES[key] = (_t.monotonic(), rows)
+    adds = await db.signal_adds(sig["id"], "PENDING")
+    return web.json_response({"tf": tf, "c": rows,
+                              "adds": [float(a["price"]) for a in adds if a["kind"] == "LIMIT"]},
+                             headers=NO_CACHE)
 
 
 async def api_spark(request):
@@ -633,6 +671,7 @@ def routes() -> list:
         web.post("/api/app/open", api_open),
         web.post("/api/app/act", api_act),
         web.post("/api/app/spark", api_spark),
+        web.post("/api/app/candles", api_candles),
         web.post("/api/app/top", api_top),
         web.post("/api/app/diptop", api_diptop),
         web.post("/api/app/diptasks", api_diptasks),
@@ -683,7 +722,7 @@ T = {
         "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
         "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
         "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
-        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "ns_sl": "Stop (SL)",
+        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Chiziqni (SL, TP, kirish, limit) barmoq bilan surib, saqlang", "ns_sl": "Stop (SL)",
         "ns_tps": "Maqsadlar (TP) — bo'sh joy bilan", "ns_amount": "Summa, $ (ixtiyoriy)",
         "ns_send": "Signal berish", "ns_where": "Qayerga",
         "ref_title": "Taklif qilish", "ref_sub": "Do'stlaringizni taklif qiling — DIP yig'ing", "ref_code": "Taklif kodingiz",
@@ -745,7 +784,7 @@ T = {
         "df_term": "Терминал", "df_inbot": "Управлять в боте",
         "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
         "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
-        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "ns_sl": "Стоп (SL)",
+        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Перетащите линию (SL, TP, вход, лимит) пальцем и сохраните", "ns_sl": "Стоп (SL)",
         "ns_tps": "Цели (TP) — через пробел", "ns_amount": "Сумма, $ (необязательно)",
         "ns_send": "Отправить сигнал", "ns_where": "Куда",
         "ref_title": "Пригласить", "ref_sub": "Приглашайте друзей — копите DIP", "ref_code": "Ваш код",
@@ -807,7 +846,7 @@ T = {
         "df_term": "Trading terminal", "df_inbot": "Manage in bot",
         "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
         "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
-        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "ns_sl": "Stop (SL)",
+        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Drag a line (SL, TP, entry, limit) and save", "ns_sl": "Stop (SL)",
         "ns_tps": "Targets (TP) — space-separated", "ns_amount": "Size, $ (optional)",
         "ns_send": "Send signal", "ns_where": "Where",
         "ref_title": "Invite", "ref_sub": "Invite friends — earn DIP", "ref_code": "Your code",
