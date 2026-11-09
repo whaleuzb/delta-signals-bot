@@ -502,9 +502,12 @@ function termLoad(){var g=S.page;if(!g||g.id!='term')return;
 function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df)return;
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
 function termLines(i,g){if(i.df)return dfLines(i,g);var L=[],pend=i.status=='PENDING';
- L.push({k:'entry',p:+i.entry,c:'rgba(255,255,255,.75)',lb:t('entry'),dr:pend});
- if(i.sl!=null)L.push({k:'sl',p:+i.sl,c:'#ff5c5c',lb:'SL',dr:true});
- (i.tps||[]).forEach(function(p,k){L.push({k:'tp'+k,p:+p,c:'#c2f23a',lb:'TP'+(k+1),dr:k>=(i.tp_hit||0),hit:k<(i.tp_hit||0)})});
+ /* 316: TP/SL da kutilayotgan natija ($, summa yo'q bo'lsa %), kirishda — unrealized */
+ var e=+i.entry,dir=i.side=='LONG'?1:-1,lv=i.lev||1,al=i.alloc,rest=Math.max(0,1-(i.filled||0)),
+  at=function(p){var pc=(p/e-1)*100*dir*lv*rest;return al?fm(pc/100*al):fpc(pc)},un=i.unreal;
+ L.push(!pend&&un!=null?{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:al?fm(un/100*al):fpc(un),tc:un>=0?'#c2f23a':'#ff5c5c',np:1,dr:false}:{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:t('entry'),dr:pend});
+ if(i.sl!=null)L.push({k:'sl',p:+i.sl,c:'#ff5c5c',lb:'SL',dr:true,f:pend?null:at});
+ (i.tps||[]).forEach(function(p,k){L.push({k:'tp'+k,p:+p,c:'#c2f23a',lb:'TP'+(k+1),dr:k>=(i.tp_hit||0),hit:k<(i.tp_hit||0),f:pend||k<(i.tp_hit||0)?null:at})});
  (g.adds||[]).forEach(function(p,k){L.push({k:'lim'+k,p:+p,c:'#b4b9ae',lb:'Limit',dr:true})});
  /* 309: likvidatsiya (faqat leverajli) — surilmaydi, masshtabga ta'sir qilmaydi (ns): uzoqda bo'lsa chetda ▲/▼ yorliq */
  if(i.lev>1){var lq=+i.entry*(1-(i.side=='LONG'?1:-1)/i.lev);if(lq>0)L.push({k:'liq',p:lq,c:'#ff9f43',lb:'LIQ',dr:false,ns:true})}
@@ -541,11 +544,11 @@ function termSvg(i,g){var L=termLines(i,g),sc=termScale(g,L,i),c=g.c||[],W=TER.W
   R.push({l:l,y:Math.max(8,Math.min(TER.H-8,y0)),out:out,ly:out<0?9+16*(pinT++):out>0?TER.H-9-16*(pinB++):y0})});
  R.sort(function(a,b){return a.ly-b.ly});for(var q=1;q<R.length;q++)if(R[q].ly<R[q-1].ly+15)R[q].ly=R[q-1].ly+15;
  if(R.length&&R[R.length-1].ly>TER.H-8){R[R.length-1].ly=TER.H-8;for(q=R.length-2;q>=0;q--)if(R[q].ly>R[q+1].ly-15)R[q].ly=R[q+1].ly-15}
- R.forEach(function(r){var l=r.l,act=g.drag&&g.drag.k==l.k,y=r.y.toFixed(1),ly=r.ly.toFixed(1),txt=(r.out?(r.out<0?'▲ ':'▼ '):'')+l.lb+(l.hit?' ✓':'')+' '+fp(l.p),lw=txt.length*5.1+12;
+ R.forEach(function(r){var l=r.l,act=g.drag&&g.drag.k==l.k,y=r.y.toFixed(1),ly=r.ly.toFixed(1),txt=(r.out?(r.out<0?'▲ ':'▼ '):'')+l.lb+(l.hit?' ✓':'')+(l.np?'':' '+fp(l.p))+(l.f?' · '+l.f(l.p):''),lw=txt.length*5.1+12;
   if(!r.out)o+='<line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="'+l.c+'" stroke-width="'+(act?1.4:.8)+'" '+(l.k=='entry'||l.k.indexOf('lim')==0?'stroke-dasharray="4 4"':l.k=='liq'?'stroke-dasharray="1.5 3"':'')+' opacity="'+(l.hit?.3:act?1:.62)+'"/>'
    +(Math.abs(r.ly-r.y)>2?'<line x1="'+(4+lw)+'" x2="'+(10+lw)+'" y1="'+ly+'" y2="'+y+'" stroke="'+l.c+'" stroke-width=".6" opacity=".5"/>':'');
-  o+='<rect x="4" y="'+(ly-7)+'" width="'+lw.toFixed(1)+'" height="14" rx="5" fill="rgba(10,10,12,.86)" stroke="'+l.c+'" stroke-width=".6" stroke-opacity=".7"'+(r.out?' stroke-dasharray="3 2"':'')+'/>'
-   +'<text x="9" y="'+(+ly+3)+'" fill="'+l.c+'" fill-opacity=".92" font-size="8.5" font-weight="600">'+esc(txt)+'</text>';
+  o+='<rect x="4" y="'+(ly-7)+'" width="'+lw.toFixed(1)+'" height="14" rx="5" fill="rgba(10,10,12,.72)"/>'
+   +'<text x="9" y="'+(+ly+3)+'" fill="'+(l.tc||l.c)+'" fill-opacity=".95" font-size="8.5" font-weight="'+(l.np?700:600)+'">'+esc(txt)+'</text>';
   if(!r.out&&l.dr&&!l.hit)o+='<g opacity="'+(act?1:.75)+'"><rect x="'+(W-26)+'" y="'+(y-7)+'" width="22" height="14" rx="7" fill="'+l.c+'"/><path d="M'+(W-18.5)+' '+(y-1.5)+'l3.5-3 3.5 3M'+(W-18.5)+' '+(+y+1.5)+'l3.5 3 3.5-3" stroke="#050506" stroke-width="1.2" fill="none"/></g>'});
  return'<svg id="tsvg" viewBox="0 0 '+TER.W+' '+(TER.H+TER.AX)+'" preserveAspectRatio="none" style="width:100%;height:'+(TER.H+TER.AX)+'px;display:block;touch-action:none;user-select:none;cursor:grab"><defs><clipPath id="tclip"><rect x="0" y="0" width="'+W+'" height="'+TER.H+'"/></clipPath></defs><g clip-path="url(#tclip)">'+o.split('<!--L-->')[0]+'</g>'+(o.split('<!--L-->')[1]||'')+'</svg>'}
 function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
@@ -874,8 +877,9 @@ function dfItem(g){var s=S.dfs,sym=g.df.sym,base={df:1,id:'df',symbol:sym,side:'
  var p=(s.positions||[]).filter(function(x){return x.symbol==sym})[0],px=(s.prices||{})[sym];if(px==null&&p)px=p.price;
  base.price=px!=null?+px:null;base.pos=p||null;base.orders=(s.orders||[]).filter(function(o){return o.symbol==sym});
  if(p){base.status='ACTIVE';base.entry=+p.avg;base.sl=p.sl;base.tps=p.tp!=null?[p.tp]:[]}else base.entry=base.price;return base}
-function dfLines(i,g){var L=[];if(i.pos){L.push({k:'entry',p:+i.pos.avg,c:'rgba(255,255,255,.75)',lb:t('df_avg'),dr:false});
-  if(i.pos.sl!=null)L.push({k:'sl',p:+i.pos.sl,c:'#ff5c5c',lb:'SL',dr:true});if(i.pos.tp!=null)L.push({k:'tp',p:+i.pos.tp,c:'#c2f23a',lb:'TP',dr:true})}
+function dfLines(i,g){var L=[];if(i.pos){var av=+i.pos.avg,q=+i.pos.qty||0,up=+i.pos.upnl||0,at=function(p){return fm((p-av)*q)};
+  L.push({k:'entry',p:av,c:'rgba(255,255,255,.75)',lb:fm(up),tc:up>=0?'#c2f23a':'#ff5c5c',np:1,dr:false});
+  if(i.pos.sl!=null)L.push({k:'sl',p:+i.pos.sl,c:'#ff5c5c',lb:'SL',dr:true,f:at});if(i.pos.tp!=null)L.push({k:'tp',p:+i.pos.tp,c:'#c2f23a',lb:'TP',dr:true,f:at})}
  i.orders.forEach(function(o){L.push({k:'o'+o.id,p:+o.limit,c:'#b4b9ae',lb:'Limit',dr:true})});
  if(g.drag)L.forEach(function(l){if(l.k==g.drag.k)l.p=g.drag.p});if(g.pend)L.forEach(function(l){if(l.k==g.pend.k)l.p=g.pend.to});return L}
 function dfDo(args,ok){var g=S.page;args.acc=g.df.acc;if(!args.symbol)args.symbol=g.df.sym;toast(esc(t('wait')));

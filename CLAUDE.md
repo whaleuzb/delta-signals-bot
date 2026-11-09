@@ -7886,3 +7886,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Ilova: `start_param` `nws_<id>` → `newsShare(id)`: "Ulashish tayyorlanmoqda…" → amal `newsshare` → `_app_newsshare`: `InlineQueryResultCachedPhoto` (post rasmi + matni) + "📰 News Trade'da ochish" (post havolasi), rasm bo'lmasa `InlineQueryResultArticle`; `save_prepared_inline_message` → `tg.shareMessage` → so'ng `tg.close()`. Xato bo'lsa `t.me/share/url` post havolasi bilan. Taklif havolasi YO'Q.
 - 311 dagi `start=nws_` bot oqimi o'sha kunlardagi postlar tugmasi uchun qoldirildi.
 - i18n: `nws.open_btn`; webapp T: `nws_prep`. Sinov: `test_315.py` 9/9, brauzer `t_nws.py` (start_param → shareMessage → close).
+
+## 316. Terminal grafigi: kirishda unrealized, TP/SL da kutilayotgan natija, ramkasiz yorliqlar
+- Foydalanuvchi: "chartda avg price o'rniga unreal profit chiqsin. TP da ham qancha kutilayotgan profit summasi ko'rinsin. Stopda ham. TP SL avg price yozuvlaridagi ramka kerak emas."
+- Chiziq obyektiga ixtiyoriy maydonlar: `f(p)` — shu narxdagi natija matni (yorliq "TP1 3,300 · +$285.71"; sudralayotganda ham jonli qayta hisoblanadi), `np` — narx yozilmaydi, `tc` — matn rangi.
+- Signal (`termLines`): ochiq pozitsiyada kirish yorlig'i = unrealized (`i.unreal` % → summa `alloc` bo'lsa $, aks holda %), yashil/qizil; TP/SL: (p/entry−1)·100·dir·lev·(1−filled) → $ (alloc) yoki %. PENDING va tegilgan TP — avvalgidek.
+- Dip Funded (`dfLines`): kirish = `upnl` ($), TP/SL = (p−avg)·qty.
+- Yorliq ramkasi (stroke) olib tashlandi — faqat yengil fon `rgba(10,10,12,.72)`.
