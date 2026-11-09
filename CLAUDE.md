@@ -7662,3 +7662,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ikki marta bosish — boshlang'ich holat. Narx shkalasi faqat ko'rinadigan
      shamlar + chiziqlar bo'yicha. Shamlar `clipPath` ichida, o'q yozuvlari va
      chiziqlar ustida. Surishda faqat SVG ichi qayta chiziladi (`termRedraw`).
+291. **Terminal: vaqt va narx o'qlari bilan siqish/yoyish.** Grafik ostida
+     vaqt o'qi (`TER.AX`=24px, vaqt/sana yozuvlari): uni chapga sursangiz
+     shamlar siqiladi (ko'proq sham), o'ngga — yoyiladi (`g.tz`). O'ngdagi
+     narx o'qini yuqori/pastga surish — vertikal masshtab (`g.ys`,
+     0.2…8; `termScale` markaz atrofida). Ikki marta bosish hammasini tiklaydi.
