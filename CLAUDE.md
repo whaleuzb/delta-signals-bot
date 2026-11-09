@@ -7785,3 +7785,4 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 ## 303. DIP token belgisi — Dip Funded logosi
 - Foydalanuvchi: "Diptoken logosini Dipfunded logosiga mosla. Chunki u dipfundedning tokeni."
 - `webapp.html`: `dipCoinFace()` (nav'dagi kumush tanga) va `dipCoin()` (DIP kartasi) ichidagi "D" harfi o'rniga Dip Funded uchburchagi (`dfLogo` bilan bir xil path, evenodd teshik bilan), `<g transform>` orqali 40x40 ga sig'dirilgan. Rang `currentColor`.
+- 303b: "logo tanga o'rtasiga, kichik bo'lib pastga osilib qolgan" — uchburchak endi aylana markazi (553,552) bo'yicha joylashtiriladi (bbox markazi emas — uchburchakda u pastga og'diradi). Nav tangada svg 40px, scale .058; DIP kartasida scale .035 (ichki halqaga sig'adi).
