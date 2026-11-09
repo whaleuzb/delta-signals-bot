@@ -7786,3 +7786,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Foydalanuvchi: "Diptoken logosini Dipfunded logosiga mosla. Chunki u dipfundedning tokeni."
 - `webapp.html`: `dipCoinFace()` (nav'dagi kumush tanga) va `dipCoin()` (DIP kartasi) ichidagi "D" harfi o'rniga Dip Funded uchburchagi (`dfLogo` bilan bir xil path, evenodd teshik bilan), `<g transform>` orqali 40x40 ga sig'dirilgan. Rang `currentColor`.
 - 303b: "logo tanga o'rtasiga, kichik bo'lib pastga osilib qolgan" — uchburchak endi aylana markazi (553,552) bo'yicha joylashtiriladi (bbox markazi emas — uchburchakda u pastga og'diradi). Nav tangada svg 40px, scale .058; DIP kartasida scale .035 (ichki halqaga sig'adi).
+
+## 304. Taklif posti rasmi — yangi uslub
+- Foydalanuvchi: "Taklif kartasini ham o'zgartiraylik odamni jalb qiladigan. Ranglarini ham yangi dizaynga ko'chir."
+- `static/invite.jpg` (1280x800) qayta chizildi: fon #050506, aksent lime #C2F23A (eski yashil o'rniga), "TC" belgisi + TRADE CONTROLLER, sarlavha "Signallaringiz natijasi — avtomatik.", 3 ta afzallik, shisha karta "Do'stingizni taklif qiling · +5 DIP · 1000 DIP = $10" (tanga ichida Dip Funded uchburchagi), lime "Botni ochish →" tugmasi; o'ngda joriy ilovaning 3 ta skrinshoti (Signallar, Bosh, Taklif), markaziy telefon ortida lime nur.
+- Telegram rasmni URL bo'yicha keshlaydi, shuning uchun `_app_refshare` dagi URL `invite.jpg?v=2` qilindi.
+- `ref.share_caption` ga "💎 Taklif uchun DIP token — Dip Funded tokeni" qatori (uz/ru/en).
+- Rasmdagi "+5 DIP" qattiq yozilgan: `DIP_PER_REF` o'zgarsa rasmni ham yangilash kerak.

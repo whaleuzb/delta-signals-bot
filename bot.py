@@ -948,8 +948,8 @@ async def _app_refshare(ctx, uid: int, lang) -> tuple[bool, str]:
     from telegram import InlineQueryResultPhoto
     import uuid as _uuid
     res = InlineQueryResultPhoto(
-        id=_uuid.uuid4().hex[:32], photo_url=f"{config.WEB_URL}/invite.jpg?v=1",
-        thumbnail_url=f"{config.WEB_URL}/invite.jpg?v=1", photo_width=1280, photo_height=800,
+        id=_uuid.uuid4().hex[:32], photo_url=f"{config.WEB_URL}/invite.jpg?v=2",
+        thumbnail_url=f"{config.WEB_URL}/invite.jpg?v=2", photo_width=1280, photo_height=800,
         caption=i18n.t("ref.share_caption", lang), parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
             i18n.t("ref.share_btn", lang), url=link, api_kwargs={"style": "success"})]]))
