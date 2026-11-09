@@ -394,7 +394,7 @@ function nav(){var tabs=[['home','home'],['signals','trend'],['dip','dip'],['top
  var on=null;n.querySelectorAll('a').forEach(function(a){var k=a.dataset.t==S.tab;a.classList.toggle('on',k);if(k)on=a});
  var ind=document.getElementById('ind');if(!on||on.dataset.t=='dip'){ind.style.opacity=0;return}
  ind.style.opacity=1;ind.style.width=on.offsetWidth+'px';ind.style.transform='translateX('+(on.offsetLeft-5)+'px)'}
-function dipCoinFace(){return'<svg width="30" height="30" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="20" r="15.5" stroke-width="1.6" stroke-opacity=".5"/><path d="M15 12.5h5.2a7.5 7.5 0 0 1 0 15H15z"/><path d="M12 20h5.5"/></svg>'}
+function dipCoinFace(){return'<svg width="34" height="34" viewBox="0 0 40 40" fill="none"><g transform="translate(20 21) scale(.05) translate(-553 -488)"><path fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-width="10" stroke-linejoin="round" d="M553 244 803 733H304ZM521 397Q538 368 555 397L689 662Q703 693 672 693H399Q368 693 382 662Z"/></g></svg>'}
 function go(tab){if(tab==S.tab)return;
   if(tab=='dip'){S.dtop=null;S.etask=null}
   var nv=document.getElementById('nav');if(nv)nv.classList.remove('hid');
@@ -952,7 +952,7 @@ function earnSend(){var tg_=(S.eat||'').trim();if(!tg_){toast(esc(t('earn_need')
  api('act',{action:'dipapply',args:{kind:S.eak||'channel',target:tg_,note:S.ean||''}}).then(function(r){if(r.pending){toast(esc(t('slow')));return}
   toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');if(r.ok){S.eat=S.ean='';sheetClose()}}).catch(function(){toast('Error')})}
 /* 262: DIP token kartasi */
-function dipCoin(z){z=z||34;return'<svg width="'+z+'" height="'+z+'" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2"><circle cx="20" cy="20" r="17"/><circle cx="20" cy="20" r="12.5" stroke-opacity=".45"/><path d="M15 13h5.5a7 7 0 0 1 0 14H15z" stroke-linejoin="round"/><line x1="12.5" y1="20" x2="17" y2="20"/></svg>'}
+function dipCoin(z){z=z||34;return'<svg width="'+z+'" height="'+z+'" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="17" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="20" r="12.5" stroke="currentColor" stroke-width="2" stroke-opacity=".45"/><g transform="translate(20 21) scale(.036) translate(-553 -488)"><path fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-width="6" stroke-linejoin="round" d="M553 244 803 733H304ZM521 397Q538 368 555 397L689 662Q703 693 672 693H399Q368 693 382 662Z"/></g></svg>'}
 function dipCard(bal,per){return'<div class="dipcard rise"><div class="dipglass"><div class="coin">'+dipCoin(28)+'</div><div class="dt">DIP Token</div><div class="ds">'+esc(t('dip_per').replace('{n}',per))+'</div>'
  +'<div class="db">'+bal.toLocaleString('en-US',{maximumFractionDigits:2})+'<small>DIP</small></div><div class="du">≈ $'+(bal/100).toFixed(2)+'</div>'
  +'<div class="dippill">1000 DIP = $10</div></div></div>'

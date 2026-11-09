@@ -7781,3 +7781,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Pastdagi ajratuvchi chiziq shaffof oq o'rniga to'q rang (#26262B) — RGBA rasmda alfa aralashmay oq chiqayotgan edi.
 - 302b: foydalanuvchi "logo ko'rinmadi" — `_bot_logo` endi ikki yo'l bilan oladi (`getUserProfilePhotos(bot.id)`, so'ng `getChat(bot.id).photo.big_file_id`), natijani logga yozadi ("Bot logosi: N bayt / topilmadi"), topilmasa 10 daqiqa keshlaydi. Rasm baribir bo'lmasa karta `card._tc_mark` — lime doira ichida "TC" — chizadi, ya'ni logo joyi hech qachon bo'sh qolmaydi.
 - 302c: "shamlarni chetga tiqib qo'yma" — shamlar grafik kengligining 80% iga joylashadi (`cx1`), o'ngda bo'sh joy; joriy narx nuqtasi oxirgi sham yonida, undan yorliqlargacha punktir narx chizig'i.
+
+## 303. DIP token belgisi — Dip Funded logosi
+- Foydalanuvchi: "Diptoken logosini Dipfunded logosiga mosla. Chunki u dipfundedning tokeni."
+- `webapp.html`: `dipCoinFace()` (nav'dagi kumush tanga) va `dipCoin()` (DIP kartasi) ichidagi "D" harfi o'rniga Dip Funded uchburchagi (`dfLogo` bilan bir xil path, evenodd teshik bilan), `<g transform>` orqali 40x40 ga sig'dirilgan. Rang `currentColor`.
