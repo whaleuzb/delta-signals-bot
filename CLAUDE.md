@@ -7695,3 +7695,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      mavjud vazifalarga "✍️ Izoh #id" (`adm:earnn:`; «-» — o'chirish).
      Ilovada izoh sarlavha ostida (3 qatorgacha); izoh bo'lmasa turiga
      qarab standart matn (`earn_def_*`). Sayt nomi "https://" siz.
+295. Earn'dagi "O'z kanalingizni joylashtirish" tugmasi va oynasi →
+     **"Hamkor bo'lish"** (ru "Стать партнёром", en "Become a partner"),
+     belgisi `users`.
