@@ -7431,8 +7431,45 @@ async def milestone_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─────────────────────────── Komandalar ───────────────────────────
 
+async def _news_share(update: Update, ctx: ContextTypes.DEFAULT_TYPE, raw: str) -> None:
+    """311: News Trade posti — bosgan odamning taklif havolasi bilan ulashish uchun nusxa
+    (rasm + matn + "🚀 Botni ochish" — UNING havolasi) va bir bosishda ulashish tugmasi."""
+    uid = update.effective_user.id
+    lang = await user_lang(uid)
+    try:
+        mid = int(raw)
+    except ValueError:
+        return
+    _code, link = await referral_token(uid, ctx.bot.username)
+    post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{mid}"
+    rows = []
+    if link:
+        rows.append([InlineKeyboardButton(i18n.t("share.btn", lang), url=link,
+                                          api_kwargs={"style": "success"})])
+        share = "https://t.me/share/url?" + urlencode(
+            {"url": link, "text": i18n.t("nws.share_text", lang, post=post_url)})
+        rows.append([InlineKeyboardButton("↗️ " + i18n.t("nws.share_btn", lang), url=share)])
+    kb = InlineKeyboardMarkup(rows) if rows else None
+    sent = None
+    if config.NEWS_CHANNEL_ID:
+        try:
+            sent = await ctx.bot.copy_message(uid, config.NEWS_CHANNEL_ID, mid, reply_markup=kb)
+        except Exception as e:
+            log.info("News posti nusxalanmadi (%s): %s", mid, e)
+    if sent is None:
+        await update.effective_message.reply_text(
+            i18n.t("nws.share_text", lang, post=post_url) + (f"\n{link}" if link else ""),
+            reply_markup=kb, disable_web_page_preview=False)
+        return
+    await update.effective_message.reply_text(
+        i18n.t("nws.share_hint", lang, n=f"{config.DIP_PER_REF:g}"), parse_mode=ParseMode.HTML)
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
+    if ctx.args and ctx.args[0].startswith("nws_"):
+        await _news_share(update, ctx, ctx.args[0][4:])
+        return
     if ctx.args and ctx.args[0].startswith("ref_"):
         token = ctx.args[0][4:]
         # Ikki shakl ham qabul qilinadi: qisqa kod (A7K3QM) va ESKI, oddiy
@@ -9494,12 +9531,18 @@ NEWS_MARKETS = (("crypto", exchange),)      # 308: Twelve Data (aksiya/forex) ol
 NEWS_CHANNEL_USERNAME = "newstradeuz"
 
 
+BOT_USERNAME: str | None = None      # 311: post_init o'rnatadi
+
+
 def _share_button(message_id: int) -> InlineKeyboardButton:
-    """Telegram'ning rasmiy "share" chuqur-havolasi (`t.me/share/url?url=...`)
-    — bosilganda foydalanuvchiga ICHKI Telegram chat tanlash oynasi ochiladi,
-    o'sha aynan shu postni istalgan chatga/do'stiga OLDINGA yuboradi. Bot
-    tomonidan qo'shimcha kod YOZILMAYDI — Telegram'ning o'zi bajaradi,
-    faqat postning ochiq havolasi (`t.me/<kanal>/<message_id>`) kerak."""
+    """311: "Do'stlarga yuborish" — referal ulashishdek. Kanal tugmasi hamma uchun bir xil,
+    shuning uchun u botga olib boradi (`start=nws_<id>`): bot bosgan odamga postning
+    nusxasini UNING taklif tugmasi bilan yuboradi (`_news_share`), u o'shani do'stlariga
+    uzatadi — kim kirsa, taklif o'sha odamga yoziladi. Bot nomi hali noma'lum bo'lsa —
+    eski usul (`t.me/share/url` — postning o'zi)."""
+    if BOT_USERNAME:
+        return InlineKeyboardButton("↗️ Do'stlarga yuborish",
+                                    url=f"https://t.me/{BOT_USERNAME}?start=nws_{int(message_id)}")
     post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{message_id}"
     share_url = "https://t.me/share/url?" + urlencode({"url": post_url})
     return InlineKeyboardButton("↗️ Do'stlarga yuborish", url=share_url)
@@ -11479,6 +11522,11 @@ async def migrate_td_signals(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def post_init(app: Application) -> None:
+    global BOT_USERNAME
+    try:
+        BOT_USERNAME = (await app.bot.get_me()).username
+    except Exception:
+        log.warning("Bot nomi olinmadi — News ulashish tugmasi eski usulda", exc_info=True)
     # Bir martalik baza ko'chirish (196): `MOVE_DB_TO` bo'lsa — hech qanday
     # job/handler ishlamasdan OLDIN eski bazadan yangisiga ko'chiriladi va
     # muvaffaqiyatli bo'lsa jarayon yangi baza bilan davom etadi.

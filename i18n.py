@@ -1715,6 +1715,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "share.caption_closed": {"uz": "✅ <b>{sym}</b> {side} — yopilgan savdo, natija <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatildi\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
                              "ru": "✅ <b>{sym}</b> {side} — сделка закрыта, итог <b>{pnl}%</b>\n{ws} · отслежено в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
                              "en": "✅ <b>{sym}</b> {side} — closed trade, result <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
+    "nws.share_btn": {"uz": "Do'stlarga yuborish", "ru": "Отправить друзьям", "en": "Send to friends"},
+    "nws.share_text": {"uz": "📰 Bu yangilikni ko'ring: {post}\n\n🤖 Trade Controller — signallar va yangiliklar boti 👇",
+                       "ru": "📰 Посмотрите эту новость: {post}\n\n🤖 Trade Controller — бот сигналов и новостей 👇",
+                       "en": "📰 Check out this news: {post}\n\n🤖 Trade Controller — signals & news bot 👇"},
+    "nws.share_hint": {"uz": "👆 Shu xabarni do'stlaringizga <b>uzating</b> (forward) yoki «Do'stlarga yuborish»ni bosing. Ostidagi tugma — <b>sizning taklif havolangiz</b>: kim u orqali kirsa, sizga <b>+{n} DIP</b>.",
+                       "ru": "👆 <b>Перешлите</b> это сообщение друзьям или нажмите «Отправить друзьям». Кнопка под ним — <b>ваша пригласительная ссылка</b>: за каждого пришедшего — <b>+{n} DIP</b>.",
+                       "en": "👆 <b>Forward</b> this message to friends or tap “Send to friends”. The button below is <b>your invite link</b>: <b>+{n} DIP</b> for everyone who joins."},
     "share.btn": {"uz": "🚀 Botni ochish", "ru": "🚀 Открыть бота", "en": "🚀 Open the bot"},
     "dip.out_done": {
         "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",
