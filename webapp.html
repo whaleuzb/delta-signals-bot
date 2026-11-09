@@ -8,7 +8,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--ink:#f5f5f7;--mut:rgba(245,245,247,.55);--faint:rgba(245,245,247,.32);
  --g:#2ecc8f;--r:#ff5c5c;--top:0px;
- --glass:linear-gradient(155deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 60%,rgba(255,255,255,.02)),rgba(14,14,16,.55);
+ --glass:linear-gradient(155deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 60%,rgba(255,255,255,.02)),rgba(14,14,16,.72);
  --edge:rgba(255,255,255,.13);--ease:cubic-bezier(.22,1,.36,1)}
 html{background:#050506}
 html,body{color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Roboto,sans-serif;
@@ -19,14 +19,14 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 /* ---- FON: yulduzlar (canvas) + tumanlik + donadorlik + chetdagi nur ---- */
 #bg{position:fixed;inset:0;z-index:-3;width:100%;height:100%}
 .neb{position:fixed;z-index:-2;border-radius:50%;filter:blur(60px);pointer-events:none;will-change:transform}
-.neb.a{width:120vw;height:70vh;left:-50vw;top:-18vh;background:radial-gradient(closest-side,rgba(210,214,222,.28),transparent);animation:n1 38s ease-in-out infinite alternate}
-.neb.b{width:90vw;height:60vh;right:-45vw;top:38vh;background:radial-gradient(closest-side,rgba(46,204,143,.17),transparent);animation:n2 46s ease-in-out infinite alternate}
-.neb.c{width:80vw;height:50vh;left:-20vw;bottom:-25vh;background:radial-gradient(closest-side,rgba(200,200,210,.16),transparent);animation:n1 52s ease-in-out infinite alternate-reverse}
+.neb.a{width:120vw;height:70vh;left:-50vw;top:-18vh;background:radial-gradient(closest-side,rgba(210,214,222,.28),transparent)}
+.neb.b{width:90vw;height:60vh;right:-45vw;top:38vh;background:radial-gradient(closest-side,rgba(46,204,143,.17),transparent)}
+.neb.c{width:80vw;height:50vh;left:-20vw;bottom:-25vh;background:radial-gradient(closest-side,rgba(200,200,210,.16),transparent)}
 @keyframes n1{to{transform:translate3d(12vw,6vh,0) scale(1.15)}}
 @keyframes n2{to{transform:translate3d(-14vw,-8vh,0) scale(1.1)}}
 .grain{position:fixed;inset:-50%;z-index:-1;pointer-events:none;opacity:.10;
  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
- animation:grain 1.2s steps(6) infinite}
+}
 @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}60%{transform:translate(-2%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
 .streak{position:fixed;z-index:-1;pointer-events:none;width:2px;height:90px;border-radius:2px;opacity:.35;
  background:linear-gradient(to bottom,transparent,rgba(255,255,255,.7),transparent)}
@@ -35,8 +35,9 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 
 /* ---- SHISHA ---- */
 .glass{position:relative;background:var(--glass);border:1px solid var(--edge);
- -webkit-backdrop-filter:blur(26px) saturate(140%);backdrop-filter:blur(26px) saturate(140%);
- box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.03),0 20px 50px rgba(0,0,0,.45)}
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(255,255,255,.03),0 12px 30px rgba(0,0,0,.35)}
+/* 257: backdrop-filter faqat suzuvchi elementlarda — telefon qizimasin */
+.nav.glass,.toast.glass,.sheet.glass,.pill.glass{-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .glass.acc{background:radial-gradient(120% 90% at 100% 100%,rgba(46,204,143,.26),transparent 60%),var(--glass)}
 .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
  background:linear-gradient(115deg,rgba(255,255,255,.07),transparent 35%)}
@@ -114,7 +115,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .spk .lb{position:absolute;left:0;font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;transform:translateY(-50%);
  background:rgba(10,10,12,.7);border:1px solid rgba(255,255,255,.08)}
 .spk .pt{position:absolute;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%)}
-.spk .pt::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid currentColor;opacity:.6;animation:ring 1.8s infinite}
+.spk .pt{box-shadow:0 0 8px currentColor}
 @keyframes ring{to{transform:scale(2.2);opacity:0}}
 .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}
 .kv div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:7px 9px;font-size:12px}
@@ -204,7 +205,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .eq svg{width:100%;height:120px;display:block;overflow:visible}
 .sect{font-size:14px;font-weight:800;margin:16px 2px 10px;letter-spacing:-.01em}
 .page{position:fixed;inset:0;z-index:25;overflow-y:auto;padding:calc(var(--top) + 10px) 14px 110px;transform:translateX(100%);
- transition:transform .5s var(--ease);background:rgba(5,5,6,.6);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+ transition:transform .5s var(--ease);background:rgba(5,5,6,.94)}
 .page.show{transform:none}
 .page:not(.show){visibility:hidden;transition:transform .5s var(--ease),visibility 0s .5s}
 .ghd{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
@@ -579,14 +580,12 @@ function load(){var w=cur();if(!w){render();return}
  function size(){W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);
   st=[];var n=Math.round(W*H/1500);for(var k=0;k<n;k++)st.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()<.08?Math.random()*.8+.9:Math.random()*.7+.25,
    a:Math.random()*.6+.35,s:Math.random()*2+.5,ph:Math.random()*6.3,v:Math.random()*.06+.01,g:Math.random()<.12})}
- size();addEventListener('resize',size);
- var red=matchMedia('(prefers-reduced-motion:reduce)').matches;
- function draw(t){x.clearRect(0,0,W,H);for(var k=0;k<st.length;k++){var s=st[k];var a=s.a*(.65+.35*Math.sin(t/1000*s.s+s.ph));
-   if(!red){s.y-=s.v;if(s.y<-2){s.y=H+2;s.x=Math.random()*W}}
-   x.globalAlpha=a;x.fillStyle=s.g?'#9df2cf':'#ffffff';x.beginPath();x.arc(s.x,s.y,s.r,0,6.283);x.fill();
-   }
-  x.globalAlpha=1;if(!red)requestAnimationFrame(draw)}
- requestAnimationFrame(draw)})();
+size();
+ /* 257: bir marta chiziladi — doimiy 60 kadr/s sikl telefonni qizdirardi */
+ function draw(){x.clearRect(0,0,W,H);for(var k=0;k<st.length;k++){var s=st[k];
+   x.globalAlpha=s.a;x.fillStyle=s.g?'#9df2cf':'#ffffff';x.beginPath();x.arc(s.x,s.y,s.r,0,6.283);x.fill()}
+  x.globalAlpha=1}
+ draw();addEventListener('resize',function(){size();draw()})})();
 
 addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide()}catch(e){}});
 (function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
@@ -605,6 +604,6 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
   var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(openDf,50);
-  render();load();setInterval(function(){if(!document.hidden&&!document.getElementById('sheet').classList.contains('show'))load()},15000)})
+  render();load();setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

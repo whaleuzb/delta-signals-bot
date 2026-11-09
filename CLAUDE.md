@@ -7398,3 +7398,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 256. **Depozit oynasidagi Dip Funded bloki chiqmasdi**: `api_me` havolalarni
      `dipfunded.enabled()` (DIPFUNDED_API_KEY) ga bog'lagan edi, veb servisda
      kalit yo'q. Endi havolalar faqat `config.DIPFUNDED_URL`ga bog'liq.
+257. **Mini App telefonni qizdirmasin.** Sabab: yulduzli canvas 60 kadr/s
+     qayta chizilardi, tumanlik/donadorlik doimiy animatsiyada edi, har shisha
+     karta esa `backdrop-filter: blur(26px)` bilan HAR kadrda fonni qayta
+     xiralashtirardi. Endi: yulduzlar bir marta chiziladi (rAF sikl yo'q),
+     tumanlik va donadorlik harakatsiz, `backdrop-filter` faqat suzuvchi
+     elementlarda (panel, toast, pastki oyna, tepadagi tugmalar; 14px),
+     kartalar biroz quyuqroq fon bilan; guruh sahifasi qatlami blur'siz;
+     signal nuqtasidagi halqa animatsiyasi olib tashlandi; avtomatik
+     yangilanish 15 → 30 s va faqat Bosh/Signallar ochiq bo'lsa.
+     Qaytadan og'ir doimiy animatsiya QO'SHMANG.
