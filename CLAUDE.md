@@ -7446,3 +7446,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      standart 5) va taklif qilganga "🎉 +5 DIP" xabari. Ishga tushishda
      `dip_backfill` — oldingi takliflar uchun ham (idempotent). Ko'rinishi:
      /taklif xabarida DIP qatori; ilovada Taklif sahifasida "DIP balans".
+262. **DIP token kartasi** (webapp.html): Taklif sahifasidagi DIP balans endi
+     shisha uslubidagi "DIP Token" kartasi — kulrang tutunli fon (radial
+     gradientlar + grain + vignette, hammasi statik, animatsiyasiz), ustida
+     muzli shisha panel (`.dipglass`, blur 22px), SVG tanga (`dipCoin`),
+     katta "DIP Token" sarlavhasi, balans, "≈ $" (bal/100) va "1000 DIP = $10"
+     tabletkasi. Funksiya: `dipCard(bal, per)`; `refRender` ichida chaqiriladi.
