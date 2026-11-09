@@ -7698,3 +7698,15 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 295. Earn'dagi "O'z kanalingizni joylashtirish" tugmasi va oynasi →
      **"Hamkor bo'lish"** (ru "Стать партнёром", en "Become a partner"),
      belgisi `users`.
+296. **Terminal: chiziqlar grafikdan chiqib ketmaydi + BUY/SELL tugmalari.**
+     Sabab: `.eq svg{overflow:visible}` qoidasi terminal SVG'siga ham
+     ta'sir qilardi — chiziqlar va narx yorlig'i grafik ostidagi bloklar
+     ustiga chizilardi. `#tsvg{overflow:hidden!important}`; ko'rinish
+     oynasidan tashqaridagi chiziqlar chetda "▲/▼ SL 99,000" yorlig'i
+     bilan (bir chetda bir nechta bo'lsa ketma-ket teriladi, surish ham
+     shu joydan boshlanadi); narx yorlig'i ham chetga qisiladi.
+     Grafik ostida `termActs`: **BUY · Qo'shish** (`askAdd`, faqat
+     qo'shish mumkin bo'lsa) va **SELL · Yopish** (`sellSheet`: 25/50/75% —
+     `pc`, "Yopish · 100%" — `close`); ikkinchi qator: BE, Stop, TP (yoki
+     TP/SL), Hajm, Limitlar ✕. PENDING signalda — kirishni o'zgartirish va
+     bekor qilish. Amaldan keyin `load()` terminalni ham yangilaydi.
