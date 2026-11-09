@@ -989,8 +989,8 @@ async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
                              "min": REF_CODE_MIN, "max": REF_CODE_MAX})
 
 
-USDT_NETS = {"TRC20": re.compile(r"^T[1-9A-HJ-NP-Za-km-z]{33}$"),
-             "BEP20": re.compile(r"^0x[0-9a-fA-F]{40}$")}
+# 266: USDT faqat BEP20 (BNB Smart Chain) orqali to'lanadi.
+USDT_NETS = {"BEP20": re.compile(r"^0x[0-9a-fA-F]{40}$")}
 
 
 async def _dip_who(ctx, uid: int) -> str:

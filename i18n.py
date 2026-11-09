@@ -1675,9 +1675,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Dip Funded isn't responding right now. Your request is saved — the admin will complete it.",
     },
     "dip.bad_addr": {
-        "uz": "Hamyon manzili noto'g'ri. TRC20 — T bilan, BEP20 — 0x bilan boshlanadi.",
-        "ru": "Неверный адрес кошелька. TRC20 начинается с T, BEP20 — с 0x.",
-        "en": "Invalid wallet address. TRC20 starts with T, BEP20 with 0x.",
+        "uz": "Hamyon manzili noto'g'ri. Faqat BEP20 (BNB Smart Chain) — 0x bilan boshlanadigan 42 belgili manzil.",
+        "ru": "Неверный адрес кошелька. Только BEP20 (BNB Smart Chain) — адрес из 42 символов, начинается с 0x.",
+        "en": "Invalid wallet address. BEP20 (BNB Smart Chain) only — a 42-character address starting with 0x.",
     },
     "dip.usdt_sent": {
         "uz": "✅ So'rov yuborildi: {usdt} USDT ({net}). Komissiya: {fee} DIP. Admin to'lagach xabar keladi.",

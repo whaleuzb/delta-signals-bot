@@ -7484,3 +7484,6 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      qilinmaydi, balans oshkor qilinmaydi). Topilmasa (`no_user`) DIP
      qaytariladi; tarmoq xatosida 'pending' + "🔁 Qayta o'tkazish" (o'sha
      odamga, o'sha ref bilan). Komissiyasiz, butun balans, ≥3000 DIP.
+266. **USDT faqat BEP20** — TRC20 olib tashlandi (`USDT_NETS` da faqat BEP20:
+     0x + 40 hex). Ilovada tarmoq tanlash tugmalari o'rniga "Tarmoq: faqat
+     BEP20 (BNB Smart Chain)" yozuvi; `S.dnet='BEP20'`.

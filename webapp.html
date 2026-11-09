@@ -612,7 +612,7 @@ function dipOut(d){var bal=+d.dip||0,mn=+d.dip_min||3000,pend=+d.dip_pend||0,fmt
   +'<div class="dbar"><i style="width:'+pc.toFixed(1)+'%"></i></div>';
  if(!ok)h+='<div class="rs" style="margin-top:8px">'+esc(t('dip_out_lock').replace('{min}',fmt(mn)).replace('{n}',fmt(mn-bal)))+'</div>';
  return h+'<button class="btn p full" style="margin-top:10px;padding:12px;font-size:14px;width:100%"'+(ok?' onclick="dipWithdraw()"':' disabled')+'>'+esc(t('dip_out'))+'</button></div>'}
-function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0,fp=+d.dip_fee||10,fee=Math.round(bal*fp)/100,fm=function(x){return x.toLocaleString('en-US',{maximumFractionDigits:2})};S.dnet=S.dnet||'TRC20';
+function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0,fp=+d.dip_fee||10,fee=Math.round(bal*fp)/100,fm=function(x){return x.toLocaleString('en-US',{maximumFractionDigits:2})};S.dnet='BEP20';
  var h='<h4>'+esc(t('dip_out'))+'</h4><p>'+fm(bal)+' DIP ≈ $'+(bal/100).toFixed(2)+'</p>';
  if(d.dip_df)h+='<div class="tile2 glass" style="margin-bottom:10px"><div class="k">'+esc(t('dip_to_df'))+'</div><div class="v" style="font-size:18px">'+fm(bal)+' DIP</div><div class="rs" style="margin-top:4px">'+esc(t('dip_to_df_s'))+'</div>'
   +'<button class="btn p" style="margin-top:10px" onclick="dipGo(\'df\')">'+esc(t('dip_move'))+'</button>'
@@ -620,8 +620,8 @@ function dipWithdraw(){var d=S.ref;if(!d)return;var bal=+d.dip||0,fp=+d.dip_fee|
   +'<input id="dip_to" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="'+esc(t('dip_to_ph'))+'" value="'+esc(S.dto||'')+'" oninput="S.dto=this.value" style="margin:8px 0 0;font-size:14px;padding:11px 12px">'
   +'<button class="btn" style="margin-top:10px" onclick="dipTo()">'+esc(t('dip_to_other'))+'</button></div>';
  h+='<div class="tile2 glass"><div class="k">'+esc(t('dip_to_usdt'))+'</div><div class="v" style="font-size:18px">'+esc(t('dip_get'))+' '+((bal-fee)/100).toFixed(2)+' USDT</div><div class="rs" style="margin-top:4px">'+esc(t('dip_fee_s').replace('{p}',fm(fp)).replace('{n}',fm(fee)))+'</div>'
-  +'<div style="display:flex;gap:8px;margin-top:10px">'+['TRC20','BEP20'].map(function(n){return'<button class="btn'+(S.dnet==n?' p':'')+'" style="margin:0" onclick="S.dnet=\''+n+'\';dipWithdraw()">'+n+'</button>'}).join('')+'</div>'
-  +'<input id="dip_addr" autocomplete="off" spellcheck="false" placeholder="'+esc(t('dip_addr'))+' ('+S.dnet+')" value="'+esc(S.daddr||'')+'" oninput="S.daddr=this.value" style="margin:10px 0 0;font-size:14px;padding:11px 12px">'
+  +'<div class="rs" style="margin-top:8px">'+esc(t('dip_net'))+'</div>'
+  +'<input id="dip_addr" autocomplete="off" spellcheck="false" placeholder="'+esc(t('dip_addr'))+' (0x…)" value="'+esc(S.daddr||'')+'" oninput="S.daddr=this.value" style="margin:10px 0 0;font-size:14px;padding:11px 12px">'
   +'<button class="btn p" style="margin-top:10px" onclick="dipGo(\'usdt\')">'+esc(t('dip_send'))+'</button></div>';
  sheetOpen(h)}
 function dipTo(){var to=(S.dto||'').trim(),d=S.ref;if(!to){toast(esc(t('dip_to_ph')));return}toast(esc(t('wait')));
