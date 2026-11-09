@@ -193,7 +193,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
               logo: bytes | None, qr_url: str, qr_code: str | None, sig_id: int | None,
               when: datetime, lang: str | None = None, bot_logo: bytes | None = None,
               closed: bool = False, r_multiple: float | None = None,
-              liq: float | None = None) -> io.BytesIO:
+              liq: float | None = None, marks: list | None = None) -> io.BytesIO:
     """Pozitsiya kartasi: ochiq (Unrealized PnL) yoki `closed=True` — yopilgan savdo (305),
     grafik, kirish/joriy(chiqish)/SL/TP, QR."""
     acc = LIME if pnl_pct >= 0 else RED
@@ -279,6 +279,17 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
             top, bot = min(Y(o), Y(cl)), max(Y(o), Y(cl))
             d.rectangle((cx - bw * .32, top, cx + bw * .32, max(bot, top + 2)), fill=col)
 
+        # 317: kirish/chiqish belgilari — aniq sham va narxda (xarid ▲ ostida, sotuv ▼ ustida)
+        for ms, mp, buy in (marks or []):
+            k = next((j for j in range(n - 1, -1, -1) if cs[j][0] <= ms), None)
+            if k is None or not mp:
+                continue
+            mx, my, z = ix0 + (k + .5) * bw, Y(mp), 11
+            colm = LIME if buy else RED
+            tri = ([(mx, my + 3), (mx + z, my + 3 + z * 1.6), (mx - z, my + 3 + z * 1.6)] if buy else
+                   [(mx, my - 3), (mx + z, my - 3 - z * 1.6), (mx - z, my - 3 - z * 1.6)])
+            d.polygon(tri, fill=colm, outline="#050506")
+            d.ellipse((mx - 4, my - 4, mx + 4, my + 4), fill="#FFFFFF", outline="#050506")
         # Chiziqlar — 312: ingichka va bosiqroq (rang fonga aralashtiriladi)
         for v, col, lb in lvl:
             yy = Y(v)
@@ -318,8 +329,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
                 t = ("▲ " if ly < iy0 else "▼ ") + t
             elif abs(ly - yy) > 3:
                 d.line((ix1, ly, lx, yy), fill=_mix(col, .45), width=1)
-            d.rounded_rectangle((lx, yy - TH, lx + lw, yy + TH), radius=8, fill="#0A0A0C",
-                                outline=_mix(col, .7), width=1)
+            d.rounded_rectangle((lx, yy - TH, lx + lw, yy + TH), radius=8, fill="#151517")   # 317: ramkasiz
             d.text((lx + 8, yy - 10), t, font=fl, fill=_mix(col, .92))
         py = Y(price)
         lx0 = cx1 + 6

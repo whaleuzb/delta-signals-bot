@@ -501,11 +501,14 @@ function termLoad(){var g=S.page;if(!g||g.id!='term')return;
  api('candles',{sig:g.sig,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];g.adds=d.adds||[];termRender()}).catch(function(){})}
 function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df)return;
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
+function termMarks(i){var M=[];
+ if(i.df){var s=S.dfs;(s&&s.trades||[]).forEach(function(z){if(z.symbol==i.symbol&&z.ts)M.push({t:z.ts*1000,p:+z.price,buy:String(z.side).toLowerCase()=='buy'})});return M}
+ if(i.opened&&i.status!='PENDING')M.push({t:Date.parse(i.opened),p:+(i.entry_first||i.entry),buy:i.side=='LONG'});return M}
 function termLines(i,g){if(i.df)return dfLines(i,g);var L=[],pend=i.status=='PENDING';
  /* 316: TP/SL da kutilayotgan natija ($, summa yo'q bo'lsa %), kirishda — unrealized */
  var e=+i.entry,dir=i.side=='LONG'?1:-1,lv=i.lev||1,al=i.alloc,rest=Math.max(0,1-(i.filled||0)),
   at=function(p){var pc=(p/e-1)*100*dir*lv*rest;return al?fm(pc/100*al):fpc(pc)},un=i.unreal;
- L.push(!pend&&un!=null?{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:al?fm(un/100*al):fpc(un),tc:un>=0?'#c2f23a':'#ff5c5c',np:1,dr:false}:{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:t('entry'),dr:pend});
+ L.push(!pend&&un!=null?{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:al?fm(un/100*al)+' · '+fpc(un):fpc(un),tc:un>=0?'#c2f23a':'#ff5c5c',np:1,dr:false}:{k:'entry',p:e,c:'rgba(255,255,255,.75)',lb:t('entry'),dr:pend});
  if(i.sl!=null)L.push({k:'sl',p:+i.sl,c:'#ff5c5c',lb:'SL',dr:true,f:pend?null:at});
  (i.tps||[]).forEach(function(p,k){L.push({k:'tp'+k,p:+p,c:'#c2f23a',lb:'TP'+(k+1),dr:k>=(i.tp_hit||0),hit:k<(i.tp_hit||0),f:pend||k<(i.tp_hit||0)?null:at})});
  (g.adds||[]).forEach(function(p,k){L.push({k:'lim'+k,p:+p,c:'#b4b9ae',lb:'Limit',dr:true})});
@@ -530,7 +533,12 @@ function termSvg(i,g){var L=termLines(i,g),sc=termScale(g,L,i),c=g.c||[],W=TER.W
  var ax='';for(var k=1;k<5;k++){var yy=(TER.H*k/5).toFixed(1);o+='<line x1="0" x2="'+W+'" y1="'+yy+'" y2="'+yy+'" stroke="rgba(255,255,255,.05)"/>';ax+='<text x="'+(W+6)+'" y="'+(+yy+3)+'" fill="rgba(255,255,255,.3)" font-size="8">'+fp(termP(+yy,sc))+'</text>'}
  if(n){var bw=W/g.vn;c.forEach(function(x,k){if(k<win.L-1||k>win.R+1)return;var up=x[4]>=x[1],col=up?'#c2f23a':'#ff5c5c',cx=(k-win.L+.5)*bw;
    o+='<line x1="'+cx.toFixed(1)+'" x2="'+cx.toFixed(1)+'" y1="'+Y(x[2])+'" y2="'+Y(x[3])+'" stroke="'+col+'" stroke-width="1" opacity=".8"/>'
-    +'<rect x="'+(cx-bw*.35).toFixed(1)+'" y="'+Math.min(Y(x[1]),Y(x[4]))+'" width="'+Math.max(1,bw*.7).toFixed(1)+'" height="'+Math.max(1,Math.abs(Y(x[1])-Y(x[4]))).toFixed(1)+'" fill="'+col+'" opacity="'+(up?.85:.8)+'"/>'})}
+    +'<rect x="'+(cx-bw*.35).toFixed(1)+'" y="'+Math.min(Y(x[1]),Y(x[4]))+'" width="'+Math.max(1,bw*.7).toFixed(1)+'" height="'+Math.max(1,Math.abs(Y(x[1])-Y(x[4]))).toFixed(1)+'" fill="'+col+'" opacity="'+(up?.85:.8)+'"/>'});
+  /* 317: kirish/chiqish belgilari — aniq vaqt va narx nuqtasida (xarid ▲ yashil ostida, sotuv ▼ qizil ustida) */
+  termMarks(i).forEach(function(m){var k=-1;for(var j=n-1;j>=0;j--){if(c[j][0]<=m.t){k=j;break}}if(k<0||k<win.L-1||k>win.R+1)return;
+   var mx=(k-win.L+.5)*bw,my=+Y(m.p),s=4.2,col=m.buy?'#c2f23a':'#ff5c5c';
+   o+=(m.buy?'<path d="M'+mx.toFixed(1)+' '+(my+1.5).toFixed(1)+'l'+s+' '+(s*1.6).toFixed(1)+'h-'+(2*s)+'z"':'<path d="M'+mx.toFixed(1)+' '+(my-1.5).toFixed(1)+'l'+s+' -'+(s*1.6).toFixed(1)+'h-'+(2*s)+'z"')+' fill="'+col+'" stroke="#050506" stroke-width=".8"/>'
+    +'<circle cx="'+mx.toFixed(1)+'" cy="'+my.toFixed(1)+'" r="1.6" fill="#fff" opacity=".85"/>'})}
  o+='<!--L-->'+ax;
  /* 291: vaqt o'qi (pastda) — surib siqish/yoyish */
  var ty=TER.H;o+='<rect x="0" y="'+ty+'" width="'+W+'" height="'+TER.AX+'" fill="rgba(255,255,255,.03)"/><line x1="0" x2="'+W+'" y1="'+ty+'" y2="'+ty+'" stroke="rgba(255,255,255,.1)"/>'
@@ -878,7 +886,7 @@ function dfItem(g){var s=S.dfs,sym=g.df.sym,base={df:1,id:'df',symbol:sym,side:'
  base.price=px!=null?+px:null;base.pos=p||null;base.orders=(s.orders||[]).filter(function(o){return o.symbol==sym});
  if(p){base.status='ACTIVE';base.entry=+p.avg;base.sl=p.sl;base.tps=p.tp!=null?[p.tp]:[]}else base.entry=base.price;return base}
 function dfLines(i,g){var L=[];if(i.pos){var av=+i.pos.avg,q=+i.pos.qty||0,up=+i.pos.upnl||0,at=function(p){return fm((p-av)*q)};
-  L.push({k:'entry',p:av,c:'rgba(255,255,255,.75)',lb:fm(up),tc:up>=0?'#c2f23a':'#ff5c5c',np:1,dr:false});
+  L.push({k:'entry',p:av,c:'rgba(255,255,255,.75)',lb:fm(up)+' · '+fpc(+i.pos.upnl_pct||0),tc:up>=0?'#c2f23a':'#ff5c5c',np:1,dr:false});
   if(i.pos.sl!=null)L.push({k:'sl',p:+i.pos.sl,c:'#ff5c5c',lb:'SL',dr:true,f:at});if(i.pos.tp!=null)L.push({k:'tp',p:+i.pos.tp,c:'#c2f23a',lb:'TP',dr:true,f:at})}
  i.orders.forEach(function(o){L.push({k:'o'+o.id,p:+o.limit,c:'#b4b9ae',lb:'Limit',dr:true})});
  if(g.drag)L.forEach(function(l){if(l.k==g.drag.k)l.p=g.drag.p});if(g.pend)L.forEach(function(l){if(l.k==g.pend.k)l.p=g.pend.to});return L}

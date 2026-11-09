@@ -7893,3 +7893,11 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Signal (`termLines`): ochiq pozitsiyada kirish yorlig'i = unrealized (`i.unreal` % → summa `alloc` bo'lsa $, aks holda %), yashil/qizil; TP/SL: (p/entry−1)·100·dir·lev·(1−filled) → $ (alloc) yoki %. PENDING va tegilgan TP — avvalgidek.
 - Dip Funded (`dfLines`): kirish = `upnl` ($), TP/SL = (p−avg)·qty.
 - Yorliq ramkasi (stroke) olib tashlandi — faqat yengil fon `rgba(10,10,12,.72)`.
+
+## 317. Grafik qoidalari ikkala tizimda umumiy + kirish/chiqish belgilari
+- Foydalanuvchi: "Dipfunded bo'limida ham asosiyda ham shunday bo'lsin. Kelajakdagi chart sozlamalari ikkisiga ham amal qilishini ta'minla." + "aynan qaysi nuqtada kirilgani va chiqilgani bo'yicha kichik belgilar bo'lsin. Ulashish kartasida ham".
+- **UMUMIY QOIDA (majburiy):** grafik yorliqlari/chiziqlari/belgilari bo'yicha har qanday o'zgarish UCHALA joyda birga qilinadi: (1) shu repo `webapp.html` `termSvg` (signal + Dip Funded terminali, bitta kod), (2) `card.py` `open_card` (ulashish/natija kartasi), (3) whaleuzb/delta-prop sayti `static/js/terminal.js` + `static/css/style.css` `.ln-*` (o'sha repoda `CLAUDE.md` "Grafik qoidalari" — shu qoidalar ro'yxati).
+- Joriy qoidalar: kirish yorlig'i = unrealized `+$51.80 · +2.66%` (yashil/qizil); TP/SL = `TP 108,000 · +$124.80` (surishda jonli); yorliqlar ramkasiz (yengil qorong'i fon, matn chiziq rangida); chiziqlar ingichka; bitimlar belgilari — xarid yashil ▲ (narx ostida), sotuv qizil ▼ (narx ustida).
+- delta-prop (commit 6a2c440): TP/SL yorlig'iga narx qo'shildi, `.ln-lbl`/`.ln-entry` ramkasiz va fonsiz-rangsiz (tasdiqlash qizili va TP/SL qo'shish tugmalari o'zgarmagan); sayt belgilari lightweight-charts v4 `setMarkers` (sham ustida/ostida nuqta — v4 aniq narxga qo'ya olmaydi).
+- Ilova: `termMarks(i)` — signal: `opened` vaqtida `entry_first` (yo'q bo'lsa `entry`) narxida, LONG ▲ / SHORT ▼; Dip Funded: `S.dfs.trades` (`ts`, `price`, `side`) shu juftlik bo'yicha. Belgi — uchburchak + oq nuqta aniq narxda. `/api/app/open` elementiga `entry_first`; `_df_state_json` savdolariga `ts`.
+- Karta: `open_card(..., marks=[(ms, narx, xaridmi)])` — `bot._card_marks(sig, closed)`: kirish (`opened_at`, `entry_first`) va yopilganda chiqish (`closed_at`, `exit_price`, teskari tomon). Karta yorliqlari ham ramkasiz.

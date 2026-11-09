@@ -1354,6 +1354,18 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
+def _card_marks(sig, closed: bool = False) -> list:
+    """317: kartadagi kirish (va yopilganda chiqish) belgilari: (ms, narx, xaridmi)."""
+    long_ = sig["side"] == "LONG"
+    out = []
+    ef = sig["entry_first"] if sig["entry_first"] is not None else sig["entry"]
+    if sig["opened_at"]:
+        out.append((int(sig["opened_at"].timestamp() * 1000), float(ef), long_))
+    if closed and sig["closed_at"] and sig["exit_price"] is not None:
+        out.append((int(sig["closed_at"].timestamp() * 1000), float(sig["exit_price"]), not long_))
+    return out
+
+
 _TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
 
 
@@ -1454,7 +1466,8 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                          username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
                          qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang,
                          bot_logo=await _bot_logo(ctx.bot),
-                         liq=parsing.liq_price(sig["side"], float(sig["entry"]), L))
+                         liq=parsing.liq_price(sig["side"], float(sig["entry"]), L),
+                         marks=_card_marks(sig))
     img = Image.open(buf).convert("RGB")
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=88)
@@ -1543,7 +1556,7 @@ def _df_state_json(data: dict, lang) -> dict:
             "orders": [{"id": o["id"], "symbol": o["symbol"], "limit": o.get("limit"),
                         "amount": o.get("amount"), "sl": o.get("sl"), "tp": o.get("tp")}
                        for o in (st.get("orders") or [])],
-            "trades": [{"time": t_.get("time"), "symbol": t_.get("symbol"), "side": t_.get("side"),
+            "trades": [{"time": t_.get("time"), "ts": t_.get("ts"), "symbol": t_.get("symbol"), "side": t_.get("side"),
                         "price": t_.get("price"), "pnl": t_.get("pnl"), "kind": t_.get("kind")}
                        for t_ in (st.get("trades") or [])][:10],
             "prices": {k: float(v) for k, v in px.items()}}
@@ -1911,7 +1924,8 @@ async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None 
         when=sig["closed_at"].astimezone(stats.TZ), lang=ws_lang(ws),
         bot_logo=(await _bot_logo(bot)) if bot else None, closed=True,
         r_multiple=float(sig["r_multiple"]) if sig["r_multiple"] is not None else None,
-        liq=parsing.liq_price(sig["side"], float(sig["entry"]), L))
+        liq=parsing.liq_price(sig["side"], float(sig["entry"]), L),
+        marks=_card_marks(sig, closed=True))
 
 
 async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) -> None:
