@@ -7437,7 +7437,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ochiq sahifada butun davr (`/api/app/group` → `<kind>.syms`). Botda
      "📉 Juftliklar" Sozlamalardan Statistika ekraniga (PDF yonida) ko'chdi.
 261. **Taklif uchun DIP (har taklif +5, chegarasiz).** DIP — Dip Funded DIP
-     bilan bir xil qiymat (1 DIP = $1); hozircha Trade Controller'da
+     bilan bir xil qiymat (1000 DIP = $10, ya'ni 1 DIP = $0.01; Dip Funded
+     `programs.DIP_PER_USD = 100`, u yerda ledger DOLLARDA — integratsiyada
+     DIP/100); hozircha Trade Controller'da
      yig'iladi, Dip Funded'da ishlatish keyin. `dip_ledger` (balans = yig'indi;
      taklif uchun `ref_user` UNIQUE — bitta odam uchun bir marta). `cmd_start`:
      `add_referral` yangi yozuv bo'lsa `dip_referral` (`config.DIP_PER_REF`,
