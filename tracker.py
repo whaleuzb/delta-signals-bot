@@ -11,23 +11,34 @@ from datetime import datetime, timedelta, timezone
 import config
 import db
 import exchange
-import forex
 import futures
 import parsing
-import stocks
 
 log = logging.getLogger(__name__)
 
-_td_tried: dict[int, float] = {}     # 307b: forex/aksiya signali oxirgi tekshirilgan payt
+
+
+class _Offline:
+    """308: Twelve Data olib tashlandi. Eski `forex`/`stock` bozorli yozuvlar uchun
+    jim zaxira — shamlar bo'sh, narx yo'q (hech kim tarmoqqa chiqmaydi, chaqiruvchilar
+    bo'sh javobni allaqachon to'g'ri qayta ishlaydi)."""
+    @staticmethod
+    async def klines(*_a, **_k):
+        return []
+
+    @staticmethod
+    async def last_price(*_a, **_k):
+        return None
+
+
+_offline = _Offline()
 
 
 def provider(market: str):
-    """market bo'yicha narx manbai: forex/aksiya — Twelve Data, fyuchers —
-    MEXC kontraktlari (198), aks holda MEXC spot."""
-    if market == "forex":
-        return forex
-    if market == "stock":
-        return stocks
+    """market bo'yicha narx manbai: fyuchers — MEXC kontraktlari (198), aks holda
+    MEXC spot. Eski forex/aksiya (Twelve Data, 308 da olib tashlandi) — `_offline`."""
+    if market in ("forex", "stock"):
+        return _offline
     if market == "futures":
         return futures
     return exchange
@@ -101,18 +112,9 @@ async def process(sig) -> list[dict]:
 
     is_first_poll = sig["last_checked_ms"] is None
     start_ms = sig["last_checked_ms"] or int(sig["created_at"].timestamp() * 1000)
-    # 307b: forex/aksiya — Twelve Data (bepul reja kuniga ~800 so'rov). Har 45 s da
-    # so'rash bitta signalning o'zida kuniga ~1900 so'rov edi — kvota kun bo'yi tugab,
-    # kuzatuv umuman to'xtardi. Shamlar `last_checked_ms` dan o'qilgani uchun siyrak
-    # tekshirish hech bir shamni yo'qotmaydi (TP/SL baribir topiladi), faqat xabar
-    # biroz kechroq keladi.
-    # Oxirgi URINISH vaqti xotirada (`last_checked_ms` dam olish kuni yoki limit paytida
-    # bo'sh javobda siljimaydi — shunga tayansak yana har 45 s da so'ralardi).
-    if sig["market"] in ("forex", "stock") and not is_first_poll and not sig.get("backfill"):
-        mono = time.monotonic()
-        if mono - _td_tried.get(sig["id"], -1e9) < config.TD_POLL_SECONDS:
-            return []
-        _td_tried[sig["id"]] = mono
+    # 308: eski forex/aksiya signali (MEXC ekvivalenti topilmagan) — kuzatilmaydi.
+    if sig["market"] in ("forex", "stock"):
+        return []
     # `end_ms` — MAJBURIY. MEXC (va forex/aksiya provayderlari, bir xil
     # imzo) FAQAT `startTime` berilganda (`endTime`siz) uni DEYARLI E'TIBORGA
     # OLMAYDI — o'rniga eng SO'NGGI `limit` (standart 500) shamni, HOZIRDAN

@@ -1,10 +1,9 @@
 # Trade Controller
 
 Telegram guruhdagi trading signallarni avtomatik kuzatib, foiz va R statistikasini
-yurituvchi bot. Narx manbasi — kripto uchun **MEXC Spot**, forex/metallar va
-AQSh aksiyalari (AAPL, TSLA, NVDA ...) uchun
-**Twelve Data** (ixtiyoriy, `TWELVE_DATA_API_KEY` bo'lsa yoqiladi). Signal kiritishda
-qaysi bozor ekani avtomatik aniqlanadi — alohida tanlash shart emas.
+yurituvchi bot. Narx manbasi — **MEXC** (spot va fyuchers): kripto, metallar
+(GOLD/XAUT, SILVER) va tokenlashgan AQSh aksiyalari (AAPL → AAPLONUSDT ...).
+Signal kiritishda qaysi juftlik ekani avtomatik aniqlanadi — alohida tanlash shart emas.
 
 Multi-tenant: bitta bot bir nechta mustaqil **workspace**ga xizmat qiladi — istalgan
 yopiq guruh o'zini `/setup` bilan ro'yxatdan o'tkazib, o'z admini boshqaradigan alohida
@@ -126,8 +125,7 @@ eth long 3200 3400 3550 3100      ← kalit so'zsiz: entry, TP lar, SL
 BTCUSDT LONG market entry 65000 tp 67000 sl 64000   ← "market" — darhol ochiq
 ```
 
-Bot nomni MEXC Spot, so'ng Twelve Data (forex, keyin AQSh aksiyalari)
-ro'yxati bilan tekshiradi,
+Bot nomni MEXC ro'yxati (kripto, metall, aksiya tokeni) bilan tekshiradi,
 LONG/SHORT mantiqini validatsiya qiladi (SL entrydan past bo'lishi va h.k.) va
 risk 25% dan oshsa ogohlantiradi.
 

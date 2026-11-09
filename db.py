@@ -1863,6 +1863,22 @@ async def open_allocated(workspace_id: int,
     return float(row["s"] or 0) + await pending_add_usd(workspace_id, futures)
 
 
+async def td_open_signals() -> list[asyncpg.Record]:
+    """308: Twelve Data olib tashlandi — hali ochiq eski forex/aksiya signallari."""
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT id, symbol, market, workspace_id FROM signals "
+                             "WHERE status IN ('PENDING','ACTIVE') AND market IN ('forex','stock') "
+                             "ORDER BY id")
+
+
+async def move_signal_to_mexc(sig_id: int, symbol: str) -> None:
+    """308: eski forex/aksiya signalini MEXC'dagi ekvivalentiga o'tkazadi (bozor `crypto`).
+    `last_checked_ms` saqlanadi — kuzatuv shu joydan MEXC shamlari bilan davom etadi."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET symbol=$2, market='crypto' WHERE id=$1 "
+                        "AND market IN ('forex','stock')", sig_id, symbol)
+
+
 async def live_signals(workspace_id: int | None = None) -> list[asyncpg.Record]:
     """workspace_id berilmasa — BARCHA workspace'lardagi ochiq signallar (kuzatuv
     sikli uchun; u har birini o'z workspace_id'si bilan qaytaradi)."""

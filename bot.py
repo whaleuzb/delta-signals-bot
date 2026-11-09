@@ -40,14 +40,12 @@ import cryptonews
 import db
 import econcalendar
 import exchange
-import forex
 import i18n
 import indicators
 import liquidations
 import listings
 import news
 import newsai
-import stocks
 import parsing
 import paymembers
 import resultlink
@@ -5001,8 +4999,8 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
 
     Matndan qaysi so'z juftlik ekanini aniq bilib bo'lmaydi ("Yangi signal:
     btc long..." — qaysi biri?), shuning uchun tanlovni BIRJAGA qoldiramiz:
-    ro'yxatda topilgani — o'sha. Avval hamma nomzod kripto bo'yicha, keyin
-    forex bo'yicha tekshiriladi (kripto — keng tarqalgan holat).
+    ro'yxatda topilgani — o'sha. Hammasi MEXC'dan: kripto, metall, aksiya tokeni
+    (308 dan beri Twelve Data — forex/aksiya — yo'q).
 
     Qimmat emas: ikkala manba ham juftliklar ro'yxatini 1 soatga keshlaydi,
     ya'ni bu oddiy to'plamda qidiruv, tarmoq so'rovi emas."""
@@ -5014,9 +5012,8 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
             break
         if sym:
             return sym, "crypto"
-    # Oltin/kumush — MEXC tokeni (GOLD(XAUT), SILVER(XAG)) forex'dan OLDIN
-    # (189): narx birjadan, Twelve Data limitlarisiz. Topilmasa forex
-    # (Twelve Data XAU/USD) avvalgidek zaxira.
+    # Oltin/kumush — MEXC tokeni (GOLD(XAUT), SILVER(XAG)) (189).
+    # 308: Twelve Data (forex/aksiya) olib tashlandi — hamma narx MEXC'dan.
     for raw in cands[:2]:
         try:
             sym = await exchange.resolve_metal(raw)
@@ -5025,15 +5022,6 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
             break
         if sym:
             return sym, "crypto"
-    if forex.enabled():
-        for raw in cands:
-            try:
-                sym = await forex.resolve(raw)
-            except Exception:
-                log.warning("Forex juftliklar ro'yxati olinmadi", exc_info=True)
-                break
-            if sym:
-                return sym, "forex"
     # Aksiya — avval MEXC'dagi tokenlashgan ko'rinishi (188): `MRNA` ->
     # `MRNAONUSDT`. Kuzatuv birjadan (bozor `crypto`), Twelve Data
     # limitlariga bog'liq emas. Keshdagi ro'yxatda qidiruv, lekin baribir
@@ -5047,22 +5035,6 @@ async def resolve_symbol(cands: list[str]) -> tuple[str | None, str]:
             break
         if sym:
             return sym, "crypto"
-    # Aksiyalar — ENG OXIRIDA. Sabab: "BTC" kabi so'z tasodifan biror tiker
-    # bilan to'qnashib qolsa, kripto ustun bo'lib qolsin (bot asosan kripto
-    # uchun ishlatiladi).
-    if stocks.enabled():
-        # Faqat DASTLABKI ikkita nomzod: aksiya tekshiruvi — tarmoq so'rovi
-        # (kripto va forex esa keshdagi ro'yxatda qidiruv). Twelve Data bepul
-        # rejasi daqiqasiga 8 so'rov beradi, oltita nomzodni sinash uni bir
-        # xabarda yeb qo'yishi mumkin edi.
-        for raw in cands[:2]:
-            try:
-                sym = await stocks.resolve(raw)
-            except Exception:
-                log.warning("Aksiyalar ro'yxati olinmadi", exc_info=True)
-                break
-            if sym:
-                return sym, "stock"
     # MEXC'da bor, lekin umumiy ro'yxatdan tushib qolgan juftlik (masalan
     # RealStocks tokenlari — MRNAONUSDT, 187). ENG OXIRIDA va faqat dastlabki
     # ikkita nomzod: bu tarmoq so'rovi, va avvalgi manbalar (forex, aksiya)
@@ -9453,7 +9425,7 @@ async def handle_ref_code_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE) 
 # funksiyalari orqali TASDIQLANADI (modelning o'zi noto'g'ri taxmin qilishi
 # mumkin, shu sabab bu yerda ikkinchi bosqich — tasdiqlash — bor
 # bor). Kripto birinchi — News Trade AI'ning asosiy auditoriyasi shu.
-NEWS_MARKETS = (("crypto", exchange), ("stock", stocks), ("forex", forex))
+NEWS_MARKETS = (("crypto", exchange),)      # 308: Twelve Data (aksiya/forex) olib tashlandi
 
 # Kanalning ochiq (public) username'i — "Do'stlarga yuborish" tugmasi va
 # bosh menyudagi "News Trade AI" havolasi shundan foydalanadi. `NEWS_CHANNEL_ID`
@@ -9804,9 +9776,6 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
 # ishga tushsa ham, yangi konteyner shunchaki keyingi tikda xuddi shu
 # so'rovni bazadan qayta qiladi va DAVOM ETADI (hech narsa yo'qolmaydi).
 
-_LIVE_AT: dict[int, float] = {}
-
-
 async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not config.NEWS_CHANNEL_ID:
         return
@@ -9818,15 +9787,7 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     for row in rows:
-        # 307: forex/aksiya shamlari Twelve Data'dan (bepul reja — daqiqasiga 8 so'rov).
-        # Har 4 s da yangilash limitni darhol yeb, forex signallari kuzatuvini ham
-        # to'xtatardi — ular 45 s da bir yangilanadi. Oyna tugagach esa darhol
-        # (yakuniy natija yozilishi uchun). Kripto (MEXC) avvalgidek tez.
         deadline = row["event_at"] + timedelta(minutes=config.NEWS_LIVE_MINUTES)
-        if row["market"] != "crypto" and now < deadline:
-            if time.monotonic() - _LIVE_AT.get(row["id"], 0.0) < 45:
-                continue
-            _LIVE_AT[row["id"]] = time.monotonic()
         # Hajm portlashi (surge) uchun bir marta (post vaqtida) hisoblangan
         # Volume/Volume Delta profili bo'lsa — QAYTA SO'RALMAYDI (MEXC
         # tezlik chegarasiga xavf), bazadan o'qilib qayta ishlatiladi,
@@ -9875,7 +9836,6 @@ async def news_live_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
         if now >= deadline:
             await db.finalize_news_outcome(row["id"], live_pct)
-            _LIVE_AT.pop(row["id"], None)
 
 
 async def news_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -11419,6 +11379,47 @@ def _announce_kb():
         api_kwargs={"style": "success"})]])
 
 
+async def migrate_td_signals(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """308: Twelve Data olib tashlandi. Hali ochiq forex/aksiya signallari MEXC'dagi
+    ekvivalentiga o'tkaziladi: metall (XAUUSD -> GOLD/XAUT, XAG -> SILVER) va aksiya
+    tokeni (AAPL -> AAPLONUSDT). Haqiqiy forex juftligi (EURUSD) MEXC'da yo'q — uni
+    tasodifiy tokenga bog'lamaslik uchun `resolve(probe=True)` ATAYLAB ishlatilmaydi.
+    O'tkazilmaganlar kuzatilmaydi (tracker `_offline`) — adminlarga ro'yxat yuboriladi."""
+    try:
+        rows = await db.td_open_signals()
+    except Exception:
+        log.exception("Eski forex/aksiya signallari o'qilmadi")
+        return
+    if not rows:
+        return
+    moved, left = [], []
+    for r in rows:
+        sym = None
+        try:
+            sym = await exchange.resolve_metal(r["symbol"])
+            if not sym and r["market"] == "stock":
+                sym = await exchange.resolve_stock_token(r["symbol"])
+        except Exception:
+            log.warning("MEXC ekvivalenti tekshirilmadi (#%s)", r["id"], exc_info=True)
+        if sym:
+            await db.move_signal_to_mexc(r["id"], sym)
+            moved.append(f"#{r['id']} {r['symbol']} → {sym}")
+        else:
+            left.append(f"#{r['id']} {r['symbol']} ({r['market']})")
+    log.info("Twelve Data signallari: o'tkazildi %d, qoldi %d", len(moved), len(left))
+    txt = "🔁 <b>Twelve Data o'chirildi</b> — ochiq forex/aksiya signallari:\n"
+    if moved:
+        txt += "\n✅ MEXC'ga o'tkazildi:\n" + "\n".join(html.escape(x) for x in moved)
+    if left:
+        txt += ("\n\n⚠️ MEXC'da ekvivalenti yo'q — endi kuzatilmaydi, qo'lda yoping:\n"
+                + "\n".join(html.escape(x) for x in left))
+    for a in config.ADMIN_IDS:
+        try:
+            await ctx.bot.send_message(a, txt, parse_mode=ParseMode.HTML)
+        except Exception:
+            log.warning("Admin %s ga xabar ketmadi", a)
+
+
 async def post_init(app: Application) -> None:
     # Bir martalik baza ko'chirish (196): `MOVE_DB_TO` bo'lsa — hech qanday
     # job/handler ishlamasdan OLDIN eski bazadan yangisiga ko'chiriladi va
@@ -11492,8 +11493,6 @@ async def post_shutdown(app: Application) -> None:
     await tgsource.close()
     await exchange.close()
     await futures.close()
-    await forex.close()
-    await stocks.close()
 
 
 async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -11697,6 +11696,7 @@ def main() -> None:
     app.job_queue.run_repeating(partner_job, interval=6 * 3600, first=600)
     app.job_queue.run_daily(backup_job, time=dtime(hour=3, minute=17, tzinfo=stats.TZ))
     app.job_queue.run_repeating(app_action_job, interval=2, first=15)
+    app.job_queue.run_once(migrate_td_signals, when=40)      # 308
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
