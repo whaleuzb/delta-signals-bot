@@ -7494,3 +7494,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `sessionStorage.tc_nav` ga. Init'da navigatsiya turi `reload` bo'lsa
      `tc_nav` ishlatiladi (yangi ochilishda — havoladagi parametrlar).
      Tiklanadi: tab, guruh sahifasi, Dip Funded ro'yxati/hisobi, Taklif.
+268. **DIP bo'limi — pastki menyuda alohida tab** (`TABS`: home, signals,
+     **dip**, top, tour, profile; tanga belgisi `I.dip`). `dipView`: DIP
+     karta + chiqarish (`dipOut`) + "Do'st taklif qilish" (`refShare`) /
+     "Taklif sahifasi" (`openRef`) va **reyting** — `POST /api/app/diptop`
+     (`db.dip_top`): YIG'ILGAN DIP bo'yicha (withdraw/withdraw_refund
+     hisobga olinmaydi — chiqargan odam tushib ketmaydi), top 50, ism faqat
+     birinchi so'z (username ko'rsatilmaydi), taklif soni; o'z qatori
+     "Siz · …" ajratilgan, 50 dan pastda bo'lsa oxirida "···" bilan. Taklif
+     sahifasida katta karta o'rniga ixcham "DIP balans" qatori (→ DIP tab).
+     `dipRefresh()` — chiqarishdan keyin qaysi sahifa ochiq bo'lsa o'shani
+     yangilaydi.

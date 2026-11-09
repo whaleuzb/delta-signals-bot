@@ -1087,6 +1087,27 @@ async def dip_balance(user_id: int) -> float:
     return float(v or 0)
 
 
+async def dip_top(limit: int = 50, me: int | None = None) -> list[asyncpg.Record]:
+    """268: DIP reytingi — YIG'ILGAN DIP bo'yicha (chiqarish/qaytarish
+    hisobga olinmaydi, ya'ni chiqargan odam reytingdan tushmaydi).
+    Top `limit` + (bo'lsa) so'ragan odamning o'z qatori."""
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            WITH e AS (
+                SELECT user_id, SUM(amount) AS earned,
+                       COUNT(*) FILTER (WHERE reason = 'referral') AS refs, MIN(created_at) AS first
+                FROM dip_ledger WHERE reason NOT IN ('withdraw', 'withdraw_refund')
+                GROUP BY user_id HAVING SUM(amount) > 0
+            ), r AS (
+                SELECT e.*, ROW_NUMBER() OVER (ORDER BY earned DESC, first, user_id) AS rank FROM e
+            )
+            SELECT r.user_id, r.earned, r.refs, r.rank, u.first_name, u.username
+            FROM r LEFT JOIN users u ON u.user_id = r.user_id
+            WHERE r.rank <= $1 OR r.user_id = $2
+            ORDER BY r.rank
+        """, limit, me or 0)
+
+
 async def dip_pending(user_id: int) -> float:
     """263: kutilayotgan chiqarish so'rovi summasi (yo'q bo'lsa 0)."""
     async with pool().acquire() as c:

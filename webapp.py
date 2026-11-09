@@ -355,6 +355,21 @@ async def api_top(request):
     }, headers=NO_CACHE)
 
 
+async def api_diptop(request):
+    """268: DIP reytingi (ochiq) — ism faqat birinchi so'z, username ko'rsatilmaydi."""
+    _body, uid = await _uid_opt(request)
+    rows = await db.dip_top(50, uid)
+
+    def nm(r):
+        n = (r["first_name"] or "").strip().split()
+        return (n[0][:18] if n else None) or "Trader"
+    out = [{"rank": r["rank"], "name": nm(r), "dip": round(float(r["earned"]), 2), "refs": r["refs"],
+            "me": bool(uid) and r["user_id"] == uid} for r in rows]
+    top = [x for x in out if x["rank"] <= 50]
+    mine = next((x for x in out if x["me"]), None)
+    return web.json_response({"top": top, "me": mine}, headers=NO_CACHE)
+
+
 def _curve(rows, deposit, net) -> list:
     pts, acc = [], 0.0
     weighted = bool(deposit) and any(r["alloc_amount"] is not None for r in rows)
@@ -561,6 +576,7 @@ def routes() -> list:
         web.post("/api/app/act", api_act),
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/top", api_top),
+        web.post("/api/app/diptop", api_diptop),
         web.post("/api/app/period", api_period),
         web.post("/api/app/group", api_group),
         web.post("/api/app/tour", api_tour),
@@ -617,7 +633,7 @@ T = {
         "ref_new": "Yangi kod ({mn}–{mx} belgi)", "ref_share_txt": "Trade Controller — signallar natijasini kuzatish boti",
         "man_fill": "Juftlik, stop va TP ni to'ldiring",
         "pairs": "Juftliklar",
-        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_out_ask": "Barcha {n} DIP ni chiqarishga so'rov yuborilsinmi?", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
+        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_out_ask": "Barcha {n} DIP ni chiqarishga so'rov yuborilsinmi?", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip": "DIP", "dip_rank": "Reyting", "dip_rank_sub": "Eng ko'p DIP yig'ganlar", "dip_refs": "taklif", "dip_you": "Siz", "dip_empty": "Hali hech kim DIP yig'magan", "dip_invite": "Do'st taklif qilish", "dip_more": "Taklif sahifasi", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -679,7 +695,7 @@ T = {
         "ref_new": "Новый код ({mn}–{mx} символов)", "ref_share_txt": "Trade Controller — бот для учёта результатов сигналов",
         "man_fill": "Заполните пару, стоп и TP",
         "pairs": "Пары",
-        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_out_ask": "Отправить заявку на вывод всех {n} DIP?", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
+        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_out_ask": "Отправить заявку на вывод всех {n} DIP?", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip": "DIP", "dip_rank": "Рейтинг", "dip_rank_sub": "Больше всего DIP", "dip_refs": "пригл.", "dip_you": "Вы", "dip_empty": "Пока никто не собрал DIP", "dip_invite": "Пригласить друга", "dip_more": "Страница приглашений", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -741,7 +757,7 @@ T = {
         "ref_new": "New code ({mn}–{mx} chars)", "ref_share_txt": "Trade Controller — signal results tracking bot",
         "man_fill": "Fill in pair, stop and TP",
         "pairs": "Pairs",
-        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_out_ask": "Send a request to withdraw all {n} DIP?", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
+        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_out_ask": "Send a request to withdraw all {n} DIP?", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip": "DIP", "dip_rank": "Ranking", "dip_rank_sub": "Most DIP collected", "dip_refs": "invites", "dip_you": "You", "dip_empty": "No one has collected DIP yet", "dip_invite": "Invite a friend", "dip_more": "Invite page", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",
