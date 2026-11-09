@@ -7628,3 +7628,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      o'tuvchi shaffof gradient. Ishlatiladi: bosh sahifadagi Dip Funded
      kartasi (52px, avvalgi ⚡ o'rniga), Dip Funded sahifasi sarlavhasi
      (`dfHead`), Depozit oynasidagi Dip Funded bloki.
+287. **Taklif sahifasi bitta ekranga sig'adi; bosh sahifa pasti menyu ostida
+     qolmaydi.** DIP karta ixcham: balandlik 168px (avval 4/5 nisbat),
+     "DIP Token" bir qatorda 24px, balans 32px, "1000 DIP = $10" o'ng pastda,
+     tanga 28px; chiqarish bloki va izoh ixchamroq. `body` pastki joyi
+     110 → 150px (o'rtadagi DIP tanga menyudan 38px yuqori chiqadi — oxirgi
+     karta uning ostida qolardi); `.page` pastki joyi 40px (u yerda menyu yo'q).
