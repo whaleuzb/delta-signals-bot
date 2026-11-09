@@ -7622,3 +7622,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (`dip_tasks_for`, `dip_task_get().expired`). Ilova: "99 USDT · 1 oy",
      4-band "1 oy davomida ko'rinadi"; adminga "99 USDT / 30 kun", `/earn` da
      "dd.mm.yyyy gacha" va ⌛️; arizachiga "30 kunga joylashtirildi".
+286. **Dip Funded — asl logotip, shaffof shisha uslubida.** `dfLogo(z)`:
+     delta-prop `templates/base.html` dagi logo-mark yo'li (uchburchak,
+     ichi o'yilgan), to'ldirish — oq gradient .42→.04, chiziq — oqdan lime'ga
+     o'tuvchi shaffof gradient. Ishlatiladi: bosh sahifadagi Dip Funded
+     kartasi (52px, avvalgi ⚡ o'rniga), Dip Funded sahifasi sarlavhasi
+     (`dfHead`), Depozit oynasidagi Dip Funded bloki.

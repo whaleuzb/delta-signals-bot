@@ -412,7 +412,12 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  +'<div class="card glass rise" onclick="depSheet()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div>'+(hs.spot&&hs.spot.last.length?'<div class="cch">'+mbars(hs.spot.last,300,40)+'</div>':'<div class="deco">'+ic('wallet',50)+'</div>')+'</div>'
  +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div>'+(hs.spot?'<div class="deco" style="right:12px;bottom:10px">'+mring(hs.spot.wr,52)+'</div>':'<div class="deco">'+ic('bars',36)+'</div>')+'</div>'
  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
- +'<div class="card glass acc rise" onclick="openDf()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
+ +'<div class="card glass acc rise" onclick="openDf()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco" style="opacity:1">'+dfLogo(52)+'</div></div>'}
+/* 286: Dip Funded'ning asl logotipi (delta-prop templates/base.html) — shaffof shisha uslubida */
+var DFL=0;function dfLogo(z){var id='dfl'+(DFL++);return'<svg width="'+z+'" height="'+z+'" viewBox="290 230 527 517" style="overflow:visible;flex:none"><defs>'
+ +'<linearGradient id="'+id+'f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity=".04"/></linearGradient>'
+ +'<linearGradient id="'+id+'s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".5" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#c2f23a" stop-opacity=".55"/></linearGradient></defs>'
+ +'<path fill="url(#'+id+'f)" stroke="url(#'+id+'s)" stroke-width="10" stroke-linejoin="round" fill-rule="evenodd" d="M553 244 803 733H304ZM521 397Q538 368 555 397L689 662Q703 693 672 693H399Q368 693 382 662Z"/></svg>'}
 /* 279: kartalardagi kichik grafiklar */
 function mline(pts,W,H,id){if(!pts||pts.length<2)return'';var a=[0].concat(pts),n=a.length,mn=Math.min.apply(null,a),mx=Math.max.apply(null,a);if(mx==mn)mx=mn+1;
  var X=function(k){return(k/(n-1)*W).toFixed(1)},Y=function(v){return(H-3-(v-mn)/(mx-mn)*(H-6)).toFixed(1)};var c=a[n-1]>=0?'#c2f23a':'#ff5c5c';
@@ -618,14 +623,14 @@ function depSheet(){var w=cur();if(!w)return;var bs=0,bf=0;S.items.forEach(funct
  var blk=function(key,act,val,busy){return'<div class="tile2 glass" style="margin-bottom:10px"><div class="k">'+esc(t(key))+'</div><div class="v">'+(val!=null?f0(val):'—')+'</div>'
   +(val!=null?'<div class="rs" style="margin-top:4px">'+esc(t('busy_l'))+' '+f0(busy)+' · '+esc(t('free_l'))+' '+f0(Math.max(0,val-busy))+'</div>':'')
   +'<div style="display:flex;gap:8px;margin-top:10px"><input id="d_'+act+'" inputmode="decimal" placeholder="'+esc(t('new_val'))+'" style="margin:0;font-size:16px;padding:10px 12px"><button class="btn p" style="width:auto;flex:none;margin:0" onclick="saveDep(\''+act+'\')">'+esc(t('save'))+'</button></div></div>'};
- var dfb=S.df?'<div class="tile2 glass acc" style="margin-bottom:10px"><div class="k">Dip Funded</div><div class="v" style="font-size:16px">'+esc(t('df_accs'))+'</div>'
+ var dfb=S.df?'<div class="tile2 glass acc" style="margin-bottom:10px"><div class="k" style="display:flex;align-items:center;gap:7px">'+dfLogo(16)+'Dip Funded</div><div class="v" style="font-size:16px">'+esc(t('df_accs'))+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn p" style="margin:0" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button><button class="btn" style="margin:0" onclick="sheetClose();openDf()">'+esc(t('df_accs'))+'</button></div></div>':'';
  sheetOpen('<h4>'+esc(t('dep_title'))+'</h4><p>'+esc(wsName(w))+'</p>'+blk('dep_spot','dep',w.deposit,bs)+blk('dep_fut','fdep',w.fut_deposit,bf)+dfb)}
 function saveDep(act){var v=num(document.getElementById('d_'+act).value);if(!v)return;var w=cur();
  actWs(act,v,w.id).then(function(r){if(r&&r.ok){if(act=='dep')w.deposit=v;else w.fut_deposit=v;sheetClose();S.anim=false;render()}})}
 /* 255: Dip Funded prop hisoblari — ilova ichida (ma'lumotni bot beradi) */
 function dfCall(a,arg){return api('act',{action:a,arg:arg}).then(function(r){var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}return{ok:r.ok,d:d,pending:r.pending}})}
-function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(back?'openDf(1)':'closeGroup()')+'">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('zap',22)+'</div><div><h2>Dip Funded</h2><div class="rs">'+esc(t('df_accs'))+'</div></div></div>'}
+function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(back?'openDf(1)':'closeGroup()')+'">'+ic('back',18)+'</div><div class="av">'+dfLogo(24)+'</div><div><h2>Dip Funded</h2><div class="rs">'+esc(t('df_accs'))+'</div></div></div>'}
 function dfErr(d){var c=d&&d.code;if(c=='not_linked'||c=='profile')return'<div class="empty glass rise">'+ic('link',36)+'<div style="margin:8px 0 14px">'+esc(t('df_nolink'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button></div>';
  return'<div class="empty glass rise">'+esc(t('df_unav'))+'</div>'}
 function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}}
