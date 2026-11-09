@@ -205,7 +205,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .eq svg{width:100%;height:120px;display:block;overflow:visible}
 .sect{font-size:14px;font-weight:800;margin:16px 2px 10px;letter-spacing:-.01em}
 .page{position:fixed;inset:0;z-index:25;overflow-y:auto;padding:calc(var(--top) + 10px) 14px 110px;transform:translateX(100%);
- transition:transform .5s var(--ease);background:rgba(5,5,6,.94)}
+ transition:transform .5s var(--ease);background:#050506}
 .page.show{transform:none}
 .page:not(.show){visibility:hidden;transition:transform .5s var(--ease),visibility 0s .5s}
 .ghd{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
@@ -240,6 +240,9 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  book:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
  pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
  chev:'<polyline points="6 9 12 15 18 9"/>',
+ plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+ gift:'<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8c-2-4-6-4-6-1.5S10 8 12 8zm0 0c2-4 6-4 6-1.5S14 8 12 8z"/>',
+ copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
  crown:'<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
  back:'<polyline points="15 18 9 12 15 6"/>',
  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
@@ -305,6 +308,7 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  var dep=[];if(w.deposit!=null)dep.push(t('spot')+' '+f0(w.deposit));if(w.fut_deposit!=null)dep.push(t('fut')+' '+f0(w.fut_deposit));
  v.innerHTML='<div class="slider rise" id="slider">'+sl.join('')+'</div>'
  +'<div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>'
+ +'<button class="btn p full rise" style="width:100%;padding:14px;font-size:15px;margin-bottom:10px" onclick="newSig()">'+ic('plus',16)+' '+esc(t('ns_btn'))+'</button>'
  +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('open'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('open_n',{n:n}))+'</div><div class="deco">'+ic('trend',50)+'</div></div>'
  +'<div class="card glass rise" onclick="depSheet()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
  +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
@@ -341,6 +345,7 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
 function signals(v,w){var f=S.filter;var list=S.items.filter(function(i){return f=='all'||(f=='long'&&i.side=='LONG')||(f=='short'&&i.side=='SHORT')||(f=='limit'&&i.status=='PENDING')});
  var tot=totals();
  v.innerHTML='<h3 class="rise">'+esc(t('signals'))+(tot!=null?'<small class="'+(tot>=0?'g':'r')+'">'+fm(tot)+'</small>':'')+'</h3>'
+ +'<button class="btn p full rise" style="width:100%;padding:12px;font-size:14px;margin-bottom:12px" onclick="newSig()">'+ic('plus',15)+' '+esc(t('ns_btn'))+'</button>'
  +'<div class="chips rise">'+[['all','Hammasi'],['long','LONG'],['short','SHORT'],['limit',t('limit')]].map(function(c){return'<span class="chip glass'+(f==c[0]?' on':'')+'" onclick="setF(\''+c[0]+'\')">'+esc(c[0]=='all'?({uz:'Hammasi',ru:'Все',en:'All'}[S.lang]||'Hammasi'):c[1])+'</span>'}).join('')+'</div>'
  +(list.length?list.map(sigCard).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('none'))+'</div></div>');
  S.items.forEach(function(i){S.prev[i.id]=i.live})}
@@ -378,6 +383,7 @@ function profile(v,w){var u=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user)||{};
   +'<span style="color:'+(on?'var(--g)':'var(--mut)')+'">'+wsIc(x)+'</span><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(wsName(x))+'</div>'
   +'<div class="m" style="font-size:11px">'+esc(x.type=='personal'?t('personal'):x.channel?t('channel'):t('group'))+(x.deposit!=null?' · '+f0(x.deposit):'')+'</div></div>'
   +'<span class="tag" style="position:static">'+esc(t('open_n',{n:x.open||0}))+'</span></div>'}).join('');
+ if(!S.pub)h+='<div class="card glass acc rise" style="min-height:0;margin-top:14px" onclick="openRef()"><h2>'+esc(t('ref_title'))+'</h2><div class="s">'+esc(t('ref_sub'))+'</div><div class="deco">'+ic('gift',40)+'</div></div>';
  h+='<h3 class="rise" style="font-size:15px">'+esc(t('ui_lang'))+'</h3><div class="chips rise">'+[['uz',"O'zbek"],['ru','Русский'],['en','English']].map(function(l){return'<span class="chip glass'+(S.lang==l[0]?' on':'')+'" onclick="setLang(\''+l[0]+'\')">'+l[1]+'</span>'}).join('')+'</div>';
  h+='<button class="btn p full rise" style="width:100%;margin-top:10px;padding:13px;font-size:14px" onclick="toBot()">'+ic('bot',16)+' '+esc(t('back_bot'))+'</button>';
  v.innerHTML=h}
@@ -520,6 +526,51 @@ function dfAcc(id){tick();S.page={id:'df',acc:id};var p=document.getElementById(
   var tu=(S.df||'').replace(/[/]$/,'')+'/account/trade/'+a.id;
   h+='<div style="display:flex;gap:8px;margin-top:10px" class="rise"><button class="btn p" onclick="openLink(\''+esc(tu)+'\')">'+esc(t('df_term'))+'</button><button class="btn" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button></div>';
   p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'})})}
+/* ===== 258: yangi signal (ilova ichida) ===== */
+var NS={kind:'spot',lev:10,side:'LONG',mode:'market'};
+function nsSeg(id,opts,cur,fn){var k=Math.max(0,opts.map(function(o){return o[0]}).indexOf(cur));return'<div class="seg glass" style="margin-bottom:10px"><div class="si" style="width:calc((100% - 8px)/'+opts.length+');transform:translateX('+(k*100)+'%)"></div>'+opts.map(function(o){return'<a class="'+(o[0]==cur?'on':'')+'" onclick="'+fn+'(\''+o[0]+'\')">'+esc(o[1])+'</a>'}).join('')+'</div>'}
+function nsKeep(){var g=function(i){var e=document.getElementById(i);return e?e.value:undefined};['sym','entry','sl','tps','amount'].forEach(function(k){var v=g('ns_'+k);if(v!==undefined)NS[k]=v});var w=document.getElementById('ns_ws');if(w)NS.ws=+w.value}
+function nsSet(k,v){nsKeep();NS[k]=v;tick();nsRender()}
+function newSig(){tick();if(!S.ws.length)return;NS.ws=NS.ws||S.cur;S.page={id:'ns'};nsRender();pageShow()}
+function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(function(x){return x.id==NS.ws})[0]||cur();
+ var lb=function(t_){return'<div class="rs" style="margin:10px 2px 6px">'+esc(t_)+'</div>'};
+ var fi=function(id,ph,val,mode){return'<input id="ns_'+id+'" '+(mode?'inputmode="'+mode+'" ':'')+'placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;outline:none">'};
+ var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('plus',22)+'</div><div><h2>'+esc(t('ns_title'))+'</h2><div class="rs">'+esc(wsName(w))+'</div></div></div>';
+ if(S.ws.length>1)h+=lb(t('ns_where'))+'<select id="ns_ws" style="width:100%;font-size:15px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==w.id?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>';
+ h+=lb(t('ns_pair'))+fi('sym','BTC',NS.sym,'');
+ h+=lb(t('ns_kind'))+nsSeg('k',[['spot','Spot'],['fut','Futures']],NS.kind,'nsKind');
+ if(NS.kind=='fut'){h+=lb(t('ns_lev'))+'<div class="chips" style="flex-wrap:wrap">'+[5,10,20,25,30,40,50,90,100].map(function(l){return'<span class="chip glass'+(NS.lev==l?' on':'')+'" onclick="nsSet(\'lev\','+l+')">'+l+'x</span>'}).join('')+'</div>';
+  h+=lb(t('ns_side'))+nsSeg('sd',[['LONG','LONG'],['SHORT','SHORT']],NS.side,'nsSide')}
+ h+=lb(t('ns_entry_mode'))+nsSeg('m',[['market',t('ns_market')],['limit',t('ns_limit')]],NS.mode,'nsMode');
+ if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal');
+ h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal')+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal');
+ var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount')+' · '+f0(dep))+fi('amount','',NS.amount,'decimal');
+ h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('ns_send'))+'</button>';
+ p.innerHTML=h}
+function nsKind(k){nsSet('kind',k)}function nsSide(k){nsSet('side',k)}function nsMode(k){nsSet('mode',k)}
+function nsSend(){nsKeep();var b=document.getElementById('ns_go');
+ var sl=num(NS.sl),tps=nums(NS.tps);if(!NS.sym||!sl||!tps.length||(NS.mode=='limit'&&!num(NS.entry))){haptic('error');toast(esc(t('man_fill')));return}
+ b.disabled=true;toast(esc(t('wait')));
+ api('act',{action:'newsig',args:{ws:NS.ws||S.cur,sym:NS.sym,kind:NS.kind,lev:NS.lev,side:NS.kind=='fut'?NS.side:'LONG',mode:NS.mode,entry:num(NS.entry),sl:sl,tps:tps,amount:num(NS.amount)}})
+ .then(function(r){b.disabled=false;if(r.pending){toast(esc(t('slow')));return}toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
+  if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';S.cur=NS.ws||S.cur;closeGroup();S.tab='home';go('signals');load()}}).catch(function(){b.disabled=false;toast('Error')})}
+
+/* ===== 258: taklif (referal) ===== */
+function openRef(){tick();S.page={id:'ref'};var p=document.getElementById('page');
+ p.innerHTML='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('gift',22)+'</div><div><h2>'+esc(t('ref_title'))+'</h2><div class="rs">'+esc(t('ref_sub'))+'</div></div></div><div class="spk"><div class="sk"></div></div>';pageShow();
+ api('act',{action:'ref'}).then(function(r){var d=null;try{d=JSON.parse(r.msg)}catch(e){}if(!d){toast(esc(t('slow')));return}refRender(d)}).catch(function(){toast('Error')})}
+function refRender(d){var p=document.getElementById('page');S.ref=d;
+ var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('gift',22)+'</div><div><h2>'+esc(t('ref_title'))+'</h2><div class="rs">'+esc(t('ref_sub'))+'</div></div></div>';
+ h+='<div class="slide glass acc rise" style="min-height:0;margin-bottom:12px"><div class="k">'+esc(t('ref_count'))+'</div><div class="v">'+d.count+'</div><div class="d">'+esc(t('ref_code'))+': <b style="color:var(--ink)">'+esc(d.code||'—')+'</b></div></div>';
+ if(d.link){h+='<div class="tile2 glass rise" style="margin-bottom:10px"><div class="k">'+esc(t('ref_link'))+'</div><div style="font-size:13px;font-weight:600;margin-top:6px;word-break:break-all">'+esc(d.link)+'</div>'
+  +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="refCopy()">'+ic('copy',14)+' '+esc(t('ref_copy'))+'</button><button class="btn p" onclick="refShare()">'+esc(t('ref_share'))+'</button></div></div>'}
+ if(d.can_pick)h+='<div class="tile2 glass rise"><div class="k">'+esc(t('ref_pick'))+'</div><div style="display:flex;gap:8px;margin-top:10px"><input id="ref_in" placeholder="'+esc(t('ref_new').replace('{mn}',d.min).replace('{mx}',d.max))+'" style="flex:1;min-width:0;font-size:15px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;outline:none"><button class="btn p" style="flex:none" onclick="refSave()">'+esc(t('save'))+'</button></div></div>';
+ else h+='<div class="rs rise" style="margin:6px 4px">'+esc(t('ref_need').replace('{n}',d.need))+'</div>';
+ p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*50)+'ms'});setTimeout(countUp,80)}
+function refCopy(){var l=S.ref&&S.ref.link;if(!l)return;try{navigator.clipboard.writeText(l).then(function(){toast(esc(t('ref_copied')));haptic('success')})}catch(e){var i=document.createElement('textarea');i.value=l;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();toast(esc(t('ref_copied')))}}
+function refShare(){var l=S.ref&&S.ref.link;if(!l)return;openLink('https://t.me/share/url?url='+encodeURIComponent(l)+'&text='+encodeURIComponent(t('ref_share_txt')))}
+function refSave(){var c=(document.getElementById('ref_in').value||'').trim();if(!c)return;toast(esc(t('wait')));
+ api('act',{action:'refcode',args:{code:c}}).then(function(r){if(r.ok){var d=null;try{d=JSON.parse(r.msg)}catch(e){}if(d){refRender(d);haptic('success');toast('✓')}}else{haptic('error');toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))))}})}
 function dfSheet(){sheetOpen('<h4>'+esc(t('df_title'))+'</h4><p>'+esc(t('df_txt'))+'</p>'
  +'<button class="btn p full" onclick="dfBot()">'+esc(t('df_acc'))+'</button>'
  +(S.df?'<button class="btn full" style="margin-top:8px" onclick="openLink(S.df)">'+esc(t('df_site'))+'</button>':'')

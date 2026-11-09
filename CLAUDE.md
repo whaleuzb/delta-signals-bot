@@ -7408,3 +7408,17 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      signal nuqtasidagi halqa animatsiyasi olib tashlandi; avtomatik
      yangilanish 15 → 30 s va faqat Bosh/Signallar ochiq bo'lsa.
      Qaytadan og'ir doimiy animatsiya QO'SHMANG.
+258. **Mini App: yangi signal va taklif (referal).** Bot sehrgaridagi
+     yaratish qismi `publish_signal(ctx, ws, d, uid, username, first_name,
+     post_file_id, chart_tf, photo)` ga ajratildi (bazaga yozish + guruh /
+     shaxsiy jurnal posti) — sehrgar ham, ilova ham shuni chaqiradi. Ilovada
+     "+ Yangi signal" (Bosh va Signallar): qayerga, juftlik, Spot/Futures,
+     leveraj chiplari, yo'nalish (faqat Futures; spot kripto — LONG, 231),
+     Bozor/Limit, SL, TP, summa. `newsig` amali (`_app_newsig`): huquq
+     `can_submit_signal`, juftlik `resolve_symbol`, bozor narxi yangidan,
+     `parsing.validate`, bot grafigi (`chart.setup_chart`, 1h, 12 s), muallif
+     `get_chat`; shaxsiy jurnalda turnir summasi so'rovi chatga (`_DM`),
+     aks holda summa bo'sh depozitdan oshmasa `_save_alloc`. Profil →
+     "Taklif qilish": son, kod, havola (nusxa / Telegram ulashish), o'z
+     kodini tanlash (`ref`/`refcode`, `_app_ref` — bot bilan bir xil
+     tekshiruv). Guruh sahifasi qatlami endi to'liq qora (orqa ko'rinmaydi).

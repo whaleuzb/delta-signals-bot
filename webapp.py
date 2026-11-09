@@ -28,7 +28,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
-WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -208,6 +208,23 @@ async def _ws_act(body, uid: int, act: str):
     """254: depozit o'rnatish (spot/futures) va Dip Funded menyusini botda
     ochish — bot bajaradi (`app_action_job`), sig_id=0."""
     arg = None
+    if act == "newsig":
+        # 258: yangi signal — forma maydonlari JSON'da; huquqni bot tekshiradi
+        # (`can_submit_signal`), bu yerda faqat workspace egaligi.
+        f = body.get("args")
+        try:
+            ws = await db.get_workspace(int((f or {}).get("ws")))
+        except (TypeError, ValueError, AttributeError):
+            raise web.HTTPBadRequest()
+        if not _can(ws, uid):
+            raise web.HTTPForbidden()
+        aid = await db.app_action_add(uid, 0, act, None, json.dumps(f)[:2000])
+        return await _wait_action(aid)
+    if act in ("ref", "refcode"):
+        args = json.dumps({"code": str((body.get("args") or {}).get("code") or "")[:20]}) \
+            if act == "refcode" else None
+        aid = await db.app_action_add(uid, 0, act, None, args)
+        return await _wait_action(aid)
     if act == "dfone":
         try:
             arg = float(int(body.get("arg")))
@@ -567,6 +584,17 @@ T = {
         "df_free": "Bo'sh", "df_daily": "Kunlik limit", "df_maxdd": "Maks. zarar", "df_target": "Maqsad",
         "df_days": "Savdo kunlari", "df_pos": "Pozitsiyalar", "df_orders": "Limit buyruqlar",
         "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
+        "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
+        "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
+        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_sl": "Stop (SL)",
+        "ns_tps": "Maqsadlar (TP) — bo'sh joy bilan", "ns_amount": "Summa, $ (ixtiyoriy)",
+        "ns_send": "Signal berish", "ns_where": "Qayerga",
+        "ref_title": "Taklif qilish", "ref_sub": "Do'stlaringizni taklif qiling", "ref_code": "Taklif kodingiz",
+        "ref_link": "Shaxsiy havola", "ref_count": "Siz orqali kelganlar", "ref_copy": "Nusxa olish",
+        "ref_share": "Ulashish", "ref_copied": "Nusxa olindi", "ref_pick": "O'z kodimni tanlash",
+        "ref_need": "Yana {n} ta odam taklif qilsangiz, o'z kodingizni tanlay olasiz",
+        "ref_new": "Yangi kod ({mn}–{mx} belgi)", "ref_share_txt": "Trade Controller — signallar natijasini kuzatish boti",
+        "man_fill": "Juftlik, stop va TP ni to'ldiring",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -616,6 +644,17 @@ T = {
         "df_free": "Свободно", "df_daily": "Дневной лимит", "df_maxdd": "Макс. просадка", "df_target": "Цель",
         "df_days": "Торговые дни", "df_pos": "Позиции", "df_orders": "Лимитные ордера",
         "df_term": "Терминал", "df_inbot": "Управлять в боте",
+        "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
+        "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
+        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_sl": "Стоп (SL)",
+        "ns_tps": "Цели (TP) — через пробел", "ns_amount": "Сумма, $ (необязательно)",
+        "ns_send": "Отправить сигнал", "ns_where": "Куда",
+        "ref_title": "Пригласить", "ref_sub": "Приглашайте друзей", "ref_code": "Ваш код",
+        "ref_link": "Личная ссылка", "ref_count": "Пришли по вашей ссылке", "ref_copy": "Копировать",
+        "ref_share": "Поделиться", "ref_copied": "Скопировано", "ref_pick": "Выбрать свой код",
+        "ref_need": "Пригласите ещё {n} — и сможете выбрать свой код",
+        "ref_new": "Новый код ({mn}–{mx} символов)", "ref_share_txt": "Trade Controller — бот для учёта результатов сигналов",
+        "man_fill": "Заполните пару, стоп и TP",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -665,6 +704,17 @@ T = {
         "df_free": "Free", "df_daily": "Daily limit", "df_maxdd": "Max loss", "df_target": "Target",
         "df_days": "Trading days", "df_pos": "Positions", "df_orders": "Limit orders",
         "df_term": "Trading terminal", "df_inbot": "Manage in bot",
+        "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
+        "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
+        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_sl": "Stop (SL)",
+        "ns_tps": "Targets (TP) — space-separated", "ns_amount": "Size, $ (optional)",
+        "ns_send": "Send signal", "ns_where": "Where",
+        "ref_title": "Invite", "ref_sub": "Invite your friends", "ref_code": "Your code",
+        "ref_link": "Personal link", "ref_count": "Joined through you", "ref_copy": "Copy",
+        "ref_share": "Share", "ref_copied": "Copied", "ref_pick": "Pick my own code",
+        "ref_need": "Invite {n} more to pick your own code",
+        "ref_new": "New code ({mn}–{mx} chars)", "ref_share_txt": "Trade Controller — signal results tracking bot",
+        "man_fill": "Fill in pair, stop and TP",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",

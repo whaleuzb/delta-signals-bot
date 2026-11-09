@@ -845,6 +845,123 @@ async def app_action_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await db.app_action_done(a["id"], ok, res)
 
 
+class _DM:
+    """Bot so'rovlari (`message.reply_text`) uchun odamning shaxsiy chati."""
+    def __init__(self, bot, uid: int):
+        self._bot, self._uid = bot, uid
+
+    async def reply_text(self, text, **kw):
+        return await self._bot.send_message(self._uid, text, **kw)
+
+
+async def _app_newsig(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """258: Mini App'dan yangi signal — botdagi sehrgar bilan AYNI tekshiruvlar
+    (juftlik birjada, narx, `parsing.validate`, huquq) va AYNI post."""
+    try:
+        f = json.loads(a["args"] or "{}")
+        ws = await db.get_workspace(int(f["ws"]))
+    except Exception:
+        return False, i18n.t("man.bad_format", lang)
+    if not ws or not await can_submit_signal(ctx.bot, uid, ws):
+        return False, i18n.t("man.no_right", lang)
+    raw = re.sub(r"[^A-Za-z0-9/]", "", str(f.get("sym") or "")).upper()
+    if not raw:
+        return False, i18n.t("app.ns_sym", lang)
+    sym, market = await resolve_symbol([raw, raw + config.QUOTE if not raw.endswith(config.QUOTE) else raw])
+    if not sym:
+        return False, i18n.t("app.ns_nosym", lang, s=html.escape(raw))
+    fut = f.get("kind") == "fut"
+    lev = None
+    if fut:
+        try:
+            lev = int(f.get("lev") or 0)
+        except (TypeError, ValueError):
+            lev = 0
+        if not 1 < lev <= 125:
+            return False, i18n.t("app.ns_lev", lang)
+    side = "SHORT" if f.get("side") == "SHORT" else "LONG"
+    if not fut and market == "crypto":
+        side = "LONG"            # 231: spot kriptoda faqat LONG
+    mode = "market" if f.get("mode") == "market" else "limit"
+    if mode == "market":
+        entry = await safe_last_price(market, sym, fresh=True)
+        if not entry:
+            return False, i18n.t("man.add_no_price", lang)
+    else:
+        try:
+            entry = float(f.get("entry"))
+        except (TypeError, ValueError):
+            return False, i18n.t("app.ns_entry", lang)
+    try:
+        sl = float(f.get("sl"))
+        tps = [float(x) for x in (f.get("tps") or []) if float(x) > 0]
+    except (TypeError, ValueError):
+        return False, i18n.t("man.bad_format", lang)
+    tps = sorted(set(tps), reverse=(side == "SHORT"))
+    d = {"symbol": sym, "side": side, "entry": entry, "sl": sl, "tps": tps,
+         "market": market, "entry_mode": mode, "leverage": lev}
+    err = parsing.validate(d, lang)
+    if err:
+        return False, err
+    # Guruh posti uchun bot grafigi (sehrgardagi "📈 Bot grafikni aniqlasin").
+    photo = None
+    try:
+        buf = await asyncio.wait_for(chart.setup_chart(d, ws["name"], ctx.bot.username, tf="1h"), 12)
+        photo = buf.getvalue() if buf else None
+    except Exception:
+        log.warning("Mini App signali: grafik yasalmadi", exc_info=True)
+    try:
+        ch = await ctx.bot.get_chat(uid)
+        uname, fname = ch.username, ch.first_name
+    except Exception:
+        uname = fname = None
+    sig_id = await publish_signal(ctx, ws, d, uid, uname, fname, chart_tf="1h", photo=photo)
+    msg = i18n.t("app.ns_ok", lang, sid=sig_id, sym=sym)
+    # Hajm (summa) — berilgan bo'lsa va egasi bo'lsa, bo'sh depozitdan oshmasa.
+    w = wsx(ws, d)
+    try:
+        amount = float(f.get("amount") or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    sig_row = await db.get_signal(sig_id)
+    if ws["type"] == "personal" and sig_row and await tournament.register_signal(sig_row):
+        await ask_tourney_amount(_DM(ctx.bot, uid), sig_row, uid, lang)
+    elif amount > 0 and w["deposit"] is not None and can_manage(uid, ws):
+        _dep, _busy, free = await free_deposit(w, sig_id)
+        if amount <= free + 1e-9:
+            await _save_alloc(sig_row, w, amount)
+        else:
+            msg += "\n" + i18n.t("app.size_over", lang, free=free)
+    return True, msg
+
+
+async def _app_ref(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """258: taklif (referal) — kod, havola, son; o'z kodini tanlash."""
+    count = await db.count_referrals(uid)
+    if a["action"] == "refcode":
+        try:
+            code = str(json.loads(a["args"] or "{}").get("code") or "").strip().lstrip("@")
+        except Exception:
+            code = ""
+        if not can_pick_ref_code(uid, count):
+            return False, i18n.t("ref.locked", lang)
+        err = validate_ref_code(code, lang)
+        if err:
+            return False, err
+        try:
+            ok = await db.set_custom_ref_code(uid, code)
+        except Exception:
+            log.exception("Taklif kodi saqlanmadi (%s)", uid)
+            return False, i18n.t("ref.save_failed", lang)
+        if not ok:
+            return False, i18n.t("ref.taken", lang)
+    code, link = await referral_token(uid, ctx.bot.username)
+    return True, json.dumps({"code": code, "link": link, "count": count,
+                             "can_pick": can_pick_ref_code(uid, count),
+                             "need": max(0, config.REF_CUSTOM_MIN - count),
+                             "min": REF_CODE_MIN, "max": REF_CODE_MAX})
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -855,6 +972,10 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         text, kb = await _df_open(uid, lang)
         await ctx.bot.send_message(uid, text, parse_mode=ParseMode.HTML, reply_markup=kb)
         return True, "ok"
+    if a["action"] == "newsig":
+        return await _app_newsig(ctx, uid, lang, a)
+    if a["action"] in ("ref", "refcode"):
+        return await _app_ref(ctx, uid, lang, a)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -4538,60 +4659,14 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     # Guruhga yuboriladigan rasm — foydalanuvchi KO'RGANINING AYNI o'zi.
     # send_final_preview() uni Telegram'ga yuklab, file_id'ni saqlab qo'ygan.
     post_file_id = item.get("ready_file_id") or item.get("file_id")
-    sig_id = await db.create_signal(ws["id"], {
-        "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
-        "sl": d["sl"], "tps": d["tps"], "chart_file_id": post_file_id,
-        "author_id": q.from_user.id, "note": d.get("reasoning"),
-        "market": d.get("market", "crypto"), "entry_mode": entry_mode,
-        "chart_tf": item.get("chart_tf"), "leverage": d.get("leverage"),
-    })
+    sig_id = await publish_signal(ctx, ws, d, q.from_user.id, q.from_user.username,
+                                  q.from_user.first_name, post_file_id=post_file_id,
+                                  chart_tf=item.get("chart_tf"))
     PENDING.pop(token, None)
     await _clear_kb(q)
     await q.message.reply_text(
         i18n.t("sig.accepted", lang, sid=sig_id),
         parse_mode=ParseMode.HTML, reply_markup=menu_back_kb(lang))
-
-    group_msg_id = None
-    if ws["type"] == "group" and ws["group_chat_id"]:
-        body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
-            ws, q.from_user.id, q.from_user.username, q.from_user.first_name,
-            ws_lang(ws))
-        body = pub(ws, body)
-        body += await promo_line(ctx.bot, ws, body, 1024 if post_file_id else 4096)
-        try:
-            if post_file_id:
-                sent = await ctx.bot.send_photo(
-                    ws["group_chat_id"], post_file_id, caption=body,
-                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
-            else:
-                sent = await ctx.bot.send_message(
-                    ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
-                    message_thread_id=ws["group_topic_id"],
-                    disable_web_page_preview=True)
-            group_msg_id = sent.message_id
-            await db.set_group_msg(sig_id, group_msg_id)
-            _promo_emoji_seen(sent, ws)
-        except Exception:
-            log.exception("Guruhga yuborib bo'lmadi")
-
-    elif ws["type"] == "personal":
-        # Shaxsiy jurnalda signal kartasi AVVAL umuman yuborilmasdi — faqat
-        # "qabul qilindi" tasdig'i chiqardi. Natijada keyingi xabarlar (TP,
-        # stop, ±5%) javob beradigan asosiy xabar ham bo'lmasdi. Endi karta
-        # egasining shaxsiy chatiga yuboriladi va uning id'si saqlanadi —
-        # guruhdagi bilan bir xil tartib.
-        body = draft_text(d, sig_id, ws_lang(ws))
-        try:
-            if post_file_id:
-                sent = await ctx.bot.send_photo(ws["owner_id"], post_file_id,
-                                                 caption=body, parse_mode=ParseMode.HTML)
-            else:
-                sent = await ctx.bot.send_message(ws["owner_id"], body,
-                                                   parse_mode=ParseMode.HTML)
-            group_msg_id = sent.message_id
-            await db.set_group_msg(sig_id, group_msg_id)
-        except Exception:
-            log.exception("Shaxsiy jurnalga yuborib bo'lmadi")
 
     # 221: darhol (market) kirishda alohida "pozitsiya ochildi" xabari
     # YUBORILMAYDI — signal postining o'zida "darhol kirilgan" deb turibdi,
@@ -4616,6 +4691,64 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     if ws["deposit"] is not None and can_manage(q.from_user.id, ws):
         await ask_personal_alloc(q.message, ws, sig_id, d, q.from_user.id)
+
+
+async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
+                         first_name: str | None, post_file_id: str | None = None,
+                         chart_tf: str | None = None, photo: bytes | None = None) -> int:
+    """258: signalni bazaga yozadi va guruhga (yoki shaxsiy jurnalga) post
+    qiladi — bot sehrgari va Mini App uchun BITTA joy. Qaytaradi: sig_id."""
+    entry_mode = d.get("entry_mode", "limit")
+    sig_id = await db.create_signal(ws["id"], {
+        "symbol": d["symbol"], "side": d["side"], "entry": d["entry"],
+        "sl": d["sl"], "tps": d["tps"], "chart_file_id": post_file_id,
+        "author_id": uid, "note": d.get("reasoning"),
+        "market": d.get("market", "crypto"), "entry_mode": entry_mode,
+        "chart_tf": chart_tf, "leverage": d.get("leverage"),
+    })
+
+    group_msg_id = None
+    if ws["type"] == "group" and ws["group_chat_id"]:
+        body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
+            ws, uid, username, first_name, ws_lang(ws))
+        body = pub(ws, body)
+        body += await promo_line(ctx.bot, ws, body, 1024 if (post_file_id or photo) else 4096)
+        try:
+            if post_file_id or photo:
+                sent = await ctx.bot.send_photo(
+                    ws["group_chat_id"], post_file_id or InputFile(photo, "signal.png"), caption=body,
+                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
+            else:
+                sent = await ctx.bot.send_message(
+                    ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
+                    message_thread_id=ws["group_topic_id"],
+                    disable_web_page_preview=True)
+            group_msg_id = sent.message_id
+            await db.set_group_msg(sig_id, group_msg_id)
+            _promo_emoji_seen(sent, ws)
+        except Exception:
+            log.exception("Guruhga yuborib bo'lmadi")
+
+    elif ws["type"] == "personal":
+        # Shaxsiy jurnalda signal kartasi AVVAL umuman yuborilmasdi — faqat
+        # "qabul qilindi" tasdig'i chiqardi. Natijada keyingi xabarlar (TP,
+        # stop, ±5%) javob beradigan asosiy xabar ham bo'lmasdi. Endi karta
+        # egasining shaxsiy chatiga yuboriladi va uning id'si saqlanadi —
+        # guruhdagi bilan bir xil tartib.
+        body = draft_text(d, sig_id, ws_lang(ws))
+        try:
+            if post_file_id or photo:
+                sent = await ctx.bot.send_photo(ws["owner_id"], post_file_id or InputFile(photo, "signal.png"),
+                                                 caption=body, parse_mode=ParseMode.HTML)
+            else:
+                sent = await ctx.bot.send_message(ws["owner_id"], body,
+                                                   parse_mode=ParseMode.HTML)
+            group_msg_id = sent.message_id
+            await db.set_group_msg(sig_id, group_msg_id)
+        except Exception:
+            log.exception("Shaxsiy jurnalga yuborib bo'lmadi")
+
+    return sig_id
 
 
 async def ask_personal_alloc(message, ws, sig_id: int, d, uid: int) -> None:
