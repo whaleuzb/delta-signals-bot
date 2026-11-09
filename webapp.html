@@ -495,11 +495,13 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
 /* 289: signal terminali — shamli grafik (SVG), taymfreym, TP/SL/kirish/limit chiziqlarini surish */
 var TER={W:360,H:330,PR:58,AX:24};
 function openTerm(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;tick();S.page={id:'term',sig:id,tf:i.tf||'1h',c:null,adds:[],drag:null,pend:null};termRender();pageShow();termLoad()}
-function termItem(){var g=S.page;return g&&S.items.filter(function(x){return x.id==g.sig})[0]}
-function termLoad(){var g=S.page;if(!g||g.id!='term')return;api('candles',{sig:g.sig,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];g.adds=d.adds||[];termRender()}).catch(function(){})}
-function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();
+function termItem(){var g=S.page;if(g&&g.df)return dfItem(g);return g&&S.items.filter(function(x){return x.id==g.sig})[0]}
+function termLoad(){var g=S.page;if(!g||g.id!='term')return;
+ if(g.df){api('dfcandles',{sym:g.df.sym,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];termRender()}).catch(function(){});return}
+ api('candles',{sig:g.sig,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];g.adds=d.adds||[];termRender()}).catch(function(){})}
+function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df)return;
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
-function termLines(i,g){var L=[],pend=i.status=='PENDING';
+function termLines(i,g){if(i.df)return dfLines(i,g);var L=[],pend=i.status=='PENDING';
  L.push({k:'entry',p:+i.entry,c:'rgba(255,255,255,.75)',lb:t('entry'),dr:pend});
  if(i.sl!=null)L.push({k:'sl',p:+i.sl,c:'#ff5c5c',lb:'SL',dr:true});
  (i.tps||[]).forEach(function(p,k){L.push({k:'tp'+k,p:+p,c:'#c2f23a',lb:'TP'+(k+1),dr:k>=(i.tp_hit||0),hit:k<(i.tp_hit||0)})});
@@ -542,7 +544,7 @@ function termSvg(i,g){var L=termLines(i,g),sc=termScale(g,L,i),c=g.c||[],W=TER.W
    +'<text x="10" y="'+(+y+3.5)+'" fill="'+l.c+'" font-size="10" font-weight="700">'+esc(l.lb)+(l.hit?' ✓':'')+' '+fp(l.p)+'</text>'
    +(l.dr&&!l.hit?'<g opacity=".9"><rect x="'+(W-34)+'" y="'+(y-9)+'" width="30" height="18" rx="9" fill="'+l.c+'"/><path d="M'+(W-24)+' '+(y-2)+'l5-4 5 4M'+(W-24)+' '+(+y+2)+'l5 4 5-4" stroke="#050506" stroke-width="1.6" fill="none"/></g>':'')});
  return'<svg id="tsvg" viewBox="0 0 '+TER.W+' '+(TER.H+TER.AX)+'" preserveAspectRatio="none" style="width:100%;height:'+(TER.H+TER.AX)+'px;display:block;touch-action:none;user-select:none;cursor:grab"><defs><clipPath id="tclip"><rect x="0" y="0" width="'+W+'" height="'+TER.H+'"/></clipPath></defs><g clip-path="url(#tclip)">'+o.split('<!--L-->')[0]+'</g>'+(o.split('<!--L-->')[1]||'')+'</svg>'}
-function termRender(){var g=S.page;if(!g||g.id!='term')return;var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
+function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
  TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
@@ -578,7 +580,7 @@ function termBind(){var sv=document.getElementById('tsvg');if(!sv)return;var g=S
   if(Math.abs(d.p-d.from)<=d.from*1e-7){termRedraw();return}g.pend={k:d.k,lb:d.lb,from:d.from,to:d.p};haptic('success');termRender()};
  sv.onwheel=function(e){e.preventDefault();g.vn=Math.round(g.vn*(e.deltaY>0?1.12:.89));termRedraw()};
  sv.ondblclick=function(){g.vn=null;g.ys=1;termRedraw()}}
-setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.drag||g.pend||document.hidden)return;var w=cur();if(!w)return;
+setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.df||g.drag||g.pend||document.hidden)return;var w=cur();if(!w)return;
  api('open',{ws:w.id}).then(function(d){if(S.page!==g||g.drag||g.pend)return;S.items=d.items;termRender()}).catch(function(){})},15000);
 /* 297/298: pozitsiya kartasi — Dip Funded mobil kartasi kabi (tanga belgisi, P&L/ROI, 6 maydon, ichida tugmalar),
    yorliqlar: Pozitsiya | Buyurtmalar; qo'shimcha ma'lumot «Batafsil» ichida */
@@ -653,7 +655,7 @@ function sellSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(
   +(i.filled<0.999?'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'+B('',"act("+id+",'pc',25)",'25%')+B('',"act("+id+",'pc',50)",'50%')+B('',"act("+id+",'pc',75)",'75%')+'</div>':'')
   +B('d full',"act("+id+",'close')",esc(t('close'))+' · 100%'))}
 function termCancel(){var g=S.page;g.pend=null;tick();termRender()}
-function termSave(){var g=S.page,i=termItem(),pd=g.pend;if(!pd||!i)return;var k=pd.k,a,arg=null,args=null;
+function termSave(){var g=S.page,i=termItem(),pd=g.pend;if(!pd||!i)return;if(g.df){dfSave();return}var k=pd.k,a,arg=null,args=null;
  if(k=='sl'){a='sl';arg=pd.to}else if(k=='entry'){a='entry';arg=pd.to}
  else if(k.indexOf('tp')==0){var ix=+k.slice(2),tp=(i.tps||[]).slice();tp[ix]=pd.to;a='tps';args=tp}
  else{a='limmv';args={from:pd.from,to:pd.to}}
@@ -841,17 +843,83 @@ function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col
  return'<div style="margin:8px 0"><div class="rs" style="display:flex;justify-content:space-between"><span>'+esc(lbl)+'</span><span>'+txt+'</span></div><div class="bar" style="margin-top:6px"><i style="left:0;width:'+u+'%;background:'+col+'"></i></div></div>'}
 function dfAcc(id){tick();S.page={id:'df',acc:id};var p=document.getElementById('page');p.scrollTop=0;
  p.innerHTML=dfHead(1)+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';
- dfCall('dfone',id).then(function(r){if(!S.page||S.page.acc!=id)return;var h=dfHead(1);if(!r.ok){p.innerHTML=h+dfErr(r.d);return}var a=r.d;
+ dfCall('dfone',id).then(function(r){if(!S.page||S.page.acc!=id)return;var h=dfHead(1);if(!r.ok){p.innerHTML=h+dfErr(r.d);return}var a=r.d;S.dfs=a;
   h+='<div class="slide glass acc rise" style="min-height:0;margin-bottom:12px"><div class="k">#'+a.id+' · '+esc(a.name)+'</div><div class="v">'+f0(+a.equity)+'</div><div class="d"><span class="'+((+a.pnl||0)>=0?'g':'r')+'">'+fm(+a.pnl||0)+'</span> · '+esc(a.status_txt)+'</div></div>';
   h+='<div class="tiles"><div class="tile2 glass rise"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">'+f0(+a.balance)+'</div></div><div class="tile2 glass rise"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">'+f0(+a.available)+'</div></div></div>';
   if(a.tradable){h+='<div class="eq glass rise">';if(a.daily)h+=bar(t('df_daily'),a.daily.used_pct,f0(+a.daily.left));if(a.max)h+=bar(t('df_maxdd'),a.max.used_pct,f0(+a.max.left));
    if(a.target&&a.target.progress!=null)h+=bar(t('df_target'),a.target.progress,f0(+a.target.amount));if(a.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+a.days.done+' / '+a.days.min+'</div>';h+='</div>'}
   h+='<div class="sect rise">'+esc(t('df_pos'))+' · '+a.positions.length+'</div>';
-  h+=a.positions.map(function(x){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">'+esc(x.symbol)+'</div><div class="rs">'+f0(+x.value)+' · '+fp(x.avg)+' → '+fp(x.price)+(x.sl!=null?' · SL '+fp(x.sl):'')+(x.tp!=null?' · TP '+fp(x.tp):'')+'</div></div><div class="rv '+((+x.upnl||0)>=0?'g':'r')+'">'+fm(+x.upnl||0)+'<small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'}).join('');
+  h+=a.positions.map(function(x){return'<div class="row glass rise" onclick="dfTerm('+a.id+',\''+esc(x.symbol)+'\')">'+coinIc(x.symbol,26)+'<div class="rm"><div class="rn">'+esc(x.symbol)+'</div><div class="rs">'+f0(+x.value)+' · '+fp(x.avg)+' → '+fp(x.price)+(x.sl!=null?' · SL '+fp(x.sl):'')+(x.tp!=null?' · TP '+fp(x.tp):'')+'</div></div><div class="rv '+((+x.upnl||0)>=0?'g':'r')+'">'+fm(+x.upnl||0)+'<small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'}).join('');
   if(a.orders.length)h+='<div class="sect rise">'+esc(t('df_orders'))+' · '+a.orders.length+'</div>'+a.orders.map(function(o){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">#'+o.id+' '+esc(o.symbol)+'</div><div class="rs">≤ '+fp(o.limit)+' · '+f0(+o.amount)+'</div></div></div>'}).join('');
-  var tu=(S.df||'').replace(/[/]$/,'')+'/account/trade/'+a.id;
-  h+='<div style="display:flex;gap:8px;margin-top:10px" class="rise"><button class="btn p" onclick="openLink(\''+esc(tu)+'\')">'+esc(t('df_term'))+'</button><button class="btn" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button></div>';
+  var fs=(a.positions[0]||{}).symbol||'BTC';
+  if(a.tradable)h=h.replace('<div class="tiles">','<button class="btn p full rise" style="width:100%;padding:13px;font-size:15px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="dfTerm('+a.id+',\''+esc(fs)+'\')">'+ic('bars',16)+' '+esc(t('df_term'))+'</button><div class="tiles">');
+  h+='<div style="display:flex;gap:8px;margin-top:10px" class="rise"><button class="btn" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button></div>';
   p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'})})}
+/* ===== 310: Dip Funded terminali — botdan chiqmay savdo (grafik signal terminalidan) ===== */
+function dfTerm(acc,sym){tick();S.page={id:'term',df:{acc:acc,sym:sym||'BTC'},tf:'1h',c:null,adds:[],drag:null,pend:null};
+ var p=document.getElementById('page');p.scrollTop=0;termRender();if(!p.classList.contains('show'))pageShow();termLoad();if(!S.dfs||S.dfs.id!=acc)dfRefresh()}
+function dfRefresh(){var g=S.page;if(!g||!g.df)return Promise.resolve();return dfCall('dfone',g.df.acc).then(function(r){if(S.page!==g)return;if(r.ok)S.dfs=r.d;else g.dferr=r.d||{};if(!g.drag&&!g.pend)termRender()})}
+function dfItem(g){var s=S.dfs,sym=g.df.sym,base={df:1,id:'df',symbol:sym,side:'LONG',lev:1,status:'NONE',tps:[],orders:[]};if(!s||s.id!=g.df.acc)return base;
+ var p=(s.positions||[]).filter(function(x){return x.symbol==sym})[0],px=(s.prices||{})[sym];if(px==null&&p)px=p.price;
+ base.price=px!=null?+px:null;base.pos=p||null;base.orders=(s.orders||[]).filter(function(o){return o.symbol==sym});
+ if(p){base.status='ACTIVE';base.entry=+p.avg;base.sl=p.sl;base.tps=p.tp!=null?[p.tp]:[]}else base.entry=base.price;return base}
+function dfLines(i,g){var L=[];if(i.pos){L.push({k:'entry',p:+i.pos.avg,c:'rgba(255,255,255,.75)',lb:t('df_avg'),dr:false});
+  if(i.pos.sl!=null)L.push({k:'sl',p:+i.pos.sl,c:'#ff5c5c',lb:'SL',dr:true});if(i.pos.tp!=null)L.push({k:'tp',p:+i.pos.tp,c:'#c2f23a',lb:'TP',dr:true})}
+ i.orders.forEach(function(o){L.push({k:'o'+o.id,p:+o.limit,c:'#b4b9ae',lb:'Limit',dr:true})});
+ if(g.drag)L.forEach(function(l){if(l.k==g.drag.k)l.p=g.drag.p});if(g.pend)L.forEach(function(l){if(l.k==g.pend.k)l.p=g.pend.to});return L}
+function dfDo(args,ok){var g=S.page;args.acc=g.df.acc;if(!args.symbol)args.symbol=g.df.sym;toast(esc(t('wait')));
+ return api('act',{action:'dftrade',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
+  if(r.ok&&d){S.dfs=d;toast(esc(noEmoji(d.msg||'OK')));haptic('success');if(ok)ok();if(S.page===g){g.pend=null;termRender();termLoad()}return}
+  toast(esc(noEmoji((d&&d.text)||t('df_unav'))));haptic('error')}).catch(function(){toast('Error')})}
+function dfSave(){var g=S.page,pd=g.pend;if(!pd)return;var k=pd.k,a={};
+ if(k=='sl'||k=='tp'){a.op='protect';a[k]=pd.to}else if(k.charAt(0)=='o'){a.op='modify';a.order_id=+k.slice(1);a.limit=pd.to}else{g.pend=null;termRender();return}dfDo(a)}
+function dfIn(id,ph,val){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px">'}
+function dfV(id){var e=document.getElementById(id);return e?num(e.value):null}
+function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mode||g.bm||'market';g.bm=mode;var av=+s.available||0;
+ var ch=function(m,l){return'<span class="chip glass'+(mode==m?' on':'')+'" onclick="dfBuySheet(\''+m+'\')">'+esc(l)+'</span>'};
+ sheetOpen('<h4>'+coinIc(i.symbol,20)+' BUY · '+esc(i.symbol)+'</h4><p>'+esc(t('df_free'))+': <b>'+f0(av)+'</b>'+(i.price!=null?' · '+fp(i.price):'')+'</p>'
+  +'<div class="chips" style="margin-bottom:10px">'+ch('market',t('df_market'))+ch('limit',t('limit'))+'</div>'
+  +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),i.price!=null?termRound(i.price*.99):''):'')
+  +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+'</div>'+dfIn('dfb_a','0','')
+  +'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+Math.floor(av*x/100)+'">'+x+'%</span>'}).join('')+'</div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'')+dfIn('dfb_tp',t('df_tp_opt'),'')+'</div>'
+  +'<button class="btn p full" style="width:100%;margin-top:4px" onclick="dfBuy()">BUY '+esc(i.symbol)+'</button>')}
+function dfBuy(){var g=S.page,a={op:'buy',amount:dfV('dfb_a')};if(!a.amount){toast(esc(t('df_amount')));return}
+ if(g.bm=='limit'){a.limit=dfV('dfb_l');if(!a.limit){toast(esc(t('df_limit_p')));return}}var sl=dfV('dfb_sl'),tp=dfV('dfb_tp');if(sl)a.sl=sl;if(tp)a.tp=tp;dfDo(a,sheetClose)}
+function dfSellSheet(){var i=termItem();if(!i.pos)return;
+ sheetOpen('<h4>'+coinIc(i.symbol,20)+' SELL · '+esc(i.symbol)+'</h4><p>'+esc(t('df_qty'))+': '+esc(i.pos.qty||'')+' · '+f0(+i.pos.value)+'</p><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+  +[25,50,75,100].map(function(x){return'<button class="btn" style="margin:0'+(x==100?';background:rgba(255,92,92,.16);color:var(--r);border-color:rgba(255,92,92,.3)':'')+'" onclick="dfDo({op:\'sell\',fraction:'+(x/100)+'},sheetClose)">'+x+'%</button>'}).join('')+'</div>')}
+function dfTpslSheet(){var i=termItem();if(!i.pos)return;
+ sheetOpen('<h4>TP / SL · '+esc(i.symbol)+'</h4><p>'+esc(t('df_tpsl_hint'))+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfp_sl','SL',i.pos.sl)+dfIn('dfp_tp','TP',i.pos.tp)+'</div>'
+  +'<button class="btn p full" style="width:100%" onclick="dfDo({op:\'protect\',sl:dfV(\'dfp_sl\'),tp:dfV(\'dfp_tp\')},sheetClose)">'+esc(t('save'))+'</button>')}
+function dfPick(){var s=S.dfs;if(!s)return;sheetOpen('<h4>'+esc(t('df_pick'))+'</h4>'+dfIn('dfq','BTC, ETH, AAPL…','').replace('inputmode="decimal" ','oninput="dfPickList()" autocapitalize="characters" ')+'<div id="dfpl" style="max-height:52vh;overflow:auto"></div>');dfPickList()}
+function dfPickList(){var s=S.dfs,e=document.getElementById('dfq'),q=(e?e.value:'').toUpperCase().trim(),held={};(s.positions||[]).forEach(function(x){held[x.symbol]=1});
+ var L=Object.keys(s.prices||{}).filter(function(k){return k.indexOf(q)>=0}).sort(function(a,b){return(held[b]||0)-(held[a]||0)||(a<b?-1:1)}).slice(0,80);
+ var b=document.getElementById('dfpl');if(b)b.innerHTML=L.map(function(k){return'<div class="row glass" style="padding:9px 12px" onclick="sheetClose();dfSym(\''+esc(k)+'\')">'+coinIc(k,24)+'<div class="rm"><div class="rn" style="font-size:14px">'+esc(k)+(held[k]?' <span class="b bl">'+esc(t('df_pos1'))+'</span>':'')+'</div></div><div class="rv" style="font-size:13px">'+fp(s.prices[k])+'</div></div>'}).join('')}
+function dfSym(sym){var g=S.page;if(!g||!g.df)return;g.df.sym=sym;g.c=null;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
+function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
+ var h='<div class="ghd"><div class="bk glass" onclick="dfAcc('+g.df.acc+')">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
+ if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
+ if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
+ h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
+ if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span></div>'
+  +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
+ if(!s||s.id!=g.df.acc){p.innerHTML=h+'<div class="spk"><div class="sk"></div></div>';termBind();return}
+ var tr=s.tradable;
+ h+='<div style="display:grid;grid-template-columns:'+(i.pos?'1fr 1fr':'1fr')+';gap:8px;margin:10px 0">'+'<button class="btn" style="margin:0;background:var(--g);color:#050506;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfBuySheet()">BUY</button>'
+  +(i.pos?'<button class="btn" style="margin:0;background:var(--r);color:#fff;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfSellSheet()">SELL</button>':'')+'</div>';
+ if(i.pos){var x=i.pos,up=(+x.upnl||0)>=0,it=function(k,v,c){return'<div class="mci"><span>'+esc(k)+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
+  h+='<div class="tile2 glass acc" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center"><div class="k">'+esc(t('df_pos1'))+' · '+esc(x.qty||'')+' '+esc(i.symbol)+'</div><div class="'+(up?'g':'r')+'" style="font-weight:800">'+fm(+x.upnl||0)+' <small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'
+   +'<div class="mcg" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px">'+it(t('df_avg'),fp(x.avg))+it(t('df_value'),f0(+x.value))+it(t('df_mark'),fp(x.price))+it('SL',x.sl!=null?fp(x.sl):'—',x.sl!=null?'r':'')+it('TP',x.tp!=null?fp(x.tp):'—',x.tp!=null?'g':'')+'</div>'
+   +'<button class="btn" style="width:100%;margin:10px 0 0" '+(tr?'':'disabled ')+'onclick="dfTpslSheet()">'+ic('pen',13)+' TP / SL</button></div>'}
+ else h+='<div class="rs" style="text-align:center;margin:4px 0 10px">'+esc(t('df_no_pos'))+'</div>';
+ if(i.orders.length)h+='<div class="sect">'+esc(t('df_orders'))+' · '+i.orders.length+'</div>'+i.orders.map(function(o){return'<div class="row glass" style="cursor:default"><div class="rm"><div class="rn" style="font-size:13px">Limit ≤ '+fp(o.limit)+'</div><div class="rs">'+f0(+o.amount)+(o.sl!=null?' · SL '+fp(o.sl):'')+(o.tp!=null?' · TP '+fp(o.tp):'')+'</div></div><button class="btn" style="margin:0;padding:8px 14px;width:auto;flex:none" onclick="dfDo({op:\'cancel\',order_id:'+o.id+'})">✕</button></div>'}).join('');
+ h+='<div class="tiles" style="margin-top:6px"><div class="tile2 glass"><div class="k">Equity</div><div class="v" style="font-size:16px">'+f0(+s.equity)+'</div></div><div class="tile2 glass"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">'+f0(+s.available)+'</div></div></div>';
+ if(tr&&(s.daily||s.max)){h+='<div class="eq glass">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,f0(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,f0(+s.max.left));h+='</div>'}
+ if(s.trades&&s.trades.length)h+='<div class="sect">'+esc(t('df_trades'))+'</div>'+s.trades.map(function(x){var b=x.side=='buy'||x.side=='BUY';return'<div class="row glass" style="cursor:default;padding:9px 12px">'+coinIc(x.symbol,22)+'<div class="rm"><div class="rn" style="font-size:13px">'+esc(x.symbol)+' <span class="b '+(b?'bl':'bs')+'">'+(b?'BUY':'SELL')+'</span></div><div class="rs">'+esc(String(x.time||'').slice(5,16))+' · '+fp(x.price)+'</div></div>'+(b?'':'<div class="rv '+((+x.pnl||0)>=0?'g':'r')+'" style="font-size:13px">'+fm(+x.pnl||0)+'</div>')+'</div>'}).join('');
+ h+='<div class="endsp"></div>';p.innerHTML=h;termBind()}
+setInterval(function(){var g=S.page;if(!g||!g.df||g.drag||g.pend||document.hidden)return;dfRefresh()},12000);
 /* ===== 258: yangi signal (ilova ichida) ===== */
 var NS={kind:'spot',lev:10,side:'LONG',mode:'market'};
 function nsSeg(id,opts,cur,fn){var k=Math.max(0,opts.map(function(o){return o[0]}).indexOf(cur));return'<div class="seg glass" style="margin-bottom:10px"><div class="si" style="width:calc((100% - 8px)/'+opts.length+');transform:translateX('+(k*100)+'%)"></div>'+opts.map(function(o){return'<a class="'+(o[0]==cur?'on':'')+'" onclick="'+fn+'(\''+o[0]+'\')">'+esc(o[1])+'</a>'}).join('')+'</div>'}

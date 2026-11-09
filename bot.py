@@ -1526,6 +1526,72 @@ async def _app_rcard(ctx, uid: int, lang, sig) -> tuple[bool, str]:
     return True, json.dumps(res_d)
 
 
+def _df_state_json(data: dict, lang) -> dict:
+    """255/310: Dip Funded hisobi holati Mini App uchun (hisob sahifasi va terminal)."""
+    acc, st = data["account"], data["state"]
+    px = data.get("prices") or st.get("prices") or {}
+    return {"id": acc["id"], "name": _df_name(acc), "status": acc["status"],
+            "status_txt": _df_status(acc, lang), "tradable": bool(acc.get("tradable")),
+            "equity": st.get("equity"), "pnl": st.get("pnl"), "balance": st.get("balance"),
+            "available": st.get("available"), "daily": st.get("daily"),
+            "max": st.get("max"), "target": st.get("target"), "days": st.get("days"),
+            "positions": [{"symbol": p_["symbol"], "qty": p_.get("qty"), "value": p_.get("value"),
+                           "avg": p_.get("avg_price"), "price": p_.get("price"),
+                           "upnl": p_.get("upnl"), "upnl_pct": p_.get("upnl_pct"),
+                           "sl": p_.get("sl"), "tp": p_.get("tp")}
+                          for p_ in (st.get("positions") or [])],
+            "orders": [{"id": o["id"], "symbol": o["symbol"], "limit": o.get("limit"),
+                        "amount": o.get("amount"), "sl": o.get("sl"), "tp": o.get("tp")}
+                       for o in (st.get("orders") or [])],
+            "trades": [{"time": t_.get("time"), "symbol": t_.get("symbol"), "side": t_.get("side"),
+                        "price": t_.get("price"), "pnl": t_.get("pnl"), "kind": t_.get("kind")}
+                       for t_ in (st.get("trades") or [])][:10],
+            "prices": {k: float(v) for k, v in px.items()}}
+
+
+async def _app_dftrade(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """310: Dip Funded savdosi ilova terminalidan — sotib olish (market/limit, SL/TP),
+    sotish (ulush), SL/TP, limitni bekor qilish/o'zgartirish. Huquqni Dip Funded o'zi
+    tekshiradi (hisob shu Telegram akkauntiga tegishlimi). Javob — yangilangan holat."""
+    if not dipfunded.enabled():
+        return False, json.dumps({"code": "off"})
+    try:
+        f = json.loads(a["args"] or "{}")
+    except ValueError:
+        f = {}
+    op, acc, sym = f.get("op"), f.get("acc"), f.get("symbol")
+    try:
+        if op == "buy":
+            if not sym or not f.get("amount"):
+                return False, json.dumps({"code": "amount", "text": i18n.t("man.bad_number", lang)})
+            data = await dipfunded.buy(uid, acc, sym, f["amount"], limit=f.get("limit"),
+                                       sl=f.get("sl"), tp=f.get("tp"))
+        elif op == "sell":
+            fr = f.get("fraction") or 0
+            if not sym or not (0 < fr <= 1):
+                return False, json.dumps({"code": "amount", "text": i18n.t("man.bad_number", lang)})
+            data = await dipfunded.sell(uid, acc, sym, fr)
+        elif op == "protect":
+            data = await dipfunded.protect(uid, acc, sym, {k: f[k] for k in ("sl", "tp") if k in f})
+        elif op == "cancel":
+            data = await dipfunded.cancel(uid, acc, int(f.get("order_id") or 0))
+        elif op == "modify":
+            data = await dipfunded.modify(uid, acc, int(f.get("order_id") or 0),
+                                          {k: f[k] for k in ("limit", "sl", "tp") if k in f})
+        else:
+            return False, json.dumps({"code": "bad"})
+    except dipfunded.NotLinked as e:
+        return False, json.dumps({"code": str(e) or "not_linked"})
+    except dipfunded.ApiError as e:
+        return False, json.dumps({"code": e.code, "text": e.text})
+    except Exception as e:
+        log.warning("Mini App Dip Funded savdosi: %s", e)
+        return False, json.dumps({"code": "unavailable"})
+    out = _df_state_json(data, lang)
+    out["msg"] = re.sub(r"<[^>]+>", "", str(data.get("message") or ""))
+    return True, json.dumps(out, default=float)
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -1550,6 +1616,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_diptask(ctx, uid, lang, a)
     if a["action"] == "dipapply":
         return await _app_dipapply(ctx, uid, lang, a)
+    if a["action"] == "dftrade":
+        return await _app_dftrade(ctx, uid, lang, a)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -1565,19 +1633,7 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
                     for x in (data.get("accounts") or [])]}
             else:
                 data = await dipfunded.account(uid, int(a["arg"]))
-                acc, st = data["account"], data["state"]
-                out = {"id": acc["id"], "name": _df_name(acc), "status": acc["status"],
-                       "status_txt": _df_status(acc, lang), "tradable": bool(acc.get("tradable")),
-                       "equity": st.get("equity"), "pnl": st.get("pnl"), "balance": st.get("balance"),
-                       "available": st.get("available"), "daily": st.get("daily"),
-                       "max": st.get("max"), "target": st.get("target"), "days": st.get("days"),
-                       "positions": [{"symbol": p_["symbol"], "value": p_.get("value"),
-                                      "avg": p_.get("avg_price"), "price": p_.get("price"),
-                                      "upnl": p_.get("upnl"), "upnl_pct": p_.get("upnl_pct"),
-                                      "sl": p_.get("sl"), "tp": p_.get("tp")}
-                                     for p_ in (st.get("positions") or [])],
-                       "orders": [{"id": o["id"], "symbol": o["symbol"], "limit": o.get("limit"),
-                                   "amount": o.get("amount")} for o in (st.get("orders") or [])]}
+                out = _df_state_json(data, lang)
             return True, json.dumps(out, default=float)
         except dipfunded.NotLinked as e:
             return False, json.dumps({"code": str(e) or "not_linked"})

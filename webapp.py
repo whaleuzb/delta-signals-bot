@@ -29,7 +29,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share", "rcard")
-WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply", "dftrade")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -242,6 +242,39 @@ async def api_candles(request):
                              headers=NO_CACHE)
 
 
+_DF_SYM = __import__("re").compile(r"^[A-Z0-9]{1,15}$")
+
+
+async def api_dfcandles(request):
+    """310: Dip Funded terminali — juftlik shamlari MEXC'dan (BTC -> BTCUSDT, AAPLON ->
+    AAPLONUSDT). Ochiq bozor ma'lumoti, faqat initData kerak. 30 soniya kesh."""
+    import time as _t
+    body, _uid = await _body(request)
+    sym = str(body.get("sym") or "").upper()
+    if not _DF_SYM.match(sym):
+        raise web.HTTPBadRequest()
+    tf = body.get("tf") if body.get("tf") in _TF_MS else "1h"
+    pair = sym if sym.endswith(config.QUOTE) else sym + config.QUOTE
+    key = ("crypto", pair, tf)
+    hit = _CANDLES.get(key)
+    if hit and _t.monotonic() - hit[0] < 30:
+        rows = hit[1]
+    else:
+        now = int(_t.time() * 1000)
+        try:
+            cs = await tracker.provider("crypto").klines(
+                pair, now - 160 * _TF_MS[tf], limit=200, tf=tf, end_ms=now)
+        except Exception:
+            log.warning("DF terminal shamlari olinmadi (%s %s)", pair, tf, exc_info=True)
+            cs = []
+        rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs][-160:]
+        if rows:
+            if len(_CANDLES) > 300:
+                _CANDLES.clear()
+            _CANDLES[key] = (_t.monotonic(), rows)
+    return web.json_response({"tf": tf, "c": rows}, headers=NO_CACHE)
+
+
 async def api_spark(request):
     body, uid = await _body(request)
     try:
@@ -282,6 +315,42 @@ async def _ws_act(body, uid: int, act: str):
         if not _can(ws, uid):
             raise web.HTTPForbidden()
         aid = await db.app_action_add(uid, 0, act, None, json.dumps(f)[:2000])
+        return await _wait_action(aid)
+    if act == "dftrade":
+        # 310: Dip Funded savdosi (ilova terminali) — huquqni Dip Funded tekshiradi
+        # (hisob shu Telegram akkauntiga tegishlimi); bu yerda faqat shakl va chegaralar.
+        f = body.get("args") if isinstance(body.get("args"), dict) else {}
+        op = str(f.get("op") or "")
+        if op not in ("buy", "sell", "protect", "cancel", "modify"):
+            raise web.HTTPBadRequest()
+        clean = {"op": op}
+        for k in ("acc", "order_id"):
+            if f.get(k) is not None:
+                try:
+                    clean[k] = int(f[k])
+                except (TypeError, ValueError):
+                    raise web.HTTPBadRequest()
+        if "acc" not in clean:
+            raise web.HTTPBadRequest()
+        if f.get("symbol") is not None:
+            sym = str(f["symbol"]).upper()
+            if not _DF_SYM.match(sym):
+                raise web.HTTPBadRequest()
+            clean["symbol"] = sym
+        for k in ("amount", "limit", "sl", "tp", "fraction"):
+            if k in f:
+                v = f[k]
+                if v is None or v == "":
+                    clean[k] = None
+                    continue
+                try:
+                    x = float(v)
+                except (TypeError, ValueError):
+                    raise web.HTTPBadRequest()
+                if not (x > 0) or x != x or x > 1e12:
+                    raise web.HTTPBadRequest()
+                clean[k] = x
+        aid = await db.app_action_add(uid, 0, act, None, json.dumps(clean))
         return await _wait_action(aid)
     if act in ("diptask", "dipapply"):
         # 282: Earn — vazifani tekshirish / joylashtirish arizasi (bot bajaradi).
@@ -730,6 +799,7 @@ def routes() -> list:
         web.post("/api/app/act", api_act),
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/candles", api_candles),
+        web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/sighist", api_sighist),
         web.post("/api/app/top", api_top),
         web.post("/api/app/diptop", api_diptop),
@@ -776,7 +846,7 @@ T = {
         "df_unav": "Dip Funded hozir javob bermayapti", "df_balance": "Balans",
         "df_free": "Bo'sh", "df_daily": "Kunlik limit", "df_maxdd": "Maks. zarar", "df_target": "Maqsad",
         "df_days": "Savdo kunlari", "df_pos": "Pozitsiyalar", "df_orders": "Limit buyruqlar",
-        "df_term": "Savdo terminali", "df_inbot": "Botda boshqarish",
+        "df_term": "Savdo terminali", "df_avg": "O'rtacha narx", "df_market": "Market", "df_limit_p": "Limit narx", "df_amount": "Summa, USDT", "df_sl_opt": "SL (ixtiyoriy)", "df_tp_opt": "TP (ixtiyoriy)", "df_qty": "Miqdor", "df_tpsl_hint": "Bo'sh qoldirilsa — olib tashlanadi", "df_pick": "Juftlikni tanlang", "df_pos1": "Pozitsiya", "df_mark": "Joriy narx", "df_value": "Qiymat", "df_no_pos": "Bu juftlikda pozitsiya yo'q — BUY bilan oching", "df_trades": "So'nggi savdolar", "df_inbot": "Botda boshqarish",
         "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
         "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
         "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Chiziqni (SL, TP, kirish, limit) barmoq bilan surib, saqlang", "ns_sl": "Stop (SL)",
@@ -836,7 +906,7 @@ T = {
         "df_unav": "Dip Funded сейчас не отвечает", "df_balance": "Баланс",
         "df_free": "Свободно", "df_daily": "Дневной лимит", "df_maxdd": "Макс. просадка", "df_target": "Цель",
         "df_days": "Торговые дни", "df_pos": "Позиции", "df_orders": "Лимитные ордера",
-        "df_term": "Терминал", "df_inbot": "Управлять в боте",
+        "df_term": "Терминал", "df_avg": "Средняя цена", "df_market": "Рынок", "df_limit_p": "Лимит-цена", "df_amount": "Сумма, USDT", "df_sl_opt": "SL (необяз.)", "df_tp_opt": "TP (необяз.)", "df_qty": "Количество", "df_tpsl_hint": "Пустое поле — удалить", "df_pick": "Выберите пару", "df_pos1": "Позиция", "df_mark": "Текущая цена", "df_value": "Стоимость", "df_no_pos": "По этой паре позиции нет — откройте через BUY", "df_trades": "Последние сделки", "df_inbot": "Управлять в боте",
         "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
         "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
         "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Перетащите линию (SL, TP, вход, лимит) пальцем и сохраните", "ns_sl": "Стоп (SL)",
@@ -896,7 +966,7 @@ T = {
         "df_unav": "Dip Funded is not responding", "df_balance": "Balance",
         "df_free": "Free", "df_daily": "Daily limit", "df_maxdd": "Max loss", "df_target": "Target",
         "df_days": "Trading days", "df_pos": "Positions", "df_orders": "Limit orders",
-        "df_term": "Trading terminal", "df_inbot": "Manage in bot",
+        "df_term": "Trading terminal", "df_avg": "Avg price", "df_market": "Market", "df_limit_p": "Limit price", "df_amount": "Amount, USDT", "df_sl_opt": "SL (optional)", "df_tp_opt": "TP (optional)", "df_qty": "Quantity", "df_tpsl_hint": "Leave empty to remove", "df_pick": "Choose a pair", "df_pos1": "Position", "df_mark": "Mark price", "df_value": "Value", "df_no_pos": "No position in this pair — open one with BUY", "df_trades": "Recent trades", "df_inbot": "Manage in bot",
         "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
         "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
         "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Drag a line (SL, TP, entry, limit) and save", "ns_sl": "Stop (SL)",
