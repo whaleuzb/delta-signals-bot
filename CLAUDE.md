@@ -7768,3 +7768,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      takliflar, foydalanuvchilar JSON.gz hujjat adminlarga; admin panel
      "💎 DIP jurnali" (`adm:diplog`): berilgan/chiqarilgan/qaytarilgan, jami
      balans, oxirgi 30 harakat, "📦 Zaxirani hozir yuborish".
+
+## 301. Ulashish kartasi — ochiq pozitsiya (Unrealized PnL)
+- `card.open_card(...)` (1080x1420): "● OCHIQ POZITSIYA" yorlig'i, LONG/SHORT·leveraj·tf chiplari, "UNREALIZED PNL · ROI" katta % va $ summa, shisha panelda shamli grafik (signal `chart_tf`, 70 sham) + TP/SL/IN chiziqlari, narxlar qatori (Kirish/Joriy/SL/TP), pastda avatar, @user, QR va taklif kodi.
+- Yorliqlar panel ichida, o'ng tomonda; bir-biriga tegmasligi uchun 38px oraliq bilan suriladi. `_chip` foni alohida RGBA qatlamda (shaffoflik saqlanadi).
+- `_app_sigshare` endi `pnl_card` (yopilgan savdo) o'rniga `open_card` chaqiradi; shamlar provayderdan olinadi (xato bo'lsa grafiksiz chiziladi). `share.caption` — "ochiq pozitsiya, unrealized {pnl}%".
+- i18n: `card.open`, `card.upnl`, `card.mark`.

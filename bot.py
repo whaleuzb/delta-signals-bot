@@ -1395,10 +1395,25 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
         u = await db.get_user(sig["author_id"]) if sig["author_id"] else None
     except Exception:
         u = None
-    buf = card.pnl_card(symbol=sig["symbol"], side=sig["side"], entry=float(sig["entry"]), exit_price=ex,
-                        pnl_pct=pnl, leverage=L, r_multiple=None, closed_at=datetime.now(stats.TZ),
-                        username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
-                        qr_url=link, sig_id=sig["id"], market=sig["market"], qr_code=code, lang=lang)
+    # 301: OCHIQ pozitsiya — yangi uslubdagi karta, shamli grafik bilan (Unrealized PnL).
+    tf = sig["chart_tf"] if sig["chart_tf"] in ("1m", "5m", "15m", "1h", "4h", "1d") else "1h"
+    tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}[tf]
+    candles = []
+    try:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        cs = await asyncio.wait_for(tracker.provider(sig["market"]).klines(
+            sig["symbol"], now_ms - 70 * tf_ms, limit=80, tf=tf, end_ms=now_ms), 10)
+        candles = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs]
+    except Exception:
+        log.warning("Ulashish kartasi: shamlar olinmadi (#%s)", sig["id"], exc_info=True)
+    tps = [float(x) for x in (sig["tps"] or [])]
+    nxt = tps[min(int(sig["tp_hit"] or 0), len(tps) - 1)] if tps else None
+    alloc = float(sig["alloc_amount"]) if sig["alloc_amount"] is not None else None
+    buf = card.open_card(symbol=sig["symbol"], side=sig["side"], entry=float(sig["entry"]), price=ex,
+                         pnl_pct=pnl, money=(pnl / 100 * alloc) if alloc else None, leverage=L,
+                         sl=float(sig["sl"]) if sig["sl"] is not None else None, tp=nxt, candles=candles, tf=tf,
+                         username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
+                         qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang)
     img = Image.open(buf).convert("RGB")
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=88)

@@ -285,3 +285,203 @@ def pnl_card(*, symbol: str, side: str, entry: float, exit_price: float,
     img.convert("RGB").save(buf, format="PNG", optimize=True)
     buf.seek(0)
     return buf
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 301: OCHIQ pozitsiya ulashish kartasi — ilovaning yangi uslubida (qora fon,
+# kulrang tuman, muzli shisha panellar, lime urg'u), shamli grafik bilan.
+# Yopilgan savdo kartasi (`pnl_card`) o'zgarmaydi.
+# ─────────────────────────────────────────────────────────────────────────────
+LIME = "#C2F23A"
+RED = "#FF5C5C"
+OW, OH = 1080, 1420
+
+
+def _rgb(c: str) -> tuple:
+    return Image.new("RGB", (1, 1), c).getpixel((0, 0))
+
+
+def _blob(img, box, color, alpha, blur):
+    from PIL import ImageFilter
+    k = 4
+    layer = Image.new("RGBA", (img.width // k, img.height // k), (0, 0, 0, 0))
+    r, g, b = _rgb(color)
+    ImageDraw.Draw(layer).ellipse(tuple(v // k for v in box), fill=(r, g, b, alpha))
+    layer = layer.filter(ImageFilter.GaussianBlur(blur)).resize(img.size, Image.LANCZOS)
+    img.alpha_composite(layer)
+
+
+def _glass(img, box, radius=36, fill=14, edge=40):
+    """Muzli shisha panel: oq shaffof to'ldirish, ingichka hoshiya, yuqorida yorqin chiziq."""
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    d.rounded_rectangle(box, radius=radius, fill=(255, 255, 255, fill), outline=(255, 255, 255, edge), width=2)
+    x0, y0, x1, _ = box
+    d.line((x0 + radius, y0 + 1, x1 - radius, y0 + 1), fill=(255, 255, 255, 80), width=2)
+    img.alpha_composite(layer)
+
+
+def _chip(img, xy, text, font, fg, bg, pad=(18, 9)):
+    """Yumaloq chip; `bg` RGBA bo'lishi mumkin — alohida qatlamda chiziladi (shaffoflik saqlanadi)."""
+    x, y = xy
+    d0 = ImageDraw.Draw(img)
+    w = d0.textlength(text, font=font)
+    bb = d0.textbbox((0, 0), text, font=font)
+    h = bb[3] - bb[1]
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rounded_rectangle((x, y, x + w + pad[0] * 2, y + h + pad[1] * 2 + 4),
+                                            radius=(h + pad[1] * 2) // 2, fill=bg)
+    img.alpha_composite(layer)
+    ImageDraw.Draw(img).text((x + pad[0], y + pad[1] - bb[1] + 2), text, font=font, fill=fg)
+    return x + w + pad[0] * 2
+
+
+def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: float,
+              money: float | None, leverage: int | None, sl: float | None, tp: float | None,
+              candles: list, tf: str | None, username: str | None, ws_name: str,
+              logo: bytes | None, qr_url: str, qr_code: str | None, sig_id: int | None,
+              when: datetime, lang: str | None = None) -> io.BytesIO:
+    """Ochiq (yopilmagan) pozitsiya kartasi: Unrealized PnL (ROI), grafik, kirish/joriy/SL/TP, QR."""
+    acc = LIME if pnl_pct >= 0 else RED
+    img = Image.new("RGBA", (OW, OH), "#050506")
+    _blob(img, (-260, -320, 760, 520), "#C8CCD6", 46, 30)
+    _blob(img, (520, 640, 1500, 1500), acc, 34, 34)
+    _blob(img, (-300, 900, 500, 1600), "#B4B9AE", 22, 30)
+    d = ImageDraw.Draw(img, "RGBA")
+    P = 64
+
+    # Tepa: brend + "OCHIQ POZITSIYA" chipi
+    _tracked(d, (P, P), "TRADE CONTROLLER", _f(28, bold=True), TXT, spacing=4.4)
+    lab = i18n.t("card.open", lang)
+    fch = _f(24, bold=True)
+    w = d.textlength("●  " + lab, font=fch) + 36
+    _chip(img, (OW - P - w, P - 6), "●  " + lab, fch, "#050506", acc)
+
+    # Juftlik + chiplar
+    y = 150
+    fs = _f(70, bold=True)
+    d.text((P, y), symbol, font=fs, fill=TXT)
+    x = P + d.textlength(symbol, font=fs) + 24
+    fc = _f(26, bold=True)
+    sc = LIME if side == "LONG" else RED
+    sr, sg_, sb = _rgb(sc)
+    x = _chip(img, (x, y + 18), side, fc, sc, (sr, sg_, sb, 46)) + 12
+    kind = f"{leverage}X" if leverage and leverage > 1 else "SPOT"
+    x = _chip(img, (x, y + 18), kind, fc, TXT, (255, 255, 255, 30)) + 12
+    if tf:
+        _chip(img, (x, y + 18), tf, fc, MUTED, (255, 255, 255, 20))
+    d = ImageDraw.Draw(img, "RGBA")
+
+    # Unrealized PnL
+    y = 262
+    _tracked(d, (P, y), i18n.t("card.upnl", lang), _f(26, bold=True), MUTED, spacing=2.6)
+    pct = f"{pnl_pct:+.2f}%"
+    size = 150
+    fb = _f(size, bold=True)
+    while d.textlength(pct, font=fb) > OW - 2 * P and size > 90:
+        size -= 6
+        fb = _f(size, bold=True)
+    d.text((P, y + 34), pct, font=fb, fill=acc)
+    if money is not None:
+        m = f"{'+' if money >= 0 else '−'}${abs(money):,.2f}"
+        d.text((P + 4, y + 34 + size + 6), m, font=_f(40, bold=True), fill=TXT)
+
+    # Grafik paneli
+    gx0, gy0, gx1, gy1 = P, 560, OW - P, 930
+    _glass(img, (gx0, gy0, gx1, gy1), radius=34, fill=10, edge=34)
+    d = ImageDraw.Draw(img, "RGBA")
+    cs = [c for c in (candles or []) if c and len(c) >= 5][-64:]
+    fl = _f(22, bold=True)
+    lvl = [(v, c, lb) for v, c, lb in ((tp, LIME, "TP"), (sl, RED, "SL"), (entry, "#D8D8DC", "IN")) if v]
+    lw = max([d.textlength(f"{lb} {_fmt_price(v)}", font=fl) for v, _c, lb in lvl] or [0]) + 18
+    ix0, iy0, ix1, iy1 = gx0 + 26, gy0 + 28, gx1 - 22 - lw - 10, gy1 - 28
+    if cs:
+        levels = [entry, price] + [v for v in (sl, tp) if v]
+        lo = min(min(c[3] for c in cs), *levels)
+        hi = max(max(c[2] for c in cs), *levels)
+        pad = (hi - lo) * 0.06 or hi * 0.01
+        lo, hi = lo - pad, hi + pad
+        Y = lambda v: iy1 - (v - lo) / (hi - lo) * (iy1 - iy0)
+        n = len(cs)
+        bw = (ix1 - ix0) / n
+        for k, c in enumerate(cs):
+            o, h_, l_, cl = c[1], c[2], c[3], c[4]
+            col = LIME if cl >= o else RED
+            cx = ix0 + (k + .5) * bw
+            d.line((cx, Y(h_), cx, Y(l_)), fill=col, width=2)
+            top, bot = min(Y(o), Y(cl)), max(Y(o), Y(cl))
+            d.rectangle((cx - bw * .32, top, cx + bw * .32, max(bot, top + 2)), fill=col)
+
+        # Chiziqlar
+        for v, col, lb in lvl:
+            yy = Y(v)
+            if lb == "IN":
+                xx = ix0
+                while xx < ix1:
+                    d.line((xx, yy, min(xx + 14, ix1), yy), fill=col, width=2)
+                    xx += 24
+            else:
+                d.line((ix0, yy, ix1, yy), fill=col, width=2)
+        # Yorliqlar: panel ichida, bir-biriga tegmasin
+        tags = sorted([[Y(v), v, col, lb] for v, col, lb in lvl], key=lambda t: t[0])
+        for k in range(1, len(tags)):
+            tags[k][0] = max(tags[k][0], tags[k - 1][0] + 38)
+        over = tags[-1][0] + 17 - (gy1 - 8) if tags else 0
+        if over > 0:
+            for t in tags:
+                t[0] -= over
+        lx = ix1 + 10
+        for yy, v, col, lb in tags:
+            t = f"{lb} {_fmt_price(v)}"
+            d.rounded_rectangle((lx, yy - 17, lx + lw, yy + 17), radius=10, fill="#0A0A0C", outline=col, width=2)
+            d.text((lx + 9, yy - 13), t, font=fl, fill=col)
+        py = Y(price)
+        d.ellipse((ix1 - 9, py - 9, ix1 + 9, py + 9), fill=acc)
+    # Narxlar qatori
+    y = 966
+    cols = [(i18n.t("card.entry", lang), _fmt_price(entry), TXT),
+            (i18n.t("card.mark", lang), _fmt_price(price), TXT),
+            ("SL", _fmt_price(sl) if sl else "—", RED if sl else MUTED),
+            ("TP", _fmt_price(tp) if tp else "—", LIME if tp else MUTED)]
+    cw = (OW - 2 * P) / 4
+    for k, (lb, v, col) in enumerate(cols):
+        x = P + k * cw
+        d.text((x, y), lb, font=_f(24), fill=MUTED)
+        d.text((x, y + 34), v, font=_f(32, bold=True), fill=col)
+
+    # Pastki qism: avatar + muallif + QR
+    d.line((P, OH - 236, OW - P - 300, OH - 236), fill=(255, 255, 255, 40), width=2)
+    av_px = 84
+    av = _circle_avatar(logo, av_px) if logo else None
+    if av is None:
+        av = _letter_avatar((ws_name or "?").strip()[:1].upper(), av_px)
+    ay = OH - 190
+    img.alpha_composite(av, (P, ay))
+    d = ImageDraw.Draw(img, "RGBA")
+    who = f"@{username}" if username else (ws_name or "Trade Controller")
+    fw = _f(32, bold=True)
+    tx = P + av_px + 22
+    while d.textlength(who, font=fw) > OW - P - 300 - tx and len(who) > 4:
+        who = who[:-2] + "…"
+    d.text((tx, ay + 6), who, font=fw, fill=TXT)
+    sub = f"{ws_name} · {when:%d.%m.%Y %H:%M}" if ws_name and username else f"{when:%d.%m.%Y %H:%M}"
+    if sig_id is not None:
+        sub = f"#{sig_id} · " + sub
+    while d.textlength(sub, font=_f(24)) > OW - P - 300 - tx and len(sub) > 6:
+        sub = sub[:-2] + "…"
+    d.text((tx, ay + 48), sub, font=_f(24), fill=FAINT)
+    qr_px, quiet = 150, 14
+    panel = qr_px + quiet * 2
+    px0, py0 = OW - P - panel, OH - P - panel
+    d.rounded_rectangle((px0, py0, px0 + panel, py0 + panel), radius=18, fill="white")
+    img.paste(_qr(qr_url, qr_px), (px0 + quiet, py0 + quiet))
+    if qr_code:
+        fcode, fcap = _f(32, bold=True), _f(22)
+        cap = i18n.t("card.ref_code", lang)
+        right = px0 + panel
+        _tracked(d, (right - _tracked_width(d, cap, fcap, 2.4), py0 - 76), cap, fcap, MUTED, spacing=2.4)
+        _tracked(d, (right - _tracked_width(d, qr_code, fcode, 3.0), py0 - 44), qr_code, fcode, TXT, spacing=3.0)
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return buf

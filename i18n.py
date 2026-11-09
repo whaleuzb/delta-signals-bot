@@ -1714,9 +1714,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "earn.p_report": {"uz": "📊 <b>{title}</b> — DIP Earn haftalik hisoboti\nOxirgi 7 kunda qo'shilganlar: <b>{week}</b>\nJami (tekshirilgan, chiqib ketmaganlar): <b>{total}</b>\nJoylashuv: {till} gacha",
                       "ru": "📊 <b>{title}</b> — недельный отчёт DIP Earn\nЗа 7 дней: <b>{week}</b>\nВсего (проверенные, не отписались): <b>{total}</b>\nРазмещение до {till}",
                       "en": "📊 <b>{title}</b> — DIP Earn weekly report\nLast 7 days: <b>{week}</b>\nTotal (verified, still subscribed): <b>{total}</b>\nListed until {till}"},
-    "share.caption": {"uz": "📊 <b>{sym}</b> {side} — <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatilmoqda\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
-                      "ru": "📊 <b>{sym}</b> {side} — <b>{pnl}%</b>\n{ws} · отслеживается в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
-                      "en": "📊 <b>{sym}</b> {side} — <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
+    "share.caption": {"uz": "📊 <b>{sym}</b> {side} — ochiq pozitsiya, unrealized <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatilmoqda\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
+                      "ru": "📊 <b>{sym}</b> {side} — открытая позиция, нереализ. <b>{pnl}%</b>\n{ws} · отслеживается в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
+                      "en": "📊 <b>{sym}</b> {side} — open position, unrealized <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
     "share.btn": {"uz": "🚀 Botni ochish", "ru": "🚀 Открыть бота", "en": "🚀 Open the bot"},
     "dip.out_done": {
         "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",
@@ -3802,6 +3802,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "card.subtitle": {
         "uz": "Savdo jurnali", "ru": "Журнал сделок", "en": "Trading journal",
     },
+    "card.open": {"uz": "OCHIQ POZITSIYA", "ru": "ОТКРЫТАЯ ПОЗИЦИЯ", "en": "OPEN POSITION"},
+    "card.upnl": {"uz": "UNREALIZED PNL · ROI", "ru": "НЕРЕАЛИЗ. PNL · ROI", "en": "UNREALIZED PNL · ROI"},
+    "card.mark": {"uz": "Joriy narx", "ru": "Текущая цена", "en": "Mark price"},
     "card.closed": {
         "uz": "YOPILGAN SAVDO", "ru": "СДЕЛКА ЗАКРЫТА", "en": "CLOSED TRADE",
     },
