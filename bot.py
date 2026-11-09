@@ -1616,6 +1616,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_diptask(ctx, uid, lang, a)
     if a["action"] == "dipapply":
         return await _app_dipapply(ctx, uid, lang, a)
+    if a["action"] == "newsshare":
+        return await _app_newsshare(ctx, uid, lang, a)
     if a["action"] == "dftrade":
         return await _app_dftrade(ctx, uid, lang, a)
     if a["action"] in ("dfacc", "dfone"):
@@ -9532,20 +9534,73 @@ NEWS_CHANNEL_USERNAME = "newstradeuz"
 
 
 BOT_USERNAME: str | None = None      # 311: post_init o'rnatadi
+MAIN_APP = False                     # 315: BotFather'da "Main Mini App" yoqilganmi (getMe)
+_NEWS_LIVE: dict[int, tuple[str | None, str]] = {}   # 315: jonli post — eng so'nggi rasm/matn
 
 
 def _share_button(message_id: int) -> InlineKeyboardButton:
-    """311: "Do'stlarga yuborish" — referal ulashishdek. Kanal tugmasi hamma uchun bir xil,
-    shuning uchun u botga olib boradi (`start=nws_<id>`): bot bosgan odamga postning
-    nusxasini UNING taklif tugmasi bilan yuboradi (`_news_share`), u o'shani do'stlariga
-    uzatadi — kim kirsa, taklif o'sha odamga yoziladi. Bot nomi hali noma'lum bo'lsa —
-    eski usul (`t.me/share/url` — postning o'zi)."""
-    if BOT_USERNAME:
+    """315: "Do'stlarga yuborish" — PnL kartasini ulashgandek: Mini App to'g'ridan-to'g'ri
+    ochiladi (`t.me/<bot>?startapp=nws_<id>`, bot chati EMAS), u darhol `shareMessage`
+    bilan postning o'zini (rasm + matn + "News Trade'da ochish") chat tanlash oynasiga
+    beradi. Taklif havolasi yo'q. Kanal tugmasida `switch_inline_query`/`web_app` ishlamaydi —
+    shuning uchun faqat shu yo'l. Botda Main Mini App yoqilmagan bo'lsa — eski usul
+    (`t.me/share/url` — post havolasi)."""
+    if BOT_USERNAME and MAIN_APP:
         return InlineKeyboardButton("↗️ Do'stlarga yuborish",
-                                    url=f"https://t.me/{BOT_USERNAME}?start=nws_{int(message_id)}")
+                                    url=f"https://t.me/{BOT_USERNAME}?startapp=nws_{int(message_id)}")
     post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{message_id}"
     share_url = "https://t.me/share/url?" + urlencode({"url": post_url})
     return InlineKeyboardButton("↗️ Do'stlarga yuborish", url=share_url)
+
+
+async def _news_share_save(message_id: int, m) -> None:
+    """315: post rasmi (file_id) va matni — ulashish uchun (bazada + jonli xotirada)."""
+    if m is None or isinstance(m, bool):
+        return
+    fid = m.photo[-1].file_id if getattr(m, "photo", None) else None
+    body = (m.caption_html if fid else m.text_html) or ""
+    _NEWS_LIVE[message_id] = (fid, body)
+    try:
+        await db.news_share_put(message_id, fid, body)
+    except Exception:
+        log.warning("News ulashish ma'lumoti saqlanmadi (msg=%s)", message_id, exc_info=True)
+
+
+async def _app_newsshare(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """315: Mini App (`startapp=nws_<id>`) — postni rasm/matn/tugma bilan ulashishga
+    tayyorlaydi (`savePreparedInlineMessage`), ilova `shareMessage` chaqiradi."""
+    from telegram import InlineQueryResultCachedPhoto, InlineQueryResultArticle, InputTextMessageContent
+    import uuid as _uuid
+    try:
+        mid = int(json.loads(a["args"] or "{}").get("m") or 0)
+    except (ValueError, TypeError):
+        mid = 0
+    if mid <= 0:
+        return False, json.dumps({"code": "bad"})
+    hit = _NEWS_LIVE.get(mid)
+    if hit is None:
+        row = await db.news_share_get(mid)
+        hit = (row["file_id"], row["body"]) if row else None
+    post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{mid}"
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("nws.open_btn", lang), url=post_url,
+                                                     api_kwargs={"style": "success"})]])
+    rid = _uuid.uuid4().hex[:32]
+    if hit and hit[0]:
+        res = InlineQueryResultCachedPhoto(id=rid, photo_file_id=hit[0], caption=hit[1][:1024] or None,
+                                           parse_mode=ParseMode.HTML, reply_markup=kb)
+    else:
+        body = (hit[1] if hit else "") or f'📰 <a href="{post_url}">News Trade</a>'
+        res = InlineQueryResultArticle(id=rid, title="News Trade", reply_markup=kb,
+                                       input_message_content=InputTextMessageContent(
+                                           body[:4096], parse_mode=ParseMode.HTML))
+    try:
+        pm = await ctx.bot.save_prepared_inline_message(
+            user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True,
+            allow_channel_chats=True)
+    except Exception as e:
+        log.warning("News posti ulashishga tayyorlanmadi (%s): %s", mid, e)
+        return False, json.dumps({"url": post_url})
+    return True, json.dumps({"id": pm.id, "url": post_url})
 
 
 async def _add_share_button(bot_, chat_id, message_id: int,
@@ -9560,7 +9615,8 @@ async def _add_share_button(bot_, chat_id, message_id: int,
     rows.append([_share_button(message_id)])
     full = InlineKeyboardMarkup(rows)
     try:
-        await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
+        m = await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
+        await _news_share_save(message_id, m)
     except Exception:
         log.warning("Do'stlarga yuborish tugmasi qo'shilmadi (msg=%s)", message_id,
                     exc_info=True)
@@ -9830,12 +9886,15 @@ async def _paced_media_edit(bot_, chat_id, message_id: int, photo: io.BytesIO,
             # HAR TAHRIRLASHDA O'CHIRILADI (edit_message_media butun media
             # obyektini — rasm+izoh — YANGISI bilan ALMASHTIRADI, eskisidan
             # HECH NARSA "meros" qilib olinmaydi).
-            await bot_.edit_message_media(
+            m = await bot_.edit_message_media(
                 chat_id=chat_id, message_id=message_id,
                 media=InputMediaPhoto(photo, filename="news.png",
                                       caption=caption, parse_mode=ParseMode.HTML),
                 reply_markup=reply_markup)
             ok = True
+            # 315: ulashishda eng so'nggi rasm (faqat xotirada — har 4 s bazaga yozilmasin)
+            if m is not None and not isinstance(m, bool) and getattr(m, "photo", None):
+                _NEWS_LIVE[message_id] = (m.photo[-1].file_id, m.caption_html or caption or "")
         except RetryAfter as e:
             log.info("News jonli yangilanish RetryAfter=%s", e.retry_after)
             await asyncio.sleep(e.retry_after)
@@ -11522,9 +11581,12 @@ async def migrate_td_signals(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def post_init(app: Application) -> None:
-    global BOT_USERNAME
+    global BOT_USERNAME, MAIN_APP
     try:
-        BOT_USERNAME = (await app.bot.get_me()).username
+        me = await app.bot.get_me()
+        BOT_USERNAME = me.username
+        MAIN_APP = bool(getattr(me, "has_main_web_app", None) or (me.api_kwargs or {}).get("has_main_web_app"))
+        log.info("Bot: @%s, Main Mini App: %s", BOT_USERNAME, MAIN_APP)
     except Exception:
         log.warning("Bot nomi olinmadi — News ulashish tugmasi eski usulda", exc_info=True)
     # Bir martalik baza ko'chirish (196): `MOVE_DB_TO` bo'lsa — hech qanday

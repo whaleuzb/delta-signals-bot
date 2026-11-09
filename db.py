@@ -617,6 +617,13 @@ CREATE TABLE IF NOT EXISTS signal_events (
 );
 CREATE INDEX IF NOT EXISTS signal_events_sig ON signal_events (signal_id, at);
 -- 300: ulashish rasmlari (Telegram InlineQueryResultPhoto faqat URL qabul qiladi).
+-- 315: News Trade postini ulashish (Mini App shareMessage) — post rasmi va matni.
+CREATE TABLE IF NOT EXISTS news_share (
+    msg_id  BIGINT PRIMARY KEY,
+    file_id TEXT,
+    body    TEXT NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS share_images (
     key  TEXT PRIMARY KEY,
     img  BYTEA NOT NULL,
@@ -1416,6 +1423,19 @@ async def share_image_put(key: str, img: bytes) -> None:
         await c.execute("INSERT INTO share_images (key, img) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE "
                         "SET img=EXCLUDED.img, at=now()", key, img)
         await c.execute("DELETE FROM share_images WHERE at < now() - interval '30 days'")
+
+
+async def news_share_put(msg_id: int, file_id: str | None, body: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO news_share (msg_id, file_id, body) VALUES ($1,$2,$3) "
+                        "ON CONFLICT (msg_id) DO UPDATE SET file_id=EXCLUDED.file_id, body=EXCLUDED.body, at=now()",
+                        msg_id, file_id, body)
+        await c.execute("DELETE FROM news_share WHERE at < now() - interval '60 days'")
+
+
+async def news_share_get(msg_id: int):
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT file_id, body FROM news_share WHERE msg_id=$1", msg_id)
 
 
 async def share_image_get(key: str) -> bytes | None:

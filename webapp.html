@@ -596,6 +596,13 @@ function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase().replace(/(USD
 function sigShare(id){toast(esc(t('wait')));api('act',{sig:id,action:'share'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg)}catch(e){}
  if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
  if(d&&d.link){refShareUrl(d.link);return}toast(esc(noEmoji(String(r.msg||'Error').replace(/<[^>]+>/g,''))))}).catch(function(){toast('Error')})}
+/* 315: News Trade "Do'stlarga yuborish" — kanal tugmasi ilovani startapp=nws_<id> bilan ochadi:
+   post (rasm + matn + "News Trade'da ochish") darhol chat tanlash oynasida; keyin ilova yopiladi */
+function newsShare(m){sheetOpen('<div style="display:flex;align-items:center;gap:12px;padding:6px 2px 4px"><div class="spk" style="width:34px;height:34px;margin:0;border-radius:50%"><div class="sk"></div></div><b>'+esc(t('nws_prep'))+'</b></div>');
+ var done=function(){try{tg.close()}catch(e){}};
+ api('act',{action:'newsshare',args:{m:m}}).then(function(r){var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}sheetClose();
+  if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(){setTimeout(done,300)});return}catch(e){}}
+  var u=d&&d.url?d.url:'https://t.me/newstradeuz/'+m;try{tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(u))}catch(e){openLink(u)}setTimeout(done,600)}).catch(function(){sheetClose()})}
 /* 306: yopilgan savdo — egasi uchun ilova ichida natija kartasi (shaxsiy jurnalda post yo'q) */
 function openTrade(id,url,mine){if(!mine){if(url)openLink(url);return}
  sheetOpen('<div id="rcbox"><div class="sk" style="width:100%;aspect-ratio:1080/1420;border-radius:18px"></div></div>');
@@ -1209,6 +1216,7 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
   S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
+ if(/^nws_\d+$/.test(sp))newsShare(+sp.slice(4));
  api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}

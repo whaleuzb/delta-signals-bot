@@ -1715,6 +1715,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "share.caption_closed": {"uz": "✅ <b>{sym}</b> {side} — yopilgan savdo, natija <b>{pnl}%</b>\n{ws} · Trade Controller orqali kuzatildi\n\nSignallar natijasi avtomatik kuzatiladi — qo'shiling 👇",
                              "ru": "✅ <b>{sym}</b> {side} — сделка закрыта, итог <b>{pnl}%</b>\n{ws} · отслежено в Trade Controller\n\nРезультаты сигналов отслеживаются автоматически — присоединяйтесь 👇",
                              "en": "✅ <b>{sym}</b> {side} — closed trade, result <b>{pnl}%</b>\n{ws} · tracked by Trade Controller\n\nSignal results are tracked automatically — join 👇"},
+    "nws.open_btn": {"uz": "📰 News Trade'da ochish", "ru": "📰 Открыть в News Trade", "en": "📰 Open in News Trade"},
     "nws.share_btn": {"uz": "Do'stlarga yuborish", "ru": "Отправить друзьям", "en": "Send to friends"},
     "nws.share_text": {"uz": "📰 Bu yangilikni ko'ring: {post}\n\n🤖 Trade Controller — signallar va yangiliklar boti 👇",
                        "ru": "📰 Посмотрите эту новость: {post}\n\n🤖 Trade Controller — бот сигналов и новостей 👇",
