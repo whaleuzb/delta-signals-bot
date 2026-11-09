@@ -28,6 +28,8 @@ TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
 
 # --- Kuzatuv ---
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "45"))
+# 307b: forex/aksiya signallari (Twelve Data) shu oraliqda bir tekshiriladi.
+TD_POLL_SECONDS = int(os.getenv("TD_POLL_SECONDS", "300"))
 EXPIRE_DAYS = int(os.getenv("EXPIRE_DAYS", "7"))  # entryga tegmagan signal shuncha kundan keyin bekor
 
 # --- Savdo qoidalari (SPOT) ---

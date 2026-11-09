@@ -5,6 +5,7 @@ Har bir ochiq signal uchun oxirgi tekshiruvdan beri kelgan 1m shamlarni ketma-ke
 o'tkazib yuborilmaydi.
 """
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 import config
@@ -16,6 +17,8 @@ import parsing
 import stocks
 
 log = logging.getLogger(__name__)
+
+_td_tried: dict[int, float] = {}     # 307b: forex/aksiya signali oxirgi tekshirilgan payt
 
 
 def provider(market: str):
@@ -98,6 +101,18 @@ async def process(sig) -> list[dict]:
 
     is_first_poll = sig["last_checked_ms"] is None
     start_ms = sig["last_checked_ms"] or int(sig["created_at"].timestamp() * 1000)
+    # 307b: forex/aksiya — Twelve Data (bepul reja kuniga ~800 so'rov). Har 45 s da
+    # so'rash bitta signalning o'zida kuniga ~1900 so'rov edi — kvota kun bo'yi tugab,
+    # kuzatuv umuman to'xtardi. Shamlar `last_checked_ms` dan o'qilgani uchun siyrak
+    # tekshirish hech bir shamni yo'qotmaydi (TP/SL baribir topiladi), faqat xabar
+    # biroz kechroq keladi.
+    # Oxirgi URINISH vaqti xotirada (`last_checked_ms` dam olish kuni yoki limit paytida
+    # bo'sh javobda siljimaydi — shunga tayansak yana har 45 s da so'ralardi).
+    if sig["market"] in ("forex", "stock") and not is_first_poll and not sig.get("backfill"):
+        mono = time.monotonic()
+        if mono - _td_tried.get(sig["id"], -1e9) < config.TD_POLL_SECONDS:
+            return []
+        _td_tried[sig["id"]] = mono
     # `end_ms` — MAJBURIY. MEXC (va forex/aksiya provayderlari, bir xil
     # imzo) FAQAT `startTime` berilganda (`endTime`siz) uni DEYARLI E'TIBORGA
     # OLMAYDI — o'rniga eng SO'NGGI `limit` (standart 500) shamni, HOZIRDAN
