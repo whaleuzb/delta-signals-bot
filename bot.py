@@ -1368,6 +1368,28 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
 
+_BOT_LOGO: dict = {"at": 0.0, "data": None}
+
+
+async def _bot_logo(bot) -> bytes | None:
+    """302: botning o'z profil rasmi (ulashish kartasi tepasida). Xotirada 6 soat saqlanadi."""
+    import time as _t
+    if _t.time() - _BOT_LOGO["at"] < 6 * 3600:
+        return _BOT_LOGO["data"]
+    data = None
+    try:
+        ph = await bot.get_user_profile_photos(bot.id, limit=1)
+        if ph.total_count and ph.photos:
+            sizes = ph.photos[0]
+            pick = next((x for x in sizes if x.width >= 160), sizes[-1])
+            f = await bot.get_file(pick.file_id)
+            data = bytes(await f.download_as_bytearray())
+    except Exception as e:
+        log.info("Bot logosi olinmadi: %s", e)
+    _BOT_LOGO.update(at=_t.time(), data=data)
+    return data
+
+
 async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
     """300: signal natijasini ulashish — rasm (pnl kartasi, jonli narx bilan) + matn + tugma
     (taklif havolasi), referal ulashishdek `savePreparedInlineMessage` + `shareMessage`."""
@@ -1413,7 +1435,8 @@ async def _app_sigshare(ctx, uid: int, lang, sig) -> tuple[bool, str]:
                          pnl_pct=pnl, money=(pnl / 100 * alloc) if alloc else None, leverage=L,
                          sl=float(sig["sl"]) if sig["sl"] is not None else None, tp=nxt, candles=candles, tf=tf,
                          username=u["username"] if u else None, ws_name=ws["name"], logo=logo,
-                         qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang)
+                         qr_url=link, qr_code=code, sig_id=sig["id"], when=datetime.now(stats.TZ), lang=lang,
+                         bot_logo=await _bot_logo(ctx.bot))
     img = Image.open(buf).convert("RGB")
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=88)

@@ -7774,3 +7774,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - Yorliqlar panel ichida, o'ng tomonda; bir-biriga tegmasligi uchun 38px oraliq bilan suriladi. `_chip` foni alohida RGBA qatlamda (shaffoflik saqlanadi).
 - `_app_sigshare` endi `pnl_card` (yopilgan savdo) o'rniga `open_card` chaqiradi; shamlar provayderdan olinadi (xato bo'lsa grafiksiz chiziladi). `share.caption` — "ochiq pozitsiya, unrealized {pnl}%".
 - i18n: `card.open`, `card.upnl`, `card.mark`.
+
+## 302. Ulashish kartasi: kichikroq shriftlar + bot logosi
+- `open_card` shriftlari ~15% kichraytirildi (juftlik 58, % 124, $ 34, narxlar 28, yorliqlar 19).
+- Tepada "TRADE CONTROLLER" oldida bot logosi (60px doira): `open_card(..., bot_logo=bytes)`. `bot._bot_logo(bot)` botning profil rasmini `get_user_profile_photos(bot.id)` orqali oladi, xotirada 6 soat saqlaydi; rasm yo'q bo'lsa logo chizilmaydi.
+- Pastdagi ajratuvchi chiziq shaffof oq o'rniga to'q rang (#26262B) — RGBA rasmda alfa aralashmay oq chiqayotgan edi.
