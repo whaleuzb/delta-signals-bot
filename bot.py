@@ -1167,6 +1167,158 @@ async def on_dip_withdraw(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         pass
 
 
+async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """282: DIP Earn vazifasi — kanal/guruh bo'lsa obuna bot orqali tekshiriladi,
+    bot/havola vazifalarida tekshirib bo'lmaydi (bosilgani yetarli)."""
+    try:
+        tid = int(json.loads(a["args"] or "{}").get("id") or 0)
+    except Exception:
+        tid = 0
+    t_ = await db.dip_task_get(tid) if tid else None
+    if not t_ or not t_["active"]:
+        return False, i18n.t("earn.gone", lang)
+    if t_["chat_id"]:
+        try:
+            m = await ctx.bot.get_chat_member(t_["chat_id"], uid)
+            ok = m.status in ("member", "administrator", "creator", "restricted")
+        except Exception as e:
+            log.warning("Earn: obuna tekshirilmadi (#%s): %s", tid, e)
+            return False, i18n.t("earn.cant_check", lang)
+        if not ok:
+            return False, i18n.t("earn.not_sub", lang)
+    reward = float(t_["reward"])
+    if not await db.dip_task_complete(tid, uid, reward):
+        return False, i18n.t("earn.already", lang)
+    return True, i18n.t("earn.got", lang, n=f"{reward:g}", bal=f"{await db.dip_balance(uid):g}")
+
+
+def _place_target(raw: str) -> tuple[str, str]:
+    """Ariza manzili → (ko'rinadigan, t.me havola). @kanal / t.me/kanal / bot."""
+    r = raw.strip()
+    m = re.match(r"^(?:https?://)?(?:t\.me|telegram\.me)/(?:s/)?([A-Za-z0-9_+]{3,64})/?$", r)
+    if m:
+        u = m.group(1)
+        return ("@" + u if not u.startswith("+") else r), f"https://t.me/{u}"
+    if re.match(r"^@?[A-Za-z][A-Za-z0-9_]{3,31}$", r):
+        u = r.lstrip("@")
+        return "@" + u, f"https://t.me/{u}"
+    return r, r if r.startswith("http") else ""
+
+
+async def _app_dipapply(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """282: Earn'ga o'z kanali/guruhi/botini joylashtirish arizasi → adminlarga."""
+    try:
+        f = json.loads(a["args"] or "{}")
+    except Exception:
+        f = {}
+    kind = f.get("kind") if f.get("kind") in ("channel", "group", "bot") else "channel"
+    shown, url = _place_target(str(f.get("target") or ""))
+    if not url:
+        return False, i18n.t("earn.bad_target", lang)
+    note = (str(f.get("note") or "").strip() or None)
+    app_id = await db.dip_app_add(uid, kind, shown, note)
+    who = await _dip_who(ctx, uid)
+    names = {"channel": "Kanal", "group": "Guruh", "bot": "Bot"}
+    text = (f"📣 <b>DIP Earn — joylashtirish arizasi #{app_id}</b>\n"
+            f"Kim: {who}\nTuri: {names[kind]}\nManzil: {html.escape(shown)}\n"
+            + (f"Izoh: {html.escape(note)}\n" if note else "")
+            + f"Narx: <b>{config.DIP_PLACE_PRICE:g} USDT</b>\n\n"
+            "To'lovni olgach, mukofotni tanlab tasdiqlang (vazifa darhol qo'shiladi). "
+            "Kanal/guruh obunasi tekshirilishi uchun botni u yerga admin qiling.")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"✅ +{n} DIP", callback_data=f"dipapp:ok:{app_id}:{n}", api_kwargs={"style": "success"})
+         for n in (5, 10, 20)],
+        [InlineKeyboardButton("❌ Rad etish", callback_data=f"dipapp:no:{app_id}:0", api_kwargs={"style": "danger"})]])
+    await _dip_admins(ctx, text, kb)
+    return True, i18n.t("earn.applied", lang, price=f"{config.DIP_PLACE_PRICE:g}")
+
+
+async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """282: admin arizani tasdiqladi (mukofot bilan) yoki rad etdi."""
+    q = update.callback_query
+    if not is_admin(q.from_user.id):
+        await q.answer()
+        return
+    _, act, app_id, reward = q.data.split(":")
+    ap = await db.dip_app_get(int(app_id))
+    if not ap or not await db.dip_app_set(int(app_id), "ok" if act == "ok" else "rejected"):
+        await q.answer("Allaqachon hal qilingan", show_alert=True)
+        return
+    ulang = await user_lang(ap["user_id"])
+    if act != "ok":
+        await q.answer("Rad etildi")
+        try:
+            await q.edit_message_text(q.message.text_html + "\n\n<b>❌ Rad etildi</b>", parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+        try:
+            await ctx.bot.send_message(ap["user_id"], i18n.t("earn.app_no", ulang), parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
+        return
+    shown, url = _place_target(ap["target"])
+    title, chat_id, note = shown, None, ""
+    if ap["kind"] in ("channel", "group") and shown.startswith("@"):
+        try:
+            ch = await ctx.bot.get_chat(shown)
+            title = ch.title or shown
+            me = await ctx.bot.get_chat_member(ch.id, ctx.bot.id)
+            if me.status in ("administrator", "creator"):
+                chat_id = ch.id
+            else:
+                note = "\n⚠️ Bot u yerda admin emas — obuna tekshirilmaydi (keyin admin qilsangiz, vazifani qayta qo'shing)."
+        except Exception as e:
+            note = f"\n⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
+    tid = await db.dip_task_add(ap["kind"], title, url, chat_id, float(reward), ap["id"])
+    await q.answer("Qo'shildi")
+    try:
+        await q.edit_message_text(q.message.text_html + f"\n\n<b>✅ Vazifa #{tid} qo'shildi: +{reward} DIP</b>"
+                                  + html.escape(note), parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+    try:
+        await ctx.bot.send_message(ap["user_id"], i18n.t("earn.app_ok", ulang, target=html.escape(shown)),
+                                   parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+
+
+async def cmd_dip_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """282: /earn — admin uchun Earn vazifalari ro'yxati (o'chirish/yoqish)."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    rows = await db.dip_tasks_all()
+    if not rows:
+        await update.effective_message.reply_text("Earn vazifalari yo'q. Arizalar ilovadan keladi.")
+        return
+    lines, kb = [], []
+    for r in rows:
+        mark = "🟢" if r["active"] else "⚪️"
+        chk = "tekshiriladi" if r["chat_id"] else "tekshirilmaydi"
+        lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · {r['n']} kishi · {chk}")
+        kb.append([InlineKeyboardButton(("⏸ O'chirish #" if r["active"] else "▶️ Yoqish #") + str(r["id"]),
+                                        callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}")])
+    await update.effective_message.reply_text("<b>DIP Earn vazifalari</b>\n" + "\n".join(lines),
+                                              parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(kb),
+                                              disable_web_page_preview=True)
+
+
+async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    if not is_admin(q.from_user.id):
+        await q.answer()
+        return
+    _, act, tid = q.data.split(":")
+    await db.dip_task_set_active(int(tid), act == "on")
+    await q.answer("OK")
+    try:
+        await q.message.delete()
+    except Exception:
+        pass
+    await cmd_dip_tasks(update, ctx)
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -1187,6 +1339,10 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_dipout(ctx, uid, lang, a)
     if a["action"] == "diplook":
         return await _app_diplook(uid, a)
+    if a["action"] == "diptask":
+        return await _app_diptask(ctx, uid, lang, a)
+    if a["action"] == "dipapply":
+        return await _app_dipapply(ctx, uid, lang, a)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -10781,6 +10937,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_channel_connect, pattern=r"^chsetup:"))
     app.add_handler(CallbackQueryHandler(on_channel_cancel, pattern=r"^chsetup_no$"))
     app.add_handler(CommandHandler("admin", cmd_admin))
+    app.add_handler(CommandHandler("earn", cmd_dip_tasks))
     app.add_handler(CallbackQueryHandler(on_admin, pattern=r"^adm:"))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
@@ -10829,6 +10986,8 @@ def main() -> None:
     app.add_handler(CommandHandler("taklif", cmd_invite))
     app.add_handler(CallbackQueryHandler(on_ref_code_start, pattern=r"^refcode$"))
     app.add_handler(CallbackQueryHandler(on_dip_withdraw, pattern=r"^dipw:(ok|no|retry):\d+$"))
+    app.add_handler(CallbackQueryHandler(on_dip_app, pattern=r"^dipapp:(ok|no):\d+:\d+$"))
+    app.add_handler(CallbackQueryHandler(on_dip_task_toggle, pattern=r"^dipt:(on|off):\d+$"))
     app.add_handler(CallbackQueryHandler(on_button, pattern=r"^(okc|nopic|pic|go|no|ed|tf|bk):"))
     app.add_handler(CallbackQueryHandler(on_signal_copy, pattern=r"^sigcopy:"))
     app.add_handler(CallbackQueryHandler(on_alloc_skip, pattern=r"^allocskip:"))

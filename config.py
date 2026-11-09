@@ -292,3 +292,5 @@ DIP_PER_REF = float(os.getenv("DIP_PER_REF", "5"))
 DIP_MIN_OUT = float(os.getenv("DIP_MIN_OUT", "3000"))
 # 264: USDT qilib hamyonga chiqarishda tokenlardan olib qolinadigan komissiya (%).
 DIP_USDT_FEE_PCT = float(os.getenv("DIP_USDT_FEE_PCT", "10"))
+# 282: DIP Earn — o'z kanali/botini vazifa sifatida joylashtirish narxi (USDT).
+DIP_PLACE_PRICE = float(os.getenv("DIP_PLACE_PRICE", "99"))

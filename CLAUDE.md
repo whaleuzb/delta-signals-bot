@@ -7590,3 +7590,18 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      signallardagi kichik grafik** (`webapp._spark`) signalning `chart_tf` i
      bo'lsa shu taymda oxirgi 110 sham (`_TF_MS`), bo'lmasa avvalgidek
      avtomatik. Signal kartasida taym belgisi (`i.tf`, `/api/app/open` → "tf").
+282. **DIP bo'limi: Reyting | Earn.** `dipView` tepasida `seg` (`S.dseg`).
+     **Earn** (`earnView`): faol vazifalar (`POST /api/app/diptasks` →
+     `db.dip_tasks_for`), "Bajarish" → havola ochiladi → "Tekshirish" →
+     `diptask` amali (`_app_diptask`): `chat_id` bo'lsa `get_chat_member` bilan
+     obuna tekshiriladi (bot o'sha kanalda admin bo'lishi shart), bot/havola
+     vazifalarida tekshiruvsiz; `dip_task_done` (PK task+user) + ledger
+     reason='task' — bir marta. Kichik "O'z kanalingizni joylashtirish"
+     tugmasi → sheet (`earnApply`): narx `config.DIP_PLACE_PRICE` (99 USDT),
+     jonli auditoriya (`db.audience_stats`: users, 30/7/1 kunda faol, guruhlar,
+     DIP yig'uvchilar) va trafik haqida 4 band; forma (Kanal/Guruh/Bot,
+     manzil, izoh) → `dipapply` (`_app_dipapply`, `dip_apps`) → adminlarga
+     "✅ +5/+10/+20 DIP" / "❌" (`dipapp:`). Tasdiqlansa `get_chat` +
+     botning adminligi tekshirilib vazifa qo'shiladi (`dip_tasks`), arizachiga
+     xabar. Admin: `/earn` — vazifalar ro'yxati, o'chirish/yoqish (`dipt:`).
+     To'lovni (99 USDT) admin qo'lda oladi.

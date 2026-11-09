@@ -576,6 +576,36 @@ ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE dip_withdrawals ADD COLUMN IF NOT EXISTS fee NUMERIC NOT NULL DEFAULT 0;
 -- 271: DIP reytingidagi odamlarning Telegram avatari (bayt bazada — veb
 -- servisda BOT_TOKEN yo'q). `key` — tasodifiy, URL'da user_id oshkor bo'lmasin.
+-- 282: DIP Earn — vazifalar (kanal/guruhga obuna, bot, havola) va bajarilganlar.
+-- `chat_id` bo'lsa obuna bot orqali tekshiriladi (bot o'sha kanalda admin bo'lishi kerak).
+CREATE TABLE IF NOT EXISTS dip_tasks (
+    id         BIGSERIAL PRIMARY KEY,
+    kind       TEXT NOT NULL DEFAULT 'channel',
+    title      TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    chat_id    BIGINT,
+    reward     NUMERIC NOT NULL DEFAULT 10,
+    active     BOOLEAN NOT NULL DEFAULT TRUE,
+    app_id     BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS dip_task_done (
+    task_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    reward  NUMERIC NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (task_id, user_id)
+);
+-- 282: Earn'ga joylashtirish arizalari (narx `config.DIP_PLACE_PRICE` USDT).
+CREATE TABLE IF NOT EXISTS dip_apps (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT NOT NULL,
+    kind       TEXT NOT NULL,
+    target     TEXT NOT NULL,
+    note       TEXT,
+    status     TEXT NOT NULL DEFAULT 'new',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS user_avatars (
     user_id BIGINT PRIMARY KEY,
     key     TEXT NOT NULL UNIQUE,
@@ -1147,6 +1177,92 @@ async def set_user_avatar(user_id: int, img: bytes | None) -> None:
 async def user_avatar(key: str) -> bytes | None:
     async with pool().acquire() as c:
         return await c.fetchval("SELECT img FROM user_avatars WHERE key=$1", key)
+
+
+async def dip_tasks_for(user_id: int | None) -> list[asyncpg.Record]:
+    """282: faol vazifalar + shu odam bajarganmi."""
+    async with pool().acquire() as c:
+        return await c.fetch("""
+            SELECT t.id, t.kind, t.title, t.url, t.reward, (t.chat_id IS NOT NULL) AS verified,
+                   (d.user_id IS NOT NULL) AS done,
+                   (SELECT COUNT(*) FROM dip_task_done x WHERE x.task_id = t.id) AS n
+            FROM dip_tasks t LEFT JOIN dip_task_done d ON d.task_id = t.id AND d.user_id = $1
+            WHERE t.active ORDER BY t.id DESC
+        """, user_id or 0)
+
+
+async def dip_task_get(task_id: int):
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM dip_tasks WHERE id=$1", task_id)
+
+
+async def dip_task_complete(task_id: int, user_id: int, reward: float) -> bool:
+    """282: bir marta — bajarildi yozuvi + DIP ledger (reason='task')."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            r = await c.execute(
+                "INSERT INTO dip_task_done (task_id, user_id, reward) VALUES ($1,$2,$3) "
+                "ON CONFLICT DO NOTHING", task_id, user_id, _d(reward))
+            if not r.endswith(" 1"):
+                return False
+            await c.execute("INSERT INTO dip_ledger (user_id, amount, reason) VALUES ($1,$2,'task')",
+                            user_id, _d(reward))
+    return True
+
+
+async def dip_task_add(kind: str, title: str, url: str, chat_id: int | None, reward: float,
+                       app_id: int | None = None) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO dip_tasks (kind, title, url, chat_id, reward, app_id) "
+            "VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", kind, title, url, chat_id, _d(reward), app_id)
+
+
+async def dip_tasks_all() -> list[asyncpg.Record]:
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT t.*, (SELECT COUNT(*) FROM dip_task_done d WHERE d.task_id=t.id) AS n "
+            "FROM dip_tasks t ORDER BY t.active DESC, t.id DESC LIMIT 30")
+
+
+async def dip_task_set_active(task_id: int, active: bool) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_tasks SET active=$2 WHERE id=$1", task_id, active)
+
+
+async def dip_app_add(user_id: int, kind: str, target: str, note: str | None) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval(
+            "INSERT INTO dip_apps (user_id, kind, target, note) VALUES ($1,$2,$3,$4) RETURNING id",
+            user_id, kind, target, note)
+
+
+async def dip_app_get(app_id: int):
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT * FROM dip_apps WHERE id=$1", app_id)
+
+
+async def dip_app_set(app_id: int, status: str) -> bool:
+    """Faqat yangi arizani o'zgartiradi (ikki marta bosish himoyasi)."""
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE dip_apps SET status=$2 WHERE id=$1 AND status='new'", app_id, status)
+    return r.endswith(" 1")
+
+
+async def audience_stats() -> dict:
+    """282: Earn arizasi uchun — botning jonli auditoriyasi."""
+    async with pool().acquire() as c:
+        r = await c.fetchrow("""
+            SELECT COUNT(*) AS users,
+                   COUNT(*) FILTER (WHERE last_seen > now() - interval '30 days') AS m30,
+                   COUNT(*) FILTER (WHERE last_seen > now() - interval '7 days')  AS d7,
+                   COUNT(*) FILTER (WHERE last_seen > now() - interval '1 day')   AS d1
+            FROM users
+        """)
+        groups = await c.fetchval("SELECT COUNT(*) FROM workspaces WHERE type='group' AND NOT archived")
+        dip = await c.fetchval("SELECT COUNT(DISTINCT user_id) FROM dip_ledger WHERE amount > 0")
+    return {"users": r["users"], "m30": r["m30"], "d7": r["d7"], "d1": r["d1"],
+            "groups": groups or 0, "dip": dip or 0}
 
 
 async def dip_pending(user_id: int) -> float:

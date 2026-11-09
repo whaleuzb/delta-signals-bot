@@ -28,7 +28,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size")
-WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -226,6 +226,14 @@ async def _ws_act(body, uid: int, act: str):
             raise web.HTTPForbidden()
         aid = await db.app_action_add(uid, 0, act, None, json.dumps(f)[:2000])
         return await _wait_action(aid)
+    if act in ("diptask", "dipapply"):
+        # 282: Earn — vazifani tekshirish / joylashtirish arizasi (bot bajaradi).
+        f = body.get("args") if isinstance(body.get("args"), dict) else {}
+        args = json.dumps({"id": int(f.get("id") or 0)} if act == "diptask" else
+                          {"kind": str(f.get("kind") or "")[:10], "target": str(f.get("target") or "")[:120],
+                           "note": str(f.get("note") or "")[:300]})
+        aid = await db.app_action_add(uid, 0, act, None, args)
+        return await _wait_action(aid)
     if act in ("ref", "refcode", "refshare", "dipout", "diplook"):
         f = body.get("args") if isinstance(body.get("args"), dict) else {}
         args = json.dumps({"code": str(f.get("code") or "")[:20]}) if act == "refcode" else \
@@ -359,6 +367,19 @@ async def api_top(request):
         "channels": sorted((item(r) for r in rows if r["is_channel"]), key=key),
         "futures": sorted((item(r, True) for r in futs), key=key),
     }, headers=NO_CACHE)
+
+
+async def api_diptasks(request):
+    """282: DIP Earn — faol vazifalar (bajarilganlari belgilangan) va joylashtirish
+    arizasi uchun auditoriya ma'lumoti."""
+    _body, uid = await _uid_opt(request)
+    rows = await db.dip_tasks_for(uid)
+    aud = await db.audience_stats()
+    return web.json_response({
+        "tasks": [{"id": r["id"], "kind": r["kind"], "title": r["title"], "url": r["url"],
+                   "reward": float(r["reward"]), "verified": r["verified"], "done": r["done"], "n": r["n"]}
+                  for r in rows],
+        "aud": aud, "price": config.DIP_PLACE_PRICE}, headers=NO_CACHE)
 
 
 async def api_diptop(request):
@@ -613,6 +634,7 @@ def routes() -> list:
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/top", api_top),
         web.post("/api/app/diptop", api_diptop),
+        web.post("/api/app/diptasks", api_diptasks),
         web.post("/api/app/hstat", api_hstat),
         web.post("/api/app/period", api_period),
         web.post("/api/app/group", api_group),
@@ -670,7 +692,7 @@ T = {
         "ref_new": "Yangi kod ({mn}–{mx} belgi)", "ref_share_txt": "Trade Controller — signallar natijasini kuzatish boti",
         "man_fill": "Juftlik, stop va TP ni to'ldiring",
         "pairs": "Juftliklar",
-        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_out_ask": "Barcha {n} DIP ni chiqarishga so'rov yuborilsinmi?", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip": "DIP", "dip_rank": "Reyting", "dip_rank_sub": "Eng ko'p DIP yig'ganlar", "dip_refs": "taklif", "dip_you": "Siz", "dip_empty": "Hali hech kim DIP yig'magan", "dip_invite": "Do'st taklif qilish", "dip_more": "Taklif sahifasi", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
+        "dip_out": "Tokenlarni chiqarish", "dip_out_lock": "{min} DIP dan ochiladi · yana {n} DIP", "dip_out_pend": "So'rov ko'rib chiqilmoqda: {n} DIP", "dip_out_ask": "Barcha {n} DIP ni chiqarishga so'rov yuborilsinmi?", "dip_to_df": "Dip Funded hisobiga", "dip_to_df_s": "Komissiyasiz · darhol o'tadi", "dip_to_usdt": "USDT qilib hamyonga", "dip_fee_s": "Komissiya {p}% ({n} DIP)", "dip_get": "Siz olasiz", "dip_net": "Tarmoq: faqat BEP20 (BNB Smart Chain)", "dip_addr": "USDT hamyon manzili", "dip_send": "So'rov yuborish", "dip_move": "O'tkazish", "dip_to_other": "Kimgadir o'tkazish", "dip_to_ph": "Dip Funded ID yoki @username", "dip_to_ask": "{name} ({id}) ga {n} DIP o'tkazilsinmi?", "dip_nouser": "Bunday foydalanuvchi topilmadi", "dip": "DIP", "dip_rank": "Reyting", "dip_rank_sub": "Eng ko'p DIP yig'ganlar", "dip_refs": "taklif", "dip_you": "Siz", "dip_empty": "Hali hech kim DIP yig'magan", "dip_invite": "Do'st taklif qilish", "dip_more": "Taklif sahifasi", "earn_title": "DIP Earn", "earn_sub": "Vazifalarni bajaring — har biri uchun DIP oling. Kanal obunasi bot orqali tekshiriladi.", "earn_done": "Bajarildi", "earn_check": "Tekshirish", "earn_go": "Bajarish", "earn_people": "kishi", "earn_verified": "tekshiriladi", "earn_empty": "Hozircha vazifalar yo'q", "earn_apply_btn": "O'z kanalingizni joylashtirish", "earn_apply_title": "Earn'ga joylashtirish", "earn_apply_sub": "Kanalingiz, guruhingiz yoki botingiz barcha foydalanuvchilarga DIP vazifasi sifatida ko'rinadi.", "earn_price": "Joylashtirish narxi", "earn_once": "bir martalik", "earn_aud": "Auditoriya (jonli raqamlar)", "earn_a_users": "Foydalanuvchilar", "earn_a_m30": "30 kunda faol", "earn_a_d7": "7 kunda faol", "earn_a_d1": "Bugun faol", "earn_a_groups": "Signal guruhlari", "earn_a_dip": "DIP yig'uvchilar", "earn_f1": "Hammasi jonli auditoriya — botlar emas, Telegram'dagi haqiqiy treyderlar", "earn_f2": "DIP faqat obuna bo'lgandan keyin beriladi — bot har birini tekshiradi", "earn_f3": "Auditoriya: kripto va forex treyderlar, signal guruhlari egalari va a'zolari", "earn_f4": "Vazifa DIP bo'limida barcha foydalanuvchilarga doimiy ko'rinadi", "earn_k_channel": "Kanal", "earn_k_group": "Guruh", "earn_note": "Izoh yoki aloqa (ixtiyoriy)", "earn_send": "Ariza yuborish", "earn_need": "Manzilni kiriting", "dip_bal": "DIP balans", "dip_per": "Har bir taklif uchun +{n} DIP", "dip_note": "1000 DIP = $10 · Dip Funded hisobiga yoki USDT qilib hamyonga chiqarish mumkin",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -732,7 +754,7 @@ T = {
         "ref_new": "Новый код ({mn}–{mx} символов)", "ref_share_txt": "Trade Controller — бот для учёта результатов сигналов",
         "man_fill": "Заполните пару, стоп и TP",
         "pairs": "Пары",
-        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_out_ask": "Отправить заявку на вывод всех {n} DIP?", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip": "DIP", "dip_rank": "Рейтинг", "dip_rank_sub": "Больше всего DIP", "dip_refs": "пригл.", "dip_you": "Вы", "dip_empty": "Пока никто не собрал DIP", "dip_invite": "Пригласить друга", "dip_more": "Страница приглашений", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
+        "dip_out": "Вывести токены", "dip_out_lock": "Доступно от {min} DIP · ещё {n} DIP", "dip_out_pend": "Заявка рассматривается: {n} DIP", "dip_out_ask": "Отправить заявку на вывод всех {n} DIP?", "dip_to_df": "На счёт Dip Funded", "dip_to_df_s": "Без комиссии · сразу", "dip_to_usdt": "В USDT на кошелёк", "dip_fee_s": "Комиссия {p}% ({n} DIP)", "dip_get": "Вы получите", "dip_net": "Сеть: только BEP20 (BNB Smart Chain)", "dip_addr": "Адрес USDT-кошелька", "dip_send": "Отправить заявку", "dip_move": "Перевести", "dip_to_other": "Перевести другому", "dip_to_ph": "ID Dip Funded или @username", "dip_to_ask": "Перевести {n} DIP пользователю {name} ({id})?", "dip_nouser": "Пользователь не найден", "dip": "DIP", "dip_rank": "Рейтинг", "dip_rank_sub": "Больше всего DIP", "dip_refs": "пригл.", "dip_you": "Вы", "dip_empty": "Пока никто не собрал DIP", "dip_invite": "Пригласить друга", "dip_more": "Страница приглашений", "earn_title": "DIP Earn", "earn_sub": "Выполняйте задания — за каждое DIP. Подписка на канал проверяется ботом.", "earn_done": "Выполнено", "earn_check": "Проверить", "earn_go": "Выполнить", "earn_people": "чел.", "earn_verified": "с проверкой", "earn_empty": "Пока заданий нет", "earn_apply_btn": "Разместить свой канал", "earn_apply_title": "Размещение в Earn", "earn_apply_sub": "Ваш канал, группа или бот будет виден всем пользователям как DIP-задание.", "earn_price": "Цена размещения", "earn_once": "разово", "earn_aud": "Аудитория (живые цифры)", "earn_a_users": "Пользователи", "earn_a_m30": "Активны 30 дн.", "earn_a_d7": "Активны 7 дн.", "earn_a_d1": "Активны сегодня", "earn_a_groups": "Сигнальные группы", "earn_a_dip": "Собирают DIP", "earn_f1": "Только живая аудитория — не боты, реальные трейдеры в Telegram", "earn_f2": "DIP даются только после подписки — бот проверяет каждого", "earn_f3": "Аудитория: крипто- и форекс-трейдеры, владельцы и участники сигнальных групп", "earn_f4": "Задание постоянно видно всем в разделе DIP", "earn_k_channel": "Канал", "earn_k_group": "Группа", "earn_note": "Комментарий или контакт (необяз.)", "earn_send": "Отправить заявку", "earn_need": "Укажите адрес", "dip_bal": "Баланс DIP", "dip_per": "+{n} DIP за каждое приглашение", "dip_note": "1000 DIP = $10 · можно вывести на счёт Dip Funded или в USDT на кошелёк",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -794,7 +816,7 @@ T = {
         "ref_new": "New code ({mn}–{mx} chars)", "ref_share_txt": "Trade Controller — signal results tracking bot",
         "man_fill": "Fill in pair, stop and TP",
         "pairs": "Pairs",
-        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_out_ask": "Send a request to withdraw all {n} DIP?", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip": "DIP", "dip_rank": "Ranking", "dip_rank_sub": "Most DIP collected", "dip_refs": "invites", "dip_you": "You", "dip_empty": "No one has collected DIP yet", "dip_invite": "Invite a friend", "dip_more": "Invite page", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
+        "dip_out": "Withdraw tokens", "dip_out_lock": "Unlocks at {min} DIP · {n} DIP to go", "dip_out_pend": "Request under review: {n} DIP", "dip_out_ask": "Send a request to withdraw all {n} DIP?", "dip_to_df": "To Dip Funded account", "dip_to_df_s": "No fee · instant", "dip_to_usdt": "As USDT to a wallet", "dip_fee_s": "Fee {p}% ({n} DIP)", "dip_get": "You receive", "dip_net": "Network: BEP20 (BNB Smart Chain) only", "dip_addr": "USDT wallet address", "dip_send": "Send request", "dip_move": "Transfer", "dip_to_other": "Send to someone", "dip_to_ph": "Dip Funded ID or @username", "dip_to_ask": "Send {n} DIP to {name} ({id})?", "dip_nouser": "User not found", "dip": "DIP", "dip_rank": "Ranking", "dip_rank_sub": "Most DIP collected", "dip_refs": "invites", "dip_you": "You", "dip_empty": "No one has collected DIP yet", "dip_invite": "Invite a friend", "dip_more": "Invite page", "earn_title": "DIP Earn", "earn_sub": "Complete tasks — earn DIP for each. Channel subscriptions are checked by the bot.", "earn_done": "Done", "earn_check": "Check", "earn_go": "Start", "earn_people": "people", "earn_verified": "verified", "earn_empty": "No tasks yet", "earn_apply_btn": "List your channel", "earn_apply_title": "List in Earn", "earn_apply_sub": "Your channel, group or bot is shown to every user as a DIP task.", "earn_price": "Listing price", "earn_once": "one-time", "earn_aud": "Audience (live numbers)", "earn_a_users": "Users", "earn_a_m30": "Active 30d", "earn_a_d7": "Active 7d", "earn_a_d1": "Active today", "earn_a_groups": "Signal groups", "earn_a_dip": "DIP collectors", "earn_f1": "100% live audience — not bots, real traders on Telegram", "earn_f2": "DIP is given only after subscribing — the bot checks everyone", "earn_f3": "Audience: crypto & forex traders, signal group owners and members", "earn_f4": "The task stays visible to everyone in the DIP section", "earn_k_channel": "Channel", "earn_k_group": "Group", "earn_note": "Note or contact (optional)", "earn_send": "Send application", "earn_need": "Enter the address", "dip_bal": "DIP balance", "dip_per": "+{n} DIP per invite", "dip_note": "1000 DIP = $10 · withdraw to Dip Funded or as USDT to a wallet",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",
