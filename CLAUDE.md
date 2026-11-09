@@ -7866,3 +7866,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Uslub: yorliq shrifti 10→8.5 (600), balandligi 18→14, ramka .6; chiziq 1.2→.8, shaffoflik .62 (sudralayotgani 1.4/1); sudrash tutqichi 30×18→22×14; o'q raqamlari 9→8, narx yorlig'i 9.5→8.5 (14px).
 - Signal terminali ham, Dip Funded terminali ham (bitta `termSvg`) shu bilan.
 - 312b (ulashish/natija kartasi, `card.open_card`): foydalanuvchi "Yuborish kartasida ham shu muammo". Yorliq shrifti 19→16, balandligi 30→26, oraliq 34→30, ramka 1px; chiziqlar 2→1px va `_mix(col, .6)` (panel foniga aralashtirilgan bosiq rang — RGBA rasmda alfa aralashmaydi); surilgan yorliq chiziq uchiga ingichka bog'lovchi bilan; joriy narx punktiri ingichka.
+
+## 313. Umumiy juftlik tanlash oynasi (belgi + narx + qidiruv) — hamma joyda
+- Foydalanuvchi (Dip Funded "Choose a pair" skrinshoti): "aktiv qidirishda hamma joyda shunday bo'lsin".
+- `webapp.html` `pairPick(o)` — {title, list:[[sym,price]], held, typed, loading, pick}: qidiruv (USDT qo'shimchasi va belgilar tashlanadi), tartib: ochiq pozitsiyalar → aniq moslik → boshlanishi → ro'yxat tartibi (hajm), 80 tagacha; `typed` — ro'yxatda yo'q nom "shu nom bilan" qatori (XAU, MRNA — serverda `resolve_symbol` MEXC metall/aksiya tokeniga aylantiradi). `dfPick` shunga o'tdi.
+- "Yangi signal" formasi: juftlik matn maydoni o'rniga tanlash tugmasi (belgi + nom, yashirin `#ns_sym` — `nsKeep` o'zgarmagan) → `nsPick` — Spot bo'lsa spot, Futures bo'lsa fyuchers ro'yxati.
+- `/api/app/pairs` {kind: spot|fut} → `exchange.price_list()` (`/api/v3/ticker/24hr`, faqat `valid_symbols`, narx>0) yoki `futures.price_list()` (`/api/v1/contract/ticker`, `_USDT`), 24 soatlik hajm bo'yicha, 60 s kesh (modulda), 2500 tagacha; ilovada `pairsGet` 60 s kesh.
+- Tarjimalar: `pp_typed`, `pp_choose`. Sinov: `test_313.py` 2/2 (MEXC javobini o'qish), brauzer `t_pp.py` (qidiruv, typed, futures ro'yxati).

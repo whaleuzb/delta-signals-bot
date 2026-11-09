@@ -121,6 +121,33 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
 _empty_logged: dict[tuple[str, str], float] = {}
 
 
+_plist: tuple[float, list] = (0.0, [])
+
+
+async def price_list() -> list[tuple[str, float]]:
+    """313: fyuchers kontraktlari (asosiy nom, narx) 24 soatlik hajm bo'yicha. 60 s kesh."""
+    global _plist
+    if _plist[1] and time.monotonic() - _plist[0] < 60:
+        return _plist[1]
+    r = await _client.get("/api/v1/contract/ticker")
+    r.raise_for_status()
+    q = "_" + config.QUOTE
+    rows = []
+    for d in r.json().get("data") or []:
+        s = str(d.get("symbol", "")) if isinstance(d, dict) else ""
+        if not s.endswith(q):
+            continue
+        try:
+            px, vol = float(d["lastPrice"]), float(d.get("amount24") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if px > 0:
+            rows.append((vol, s[: -len(q)], px))
+    rows.sort(reverse=True)
+    _plist = (time.monotonic(), [(s, p) for _v, s, p in rows])
+    return _plist[1]
+
+
 async def last_price(symbol: str, fresh: bool = False) -> float | None:
     """Joriy narx. MEXC fyuchers vaqti-vaqti bilan 403 yoki 510 ("Requests
     are too frequent") qaytaradi — shunda oxirgi ma'lum narx (1 soatgacha)

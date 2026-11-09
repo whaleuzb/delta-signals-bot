@@ -314,6 +314,34 @@ async def ticker_24hr() -> dict[str, float]:
     return _parse_ticker_24hr(r.json())
 
 
+_plist: tuple[float, list] = (0.0, [])
+
+
+async def price_list() -> list[tuple[str, float]]:
+    """313: ilovadagi juftlik tanlash oynasi — barcha faol USDT spot juftliklari
+    (asosiy nom, narx) 24 soatlik hajm bo'yicha kamayib. Bitta so'rov, 60 s kesh."""
+    global _plist
+    if _plist[1] and time.monotonic() - _plist[0] < 60:
+        return _plist[1]
+    r = await _client.get("/api/v3/ticker/24hr")
+    r.raise_for_status()
+    ok = await valid_symbols()
+    rows = []
+    for t in r.json():
+        sym = t.get("symbol", "")
+        if not sym.endswith(config.QUOTE) or sym not in ok:
+            continue
+        try:
+            px, vol = float(t["lastPrice"]), float(t.get("quoteVolume") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if px > 0:
+            rows.append((vol, sym[: -len(config.QUOTE)], px))
+    rows.sort(reverse=True)
+    _plist = (time.monotonic(), [(s, p) for _v, s, p in rows])
+    return _plist[1]
+
+
 async def volume_ticker_24hr() -> dict[str, float]:
     """Hajm portlashini kuzatish (`surge_scan_job`) uchun — imkon qadar
     Binance'dan (dunyodagi eng katta savdo hajmi — "pul qayerda ko'p

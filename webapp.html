@@ -896,10 +896,23 @@ function dfSellSheet(){var i=termItem();if(!i.pos)return;
 function dfTpslSheet(){var i=termItem();if(!i.pos)return;
  sheetOpen('<h4>TP / SL · '+esc(i.symbol)+'</h4><p>'+esc(t('df_tpsl_hint'))+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfp_sl','SL',i.pos.sl)+dfIn('dfp_tp','TP',i.pos.tp)+'</div>'
   +'<button class="btn p full" style="width:100%" onclick="dfDo({op:\'protect\',sl:dfV(\'dfp_sl\'),tp:dfV(\'dfp_tp\')},sheetClose)">'+esc(t('save'))+'</button>')}
-function dfPick(){var s=S.dfs;if(!s)return;sheetOpen('<h4>'+esc(t('df_pick'))+'</h4>'+dfIn('dfq','BTC, ETH, AAPL…','').replace('inputmode="decimal" ','oninput="dfPickList()" autocapitalize="characters" ')+'<div id="dfpl" style="max-height:52vh;overflow:auto"></div>');dfPickList()}
-function dfPickList(){var s=S.dfs,e=document.getElementById('dfq'),q=(e?e.value:'').toUpperCase().trim(),held={};(s.positions||[]).forEach(function(x){held[x.symbol]=1});
- var L=Object.keys(s.prices||{}).filter(function(k){return k.indexOf(q)>=0}).sort(function(a,b){return(held[b]||0)-(held[a]||0)||(a<b?-1:1)}).slice(0,80);
- var b=document.getElementById('dfpl');if(b)b.innerHTML=L.map(function(k){return'<div class="row glass" style="padding:9px 12px" onclick="sheetClose();dfSym(\''+esc(k)+'\')">'+coinIc(k,24)+'<div class="rm"><div class="rn" style="font-size:14px">'+esc(k)+(held[k]?' <span class="b bl">'+esc(t('df_pos1'))+'</span>':'')+'</div></div><div class="rv" style="font-size:13px">'+fp(s.prices[k])+'</div></div>'}).join('')}
+function dfPick(){var s=S.dfs;if(!s)return;var held={};(s.positions||[]).forEach(function(x){held[x.symbol]=1});
+ pairPick({title:t('df_pick'),list:Object.keys(s.prices||{}).sort().map(function(k){return[k,s.prices[k]]}),held:held,pick:dfSym})}
+/* 313: umumiy juftlik tanlash oynasi — belgi, narx, qidiruv; ochiq pozitsiyalar tepada.
+   o: {title, list:[[sym,price]], held:{sym:1}, typed: ro'yxatda yo'q nomni ham qabul qilish, loading, pick(sym)} */
+function pairPick(o){S.pp=o;sheetOpen('<h4>'+esc(o.title||t('df_pick'))+'</h4>'+dfIn('ppq','BTC, ETH, SOL…','').replace('inputmode="decimal" ','oninput="ppList()" autocapitalize="characters" autocomplete="off" ')+'<div id="ppl" style="max-height:52vh;overflow:auto"></div>');ppList()}
+function ppList(){var o=S.pp,b=document.getElementById('ppl');if(!o||!b)return;var e=document.getElementById('ppq'),q=(e?e.value:'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/USDT$/,''),held=o.held||{},L=o.list||[];
+ if(!L.length&&o.loading){b.innerHTML='<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
+ var rk=function(x,i){return(held[x[0]]?0:1e6)+(q&&x[0]==q?0:q&&x[0].indexOf(q)==0?1e5:q?2e5:0)+i};
+ var R=[];L.forEach(function(x,i){if(!q||x[0].indexOf(q)>=0)R.push([rk(x,i),x])});R.sort(function(a,c){return a[0]-c[0]});R=R.slice(0,80).map(function(r){return r[1]});
+ var row=function(sym,px,tag){return'<div class="row glass" style="padding:9px 12px" onclick="ppGo(\''+esc(sym)+'\')">'+coinIc(sym,24)+'<div class="rm"><div class="rn" style="font-size:14px">'+esc(sym)+(tag?' <span class="b bl">'+esc(tag)+'</span>':'')+'</div></div>'+(px!=null?'<div class="rv" style="font-size:13px">'+fp(px)+'</div>':'')+'</div>'};
+ var h='';if(o.typed&&q&&!L.some(function(x){return x[0]==q}))h+=row(q,null,t('pp_typed'));
+ h+=R.map(function(x){return row(x[0],x[1],held[x[0]]?t('df_pos1'):'')}).join('');
+ b.innerHTML=h||'<div class="rs" style="text-align:center;padding:14px">—</div>'}
+function ppGo(sym){var o=S.pp;sheetClose();if(o&&o.pick)o.pick(sym)}
+S.pairs={};
+function pairsGet(kind){var c=S.pairs[kind];if(c&&Date.now()-c.at<60000)return Promise.resolve(c.p);
+ return api('pairs',{kind:kind}).then(function(d){S.pairs[kind]={at:Date.now(),p:d.p||[]};return d.p||[]})}
 function dfSym(sym){var g=S.page;if(!g||!g.df)return;g.df.sym=sym;g.c=null;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
 function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var h='<div class="ghd"><div class="bk glass" onclick="dfAcc('+g.df.acc+')">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
@@ -928,6 +941,8 @@ setInterval(function(){var g=S.page;if(!g||!g.df||g.drag||g.pend||document.hidde
 var NS={kind:'spot',lev:10,side:'LONG',mode:'market'};
 function nsSeg(id,opts,cur,fn){var k=Math.max(0,opts.map(function(o){return o[0]}).indexOf(cur));return'<div class="seg glass" style="margin-bottom:10px"><div class="si" style="width:calc((100% - 8px)/'+opts.length+');transform:translateX('+(k*100)+'%)"></div>'+opts.map(function(o){return'<a class="'+(o[0]==cur?'on':'')+'" onclick="'+fn+'(\''+o[0]+'\')">'+esc(o[1])+'</a>'}).join('')+'</div>'}
 function nsKeep(){var g=function(i){var e=document.getElementById(i);return e?e.value:undefined};['sym','entry','sl','tps','amount'].forEach(function(k){var v=g('ns_'+k);if(v!==undefined)NS[k]=v});var w=document.getElementById('ns_ws');if(w)NS.ws=+w.value}
+function nsPick(){nsKeep();var kind=NS.kind=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(s){nsKeep();NS.sym=s;nsRender()}};pairPick(o);
+ pairsGet(kind).then(function(p){o.list=p;o.loading=false;if(S.pp===o)ppList()}).catch(function(){o.loading=false;if(S.pp===o)ppList()})}
 function nsSet(k,v){nsKeep();NS[k]=v;tick();nsRender()}
 function newSig(){tick();if(!S.ws.length)return;NS.ws=NS.ws||S.cur;S.page={id:'ns'};nsRender();pageShow()}
 function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(function(x){return x.id==NS.ws})[0]||cur();
@@ -935,7 +950,8 @@ function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(func
  var fi=function(id,ph,val,mode){return'<input id="ns_'+id+'" '+(mode?'inputmode="'+mode+'" ':'')+'placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;outline:none">'};
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('plus',22)+'</div><div><h2>'+esc(t('ns_title'))+'</h2><div class="rs">'+esc(wsName(w))+'</div></div></div>';
  if(S.ws.length>1)h+=lb(t('ns_where'))+'<select id="ns_ws" style="width:100%;font-size:15px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==w.id?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>';
- h+=lb(t('ns_pair'))+fi('sym','BTC',NS.sym,'');
+ h+=lb(t('ns_pair'))+'<input type="hidden" id="ns_sym" value="'+esc(NS.sym||'')+'"><div onclick="nsPick()" style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 14px">'
+  +(NS.sym?coinIc(NS.sym,24)+'<span style="flex:1">'+esc(NS.sym)+'</span>':'<span style="flex:1;color:var(--mut);font-weight:600">'+esc(t('pp_choose'))+'</span>')+'<span style="opacity:.5">▾</span></div>';
  h+=lb(t('ns_kind'))+nsSeg('k',[['spot','Spot'],['fut','Futures']],NS.kind,'nsKind');
  if(NS.kind=='fut'){h+=lb(t('ns_lev'))+'<div class="chips" style="flex-wrap:wrap">'+[5,10,20,25,30,40,50,90,100].map(function(l){return'<span class="chip glass'+(NS.lev==l?' on':'')+'" onclick="nsSet(\'lev\','+l+')">'+l+'x</span>'}).join('')+'</div>';
   h+=lb(t('ns_side'))+nsSeg('sd',[['LONG','LONG'],['SHORT','SHORT']],NS.side,'nsSide')}
