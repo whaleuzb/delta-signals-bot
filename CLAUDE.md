@@ -7540,3 +7540,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bir marta (`sessionStorage.tc_vr`). Shuningdek `/` endi `/app` ga
      (avval `/app?tab=top`) — BotFather'dagi asosiy ilova havolasi `/` bo'lsa
      Telegram ichida Bosh ochiladi; brauzerda (ochiq rejim) baribir Top.
+274. **Yangi palitra: Cloud Grey · Jet Black · Acid Lime** (webapp.html).
+     Urg'u `--g` = #c2f23a (avvalgi yashil #2ecc8f / rgba(46,204,143) hammasi
+     almashtirildi), fon Jet Black #0e100d, shisha va tumanliklar Cloud Grey
+     (#b4b9ae) tusida; zarar uchun qizil qoldi. Shisha shaffofligi 2 baravar:
+     `--glass` asosi rgba(…,.72) → .36. **Shisha sezgirligi:** `.glass` ni
+     bosganda (delegatsiyalangan `pointerdown`) bosilgan nuqtadan lime
+     yorug'lik to'lqini (`.tapw > .tapfx`, 0.6s) va chetlar yorishadi
+     (`.glass.tap`). Faqat bosilganda — doimiy animatsiya yo'q (257).
