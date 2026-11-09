@@ -7526,3 +7526,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      DIP top-50 dagilar uchun sutkada bir marta `get_user_profile_photos`);
      veb `GET /av/<key>.jpg` (user_id URL'da oshkor emas). Rasm yo'q yoki
      yashirilgan bo'lsa harf-avatar (`uav()`). `diptop` JSON'da `av`.
+272. **Kompyuterda (keng oyna) ilova telefon kengligida.** `@media
+     (min-width:640px)`: body max-width 480px o'rtada; `.page`, `.sheet`,
+     `.toast` ham shu kenglikka moslanadi (nav allaqachon min(92vw,420px)).
+     Telegram Desktop oynasining o'lchamini ilova boshqara olmaydi.
