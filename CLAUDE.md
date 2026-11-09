@@ -7487,3 +7487,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 266. **USDT faqat BEP20** — TRC20 olib tashlandi (`USDT_NETS` da faqat BEP20:
      0x + 40 hex). Ilovada tarmoq tanlash tugmalari o'rniga "Tarmoq: faqat
      BEP20 (BNB Smart Chain)" yozuvi; `S.dnet='BEP20'`.
+267. **Ilovada "Yangilash" turgan sahifada qoladi** (webapp.html). Har
+     navigatsiyada (`tick()` → `setTimeout(saveNav)`, `closeGroup`) joriy
+     bo'lim va sahifa URL'ga `history.replaceState` bilan yoziladi
+     (`?tab=…&g=…|df=1&acc=…|ref=1`, initData hash'i saqlanadi) va
+     `sessionStorage.tc_nav` ga. Init'da navigatsiya turi `reload` bo'lsa
+     `tc_nav` ishlatiladi (yangi ochilishda — havoladagi parametrlar).
+     Tiklanadi: tab, guruh sahifasi, Dip Funded ro'yxati/hisobi, Taklif.

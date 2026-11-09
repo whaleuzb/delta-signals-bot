@@ -285,7 +285,12 @@ function api(p,b){b=b||{};b.initData=tg?tg.initData:'';return fetch('/api/app/'+
 function noEmoji(s){return String(s).replace(/[✀-➿☀-⛿️]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF]/g,'').trim()}
 function toast(m){var e=document.getElementById('toast');e.innerHTML=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},4200)}
 function haptic(k){try{tg.HapticFeedback.notificationOccurred(k)}catch(e){}}
-function tick(){try{tg.HapticFeedback.selectionChanged()}catch(e){}}
+function tick(){try{tg.HapticFeedback.selectionChanged()}catch(e){}setTimeout(saveNav,0)}
+/* 267: "Yangilash" (reload) turgan sahifada qolsin — joriy bo'lim/sahifa URL'ga
+   (history.replaceState, initData hash'i saqlanadi) va sessionStorage'ga yoziladi. */
+function navQs(){var q=new URLSearchParams(location.search);['tab','g','df','acc','ref'].forEach(function(k){q.delete(k)});
+ q.set('tab',S.tab);var p=S.page;if(p){if(p.id=='df'){q.set('df','1');if(p.acc)q.set('acc',p.acc)}else if(p.id=='ref')q.set('ref','1');else if(+p.id)q.set('g',p.id)}return q.toString()}
+function saveNav(){if(!S.tab)return;var qs=navQs();try{history.replaceState(history.state,'',location.pathname+'?'+qs+location.hash)}catch(e){}try{sessionStorage.setItem('tc_nav',qs)}catch(e){}}
 function cur(){return S.ws.filter(function(w){return w.id==S.cur})[0]}
 function wsName(w){return w.type=='personal'?t('personal'):w.name}
 function wsIc(w){return ic(w.type=='personal'?'book':w.channel?'mega':'users',16)}
@@ -453,7 +458,7 @@ setInterval(function(){document.querySelectorAll('[data-cd]').forEach(function(e
 function openGroup(id){tick();S.page={id:id,kind:'spot',mon:null,data:null};pageRender();var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');
  try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}
  api('group',{id:id,lang:S.lang}).then(function(d){if(!S.page||S.page.id!=id)return;S.page.data=d;pageRender(true);loadPer()}).catch(function(){var p=document.getElementById('page');p.innerHTML=pageHead(null)+'<div class="empty glass">'+esc(t('not_public'))+'</div>'})}
-function closeGroup(){document.getElementById('page').classList.remove('show');S.page=null;try{tg.BackButton.offClick(closeGroup);tg.BackButton.hide()}catch(e){}}
+function closeGroup(){document.getElementById('page').classList.remove('show');S.page=null;saveNav();try{tg.BackButton.offClick(closeGroup);tg.BackButton.hide()}catch(e){}}
 function pageHead(d){return'<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div>'+(d?logoHtml(d.id,d.logo,d.name)+'<div style="min-width:0"><h2>'+esc(d.name)+'</h2><div class="rs">'+esc(d.channel?t('channel'):t('group'))+'</div></div>':'')+'</div>'}
 function curve(pts){if(!pts||pts.length<2)return'';var W=300,H=120,n=pts.length,a=[0].concat(pts);n=a.length;var mn=Math.min.apply(null,a),mx=Math.max.apply(null,a);if(mx==mn)mx=mn+1;
  var X=function(k){return k/(n-1)*W},Y=function(v){return H-(v-mn)/(mx-mn)*H};var up=a[n-1]>=0;var c=up?'#2ecc8f':'#ff5c5c';
@@ -718,7 +723,9 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}
  /* 252: Telegram tashqarisida (brauzer, to'lov boti) — ochiq rejim:
     Top, Turnir va guruh sahifalari; boshqaruv faqat Telegram ichida. */
- var q0=new URLSearchParams(location.search);var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
+ var q0=new URLSearchParams(location.search);
+ try{var nv=performance.getEntriesByType('navigation')[0];var sv=sessionStorage.getItem('tc_nav');if(nv&&nv.type=='reload'&&sv)q0=new URLSearchParams(sv)}catch(e){}
+ var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
  if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));
  if(!tg||!tg.initData){S.pub=true;S.bot=BOT;var nl=q0.get('lang');S.lang=T[nl]?nl:'uz';try{var sl0=localStorage.getItem('tc_lang');if(sl0&&T[sl0])S.lang=sl0}catch(e){}
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
@@ -728,7 +735,7 @@ addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
-  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(openDf,50);
+  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(function(){if(+q.get('acc')){pageShow();dfAcc(+q.get('acc'))}else openDf()},50);if(q.get('ref'))setTimeout(openRef,50);
   render();load();setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>
