@@ -129,6 +129,13 @@ ORANGE = "#FF9F43"
 OW, OH = 1080, 1420
 
 
+def _mix(c: str, a: float, bg: tuple = (12, 12, 14)) -> tuple:
+    """312: rangni panel foniga aralashtiradi (RGBA rasmda alfa aralashmaydi —
+    shuning uchun "shaffof" chiziq o'rniga bosiq rang)."""
+    r, g, b = _rgb(c)
+    return tuple(int(bg[i] + (x - bg[i]) * a) for i, x in enumerate((r, g, b)))
+
+
 def _rgb(c: str) -> tuple:
     return Image.new("RGB", (1, 1), c).getpixel((0, 0))
 
@@ -248,7 +255,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     _glass(img, (gx0, gy0, gx1, gy1), radius=34, fill=10, edge=34)
     d = ImageDraw.Draw(img, "RGBA")
     cs = [c for c in (candles or []) if c and len(c) >= 5][-64:]
-    fl = _f(19, bold=True)
+    fl = _f(16, bold=True)     # 312: kichikroq yorliqlar
     # 309: LIQ — masshtabga kirmaydi (uzoqda bo'lsa yorliq chetda "▲/▼ LIQ").
     lvl = [(v, c, lb) for v, c, lb in ((tp, LIME, "TP"), (sl, RED, "SL"), (entry, "#D8D8DC", "IN"),
                                        (liq, ORANGE, "LIQ")) if v]
@@ -272,49 +279,55 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
             top, bot = min(Y(o), Y(cl)), max(Y(o), Y(cl))
             d.rectangle((cx - bw * .32, top, cx + bw * .32, max(bot, top + 2)), fill=col)
 
-        # Chiziqlar
+        # Chiziqlar — 312: ingichka va bosiqroq (rang fonga aralashtiriladi)
         for v, col, lb in lvl:
             yy = Y(v)
+            dc = _mix(col, .6)
             if lb == "LIQ":
                 if iy0 <= yy <= iy1:
                     xx = ix0
                     while xx < ix1:
-                        d.line((xx, yy, min(xx + 4, ix1), yy), fill=col, width=2)
-                        xx += 10
+                        d.line((xx, yy, min(xx + 3, ix1), yy), fill=dc, width=1)
+                        xx += 9
                 continue
             if lb == "IN":
                 xx = ix0
                 while xx < ix1:
-                    d.line((xx, yy, min(xx + 14, ix1), yy), fill=col, width=2)
-                    xx += 24
+                    d.line((xx, yy, min(xx + 10, ix1), yy), fill=dc, width=1)
+                    xx += 18
             else:
-                d.line((ix0, yy, ix1, yy), fill=col, width=2)
-        # Yorliqlar: panel ichida, bir-biriga tegmasin
+                d.line((ix0, yy, ix1, yy), fill=dc, width=1)
+        # Yorliqlar: panel ichida, bir-biriga tegmasin (surilgani chiziqqa ingichka bog'lovchi bilan)
         def _ty(v, lb):
             yy = Y(v)
             return min(max(yy, iy0), iy1) if lb == "LIQ" else yy
+        TH, GAP = 13, 30
         tags = sorted([[_ty(v, lb), v, col, lb] for v, col, lb in lvl], key=lambda t: t[0])
         for k in range(1, len(tags)):
-            tags[k][0] = max(tags[k][0], tags[k - 1][0] + 34)
-        # Pastdan sig'masa — faqat kerakli yorliqlar yuqoriga suriladi (qolganlari o'z chizig'ida).
+            tags[k][0] = max(tags[k][0], tags[k - 1][0] + GAP)
         if tags:
-            tags[-1][0] = min(tags[-1][0], gy1 - 8 - 17)
+            tags[-1][0] = min(tags[-1][0], gy1 - 8 - TH)
             for k in range(len(tags) - 2, -1, -1):
-                tags[k][0] = min(tags[k][0], tags[k + 1][0] - 34)
+                tags[k][0] = min(tags[k][0], tags[k + 1][0] - GAP)
         lx = ix1 + 10
         for yy, v, col, lb in tags:
             t = f"{lb} {_fmt_price(v)}"
-            if lb == "LIQ" and not (iy0 <= Y(v) <= iy1):
-                t = ("▲ " if Y(v) < iy0 else "▼ ") + t
-            d.rounded_rectangle((lx, yy - 15, lx + lw, yy + 15), radius=9, fill="#0A0A0C", outline=col, width=2)
-            d.text((lx + 8, yy - 11), t, font=fl, fill=col)
+            ly = Y(v)
+            out = lb == "LIQ" and not (iy0 <= ly <= iy1)
+            if out:
+                t = ("▲ " if ly < iy0 else "▼ ") + t
+            elif abs(ly - yy) > 3:
+                d.line((ix1, ly, lx, yy), fill=_mix(col, .45), width=1)
+            d.rounded_rectangle((lx, yy - TH, lx + lw, yy + TH), radius=8, fill="#0A0A0C",
+                                outline=_mix(col, .7), width=1)
+            d.text((lx + 8, yy - 10), t, font=fl, fill=_mix(col, .92))
         py = Y(price)
         lx0 = cx1 + 6
         xx = lx0
         while xx < ix1:
-            d.line((xx, py, min(xx + 6, ix1), py), fill=acc, width=2)
-            xx += 12
-        d.ellipse((lx0 - 8, py - 8, lx0 + 8, py + 8), fill=acc)
+            d.line((xx, py, min(xx + 5, ix1), py), fill=_mix(acc, .7), width=1)
+            xx += 11
+        d.ellipse((lx0 - 7, py - 7, lx0 + 7, py + 7), fill=acc)
     # Narxlar qatori
     y = 966
     cols = [(i18n.t("card.entry", lang), _fmt_price(entry), TXT),
