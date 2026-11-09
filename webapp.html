@@ -16,7 +16,7 @@
 html{background:#050506}
 html,body{color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Roboto,sans-serif;
  font-size:13px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-feature-settings:'ss01','cv11';overscroll-behavior:none}
-body{background:transparent;padding:calc(var(--top) + 10px) 14px 150px;min-height:100vh;overflow-x:hidden}
+body{background:transparent;padding:calc(var(--top) + 10px) 14px calc(168px + max(env(safe-area-inset-bottom,0px),var(--bot,0px)));min-height:100vh;overflow-x:hidden}
 svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;flex:none}
 
 /* ---- FON: yulduzlar (canvas) + tumanlik + donadorlik + chetdagi nur ---- */
@@ -894,7 +894,7 @@ try{tg&&tg.onEvent&&tg.onEvent('activated',checkVer)}catch(e){}
 setInterval(function(){if(!document.hidden)checkVer()},300000);
 (function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
  tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
- var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}
+ var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px');var bi=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)+(tg.safeAreaInset&&tg.safeAreaInset.bottom||0);document.documentElement.style.setProperty('--bot',bi+'px')}catch(e){}}
  /* 252: Telegram tashqarisida (brauzer, to'lov boti) — ochiq rejim:
     Top, Turnir va guruh sahifalari; boshqaruv faqat Telegram ichida. */
  var q0=new URLSearchParams(location.search);

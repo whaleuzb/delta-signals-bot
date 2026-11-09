@@ -7634,3 +7634,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      tanga 28px; chiqarish bloki va izoh ixchamroq. `body` pastki joyi
      110 → 150px (o'rtadagi DIP tanga menyudan 38px yuqori chiqadi — oxirgi
      karta uning ostida qolardi); `.page` pastki joyi 40px (u yerda menyu yo'q).
+288. **iPhone'da bosh sahifa pasti hali menyu ostida edi** — pastki xavfsiz
+     zona (~34px) hisobga olinmagan. `body` pastki joyi `calc(168px +
+     max(env(safe-area-inset-bottom), var(--bot)))`; `--bot` init'da Telegram
+     `safeAreaInset.bottom + contentSafeAreaInset.bottom` dan (Telegram iOS
+     webview'da `env()` 0 bo'lishi mumkin).
