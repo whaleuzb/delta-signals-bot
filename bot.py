@@ -1011,12 +1011,18 @@ async def _dip_admins(ctx, text: str, kb=None) -> None:
             log.warning("DIP xabari adminga yuborilmadi (%s): %s", admin, e)
 
 
-async def _dip_df_send(ctx, wid: int, uid: int, amount: float, lang) -> tuple[bool, str]:
+async def _dip_df_send(ctx, wid: int, uid: int, amount: float, lang, to: str | None = None) -> tuple[bool, str]:
     """264: Dip Funded'ga o'tkazish. DF tomonda `ref`=wid bo'yicha idempotent —
     tarmoq xatosida qayta urinish ikki marta yozmaydi. Natija (ok, matn):
     ok=None — noaniq (so'rov kutilmoqda qoladi, admin qayta urinadi)."""
     try:
-        r = await dipfunded.dip_credit(uid, wid, amount)
+        r = await dipfunded.dip_credit(uid, wid, amount, to)
+    except dipfunded.ApiError as e:
+        if e.code != "no_user":
+            log.warning("DIP Dip Funded'ga o'tmadi (#%s): %s", wid, e)
+            return None, i18n.t("dip.df_later", lang)
+        await db.dip_withdraw_finish(wid, False)          # 265: qabul qiluvchi yo'q — qaytaramiz
+        return False, i18n.t("dip.no_user", lang)
     except dipfunded.NotLinked:
         await db.dip_withdraw_finish(wid, False)          # DF hech narsa yozmagan — qaytaramiz
         return False, i18n.t("dip.df_nolink", lang, url=dipfunded.site_url("/dashboard"))
@@ -1024,7 +1030,27 @@ async def _dip_df_send(ctx, wid: int, uid: int, amount: float, lang) -> tuple[bo
         log.warning("DIP Dip Funded'ga o'tmadi (#%s): %s", wid, e)
         return None, i18n.t("dip.df_later", lang)
     await db.dip_withdraw_finish(wid, True)
+    if to:
+        return True, i18n.t("dip.dfto_done", lang, n=f"{amount:g}", name=html.escape(str(r.get("name") or "")),
+                            id=html.escape(str(r.get("id") or "")))
     return True, i18n.t("dip.df_done", lang, n=f"{amount:g}", bal=f"{float(r.get('balance') or 0):g}")
+
+
+async def _app_diplook(uid: int, a) -> tuple[bool, str]:
+    """265: Dip Funded'da qabul qiluvchini topish (ID yoki username) — JSON."""
+    try:
+        to = str(json.loads(a["args"] or "{}").get("to") or "").strip()
+    except Exception:
+        to = ""
+    if not to or len(to) > 40 or not dipfunded.enabled():
+        return False, json.dumps({"code": "no_user"})
+    try:
+        r = await dipfunded.dip_lookup(to)
+    except dipfunded.ApiError as e:
+        return False, json.dumps({"code": e.code or "err"})
+    except Exception:
+        return False, json.dumps({"code": "off"})
+    return True, json.dumps({"name": r.get("name"), "id": r.get("id"), "to": to})
 
 
 async def _app_dipout(ctx, uid: int, lang, a) -> tuple[bool, str]:
@@ -1039,9 +1065,11 @@ async def _app_dipout(ctx, uid: int, lang, a) -> tuple[bool, str]:
     dest = f.get("dest")
     net = str(f.get("net") or "").upper()
     addr = str(f.get("addr") or "").strip()
-    if dest == "df":
+    if dest in ("df", "dfto"):
         if not dipfunded.enabled():
             return False, i18n.t("dip.df_later", lang)
+        if dest == "dfto" and not (0 < len(addr) <= 40):
+            return False, i18n.t("dip.no_user", lang)
     elif dest == "usdt":
         if net not in USDT_NETS:
             return False, i18n.t("dip.bad_addr", lang)
@@ -1052,7 +1080,7 @@ async def _app_dipout(ctx, uid: int, lang, a) -> tuple[bool, str]:
     fee_pct = config.DIP_USDT_FEE_PCT if dest == "usdt" else 0
     r = await db.dip_withdraw_request(uid, config.DIP_MIN_OUT, dest,
                                       net if dest == "usdt" else None,
-                                      addr if dest == "usdt" else None, fee_pct)
+                                      addr if dest in ("usdt", "dfto") else None, fee_pct)
     if r == "pending":
         return False, i18n.t("dip.out_pending", lang)
     if r == "low":
@@ -1060,13 +1088,15 @@ async def _app_dipout(ctx, uid: int, lang, a) -> tuple[bool, str]:
                              bal=f"{await db.dip_balance(uid):g}")
     wid, amount, fee = r
     who = await _dip_who(ctx, uid)
-    if dest == "df":
-        ok, msg = await _dip_df_send(ctx, wid, uid, amount, lang)
+    if dest in ("df", "dfto"):
+        to = addr if dest == "dfto" else None
+        ok, msg = await _dip_df_send(ctx, wid, uid, amount, lang, to)
+        whom = f"\nKimga: <code>{html.escape(to)}</code>" if to else ""
         if ok:
-            await _dip_admins(ctx, f"💎 DIP → Dip Funded #{wid}\nKim: {who}\nSumma: <b>{amount:g} DIP</b> — avtomatik o'tkazildi ✅")
+            await _dip_admins(ctx, f"💎 DIP → Dip Funded #{wid}\nKim: {who}{whom}\nSumma: <b>{amount:g} DIP</b> — avtomatik o'tkazildi ✅")
         elif ok is None:
             await _dip_admins(ctx, f"⚠️ <b>DIP → Dip Funded #{wid}</b> o'tmadi (Dip Funded javob bermadi)\n"
-                                   f"Kim: {who}\nSumma: <b>{amount:g} DIP</b>", InlineKeyboardMarkup([[
+                                   f"Kim: {who}{whom}\nSumma: <b>{amount:g} DIP</b>", InlineKeyboardMarkup([[
                 InlineKeyboardButton("🔁 Qayta o'tkazish", callback_data=f"dipw:retry:{wid}", api_kwargs={"style": "primary"}),
                 InlineKeyboardButton("❌ Rad etish", callback_data=f"dipw:no:{wid}", api_kwargs={"style": "danger"})]]))
         return bool(ok), msg
@@ -1098,12 +1128,13 @@ async def on_dip_withdraw(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
     ulang = await user_lang(w["user_id"])
     amount = float(w["amount"])
     if act == "retry":
-        ok, msg = await _dip_df_send(ctx, wid, w["user_id"], amount, ulang)
+        ok, msg = await _dip_df_send(ctx, wid, w["user_id"], amount, ulang,
+                                     w["address"] if w["dest"] == "dfto" else None)
         if ok is None:
             await q.answer("Dip Funded hali javob bermayapti", show_alert=True)
             return
         await q.answer("OK")
-        mark = "✅ O'tkazildi" if ok else "❌ Dip Funded'da Telegram ulanmagan — DIP qaytarildi"
+        mark = "✅ O'tkazildi" if ok else "❌ O'tmadi (Telegram ulanmagan / qabul qiluvchi yo'q) — DIP qaytarildi"
         try:
             await q.edit_message_text(q.message.text_html + f"\n\n<b>{mark}</b>", parse_mode=ParseMode.HTML)
         except Exception:
@@ -1152,6 +1183,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_refshare(ctx, uid, lang)
     if a["action"] == "dipout":
         return await _app_dipout(ctx, uid, lang, a)
+    if a["action"] == "diplook":
+        return await _app_diplook(uid, a)
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():

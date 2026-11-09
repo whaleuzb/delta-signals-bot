@@ -1654,6 +1654,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "✅ {n} DIP переведены на ваш счёт Dip Funded. Баланс DIP в Dip Funded: <b>{bal} DIP</b>",
         "en": "✅ {n} DIP moved to your Dip Funded account. Your Dip Funded DIP balance: <b>{bal} DIP</b>",
     },
+    "dip.dfto_done": {
+        "uz": "✅ {n} DIP Dip Funded'dagi <b>{name}</b> ({id}) hisobiga o'tkazildi.",
+        "ru": "✅ {n} DIP переведены на счёт Dip Funded <b>{name}</b> ({id}).",
+        "en": "✅ {n} DIP sent to <b>{name}</b> ({id}) on Dip Funded.",
+    },
+    "dip.no_user": {
+        "uz": "Dip Funded'da bunday ID yoki username topilmadi. DIP balansingizda qoldi.",
+        "ru": "В Dip Funded нет такого ID или username. DIP остались на балансе.",
+        "en": "No such Dip Funded ID or username. Your DIP stays on your balance.",
+    },
     "dip.df_nolink": {
         "uz": "Dip Funded'da Telegram ulanmagan. dipfunded.com kabinetida Telegram'ni ulang, so'ng qayta urining: {url}",
         "ru": "Telegram не привязан к Dip Funded. Привяжите его в кабинете dipfunded.com и повторите: {url}",

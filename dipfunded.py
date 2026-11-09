@@ -151,10 +151,27 @@ def _result(r: httpx.Response) -> dict:
     raise Unavailable(f"HTTP {r.status_code}")
 
 
-async def dip_credit(tg_id: int, ref: int, dip: float) -> dict:
+async def dip_credit(tg_id: int, ref: int, dip: float, to: str | None = None) -> dict:
     """264: TC'da yig'ilgan DIP'ni Dip Funded DIP balansiga o'tkazish.
-    `ref` — TC chiqarish so'rovi raqami (DF tomonda idempotent)."""
-    return await _req("POST", "/dip/credit", tg_id, {"ref": ref, "dip": dip})
+    `ref` — TC chiqarish so'rovi raqami (DF tomonda idempotent).
+    265: `to` — boshqa odamning Dip Funded ID'si yoki username'i."""
+    body = {"ref": ref, "dip": dip}
+    if to:
+        body["to"] = to
+    return await _req("POST", "/dip/credit", tg_id, body)
+
+
+async def dip_lookup(to: str) -> dict:
+    """265: qabul qiluvchi (ochiq ism + ID). Topilmasa ApiError('no_user')."""
+    if not enabled():
+        raise Unavailable("DIPFUNDED_API_KEY sozlanmagan")
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{config.DIPFUNDED_URL}/api/tc/dip/lookup", params={"to": to},
+                            headers={"X-Api-Key": config.DIPFUNDED_API_KEY})
+    except httpx.HTTPError as e:
+        raise Unavailable(f"tarmoq xatosi: {type(e).__name__}") from e
+    return _result(r)
 
 
 async def accounts(tg_id: int) -> dict:

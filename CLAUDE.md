@@ -7475,3 +7475,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      27.00 USDT. Adminlarga manzil/tarmoq/summa + "✅ To'landi / ❌ Rad etish";
      to'lovni admin qo'lda qiladi. Rad etilsa butun summa (komissiya ham)
      qaytadi. `dip_withdrawals`: dest, network, address, fee ustunlari.
+265. **DIP'ni kimgadir o'tkazish** (Dip Funded ID yoki @username bo'yicha) —
+     qo'shimcha yo'l. Ilova sheet'ida "Kimgadir o'tkazish" maydoni → `dipTo`:
+     `diplook` amali (`_app_diplook` → `dipfunded.dip_lookup` → DF
+     `GET /api/tc/dip/lookup?to=`; javob: ochiq ism "Ali V." + ID) → tasdiq
+     "Ali V. (10025) ga N DIP o'tkazilsinmi?" → `dipout` dest='dfto'
+     (address=ID). DF `POST /api/tc/dip/credit` `to` bilan (tg_id talab
+     qilinmaydi, balans oshkor qilinmaydi). Topilmasa (`no_user`) DIP
+     qaytariladi; tarmoq xatosida 'pending' + "🔁 Qayta o'tkazish" (o'sha
+     odamga, o'sha ref bilan). Komissiyasiz, butun balans, ≥3000 DIP.
