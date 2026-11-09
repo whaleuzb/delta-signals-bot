@@ -7710,3 +7710,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `pc`, "Yopish · 100%" — `close`); ikkinchi qator: BE, Stop, TP (yoki
      TP/SL), Hajm, Limitlar ✕. PENDING signalda — kirishni o'zgartirish va
      bekor qilish. Amaldan keyin `load()` terminalni ham yangilaydi.
+297. **Terminalda birjadagidek pozitsiya kartasi** (`termInfo`, Dip Funded
+     mobil `m-card` uslubida). `/api/app/open` endi `unreal` (ochiq qism %,
+     leverajli) va `real` (qisman yopilgan qism %) ham qaytaradi. Karta:
+     Unrealized PnL (USDT) katta + ROE %; 3 ustunli to'r — Marja (alloc),
+     Pozitsiya hajmi (alloc×lev), Miqdor, Kirish/O'rtacha kirish, Mark narx,
+     Likvidatsiya (taxminiy: entry×(1∓1/lev), faqat futures), Stop, keyingi
+     TP (n/N), R:R, SL'da / keyingi TP'da natija ($ yoki %), Yopilgan qism,
+     Realized PnL, Jami natija, Ochilgan. Summa kiritilmagan bo'lsa natijalar
+     % da va izoh. Karta grafik ostida, BUY/SELL undan keyin.
