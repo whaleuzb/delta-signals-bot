@@ -7580,3 +7580,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      oxirgi 14 natija ustunlari, Statistika — WR halqasi (`mring`). Ustunlar
      kam bo'lsa chapda kulrang nuqtalar (kamida 10 joy). `loadHst` ochiq
      signallar soni o'zgarganda qayta so'raydi.
+280. **Yuqoridagi kartalar (slayder) bosiladi.** Ochiq natija → Signallar;
+     Spot depozit → guruh statistikasi (spot) `openStats(id,'spot')`; Futures
+     depozit → statistika (futures); Eng yaxshi pozitsiya → Signallar va shu
+     signal kartasiga silliq aylantirib, yorug'lik bilan belgilaydi (`goSig`).

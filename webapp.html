@@ -73,7 +73,7 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 .slider{margin:22px -14px 6px;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;
  padding:0 14px;gap:10px;scroll-padding:0 14px}
 .slider::-webkit-scrollbar{display:none}
-.slide{flex:0 0 100%;scroll-snap-align:center;border-radius:26px;padding:22px 20px 20px;min-height:178px;overflow:hidden}
+.slide{flex:0 0 100%;scroll-snap-align:center;cursor:pointer;border-radius:26px;padding:22px 20px 20px;min-height:178px;overflow:hidden}
 .slide .k{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
 .slide .v{font-size:30px;font-weight:800;letter-spacing:-.03em;margin-top:10px;line-height:1.05}
 .slide .d{color:var(--mut);margin-top:8px;font-size:12px}
@@ -396,12 +396,12 @@ function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forE
  var sl=[];
  var hs=(S.hst||{})[w.id];if(!hs||S.hstAt!=w.id+'|'+S.items.length){S.hstAt=w.id+'|'+S.items.length;loadHst(w)}hs=hs||{};
  var lv=S.items.filter(function(i){return i.live!=null}).map(function(i){return i.live});
- sl.push('<div class="slide glass acc"><div class="art">'+ic('trend',28)+'</div><div class="k"><span class="pulse"></span>'+esc(t('pnl_total'))+'</div>'
+ sl.push('<div class="slide glass acc" onclick="go(\'signals\')"><div class="art">'+ic('trend',28)+'</div><div class="k"><span class="pulse"></span>'+esc(t('pnl_total'))+'</div>'
   +'<div class="v '+(tot==null?'':tot>=0?'g':'r')+'" data-cu="'+(tot==null?'':tot)+'">'+(tot==null?'—':fm(tot))+'</div>'
   +'<div class="d">'+esc(t('open_n',{n:n}))+(busy?' · '+esc(t('busy'))+' '+f0(busy):'')+'</div>'+(lv.length?'<div class="sch">'+mbars(lv,300,46)+'</div>':'')+'</div>');
- if(w.deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('wallet',28)+'</div><div class="k">'+esc(t('spot_dep'))+'</div><div class="v" data-cu0="'+w.deposit+'">'+f0(w.deposit)+'</div><div class="d">'+(hs.spot?'<b class="'+(hs.spot.curve[hs.spot.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.spot.curve[hs.spot.curve.length-1]||0)+'</b> · '+hs.spot.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.spot.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.spot&&hs.spot.curve.length>1?'<div class="sch">'+mline(hs.spot.curve,300,52,'hsS')+'</div>':'')+'</div>');
- if(w.fut_deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('layers',28)+'</div><div class="k">'+esc(t('fut_dep'))+'</div><div class="v" data-cu0="'+w.fut_deposit+'">'+f0(w.fut_deposit)+'</div><div class="d">'+(hs.fut?'<b class="'+(hs.fut.curve[hs.fut.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.fut.curve[hs.fut.curve.length-1]||0)+'</b> · '+hs.fut.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.fut.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.fut&&hs.fut.curve.length>1?'<div class="sch">'+mline(hs.fut.curve,300,52,'hsF')+'</div>':'')+'</div>');
- if(best)sl.push('<div class="slide glass '+(best.live>=0?'acc':'')+'"><div class="art">'+ic('orbit',28)+'</div><div class="k">'+esc(t('best'))+'</div><div class="v '+(best.live>=0?'g':'r')+'">'+fpc(best.live)+'</div><div class="d">'+esc(best.symbol)+' · '+best.side+(best.lev>1?' '+best.lev+'x':'')+'</div>'+((S.spark[best.id]&&S.spark[best.id].c&&S.spark[best.id].c.length>1)?'<div class="sch">'+mline(S.spark[best.id].c.concat(best.price!=null?[best.price]:[]).map(function(x){var e=best.entry||S.spark[best.id].c[0];return(x/e-1)*100*(best.side=='LONG'?1:-1)}),300,52,'hsB')+'</div>':'')+'</div>');
+ if(w.deposit!=null)sl.push('<div class="slide glass" onclick="openStats('+w.id+',\'spot\')"><div class="art">'+ic('wallet',28)+'</div><div class="k">'+esc(t('spot_dep'))+'</div><div class="v" data-cu0="'+w.deposit+'">'+f0(w.deposit)+'</div><div class="d">'+(hs.spot?'<b class="'+(hs.spot.curve[hs.spot.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.spot.curve[hs.spot.curve.length-1]||0)+'</b> · '+hs.spot.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.spot.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.spot&&hs.spot.curve.length>1?'<div class="sch">'+mline(hs.spot.curve,300,52,'hsS')+'</div>':'')+'</div>');
+ if(w.fut_deposit!=null)sl.push('<div class="slide glass" onclick="openStats('+w.id+',\'fut\')"><div class="art">'+ic('layers',28)+'</div><div class="k">'+esc(t('fut_dep'))+'</div><div class="v" data-cu0="'+w.fut_deposit+'">'+f0(w.fut_deposit)+'</div><div class="d">'+(hs.fut?'<b class="'+(hs.fut.curve[hs.fut.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.fut.curve[hs.fut.curve.length-1]||0)+'</b> · '+hs.fut.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.fut.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.fut&&hs.fut.curve.length>1?'<div class="sch">'+mline(hs.fut.curve,300,52,'hsF')+'</div>':'')+'</div>');
+ if(best)sl.push('<div class="slide glass '+(best.live>=0?'acc':'')+'" onclick="goSig('+best.id+')"><div class="art">'+ic('orbit',28)+'</div><div class="k">'+esc(t('best'))+'</div><div class="v '+(best.live>=0?'g':'r')+'">'+fpc(best.live)+'</div><div class="d">'+esc(best.symbol)+' · '+best.side+(best.lev>1?' '+best.lev+'x':'')+'</div>'+((S.spark[best.id]&&S.spark[best.id].c&&S.spark[best.id].c.length>1)?'<div class="sch">'+mline(S.spark[best.id].c.concat(best.price!=null?[best.price]:[]).map(function(x){var e=best.entry||S.spark[best.id].c[0];return(x/e-1)*100*(best.side=='LONG'?1:-1)}),300,52,'hsB')+'</div>':'')+'</div>');
  S.nslides=sl.length;if(S.slide>=sl.length)S.slide=0;
  var dep=[];if(w.deposit!=null)dep.push(t('spot')+' '+f0(w.deposit));if(w.fut_deposit!=null)dep.push(t('fut')+' '+f0(w.fut_deposit));
  v.innerHTML='<div class="slider rise" id="slider">'+sl.join('')+'</div>'
@@ -428,6 +428,10 @@ function mring(p,z){var r=z/2-4,c=2*Math.PI*r,f=Math.max(0,Math.min(100,p))/100*
   +'<circle cx="'+z/2+'" cy="'+z/2+'" r="'+r+'" fill="none" stroke="#c2f23a" stroke-width="5" stroke-linecap="round" stroke-dasharray="'+f.toFixed(1)+' '+c.toFixed(1)+'" transform="rotate(-90 '+z/2+' '+z/2+')"/>'
   +'<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="#f5f5f7" font-size="'+Math.round(z*.24)+'" font-weight="800">'+Math.round(p)+'%</text></svg>'}
 function loadHst(w){if(!w||S.hstBusy)return;S.hstBusy=1;api('hstat',{id:w.id}).then(function(d){S.hstBusy=0;S.hst=S.hst||{};S.hst[w.id]=d;if(S.tab=='home'&&!S.page&&cur()&&cur().id==w.id){var k=S.slide;S.anim=false;render();S.slide=k}}).catch(function(){S.hstBusy=0})}
+/* 280: yuqoridagi kartalar bosiladi */
+function openStats(id,kind){openGroup(id);if(S.page)S.page.kind=kind}
+function goSig(id){S.filter='all';go('signals');setTimeout(function(){var e=document.getElementById('s'+id);if(!e)return;e.scrollIntoView({behavior:'smooth',block:'center'});
+ e.classList.add('tap');setTimeout(function(){e.classList.remove('tap')},1200)},350)}
 function bindSlider(){var s=document.getElementById('slider');if(!s)return;
  s.scrollLeft=S.slide*s.clientWidth;
  s.onscroll=function(){var k=Math.round(s.scrollLeft/Math.max(1,s.clientWidth));if(k!=S.slide){S.slide=k;tick();
