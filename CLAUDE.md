@@ -7676,3 +7676,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (150px + xavfsiz zona); menyuni yashirish `document` darajasida
      `capture` bilan istalgan aylantiruvchidan (`#page`, slayder, sheet
      bundan mustasno) va `max(scrollY, scrollingElement, body).scrollTop`.
+293. **Admin panelda "📣 Earn vazifalari"** (`adm:earn`, `/earn` ham shu
+     ko'rinish): ro'yxat (🟢/⚪️/⌛️, mukofot, necha kishi, tekshiriladimi,
+     muddat), o'chirish/yoqish (`dipt:` — panelning o'zi yangilanadi),
+     "➕ Vazifa qo'shish": turi (Kanal/Guruh/Bot/Havola, `adm:earnk:`) →
+     havola matn bilan (`AWAITING_EARN`, `handle_earn_input`: kanal/guruhda
+     `get_chat` nomi va botning adminligi — admin bo'lsa obuna tekshiriladi,
+     bo'lmasa ogohlantirish) → mukofot +5/+10/+20/+50 (`adm:earnr:`) →
+     muddat 7/30/90 kun yoki muddatsiz (`adm:earnd:`) → `db.dip_task_add`.
+     Holat `ctx.user_data["earn_new"]` da.

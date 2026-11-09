@@ -78,6 +78,8 @@ AWAITING_ALLOC: dict[int, int] = {}
 AWAITING_SIGNAL_PHOTO: dict[int, str] = {}
 # super-admin id -> True (majburiy obuna uchun kanal kutilmoqda)
 AWAITING_CHANNEL: dict[int, bool] = {}
+# 293: admin panel — Earn vazifasi qo'shish (havola kutilmoqda).
+AWAITING_EARN: dict[int, dict] = {}
 # super-admin id -> True (MarketTwits qo'shimcha #hashtag kutilmoqda)
 AWAITING_HASHTAG: dict[int, bool] = {}
 # Broadcast: admin xabar yuborishini kutamiz -> keyin tasdiqlashni
@@ -1289,10 +1291,11 @@ async def cmd_dip_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
     if not is_admin(uid):
         return
+    txt, kb = await _admin_earn_view()
+    await update.effective_message.reply_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb,
+                                              disable_web_page_preview=True)
+    return
     rows = await db.dip_tasks_all()
-    if not rows:
-        await update.effective_message.reply_text("Earn vazifalari yo'q. Arizalar ilovadan keladi.")
-        return
     lines, kb = [], []
     for r in rows:
         mark = "🟢" if r["active"] else "⚪️"
@@ -1317,11 +1320,11 @@ async def on_dip_task_toggle(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
     _, act, tid = q.data.split(":")
     await db.dip_task_set_active(int(tid), act == "on")
     await q.answer("OK")
+    txt, kb = await _admin_earn_view()
     try:
-        await q.message.delete()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
     except Exception:
         pass
-    await cmd_dip_tasks(update, ctx)
 
 
 async def _app_exec(ctx, a) -> tuple[bool, str]:
@@ -4462,6 +4465,11 @@ async def on_text_signal(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
 
     if AWAITING_HASHTAG.pop(uid, None) and is_admin(uid):
         await handle_hashtag_add(update, ctx)
+        return
+
+    st_earn = AWAITING_EARN.pop(uid, None)
+    if st_earn and is_admin(uid):
+        await handle_earn_input(update, ctx, st_earn)
         return
 
     if AWAITING_BROADCAST.pop(uid, None) and is_admin(uid):
@@ -7937,7 +7945,8 @@ def admin_home_kb(lang: str | None = None) -> InlineKeyboardMarkup:
          InlineKeyboardButton(i18n.t("adm.btn_broadcast", lang), callback_data="adm:bc")],
         [InlineKeyboardButton(i18n.t("adm.btn_pdf_groups", lang), callback_data="adm:pdfg"),
          InlineKeyboardButton(i18n.t("adm.btn_pdf_channels", lang), callback_data="adm:pdfc")],
-        [InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu")],
+        [InlineKeyboardButton(i18n.t("adm.btn_pdf_users", lang), callback_data="adm:pdfu"),
+         InlineKeyboardButton("📣 Earn vazifalari", callback_data="adm:earn")],
     ])
 
 
@@ -8218,6 +8227,60 @@ async def handle_hashtag_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> 
                          parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
+async def _admin_earn_view() -> tuple[str, InlineKeyboardMarkup]:
+    """293: admin panel — DIP Earn vazifalari: ro'yxat, o'chirish/yoqish, qo'shish."""
+    rows = await db.dip_tasks_all()
+    now = datetime.now(timezone.utc)
+    lines = ["<b>📣 DIP Earn vazifalari</b>", ""]
+    kb = []
+    if not rows:
+        lines.append("Hozircha vazifa yo'q.")
+    for r in rows:
+        exp = r["expires_at"]
+        mark = "⌛️" if (exp is not None and exp <= now) else ("🟢" if r["active"] else "⚪️")
+        till = f" · {exp.astimezone(stats.TZ):%d.%m.%Y} gacha" if exp is not None else " · muddatsiz"
+        chk = "tekshiriladi" if r["chat_id"] else "tekshirilmaydi"
+        lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · "
+                     f"{r['n']} kishi · {chk}{till}")
+        kb.append([InlineKeyboardButton(("⏸ O'chirish #" if r["active"] else "▶️ Yoqish #") + str(r["id"]),
+                                        callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}")])
+    kb.append([InlineKeyboardButton("➕ Vazifa qo'shish", callback_data="adm:earnadd",
+                                    api_kwargs={"style": "success"})])
+    kb.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="adm:home")])
+    return "\n".join(lines), InlineKeyboardMarkup(kb)
+
+
+async def handle_earn_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE, st: dict) -> None:
+    """293: admin havolani yubordi — kanal/guruh bo'lsa nomi va botning adminligi aniqlanadi."""
+    uid = update.effective_user.id
+    raw = (update.effective_message.text or "").strip()
+    shown, url = _place_target(raw)
+    if not url:
+        AWAITING_EARN[uid] = st
+        await update.effective_message.reply_text("Havolani @username yoki t.me/... ko'rinishida yuboring.")
+        return
+    title, chat_id, note = shown, None, ""
+    if st["kind"] in ("channel", "group") and shown.startswith("@"):
+        try:
+            ch = await ctx.bot.get_chat(shown)
+            title = ch.title or shown
+            me = await ctx.bot.get_chat_member(ch.id, ctx.bot.id)
+            if me.status in ("administrator", "creator"):
+                chat_id = ch.id
+                note = "✅ Bot u yerda admin — obuna tekshiriladi."
+            else:
+                note = "⚠️ Bot u yerda admin emas — obuna TEKSHIRILMAYDI. Avval botni admin qiling."
+        except Exception as e:
+            note = f"⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
+    st.update(title=title, url=url, chat_id=chat_id)
+    ctx.user_data["earn_new"] = st
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(f"+{n} DIP", callback_data=f"adm:earnr:{n}") for n in (5, 10, 20, 50)],
+                               [InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]])
+    await update.effective_message.reply_text(
+        f"<b>{html.escape(title)}</b>\n{html.escape(url)}\n{note}\n\nMukofotni tanlang:",
+        parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
+
+
 async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     if not is_admin(q.from_user.id):
@@ -8231,6 +8294,48 @@ async def on_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == "home":
         await q.edit_message_text(i18n.t("adm.home", lang), parse_mode=ParseMode.HTML,
                                    reply_markup=admin_home_kb(lang))
+    elif action == "earn":
+        AWAITING_EARN.pop(q.from_user.id, None)
+        txt, kb = await _admin_earn_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
+    elif action == "earnadd":
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📢 Kanal", callback_data="adm:earnk:channel"),
+             InlineKeyboardButton("👥 Guruh", callback_data="adm:earnk:group")],
+            [InlineKeyboardButton("🤖 Bot", callback_data="adm:earnk:bot"),
+             InlineKeyboardButton("🔗 Havola", callback_data="adm:earnk:link")],
+            [InlineKeyboardButton("⬅️ Orqaga", callback_data="adm:earn")]])
+        await q.edit_message_text("<b>➕ Yangi Earn vazifasi</b>\n\nTurini tanlang:", parse_mode=ParseMode.HTML,
+                                  reply_markup=kb)
+    elif action.startswith("earnk:"):
+        kind = action.split(":", 1)[1]
+        AWAITING_EARN[q.from_user.id] = {"kind": kind}
+        hint = ("Kanal/guruh: @username yoki t.me/... yuboring.\nObuna tekshirilishi uchun botni u yerda admin qiling."
+                if kind in ("channel", "group") else "Havolani yuboring (t.me/... yoki https://...).")
+        await q.edit_message_text(f"<b>➕ Yangi Earn vazifasi</b>\n\n{hint}", parse_mode=ParseMode.HTML,
+                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]]))
+    elif action.startswith("earnr:"):
+        st = ctx.user_data.get("earn_new")
+        if not st:
+            txt, kb = await _admin_earn_view()
+            await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb)
+            return
+        st["reward"] = float(action.split(":", 1)[1])
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("7 kun", callback_data="adm:earnd:7"),
+                                    InlineKeyboardButton("30 kun", callback_data="adm:earnd:30"),
+                                    InlineKeyboardButton("90 kun", callback_data="adm:earnd:90")],
+                                   [InlineKeyboardButton("♾ Muddatsiz", callback_data="adm:earnd:0")],
+                                   [InlineKeyboardButton("❌ Bekor", callback_data="adm:earn")]])
+        await q.edit_message_text(f"<b>{html.escape(st['title'])}</b> — +{st['reward']:g} DIP\n\nMuddatni tanlang:",
+                                  parse_mode=ParseMode.HTML, reply_markup=kb)
+    elif action.startswith("earnd:"):
+        st = ctx.user_data.pop("earn_new", None)
+        if st and st.get("reward"):
+            days = int(action.split(":", 1)[1]) or None
+            tid = await db.dip_task_add(st["kind"], st["title"], st["url"], st.get("chat_id"), st["reward"], None, days)
+            log.info("Admin Earn vazifasi qo'shdi: #%s %s", tid, st["title"])
+        txt, kb = await _admin_earn_view()
+        await q.edit_message_text(txt, parse_mode=ParseMode.HTML, reply_markup=kb, disable_web_page_preview=True)
     elif action == "stats":
         await q.edit_message_text(await _admin_stats_text(lang),
                                    parse_mode=ParseMode.HTML, reply_markup=back)
