@@ -264,6 +264,7 @@ async def api_period(request):
              "m": day0.replace(day=1), "y": day0.replace(month=1, day=1)}.get(p)
     with db.stats_kind(kind):
         r = await db.period_stats(ws["id"], since)
+        syms = await db.top_symbols(ws["id"], since, None, limit=50)
     total = r["total"] or 0
     return web.json_response({
         "n": total, "wins": r["wins"] or 0, "losses": r["losses"] or 0, "be": r["be"] or 0,
@@ -272,6 +273,8 @@ async def api_period(request):
         "liqs": r["liqs"] or 0,
         "money": float(r["real_pnl_money"]) if r["real_pnl_money"] is not None else None,
         "wr": (r["wins"] / total * 100) if total else 0,
+        "syms": [{"s": x["symbol"], "n": x["closed"], "w": x["wins"], "sum": float(x["sum_pct"])}
+                 for x in syms],
     }, headers=NO_CACHE)
 
 
@@ -396,7 +399,11 @@ async def api_group(request):
             months = await db.monthly_breakdown(ws["id"], limit=12)
         dep = ws["fut_deposit"] if kind == "fut" else ws["deposit"]
         liqs = next((v for k, v, c in n["tiles"][4:]), None)
+        with db.stats_kind(kind):
+            syms = await db.top_symbols(ws["id"], limit=50)
         out[kind] = {
+            "syms": [{"s": x["symbol"], "n": x["closed"], "w": x["wins"], "sum": float(x["sum_pct"])}
+                     for x in syms],
             "n": n["total"], "wr": round(n["winrate"], 1), "avg_r": round(n["avg_r"], 2),
             "liqs": liqs,
             "net": round(n["net"], 2),
@@ -606,6 +613,7 @@ T = {
         "ref_need": "Yana {n} ta odam taklif qilsangiz, o'z kodingizni tanlay olasiz",
         "ref_new": "Yangi kod ({mn}–{mx} belgi)", "ref_share_txt": "Trade Controller — signallar natijasini kuzatish boti",
         "man_fill": "Juftlik, stop va TP ni to'ldiring",
+        "pairs": "Juftliklar",
         "home": "Bosh", "signals": "Signallar", "profile": "Profil",
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
@@ -666,6 +674,7 @@ T = {
         "ref_need": "Пригласите ещё {n} — и сможете выбрать свой код",
         "ref_new": "Новый код ({mn}–{mx} символов)", "ref_share_txt": "Trade Controller — бот для учёта результатов сигналов",
         "man_fill": "Заполните пару, стоп и TP",
+        "pairs": "Пары",
         "home": "Главная", "signals": "Сигналы", "profile": "Профиль",
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
@@ -726,6 +735,7 @@ T = {
         "ref_need": "Invite {n} more to pick your own code",
         "ref_new": "New code ({mn}–{mx} chars)", "ref_share_txt": "Trade Controller — signal results tracking bot",
         "man_fill": "Fill in pair, stop and TP",
+        "pairs": "Pairs",
         "home": "Home", "signals": "Signals", "profile": "Profile",
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",

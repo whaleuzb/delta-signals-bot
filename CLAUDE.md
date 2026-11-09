@@ -7430,3 +7430,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      `tg.shareMessage(id)` bilan Telegram chat tanlash oynasini ochadi.
      Bot API 8.0'dan eski ilovada yoki xatoda — oddiy `t.me/share/url`.
      Rasm o'zgarsa `?v=` raqamini oshiring (Telegram keshlaydi).
+260. **Juftliklar — Statistika ichida alohida bo'lim.** Ilovada: guruh/
+     statistika sahifasida "Juftliklar · N" (juftlik, signal soni, foyda/zarar,
+     WR, jami %, nisbiy chiziq; 1–3 o'rin yashil). Egada tanlangan davr va
+     Spot/Futures bo'yicha (`/api/app/period` → `syms`, `db.top_symbols`),
+     ochiq sahifada butun davr (`/api/app/group` → `<kind>.syms`). Botda
+     "📉 Juftliklar" Sozlamalardan Statistika ekraniga (PDF yonida) ko'chdi.

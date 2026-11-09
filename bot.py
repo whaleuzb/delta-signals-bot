@@ -1453,8 +1453,6 @@ def settings_kb(uid: int, ws, lang: str | None = None) -> InlineKeyboardMarkup:
                                               callback_data="m:membersig")])
         # /top reytingi va qo'shilish havolasi (182/183).
         rows.append(top_menu_row(ws, lang))
-    # Juftliklar statistikasi.
-    rows.append([InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols")])
     rows.append([InlineKeyboardButton(i18n.t("menu.lang", lang), callback_data="lang:menu")])
     if can_manage(uid, ws) and ws["type"] == "group":
         # Guruh/kanalni botdan uzish (202) — tasdiq ekrani bilan.
@@ -3033,7 +3031,9 @@ def stats_nav_kb(mode: str, y: int | None = None, m: int | None = None,
     rows.append([
         InlineKeyboardButton(("• " if kind == "spot" else "") + "📊 Spot", callback_data="stk:spot"),
         InlineKeyboardButton(("• " if kind == "fut" else "") + "⚡ Futures", callback_data="stk:fut")])
-    rows.append([InlineKeyboardButton(i18n.t("st.btn_pdf", lang), callback_data="pdfrep")])
+    # 260: Juftliklar — Statistika ichida (Sozlamalardan ko'chdi).
+    rows.append([InlineKeyboardButton(i18n.t("menu.symbols", lang), callback_data="m:symbols"),
+                 InlineKeyboardButton(i18n.t("st.btn_pdf", lang), callback_data="pdfrep")])
     rows.append(back_row(lang))
     return InlineKeyboardMarkup(rows)
 
