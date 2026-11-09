@@ -7552,3 +7552,10 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      shisha, avvalgi tumanliklar). 274 palitrasidan faqat ranglar urg'u
      sifatida qoldi: Acid Lime `--g` (#c2f23a), Cloud Grey — ikkinchi darajali
      matn (`--mut`/`--faint`). 2x shaffoflik va bosilganda shisha effekti qoldi.
+276. **Apple uslubidagi tiniq shisha + donadorlik.** `.glass`: 0.5px hoshiya,
+     yuqorida yorqin "specular" chiziq (inset 0 1px rgba(255,255,255,.30)),
+     ichki ingichka hoshiya, pastki qorong'i chet, ikki qavat soya. Donadorlik
+     `--glass` ning ichida (matn OSTIDA — `::after` ga qo'yilsa matn ustiga
+     tushadi): ikki statik SVG feTurbulence qatlami (oq va qora mayda don,
+     baseFrequency 1.45/1.25, past alfa). Fon `.grain` .10 → .14. Matn:
+     `text-rendering:optimizeLegibility`, grayscale smoothing. Hammasi statik.
