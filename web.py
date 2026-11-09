@@ -436,7 +436,7 @@ def build_app() -> web.Application:
     app["mini_sem"] = asyncio.Semaphore(2)
     app.add_routes([
         # 252: eski HTML sahifalar o'chirildi — hammasi yagona Mini App'da.
-        web.get("/", _to_app("tab=top")),
+        web.get("/", _to_app("")),   # 273: Telegram ichida — Bosh; brauzerda baribir Top
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", _to_group),
         web.get(r"/g/{wid:\d+}/", _to_group),

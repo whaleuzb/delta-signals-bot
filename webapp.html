@@ -788,6 +788,13 @@ size();
  draw();addEventListener('resize',function(){size();draw()})})();
 
 addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide()}catch(e){}});
+/* 273: yangi versiya chiqqan bo'lsa — qaytib kelganda o'zini yangilaydi (joyi saqlanadi, 267) */
+var VER='__VER__',verAt=0;
+function checkVer(){var n=Date.now();if(n-verAt<15000)return;verAt=n;
+ fetch('/api/app/ver',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){if(d&&d.v&&d.v!=VER){var l=0;try{l=+sessionStorage.getItem('tc_vr')||0}catch(e){}if(n-l<120000)return;try{sessionStorage.setItem('tc_vr',n);saveNav()}catch(e){}location.reload()}}).catch(function(){})}
+document.addEventListener('visibilitychange',function(){if(!document.hidden)checkVer()});
+try{tg&&tg.onEvent&&tg.onEvent('activated',checkVer)}catch(e){}
+setInterval(function(){if(!document.hidden)checkVer()},300000);
 (function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
  tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}

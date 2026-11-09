@@ -567,9 +567,14 @@ async def app_page(request):
                         content_type="text/html", headers=NO_CACHE)
 
 
+async def api_ver(request):
+    return web.json_response({"v": PAGE_VER}, headers=NO_CACHE)
+
+
 def routes() -> list:
     return [
         web.get("/app", app_page),
+        web.get("/api/app/ver", api_ver),
         web.get("/invite.jpg", invite_jpg),
         web.post("/api/app/me", api_me),
         web.post("/api/app/open", api_open),
@@ -779,3 +784,8 @@ T = {
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp.html"),
           encoding="utf-8") as _fh:
     PAGE = _fh.read().replace("__T__", json.dumps(T, ensure_ascii=False))
+# 273: sahifa versiyasi — Telegram yig'ib qo'ygan (minimize) eski oynani
+# qaytarganda ilova yangi versiya chiqqanini bilib, o'zini qayta yuklaydi.
+import hashlib as _hl
+PAGE_VER = _hl.sha1(PAGE.encode()).hexdigest()[:12]
+PAGE = PAGE.replace("__VER__", PAGE_VER)

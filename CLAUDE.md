@@ -7530,3 +7530,13 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      (min-width:640px)`: body max-width 480px o'rtada; `.page`, `.sheet`,
      `.toast` ham shu kenglikka moslanadi (nav allaqachon min(92vw,420px)).
      Telegram Desktop oynasining o'lchamini ilova boshqara olmaydi.
+273. **"OCHISH" (chatlar ro'yxatidagi Mini App tugmasi) eski versiyani ochardi.**
+     Sabab: Telegram (ayniqsa iOS) ilovani yopmasdan yig'ib qo'yadi
+     (minimize) va qayta bosilganda o'sha eski yuklangan oynani qaytaradi.
+     Yechim: `webapp.PAGE_VER` (webapp.html sha1, `__VER__`), `GET
+     /api/app/ver`; ilova `visibilitychange`, Telegram `activated` hodisasi va
+     har 5 daqiqada tekshiradi — versiya boshqa bo'lsa `saveNav()` +
+     `location.reload()` (joyi saqlanadi, 267). Himoya: 2 daqiqada ko'pi bilan
+     bir marta (`sessionStorage.tc_vr`). Shuningdek `/` endi `/app` ga
+     (avval `/app?tab=top`) — BotFather'dagi asosiy ilova havolasi `/` bo'lsa
+     Telegram ichida Bosh ochiladi; brauzerda (ochiq rejim) baribir Top.
