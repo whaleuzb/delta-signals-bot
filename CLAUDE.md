@@ -7605,3 +7605,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      botning adminligi tekshirilib vazifa qo'shiladi (`dip_tasks`), arizachiga
      xabar. Admin: `/earn` — vazifalar ro'yxati, o'chirish/yoqish (`dipt:`).
      To'lovni (99 USDT) admin qo'lda oladi.
+283. **Guruh sahifasi: equity boshida, juftliklar faqat o'z statistikasida.**
+     `pageRender`: equity grafigi Spot/Futures tugmalaridan keyin birinchi
+     turadi (ochiq va o'z sahifasida). Ochiq (reyting orqali ochilgan) sahifada
+     juftliklar yo'q — `api_group` `syms` ni faqat egasiga beradi. O'z
+     statistikasida (`perHtml`) "Juftliklar · N" tugmasi — bosilsa ro'yxat
+     ochiladi/yopiladi (`togPairs`, `g.showPairs`).

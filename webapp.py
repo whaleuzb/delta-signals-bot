@@ -472,8 +472,9 @@ async def api_group(request):
         with db.stats_kind(kind):
             syms = await db.top_symbols(ws["id"], limit=50)
         out[kind] = {
+            # 283: juftliklar ochiq sahifada ko'rsatilmaydi — faqat egasiga.
             "syms": [{"s": x["symbol"], "n": x["closed"], "w": x["wins"], "sum": float(x["sum_pct"])}
-                     for x in syms],
+                     for x in syms] if out["mine"] else [],
             "n": n["total"], "wr": round(n["winrate"], 1), "avg_r": round(n["avg_r"], 2),
             "liqs": liqs,
             "net": round(n["net"], 2),

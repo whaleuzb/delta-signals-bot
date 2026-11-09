@@ -565,12 +565,12 @@ function pageRender(anim){var p=document.getElementById('page');var g=S.page;if(
  if(d.join)h+='<button class="btn p full rise" style="width:100%;padding:12px;font-size:14px;margin-bottom:12px" onclick="openLink(\''+esc(d.join)+'\')">'+ic('link',15)+' '+esc(d.channel?t('subscribe'):t('join'))+'</button>';
  else if(d.mine&&!d.personal)h+='<button class="btn full rise" style="width:100%;padding:12px;font-size:13px;margin-bottom:12px;border-style:dashed" onclick="toBot()">'+ic('link',15)+' '+esc(t('join_setup'))+'</button>';
  if(d.fut)h+=seg('gseg',[['spot','Spot'],['fut','Futures']],k,'setKind');
+ /* 283: equity — sahifa boshida; juftliklar ochiq sahifada yo'q, faqat o'z statistikasida tugma ichida */
+ if(K&&K.curve.length>1)h+='<div class="eq glass rise"><div class="rs" style="margin-bottom:8px;display:flex;justify-content:space-between"><span>'+esc(t('equity'))+'</span><b class="'+(K.net>=0?'g':'r')+'">'+fpc(K.net)+'</b></div>'+curve(K.curve)+'</div>';
  if(d.mine){var pp=g.per||'m';h+='<div class="chips rise">'+[['d','p_d'],['w','p_w'],['m','p_m'],['y','p_y'],['all','p_all']].map(function(c){return'<span class="chip glass'+(c[0]==pp?' on':'')+'" onclick="setPer(\''+c[0]+'\')">'+esc(t(c[1]))+'</span>'}).join('')+'</div><div id="perbox">'+perHtml()+'</div>'}
  if(K){var tl=[[t('s_net'),fpc(K.net),K.net>0?'g':K.net<0?'r':''],[t('s_sig'),String(K.n),''],[t('s_wr'),K.wr.toFixed(1)+'%',''],[t('s_r'),(K.avg_r>=0?'+':'')+K.avg_r.toFixed(2),K.avg_r>0?'g':K.avg_r<0?'r':'']];
   if(K.liqs)tl.push([t('s_liq'),K.liqs,'r']);
   if(!d.mine)h+='<div class="tiles">'+tl.map(function(x,j){return'<div class="tile2 glass rise'+(j==0?' acc':'')+'"><div class="k">'+esc(x[0])+'</div><div class="v '+x[2]+'">'+esc(x[1])+'</div></div>'}).join('')+'</div>';
-  if(K.curve.length>1)h+='<div class="eq glass rise"><div class="rs" style="margin-bottom:8px;display:flex;justify-content:space-between"><span>'+esc(t('equity'))+'</span><b class="'+(K.net>=0?'g':'r')+'">'+fpc(K.net)+'</b></div>'+curve(K.curve)+'</div>';
-  if(!d.mine&&K.syms)h+=pairsHtml(K.syms);
   if(K.months.length){var mx=Math.max.apply(null,K.months.map(function(m){return Math.abs(m.sum)}))||1;
    h+='<div class="sect rise">'+esc(t('months'))+'</div><div class="mgrid">'+K.months.map(function(m){var a=(.10+.34*Math.min(1,Math.abs(m.sum)/mx)).toFixed(2),pos=m.sum>=0;
     return'<div class="mtile glass rise" style="background:radial-gradient(120% 100% at 50% 100%,rgba('+(pos?'194,242,58':'255,92,92')+','+a+'),transparent 70%),var(--glass)"><div class="mm">'+(MON[S.lang]||MON.uz)[m.m-1]+' '+String(m.y).slice(2)+'</div><div class="mv '+(pos?'g':'r')+'">'+(m.sum>=0?'+':'')+(Math.abs(m.sum)>=100?m.sum.toFixed(0):m.sum.toFixed(1))+'%</div><div class="ms">'+m.n+' · '+m.wr+'%</div></div>'}).join('')+'</div>'}}
@@ -595,8 +595,8 @@ function loadTspark(){var els=[].slice.call(document.querySelectorAll('#page .ts
  (function batch(k){var part=ids.slice(k,k+15);if(!part.length)return;api('tspark',{ids:part}).then(function(d){for(var i in d)S.ts[i]=d[i];
   part.forEach(function(i){var e=document.querySelector('#page .tsp[data-tid="'+i+'"]');if(e){if(S.ts[i])e.innerHTML=tsparkSvg(i,+e.getAttribute('data-p'));else e.remove()}});batch(k+15)}).catch(function(){})})(0)}
 /* 260: juftliklar bo'limi */
-function pairsHtml(L){if(!L||!L.length)return'';var mx=Math.max.apply(null,L.map(function(x){return Math.abs(x.sum)}))||1;
- return'<div class="sect rise">'+esc(t('pairs'))+' · '+L.length+'</div>'+L.map(function(x,k){var pos=x.sum>=0,wr=x.n?Math.round(x.w/x.n*100):0;
+function pairsHtml(L,nh){if(!L||!L.length)return'';var mx=Math.max.apply(null,L.map(function(x){return Math.abs(x.sum)}))||1;
+ return(nh?'':'<div class="sect rise">'+esc(t('pairs'))+' · '+L.length+'</div>')+L.map(function(x,k){var pos=x.sum>=0,wr=x.n?Math.round(x.w/x.n*100):0;
   return'<div class="row glass rise" style="cursor:default;padding:9px 13px;flex-wrap:wrap"><span class="rk'+(k<3?' t3':'')+'">'+(k+1)+'</span><div class="rm"><div class="rn" style="font-size:13px">'+esc(x.s)+'</div><div class="rs">'+x.n+' '+esc(t('sig_w'))+' · '+x.w+'/'+(x.n-x.w)+' · '+wr+'% WR</div></div><div class="rv '+(pos?'g':'r')+'" style="font-size:14px">'+fpc(x.sum)+'</div>'
   +'<div class="bar" style="flex-basis:100%;margin:8px 0 0"><i style="left:0;width:'+(Math.abs(x.sum)/mx*100).toFixed(1)+'%;background:'+(pos?'var(--g)':'var(--r)')+'"></i></div></div>'}).join('')}
 function setKind(k){S.page.kind=k;S.page.mon=null;S.page.pd=null;tick();pageRender(true);loadPer()}
@@ -605,7 +605,9 @@ function perHtml(){var g=S.page,p=g&&g.pd;if(!p)return'<div class="tiles"><div c
  var c=function(v){return v>0?'g':v<0?'r':''};var tl=[[t('s_net'),fpc(p.sum),c(p.sum)]];
  if(p.money!=null)tl.push([t('money'),fm(p.money),c(p.money)]);tl.push([t('s_sig'),String(p.n),''],[t('s_wr'),p.wr.toFixed(1)+'%',''],[t('wl'),p.wins+' / '+p.losses,''],[t('avg_wl'),'<span class="g">'+fpc(p.avg_win)+'</span> / <span class="r">'+fpc(p.avg_loss)+'</span>','']);
  if(p.liqs)tl.push([t('s_liq'),String(p.liqs),'r']);
- return'<div class="tiles">'+tl.map(function(x,j){return'<div class="tile2 glass'+(j==0?' acc':'')+'"><div class="k">'+esc(x[0])+'</div><div class="v '+x[2]+'" style="'+(j>3?'font-size:15px':'')+'">'+x[1]+'</div></div>'}).join('')+'</div>'+pairsHtml(p.syms)}
+ var ps=p.syms||[];return'<div class="tiles">'+tl.map(function(x,j){return'<div class="tile2 glass'+(j==0?' acc':'')+'"><div class="k">'+esc(x[0])+'</div><div class="v '+x[2]+'" style="'+(j>3?'font-size:15px':'')+'">'+x[1]+'</div></div>'}).join('')+'</div>'
+ +(ps.length?'<button class="btn full" style="width:100%;padding:12px;font-size:13px;margin:2px 0 10px;display:flex;align-items:center;justify-content:center;gap:6px" onclick="togPairs()">'+ic('bars',15)+' '+esc(t('pairs'))+' · '+ps.length+' <span style="opacity:.6">'+(g.showPairs?'▴':'▾')+'</span></button>'+(g.showPairs?pairsHtml(ps,1):''):'')}
+function togPairs(){var g=S.page;if(!g)return;g.showPairs=!g.showPairs;tick();var b=document.getElementById('perbox');if(b)b.innerHTML=perHtml()}
 function loadPer(){var g=S.page;if(!g||!g.data||!g.data.mine)return;var per=g.per||'m',kind=g.data[g.kind]?g.kind:'spot';
  api('period',{id:g.id,p:per,kind:kind}).then(function(d){if(S.page!==g||(g.per||'m')!=per)return;g.pd=d;var b=document.getElementById('perbox');if(b)b.innerHTML=perHtml()}).catch(function(){})}
 function setPer(p){S.page.per=p;S.page.pd=null;tick();var b=document.getElementById('perbox');if(b)b.innerHTML=perHtml();
