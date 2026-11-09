@@ -7654,3 +7654,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      *Menyu:* pastga aylantirganda `.nav.hid` (tanga bilan birga yashirinadi),
      yuqoriga — qaytadi; sahifa oxirida yashirin. iPhone'da oxirgi karta
      (Dip Funded) menyu ostida qolardi (288 yetmadi).
+290. **Terminal grafigi suriladi va kattalashadi; narx chetga yopishmaydi.**
+     Ko'rinish oynasi `termWin(g)`: `g.vn` (ko'rinadigan shamlar, 15…n+30%,
+     boshida ≤80), `g.off` (o'ngdan siljish; boshida −18% — o'ngda bo'sh
+     joy). Chiziqdan tashqarida barmoq bilan gorizontal surish — tarix
+     (`g.pan`), ikki barmoq — pinch zoom (`g.pinch`), kompyuterda g'ildirak,
+     ikki marta bosish — boshlang'ich holat. Narx shkalasi faqat ko'rinadigan
+     shamlar + chiziqlar bo'yicha. Shamlar `clipPath` ichida, o'q yozuvlari va
+     chiziqlar ustida. Surishda faqat SVG ichi qayta chiziladi (`termRedraw`).
