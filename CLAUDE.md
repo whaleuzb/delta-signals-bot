@@ -7571,3 +7571,12 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      o'chirildi; fon `.grain` yana .10. Tiniq chetlar (276) va frosted blur
      (277) qoldi. DIP karta ichidagi fon donadorligi (262) qoldi — u shisha
      emas, shisha ortidagi fon.
+279. **Bosh sahifa kartalarida kichik grafiklar.** `POST /api/app/hstat`
+     (egasi): spot/futures uchun `curve` (oxirgi 60, `_curve`), `last`
+     (oxirgi 14 natija %), `n`, `wr`. Slayderlar: Ochiq natija — har ochiq
+     signal jonli % ustuni (`mbars`); Spot/Futures depozit — natija egri
+     chizig'i (`mline`) + "net % · N signal · WR"; Eng yaxshi pozitsiya — narx
+     yo'li kirishga nisbatan %. Kartalar: Ochiq signallar — ustunlar, Depozit —
+     oxirgi 14 natija ustunlari, Statistika — WR halqasi (`mring`). Ustunlar
+     kam bo'lsa chapda kulrang nuqtalar (kamida 10 joy). `loadHst` ochiq
+     signallar soni o'zgarganda qayta so'raydi.

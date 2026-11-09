@@ -78,6 +78,10 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 .slide .v{font-size:30px;font-weight:800;letter-spacing:-.03em;margin-top:10px;line-height:1.05}
 .slide .d{color:var(--mut);margin-top:8px;font-size:12px}
 .slide .art{position:absolute;right:16px;top:16px;color:var(--faint)}
+.sch{position:absolute;left:0;right:0;bottom:0;height:52px;pointer-events:none;opacity:.95}
+.sch svg,.cch svg{width:100%;height:100%;display:block;overflow:visible}
+.slide:has(.sch){padding-bottom:62px}
+.cch{height:40px;margin-top:12px;pointer-events:none}
 .slide.acc .art{color:var(--g);opacity:.8}
 .dots{display:flex;justify-content:center;gap:6px;margin:10px 0 16px}
 .dots i{width:6px;height:6px;border-radius:6px;background:rgba(255,255,255,.22);transition:all .35s var(--ease)}
@@ -390,22 +394,40 @@ function render(){nav();pill();var v=document.getElementById('view');var w=cur()
 function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forEach(function(i){if(i.alloc)busy+=i.alloc});
  var best=null;S.items.forEach(function(i){if(i.live!=null&&(!best||i.live>best.live))best=i});
  var sl=[];
+ var hs=(S.hst||{})[w.id];if(!hs||S.hstAt!=w.id+'|'+S.items.length){S.hstAt=w.id+'|'+S.items.length;loadHst(w)}hs=hs||{};
+ var lv=S.items.filter(function(i){return i.live!=null}).map(function(i){return i.live});
  sl.push('<div class="slide glass acc"><div class="art">'+ic('trend',28)+'</div><div class="k"><span class="pulse"></span>'+esc(t('pnl_total'))+'</div>'
   +'<div class="v '+(tot==null?'':tot>=0?'g':'r')+'" data-cu="'+(tot==null?'':tot)+'">'+(tot==null?'—':fm(tot))+'</div>'
-  +'<div class="d">'+esc(t('open_n',{n:n}))+(busy?' · '+esc(t('busy'))+' '+f0(busy):'')+'</div></div>');
- if(w.deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('wallet',28)+'</div><div class="k">'+esc(t('spot_dep'))+'</div><div class="v" data-cu0="'+w.deposit+'">'+f0(w.deposit)+'</div><div class="d">'+esc(wsName(w))+'</div></div>');
- if(w.fut_deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('layers',28)+'</div><div class="k">'+esc(t('fut_dep'))+'</div><div class="v" data-cu0="'+w.fut_deposit+'">'+f0(w.fut_deposit)+'</div><div class="d">'+esc(wsName(w))+'</div></div>');
- if(best)sl.push('<div class="slide glass '+(best.live>=0?'acc':'')+'"><div class="art">'+ic('orbit',28)+'</div><div class="k">'+esc(t('best'))+'</div><div class="v '+(best.live>=0?'g':'r')+'">'+fpc(best.live)+'</div><div class="d">'+esc(best.symbol)+' · '+best.side+(best.lev>1?' '+best.lev+'x':'')+'</div></div>');
+  +'<div class="d">'+esc(t('open_n',{n:n}))+(busy?' · '+esc(t('busy'))+' '+f0(busy):'')+'</div>'+(lv.length?'<div class="sch">'+mbars(lv,300,46)+'</div>':'')+'</div>');
+ if(w.deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('wallet',28)+'</div><div class="k">'+esc(t('spot_dep'))+'</div><div class="v" data-cu0="'+w.deposit+'">'+f0(w.deposit)+'</div><div class="d">'+(hs.spot?'<b class="'+(hs.spot.curve[hs.spot.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.spot.curve[hs.spot.curve.length-1]||0)+'</b> · '+hs.spot.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.spot.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.spot&&hs.spot.curve.length>1?'<div class="sch">'+mline(hs.spot.curve,300,52,'hsS')+'</div>':'')+'</div>');
+ if(w.fut_deposit!=null)sl.push('<div class="slide glass"><div class="art">'+ic('layers',28)+'</div><div class="k">'+esc(t('fut_dep'))+'</div><div class="v" data-cu0="'+w.fut_deposit+'">'+f0(w.fut_deposit)+'</div><div class="d">'+(hs.fut?'<b class="'+(hs.fut.curve[hs.fut.curve.length-1]>=0?'g':'r')+'">'+fpc(hs.fut.curve[hs.fut.curve.length-1]||0)+'</b> · '+hs.fut.n+' '+esc(t('sig_w'))+' · '+Math.round(hs.fut.wr)+'% WR':esc(wsName(w)))+'</div>'+(hs.fut&&hs.fut.curve.length>1?'<div class="sch">'+mline(hs.fut.curve,300,52,'hsF')+'</div>':'')+'</div>');
+ if(best)sl.push('<div class="slide glass '+(best.live>=0?'acc':'')+'"><div class="art">'+ic('orbit',28)+'</div><div class="k">'+esc(t('best'))+'</div><div class="v '+(best.live>=0?'g':'r')+'">'+fpc(best.live)+'</div><div class="d">'+esc(best.symbol)+' · '+best.side+(best.lev>1?' '+best.lev+'x':'')+'</div>'+((S.spark[best.id]&&S.spark[best.id].c&&S.spark[best.id].c.length>1)?'<div class="sch">'+mline(S.spark[best.id].c.concat(best.price!=null?[best.price]:[]).map(function(x){var e=best.entry||S.spark[best.id].c[0];return(x/e-1)*100*(best.side=='LONG'?1:-1)}),300,52,'hsB')+'</div>':'')+'</div>');
  S.nslides=sl.length;if(S.slide>=sl.length)S.slide=0;
  var dep=[];if(w.deposit!=null)dep.push(t('spot')+' '+f0(w.deposit));if(w.fut_deposit!=null)dep.push(t('fut')+' '+f0(w.fut_deposit));
  v.innerHTML='<div class="slider rise" id="slider">'+sl.join('')+'</div>'
  +'<div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>'
  +'<button class="btn p full rise" style="width:100%;padding:14px;font-size:15px;margin-bottom:10px" onclick="newSig()">'+ic('plus',16)+' '+esc(t('ns_btn'))+'</button>'
- +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('open'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('open_n',{n:n}))+'</div><div class="deco">'+ic('trend',50)+'</div></div>'
- +'<div class="card glass rise" onclick="depSheet()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div><div class="deco">'+ic('wallet',50)+'</div></div>'
- +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div><div class="deco">'+ic('bars',36)+'</div></div>'
+ +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('open'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('open_n',{n:n}))+'</div>'+(lv.length?'<div class="cch">'+mbars(lv,300,40)+'</div>':'<div class="deco">'+ic('trend',50)+'</div>')+'</div>'
+ +'<div class="card glass rise" onclick="depSheet()"><h2>'+esc(t('deposit'))+'</h2><div class="s">'+esc(dep.join(' · ')||'—')+'</div>'+(hs.spot&&hs.spot.last.length?'<div class="cch">'+mbars(hs.spot.last,300,40)+'</div>':'<div class="deco">'+ic('wallet',50)+'</div>')+'</div>'
+ +'<div class="row2"><div class="card glass rise" onclick="openGroup('+w.id+')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(t('stats_sub'))+'</div>'+(hs.spot?'<div class="deco" style="right:12px;bottom:10px">'+mring(hs.spot.wr,52)+'</div>':'<div class="deco">'+ic('bars',36)+'</div>')+'</div>'
  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
  +'<div class="card glass acc rise" onclick="openDf()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco">'+ic('zap',50)+'</div></div>'}
+/* 279: kartalardagi kichik grafiklar */
+function mline(pts,W,H,id){if(!pts||pts.length<2)return'';var a=[0].concat(pts),n=a.length,mn=Math.min.apply(null,a),mx=Math.max.apply(null,a);if(mx==mn)mx=mn+1;
+ var X=function(k){return(k/(n-1)*W).toFixed(1)},Y=function(v){return(H-3-(v-mn)/(mx-mn)*(H-6)).toFixed(1)};var c=a[n-1]>=0?'#c2f23a':'#ff5c5c';
+ var d=a.map(function(v,k){return X(k)+','+Y(v)}).join(' L');
+ return'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+c+'" stop-opacity=".28"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs>'
+  +'<path d="M'+d+' L'+W+','+H+' L0,'+H+'Z" fill="url(#'+id+')"/><path d="M'+d+'" fill="none" stroke="'+c+'" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>'
+  +'<circle cx="'+X(n-1)+'" cy="'+Y(a[n-1])+'" r="2.6" fill="'+c+'"/></svg>'}
+function mbars(vals,W,H){if(!vals||!vals.length)return'';var m=Math.max.apply(null,vals.map(Math.abs))||1,n=Math.max(vals.length,10),bw=W/n,mid=H/2,o='',off=n-vals.length;
+ for(var e=0;e<off;e++)o+='<rect x="'+(e*bw+bw*.5-1).toFixed(1)+'" y="'+(mid-1)+'" width="2" height="2" rx="1" fill="rgba(255,255,255,.14)"/>';
+ vals.forEach(function(v,k){var h=Math.max(2,Math.abs(v)/m*(mid-2)),x=(k+off)*bw+bw*.3;o+='<rect x="'+x.toFixed(1)+'" y="'+(v>=0?mid-h:mid).toFixed(1)+'" width="'+(bw*.4).toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2" fill="'+(v>=0?'#c2f23a':'#ff5c5c')+'" opacity=".9"/>'});
+ return'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><line x1="0" y1="'+mid+'" x2="'+W+'" y2="'+mid+'" stroke="rgba(255,255,255,.12)" stroke-width=".6"/>'+o+'</svg>'}
+function mring(p,z){var r=z/2-4,c=2*Math.PI*r,f=Math.max(0,Math.min(100,p))/100*c;
+ return'<svg width="'+z+'" height="'+z+'" viewBox="0 0 '+z+' '+z+'"><circle cx="'+z/2+'" cy="'+z/2+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="5"/>'
+  +'<circle cx="'+z/2+'" cy="'+z/2+'" r="'+r+'" fill="none" stroke="#c2f23a" stroke-width="5" stroke-linecap="round" stroke-dasharray="'+f.toFixed(1)+' '+c.toFixed(1)+'" transform="rotate(-90 '+z/2+' '+z/2+')"/>'
+  +'<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="#f5f5f7" font-size="'+Math.round(z*.24)+'" font-weight="800">'+Math.round(p)+'%</text></svg>'}
+function loadHst(w){if(!w||S.hstBusy)return;S.hstBusy=1;api('hstat',{id:w.id}).then(function(d){S.hstBusy=0;S.hst=S.hst||{};S.hst[w.id]=d;if(S.tab=='home'&&!S.page&&cur()&&cur().id==w.id){var k=S.slide;S.anim=false;render();S.slide=k}}).catch(function(){S.hstBusy=0})}
 function bindSlider(){var s=document.getElementById('slider');if(!s)return;
  s.scrollLeft=S.slide*s.clientWidth;
  s.onscroll=function(){var k=Math.round(s.scrollLeft/Math.max(1,s.clientWidth));if(k!=S.slide){S.slide=k;tick();

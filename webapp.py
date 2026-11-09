@@ -389,6 +389,31 @@ def _curve(rows, deposit, net) -> list:
     return [round(x, 2) for x in pts][-300:]
 
 
+async def api_hstat(request):
+    """279: Bosh sahifa kartalari uchun kichik grafiklar — spot/futures natija
+    egri chizig'i, oxirgi natijalar va win-rate (faqat egasi)."""
+    body, uid = await _body(request)
+    try:
+        ws = await db.get_workspace(int(body.get("id")))
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    if not _can(ws, uid):
+        raise web.HTTPForbidden()
+    out = {}
+    for kind in ("spot", "fut"):
+        with db.stats_kind(kind):
+            eq = await db.equity_series(ws["id"])
+        vals = [float(r["pnl_pct"]) for r in eq if r["pnl_pct"] is not None]
+        if not vals:
+            continue
+        dep = ws["fut_deposit"] if kind == "fut" else ws["deposit"]
+        net = sum(vals)
+        wins = sum(1 for v in vals if v > 0)
+        out[kind] = {"curve": _curve(eq, dep, net)[-60:], "last": [round(v, 2) for v in vals[-14:]],
+                     "n": len(vals), "wr": round(wins / len(vals) * 100, 1)}
+    return web.json_response(out, headers=NO_CACHE)
+
+
 async def api_group(request):
     body, uid = await _uid_opt(request)
     try:
@@ -582,6 +607,7 @@ def routes() -> list:
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/top", api_top),
         web.post("/api/app/diptop", api_diptop),
+        web.post("/api/app/hstat", api_hstat),
         web.post("/api/app/period", api_period),
         web.post("/api/app/group", api_group),
         web.post("/api/app/tour", api_tour),
