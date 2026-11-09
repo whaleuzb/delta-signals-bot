@@ -7566,3 +7566,8 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      ingichka chiziq (xromatik aberratsiya taqlidi). Uzun ro'yxat qatorlarida
      (`.row/.trow`) blur YO'Q — 257 (qizish). Telefon yana qizisa — birinchi
      navbatda shu blurni kamaytirish/o'chirish kerak.
+278. **Kartalardan donadorlik olib tashlandi** (foydalanuvchi namunasi —
+     silliq muzli shisha). `--glass` dagi ikki SVG noise qatlami (276)
+     o'chirildi; fon `.grain` yana .10. Tiniq chetlar (276) va frosted blur
+     (277) qoldi. DIP karta ichidagi fon donadorligi (262) qoldi — u shisha
+     emas, shisha ortidagi fon.
