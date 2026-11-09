@@ -621,7 +621,7 @@ function openRef(){tick();S.page={id:'ref'};var p=document.getElementById('page'
 function refRender(d){var p=document.getElementById('page');S.ref=d;
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('gift',22)+'</div><div><h2>'+esc(t('ref_title'))+'</h2><div class="rs">'+esc(t('ref_sub'))+'</div></div></div>';
  var per=(d.dip_per||5);
- h+='<div class="row glass acc rise" onclick="closeGroup();go(\'dip\')"><div class="av" style="color:var(--g)">'+ic('dip',20)+'</div><div class="rm"><div class="rn">'+esc(t('dip_bal'))+'</div><div class="rs">'+esc(t('dip_per').replace('{n}',per))+'</div></div><div class="rv g">'+(+d.dip||0).toLocaleString('en-US',{maximumFractionDigits:2})+'<small>DIP</small></div></div>';
+ h+=dipCard(+d.dip||0,per)+dipOut(d);
  h+='<div class="tiles"><div class="tile2 glass rise"><div class="k">'+esc(t('ref_count'))+'</div><div class="v">'+d.count+'</div></div><div class="tile2 glass rise"><div class="k">'+esc(t('ref_code'))+'</div><div class="v" style="font-size:17px">'+esc(d.code||'—')+'</div></div></div>';
  if(d.link){h+='<div class="tile2 glass rise" style="margin-bottom:10px"><div class="k">'+esc(t('ref_link'))+'</div><div style="font-size:13px;font-weight:600;margin-top:6px;word-break:break-all">'+esc(d.link)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="refCopy()">'+ic('copy',14)+' '+esc(t('ref_copy'))+'</button><button class="btn p" onclick="refShare()">'+esc(t('ref_share'))+'</button></div></div>'}
@@ -631,9 +631,9 @@ function refRender(d){var p=document.getElementById('page');S.ref=d;
 /* 268: DIP bo'limi (pastki menyu) — karta, chiqarish, taklif va reyting */
 function dipRefresh(){if(S.page&&S.page.id=='ref')refRender(S.ref);else if(S.tab=='dip'){S.anim=false;render()}}
 function dipView(v){var h='<h3 class="rise">DIP Token<small>1000 DIP = $10</small></h3>';
- if(!S.pub){if(S.ref){h+=dipCard(+S.ref.dip||0,S.ref.dip_per||5)+dipOut(S.ref)
+ if(!S.pub){if(S.ref){var bl=+S.ref.dip||0;h+='<div class="row glass acc rise" onclick="openRef()"><div class="av" style="color:var(--g)">'+ic('dip',20)+'</div><div class="rm"><div class="rn">'+esc(t('dip_bal'))+'</div><div class="rs">≈ $'+(bl/100).toFixed(2)+' · '+esc(t('dip_per').replace('{n}',S.ref.dip_per||5))+'</div></div><div class="rv g">'+bl.toLocaleString('en-US',{maximumFractionDigits:2})+'<small>DIP</small></div></div>'
    +'<div style="display:flex;gap:8px;margin-bottom:6px" class="rise"><button class="btn p" style="padding:12px;font-size:13px" onclick="refShare()">'+esc(t('dip_invite'))+'</button><button class="btn" style="padding:12px;font-size:13px" onclick="openRef()">'+esc(t('dip_more'))+'</button></div>'}
-  else{h+='<div class="spk"><div class="sk" style="height:300px"></div></div>';if(!S.refBusy){S.refBusy=1;api('act',{action:'ref'}).then(function(r){S.refBusy=0;try{S.ref=JSON.parse(r.msg)}catch(e){}if(S.ref&&S.tab=='dip'&&!S.page){S.anim=false;render()}}).catch(function(){S.refBusy=0})}}}
+  else{h+='<div class="spk"><div class="sk"></div></div>';if(!S.refBusy){S.refBusy=1;api('act',{action:'ref'}).then(function(r){S.refBusy=0;try{S.ref=JSON.parse(r.msg)}catch(e){}if(S.ref&&S.tab=='dip'&&!S.page){S.anim=false;render()}}).catch(function(){S.refBusy=0})}}}
  h+='<h3 class="rise">'+esc(t('dip_rank'))+'<small>'+esc(t('dip_rank_sub'))+'</small></h3>';
  if(!S.dtop){h+='<div class="spk"><div class="sk"></div></div>';api('diptop').then(function(d){S.dtop=d;if(S.tab=='dip'){S.anim=false;render()}}).catch(function(){});v.innerHTML=h;return}
  var row=function(x){return'<div class="row glass rise'+(x.me?' acc':'')+'" style="cursor:default"><span class="rk'+(x.rank<=3?' t3':'')+'">'+x.rank+'</span><div class="rm"><div class="rn">'+esc(x.me?t('dip_you')+' · '+x.name:x.name)+'</div><div class="rs">'+x.refs+' '+esc(t('dip_refs'))+'</div></div><div class="rv g">'+x.dip.toLocaleString('en-US',{maximumFractionDigits:2})+'<small>DIP</small></div></div>'};

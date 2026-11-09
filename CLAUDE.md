@@ -7513,3 +7513,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      muammosi qaytmasin, uzluksiz/og'ir animatsiya qo'shilmasin. Tanga aniq
      markazda bo'lishi uchun chapdagi 2 tugma `flex:1.5`. Indikator endi
      tugmaning haqiqiy `offsetLeft/offsetWidth` bo'yicha; DIP'da yashiriladi.
+270. **DIP karta faqat Taklif sahifasida.** Taklif sahifasi (`refRender`) yana
+     to'liq DIP Token kartasi + chiqarish blokini ko'rsatadi. DIP bo'limida
+     (`dipView`) karta yo'q: ixcham "DIP balans" qatori (≈ $, bosilsa
+     `openRef`), taklif tugmalari va reyting.
