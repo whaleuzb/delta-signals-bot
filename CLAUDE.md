@@ -7548,3 +7548,7 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      bosganda (delegatsiyalangan `pointerdown`) bosilgan nuqtadan lime
      yorug'lik to'lqini (`.tapw > .tapfx`, 0.6s) va chetlar yorishadi
      (`.glass.tap`). Faqat bosilganda — doimiy animatsiya yo'q (257).
+275. **Fon va asos — yana avvalgidek tungi rejim** (#050506, oq-kulrang
+     shisha, avvalgi tumanliklar). 274 palitrasidan faqat ranglar urg'u
+     sifatida qoldi: Acid Lime `--g` (#c2f23a), Cloud Grey — ikkinchi darajali
+     matn (`--mut`/`--faint`). 2x shaffoflik va bosilganda shisha effekti qoldi.

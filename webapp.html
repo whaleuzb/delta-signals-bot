@@ -6,13 +6,14 @@
 /* 240: Mini App — kosmik fon + "shisha" (glassmorphism) kartalar.
    Faqat 3 rang: oq/kulrang (asos), yashil (urg'u/foyda), qizil (zarar/yopish). */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--ink:#f3f5f0;--mut:rgba(243,245,240,.58);--faint:rgba(243,245,240,.34);
- /* 274: palitra — Cloud Grey (asos, 60%) · Jet Black (ikkinchi, 30%) · Acid Lime (urg'u, 10%) */
+:root{--ink:#f5f5f7;--mut:rgba(200,205,194,.62);--faint:rgba(200,205,194,.36);
+ /* 274/275: fon va asos — avvalgidek tungi; palitra ranglari urg'u sifatida:
+    Acid Lime (urg'u), Cloud Grey (ikkinchi darajali matn/chiziqlar), Jet Black */
  --cloud:#b4b9ae;--jet:#0e100d;
  --g:#c2f23a;--r:#ff5c5c;--top:0px;
- --glass:linear-gradient(155deg,rgba(214,219,206,.16),rgba(180,185,174,.06) 60%,rgba(180,185,174,.03)),rgba(22,24,21,.36);
- --edge:rgba(214,219,206,.18);--ease:cubic-bezier(.22,1,.36,1)}
-html{background:#0e100d}
+ --glass:linear-gradient(155deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 60%,rgba(255,255,255,.02)),rgba(14,14,16,.36);
+ --edge:rgba(255,255,255,.13);--ease:cubic-bezier(.22,1,.36,1)}
+html{background:#050506}
 html,body{color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Roboto,sans-serif;
  font-size:13px;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
 body{background:transparent;padding:calc(var(--top) + 10px) 14px 110px;min-height:100vh;overflow-x:hidden}
@@ -21,9 +22,9 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 /* ---- FON: yulduzlar (canvas) + tumanlik + donadorlik + chetdagi nur ---- */
 #bg{position:fixed;inset:0;z-index:-3;width:100%;height:100%}
 .neb{position:fixed;z-index:-2;border-radius:50%;filter:blur(60px);pointer-events:none;will-change:transform}
-.neb.a{width:120vw;height:70vh;left:-50vw;top:-18vh;background:radial-gradient(closest-side,rgba(180,185,174,.42),transparent)}
-.neb.b{width:90vw;height:60vh;right:-45vw;top:38vh;background:radial-gradient(closest-side,rgba(194,242,58,.20),transparent)}
-.neb.c{width:80vw;height:50vh;left:-20vw;bottom:-25vh;background:radial-gradient(closest-side,rgba(180,185,174,.30),transparent)}
+.neb.a{width:120vw;height:70vh;left:-50vw;top:-18vh;background:radial-gradient(closest-side,rgba(210,214,222,.28),transparent)}
+.neb.b{width:90vw;height:60vh;right:-45vw;top:38vh;background:radial-gradient(closest-side,rgba(194,242,58,.14),transparent)}
+.neb.c{width:80vw;height:50vh;left:-20vw;bottom:-25vh;background:radial-gradient(closest-side,rgba(200,200,210,.16),transparent)}
 @keyframes n1{to{transform:translate3d(12vw,6vh,0) scale(1.15)}}
 @keyframes n2{to{transform:translate3d(-14vw,-8vh,0) scale(1.1)}}
 .grain{position:fixed;inset:-50%;z-index:-1;pointer-events:none;opacity:.10;
@@ -245,7 +246,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .eq svg{width:100%;height:120px;display:block;overflow:visible}
 .sect{font-size:14px;font-weight:800;margin:16px 2px 10px;letter-spacing:-.01em}
 .page{position:fixed;inset:0;z-index:25;overflow-y:auto;padding:calc(var(--top) + 10px) 14px 110px;transform:translateX(100%);
- transition:transform .5s var(--ease);background:rgba(14,16,13,.94)}
+ transition:transform .5s var(--ease);background:#050506}
 .page.show{transform:none}
 /* 272: kompyuterda (keng oyna) — ilova telefon kengligida, o'rtada */
 @media (min-width:640px){
@@ -811,7 +812,7 @@ function checkVer(){var n=Date.now();if(n-verAt<15000)return;verAt=n;
 document.addEventListener('visibilitychange',function(){if(!document.hidden)checkVer()});
 try{tg&&tg.onEvent&&tg.onEvent('activated',checkVer)}catch(e){}
 setInterval(function(){if(!document.hidden)checkVer()},300000);
-(function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#0e100d');tg.setBackgroundColor&&tg.setBackgroundColor('#0e100d');
+(function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
  tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px')}catch(e){}}
  /* 252: Telegram tashqarisida (brauzer, to'lov boti) — ochiq rejim:
