@@ -133,8 +133,7 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
 .nav a.coinb{flex:0 0 64px;overflow:visible;font-weight:700}
 .nav a.coinb .sp{display:block;height:23px}
 .coinb .cz{position:absolute;left:50%;top:-38px;width:58px;height:58px;margin-left:-29px;perspective:240px}
-/* tanga aynan o'rtada: chapda 2 ta, o'ngda 3 ta tugma — chap tomondagilar kengroq */
-.nav a[data-t=home],.nav a[data-t=signals]{flex:1.5}
+/* tanga aynan o'rtada: chapda 3 ta (Bosh, Wallet, Signallar), o'ngda 3 ta tugma — hammasi teng kenglikda (321) */
 .coinb .cf{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0a0c0d;
  background:radial-gradient(circle at 34% 28%,#fff 0,#e9ecee 18%,#a9afb4 52%,#5d6368 80%,#2f3337 100%);
  box-shadow:0 0 0 3px #08090a,0 0 0 4px rgba(255,255,255,.14),0 8px 20px rgba(0,0,0,.6),0 0 26px rgba(194,242,58,.32);
@@ -357,7 +356,7 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  layers:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>'};
 function ic(n,z){z=z||22;return '<svg class="ic" width="'+z+'" height="'+z+'" viewBox="0 0 24 24">'+I[n]+'</svg>'}
 var tg=window.Telegram&&window.Telegram.WebApp;
-var TABS=['home','signals','dip','top','tour','profile'];
+var TABS=['home','wallet','signals','dip','top','tour','profile'];
 var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
 function t(k,o){var s=(T[S.lang]||T.uz)[k]||k;if(o)for(var x in o)s=s.replace('{'+x+'}',o[x]);return s}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -385,7 +384,7 @@ function botUrl(start){return 'https://t.me/'+S.bot+(start?'?start='+start:'')}
 function openLink(u){if(!u)return;if(S.pub&&u.indexOf('http')==0&&u.indexOf(location.origin)!=0){window.open(u,'_blank');return}if(u.indexOf(location.origin)==0||u.charAt(0)=='/'){try{sessionStorage.setItem('tc_from_app','1')}catch(e){}location.href=u;return}if(u.indexOf('https://t.me/')==0&&tg&&tg.openTelegramLink)tg.openTelegramLink(u);else if(tg&&tg.openLink&&u.indexOf('http')==0)tg.openLink(u);else location.href=u}
 
 /* ---- pastki panel: siljiydigan indikator ---- */
-function nav(){var tabs=[['home','home'],['signals','trend'],['dip','dip'],['top','crown'],['tour','trophy'],['profile','user']];
+function nav(){var tabs=[['home','home'],['wallet','wallet'],['signals','trend'],['dip','dip'],['top','crown'],['tour','trophy'],['profile','user']];
  var n=document.getElementById('nav');
  /* 269: DIP — o'rtada katta, vaqti-vaqti bilan aylanadigan tanga */
  if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){
@@ -406,13 +405,17 @@ function pill(){var w=cur();var el=document.getElementById('wsPill');
 function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null){m+=i.money;has=true}});return has?m:null}
 function render(){nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
- if(S.tab=='top')topView(v);else if(S.tab=='dip')dipView(v);else if(S.tab=='tour')tourView(v);else if(S.tab=='profile')profile(v,w);
+ if(S.tab=='wallet')walletView(v);else if(S.tab=='top')topView(v);else if(S.tab=='dip')dipView(v);else if(S.tab=='tour')tourView(v);else if(S.tab=='profile')profile(v,w);
  else if(!w)noWs(v);else if(S.tab=='signals')signals(v,w);else home(v,w);
  var k=0;v.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(k++*60)+'ms'});
  if(S.anim){setTimeout(countUp,80)}
  v.insertAdjacentHTML('beforeend','<div class="endsp"></div>');
  S.anim=false;S.dir='';bindSlider()}
 
+/* 321: Wallet — hozircha "Tez orada" */
+function walletView(v){v.innerHTML='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('wallet',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('w_sub'))+'</div></div></div>'
+ +'<div class="slide glass acc rise" style="min-height:0;padding:34px 20px;text-align:center"><div style="display:inline-flex;width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:rgba(194,242,58,.12);color:var(--g);margin-bottom:14px">'+ic('wallet',30)+'</div>'
+ +'<div style="font-size:26px;font-weight:900;letter-spacing:-.03em">'+esc(t('w_soon'))+'</div><div class="rs" style="margin-top:8px;line-height:1.5">'+esc(t('w_txt'))+'</div></div>'}
 /* ---- bosh sahifa: slayder + kartalar ---- */
 function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forEach(function(i){if(i.alloc)busy+=i.alloc});
  var best=null;S.items.forEach(function(i){if(i.live!=null&&(!best||i.live>best.live))best=i});

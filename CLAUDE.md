@@ -7910,3 +7910,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Qisman sotishlar ilgari vaqt/narx bilan saqlanmasdi → yangi jadval `signal_fills` (signal_id, at, price, share, kind tp|manual). Yoziladi: `tracker.process` — TP tegishi (sham `close_ms`, TP narxi; TP hodisasiga `at_ms` qo'shildi), saqlash muvaffaqiyatli bo'lgandan keyin; `tracker.partial_close` — joriy narx, hozirgi vaqt. Faqat bundan keyingilar uchun.
 - `db.signal_marks(sig_id)` → [{at, price, kind: add|fill}]. `/api/app/open` elementida `marks`; `termMarks` — add = kirish tomoni, fill = chiqish tomoni (LONG: kirish ▲ oq, chiqish ▼ sariq; SHORT teskari). Karta: `bot._card_marks` (endi async) shu belgilarni ham qo'shadi.
 - Sinov: `test_320.py` 4/4; test_tracker ✅.
+
+## 321. Wallet bo'limi (hozircha "Tez orada")
+- Foydalanuvchi: "wallet bo'limini qo'shaylik, ichiga kirganda tez orada yozuvi chiqsin. bosh va signallar orasiga joylashtir".
+- `TABS`/`nav()`: `wallet` Bosh va Signallar orasida (belgi `wallet`). Endi DIP tangasining chap va o'ng tomonida 3 tadan tugma — chap tugmalarni kengaytiruvchi `flex:1.5` qoidasi olib tashlandi (tanga o'rtada, tekshirildi).
+- `walletView(v)` — sarlavha + shisha karta: hamyon belgisi, "Tez orada", qisqa izoh (`w_txt`). Tarjimalar: `wallet`, `w_soon`, `w_sub`, `w_txt`.
