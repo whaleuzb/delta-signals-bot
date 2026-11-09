@@ -1238,6 +1238,18 @@ async def dip_task_set_logo(task_id: int, data: bytes | None) -> None:
         await c.execute("UPDATE dip_tasks SET logo=$2, logo_at=now() WHERE id=$1", task_id, data)
 
 
+async def dip_task_set_chat(task_id: int, chat_id: int | None) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE dip_tasks SET chat_id=$2 WHERE id=$1", task_id, chat_id)
+
+
+async def dip_tasks_unverified() -> list[asyncpg.Record]:
+    """299: kanal/guruh vazifalari, obunasi hali tekshirilmaydigan (bot admin emas edi)."""
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT id, kind, url, title FROM dip_tasks WHERE kind IN ('channel','group') "
+                             "AND chat_id IS NULL AND active")
+
+
 async def dip_task_set_note(task_id: int, note: str | None) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE dip_tasks SET note=$2 WHERE id=$1", task_id, note)

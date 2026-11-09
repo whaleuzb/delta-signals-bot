@@ -7731,3 +7731,14 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      **Batafsil ▾** (marja, pozitsiya hajmi, likvidatsiya, R:R, SL'da/TP'da,
      yopilgan qism, realized, jami, ochilgan) · **Yopish** (`sellSheet`).
      Pastda BUY/SELL qoldi (BE/Stop/TP qatori kartaga ko'chdi).
+299. **Kanal/guruh vazifalarida bot ADMIN bo'lishi shart — DIP faqat
+     tekshirilgan obunaga.** `resolve_task_chat(bot, target)` → (chat_id,
+     nom, 'ok'|'not_admin'|'not_found'); chat_id faqat bot admin bo'lsa.
+     Admin panel: admin bo'lmasa vazifa yaratilmaydi ("Botni admin qiling va
+     havolani qayta yuboring", havola qayta kutiladi). Ariza tasdig'i: admin
+     bo'lmasa ogohlantirish (alert), ariza 'new' qoladi — admin qilib qayta
+     bosish mumkin. `_app_diptask`: kanal/guruh vazifasida chat_id yo'q bo'lsa
+     shu zahoti qayta tekshiradi, baribir yo'q bo'lsa DIP berilmaydi.
+     `verify_tasks_job` (10 daqiqada, ishga tushganda 30s) — keyinroq admin
+     qilingan kanallarni avtomatik "tekshiriladi" qiladi. Bot/havola
+     vazifalari tekshiruvsiz qoladi.

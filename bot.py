@@ -1169,6 +1169,40 @@ async def on_dip_withdraw(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
         pass
 
 
+async def resolve_task_chat(bot, target: str) -> tuple[int | None, str | None, str]:
+    """299: kanal/guruh (@username yoki t.me/...) → (chat_id, nomi, holat). chat_id faqat bot
+    o'sha yerda ADMIN bo'lsa qaytadi — aks holda obunani tekshirib bo'lmaydi.
+    holat: 'ok' | 'not_admin' | 'not_found'."""
+    shown, _url = _place_target(target or "")
+    if not shown.startswith("@"):
+        return None, None, "not_found"
+    try:
+        ch = await bot.get_chat(shown)
+    except Exception:
+        return None, None, "not_found"
+    try:
+        me = await bot.get_chat_member(ch.id, bot.id)
+        if me.status in ("administrator", "creator"):
+            return ch.id, ch.title or shown, "ok"
+    except Exception:
+        pass
+    return None, ch.title or shown, "not_admin"
+
+
+async def verify_tasks_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """299: bot keyinroq admin qilingan kanal/guruh vazifalarini tekshiriladigan qiladi."""
+    try:
+        rows = await db.dip_tasks_unverified()
+    except Exception:
+        log.exception("Earn: tekshirilmagan vazifalar o'qilmadi")
+        return
+    for r in rows:
+        cid, _title, st = await resolve_task_chat(ctx.bot, r["url"])
+        if cid:
+            await db.dip_task_set_chat(r["id"], cid)
+            log.info("Earn: #%s endi tekshiriladi (bot admin)", r["id"])
+
+
 async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
     """282: DIP Earn vazifasi — kanal/guruh bo'lsa obuna bot orqali tekshiriladi,
     bot/havola vazifalarida tekshirib bo'lmaydi (bosilgani yetarli)."""
@@ -1179,6 +1213,13 @@ async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
     t_ = await db.dip_task_get(tid) if tid else None
     if not t_ or not t_["active"] or t_["expired"]:
         return False, i18n.t("earn.gone", lang)
+    if t_["kind"] in ("channel", "group") and not t_["chat_id"]:
+        # 299: kanal/guruhda DIP faqat bot tekshira olsa beriladi — adolatli bo'lsin.
+        cid, _title, _st = await resolve_task_chat(ctx.bot, t_["url"])
+        if not cid:
+            return False, i18n.t("earn.cant_check", lang)
+        await db.dip_task_set_chat(tid, cid)
+        t_ = await db.dip_task_get(tid)
     if t_["chat_id"]:
         try:
             m = await ctx.bot.get_chat_member(t_["chat_id"], uid)
@@ -1226,7 +1267,7 @@ async def _app_dipapply(ctx, uid: int, lang, a) -> tuple[bool, str]:
             + (f"Izoh: {html.escape(note)}\n" if note else "")
             + f"Narx: <b>{config.DIP_PLACE_PRICE:g} USDT / {config.DIP_PLACE_DAYS} kun</b>\n\n"
             "To'lovni olgach, mukofotni tanlab tasdiqlang (vazifa darhol qo'shiladi). "
-            "Kanal/guruh obunasi tekshirilishi uchun botni u yerga admin qiling.")
+            "Kanal/guruh bo'lsa — bot u yerda ADMIN bo'lishi shart, aks holda tasdiqlanmaydi.")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(f"✅ +{n} DIP", callback_data=f"dipapp:ok:{app_id}:{n}", api_kwargs={"style": "success"})
          for n in (5, 10, 20)],
@@ -1243,6 +1284,13 @@ async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     _, act, app_id, reward = q.data.split(":")
     ap = await db.dip_app_get(int(app_id))
+    if act == "ok" and ap and ap["status"] == "new" and ap["kind"] in ("channel", "group"):
+        # 299: tasdiqlashdan oldin bot o'sha kanal/guruhda admin bo'lishi shart.
+        cid0, _t0, st0 = await resolve_task_chat(ctx.bot, ap["target"])
+        if not cid0:
+            await q.answer("Bot bu kanal/guruhda admin emas. Botni admin qiling va qayta bosing."
+                           if st0 == "not_admin" else "Kanal/guruh topilmadi (bot kira olmaydi).", show_alert=True)
+            return
     if not ap or not await db.dip_app_set(int(app_id), "ok" if act == "ok" else "rejected"):
         await q.answer("Allaqachon hal qilingan", show_alert=True)
         return
@@ -1260,17 +1308,9 @@ async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     shown, url = _place_target(ap["target"])
     title, chat_id, note = shown, None, ""
-    if ap["kind"] in ("channel", "group") and shown.startswith("@"):
-        try:
-            ch = await ctx.bot.get_chat(shown)
-            title = ch.title or shown
-            me = await ctx.bot.get_chat_member(ch.id, ctx.bot.id)
-            if me.status in ("administrator", "creator"):
-                chat_id = ch.id
-            else:
-                note = "\n⚠️ Bot u yerda admin emas — obuna tekshirilmaydi (keyin admin qilsangiz, vazifani qayta qo'shing)."
-        except Exception as e:
-            note = f"\n⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
+    if ap["kind"] in ("channel", "group"):
+        chat_id, t3, _st = await resolve_task_chat(ctx.bot, ap["target"])
+        title = t3 or shown
     tid = await db.dip_task_add(ap["kind"], title, url, chat_id, float(reward), ap["id"], config.DIP_PLACE_DAYS)
     await refresh_task_logo(ctx.bot, {"id": tid, "url": url, "chat_id": chat_id})
     await q.answer("Qo'shildi")
@@ -8362,18 +8402,19 @@ async def handle_earn_input(update: Update, ctx: ContextTypes.DEFAULT_TYPE, st: 
         await update.effective_message.reply_text("Havolani @username yoki t.me/... ko'rinishida yuboring.")
         return
     title, chat_id, note = shown, None, ""
-    if st["kind"] in ("channel", "group") and shown.startswith("@"):
-        try:
-            ch = await ctx.bot.get_chat(shown)
-            title = ch.title or shown
-            me = await ctx.bot.get_chat_member(ch.id, ctx.bot.id)
-            if me.status in ("administrator", "creator"):
-                chat_id = ch.id
-                note = "✅ Bot u yerda admin — obuna tekshiriladi."
-            else:
-                note = "⚠️ Bot u yerda admin emas — obuna TEKSHIRILMAYDI. Avval botni admin qiling."
-        except Exception as e:
-            note = f"⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
+    if st["kind"] in ("channel", "group"):
+        # 299: kanal/guruh — bot admin bo'lishi SHART (obuna tekshirilmasa DIP adolatsiz).
+        chat_id, t2, stt = await resolve_task_chat(ctx.bot, raw)
+        if not chat_id:
+            AWAITING_EARN[uid] = st
+            msg = ("❌ Bot bu kanal/guruhda admin emas. Botni admin qiling va havolani qayta yuboring."
+                   if stt == "not_admin" else
+                   "❌ Kanal/guruh topilmadi. Ochiq @username yoki t.me/... havolasini yuboring "
+                   "(yopiq kanal bo'lsa — avval botni admin qiling).")
+            await update.effective_message.reply_text(msg)
+            return
+        title = t2 or shown
+        note = "✅ Bot u yerda admin — obuna tekshiriladi."
     st.update(title=title, url=url, chat_id=chat_id, stage="note")
     ctx.user_data["earn_new"] = st
     AWAITING_EARN[uid] = st
@@ -11340,6 +11381,7 @@ def main() -> None:
     app.job_queue.run_repeating(logo_job, interval=86400, first=90)
     app.job_queue.run_repeating(dip_avatar_job, interval=900, first=120)
     app.job_queue.run_repeating(dip_task_logo_job, interval=1800, first=45)
+    app.job_queue.run_repeating(verify_tasks_job, interval=600, first=30)
     app.job_queue.run_repeating(app_action_job, interval=2, first=15)
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
