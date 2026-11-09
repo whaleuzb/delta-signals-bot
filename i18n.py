@@ -1695,8 +1695,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "earn.already": {"uz": "Bu vazifa uchun DIP allaqachon olingan", "ru": "DIP за это задание уже получены", "en": "You already got DIP for this task"},
     "earn.got": {"uz": "✅ +{n} DIP! Balans: {bal} DIP", "ru": "✅ +{n} DIP! Баланс: {bal} DIP", "en": "✅ +{n} DIP! Balance: {bal} DIP"},
     "earn.bad_target": {"uz": "Manzilni @username yoki t.me/... ko'rinishida yozing", "ru": "Укажите адрес как @username или t.me/...", "en": "Enter the address as @username or t.me/..."},
-    "earn.applied": {"uz": "✅ Ariza yuborildi. Admin siz bilan bog'lanadi (narx {price} USDT).", "ru": "✅ Заявка отправлена. Админ свяжется с вами (цена {price} USDT).", "en": "✅ Application sent. The admin will contact you (price {price} USDT)."},
-    "earn.app_ok": {"uz": "✅ {target} DIP Earn bo'limiga joylashtirildi!", "ru": "✅ {target} размещён в разделе DIP Earn!", "en": "✅ {target} is now listed in DIP Earn!"},
+    "earn.applied": {"uz": "✅ Ariza yuborildi. Admin siz bilan bog'lanadi (narx {price} USDT, {days} kun).", "ru": "✅ Заявка отправлена. Админ свяжется с вами (цена {price} USDT, {days} дн.).", "en": "✅ Application sent. The admin will contact you (price {price} USDT, {days} days)."},
+    "earn.app_ok": {"uz": "✅ {target} DIP Earn bo'limiga {days} kunga joylashtirildi!", "ru": "✅ {target} размещён в разделе DIP Earn на {days} дн.!", "en": "✅ {target} is now listed in DIP Earn for {days} days!"},
     "earn.app_no": {"uz": "❌ DIP Earn'ga joylashtirish arizangiz rad etildi.", "ru": "❌ Заявка на размещение в DIP Earn отклонена.", "en": "❌ Your DIP Earn listing application was rejected."},
     "dip.out_done": {
         "uz": "✅ {n} DIP chiqarish so'rovingiz bajarildi.",

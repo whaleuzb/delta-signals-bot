@@ -7616,3 +7616,9 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      .13, yuqori chiziq .16; frosted kartalar: `brightness(1.12)` olib
      tashlandi (`saturate(1.15)` qoldi), oq tus .012, chetdagi nurlar
      yengilroq; `::after` yaltirashi .045; tumanlik `.neb.a` .22.
+285. **Earn'ga joylashtirish — 1 oylik** (`config.DIP_PLACE_DAYS`, 30).
+     `dip_tasks.expires_at`; admin tasdiqlaganda `now()+30 kun`. Muddati
+     o'tgan vazifa Earn ro'yxatida ko'rinmaydi va DIP bermaydi
+     (`dip_tasks_for`, `dip_task_get().expired`). Ilova: "99 USDT · 1 oy",
+     4-band "1 oy davomida ko'rinadi"; adminga "99 USDT / 30 kun", `/earn` da
+     "dd.mm.yyyy gacha" va ⌛️; arizachiga "30 kunga joylashtirildi".

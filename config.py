@@ -294,3 +294,5 @@ DIP_MIN_OUT = float(os.getenv("DIP_MIN_OUT", "3000"))
 DIP_USDT_FEE_PCT = float(os.getenv("DIP_USDT_FEE_PCT", "10"))
 # 282: DIP Earn — o'z kanali/botini vazifa sifatida joylashtirish narxi (USDT).
 DIP_PLACE_PRICE = float(os.getenv("DIP_PLACE_PRICE", "99"))
+# 285: joylashtirish muddati (kun).
+DIP_PLACE_DAYS = int(os.getenv("DIP_PLACE_DAYS", "30"))

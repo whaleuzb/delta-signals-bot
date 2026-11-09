@@ -1175,7 +1175,7 @@ async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
     except Exception:
         tid = 0
     t_ = await db.dip_task_get(tid) if tid else None
-    if not t_ or not t_["active"]:
+    if not t_ or not t_["active"] or t_["expired"]:
         return False, i18n.t("earn.gone", lang)
     if t_["chat_id"]:
         try:
@@ -1222,7 +1222,7 @@ async def _app_dipapply(ctx, uid: int, lang, a) -> tuple[bool, str]:
     text = (f"📣 <b>DIP Earn — joylashtirish arizasi #{app_id}</b>\n"
             f"Kim: {who}\nTuri: {names[kind]}\nManzil: {html.escape(shown)}\n"
             + (f"Izoh: {html.escape(note)}\n" if note else "")
-            + f"Narx: <b>{config.DIP_PLACE_PRICE:g} USDT</b>\n\n"
+            + f"Narx: <b>{config.DIP_PLACE_PRICE:g} USDT / {config.DIP_PLACE_DAYS} kun</b>\n\n"
             "To'lovni olgach, mukofotni tanlab tasdiqlang (vazifa darhol qo'shiladi). "
             "Kanal/guruh obunasi tekshirilishi uchun botni u yerga admin qiling.")
     kb = InlineKeyboardMarkup([
@@ -1230,7 +1230,7 @@ async def _app_dipapply(ctx, uid: int, lang, a) -> tuple[bool, str]:
          for n in (5, 10, 20)],
         [InlineKeyboardButton("❌ Rad etish", callback_data=f"dipapp:no:{app_id}:0", api_kwargs={"style": "danger"})]])
     await _dip_admins(ctx, text, kb)
-    return True, i18n.t("earn.applied", lang, price=f"{config.DIP_PLACE_PRICE:g}")
+    return True, i18n.t("earn.applied", lang, price=f"{config.DIP_PLACE_PRICE:g}", days=config.DIP_PLACE_DAYS)
 
 
 async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1269,15 +1269,16 @@ async def on_dip_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 note = "\n⚠️ Bot u yerda admin emas — obuna tekshirilmaydi (keyin admin qilsangiz, vazifani qayta qo'shing)."
         except Exception as e:
             note = f"\n⚠️ Kanal topilmadi yoki bot kira olmaydi ({type(e).__name__}) — obuna tekshirilmaydi."
-    tid = await db.dip_task_add(ap["kind"], title, url, chat_id, float(reward), ap["id"])
+    tid = await db.dip_task_add(ap["kind"], title, url, chat_id, float(reward), ap["id"], config.DIP_PLACE_DAYS)
     await q.answer("Qo'shildi")
     try:
-        await q.edit_message_text(q.message.text_html + f"\n\n<b>✅ Vazifa #{tid} qo'shildi: +{reward} DIP</b>"
+        await q.edit_message_text(q.message.text_html + f"\n\n<b>✅ Vazifa #{tid} qo'shildi: +{reward} DIP, {config.DIP_PLACE_DAYS} kunga</b>"
                                   + html.escape(note), parse_mode=ParseMode.HTML)
     except Exception:
         pass
     try:
-        await ctx.bot.send_message(ap["user_id"], i18n.t("earn.app_ok", ulang, target=html.escape(shown)),
+        await ctx.bot.send_message(ap["user_id"], i18n.t("earn.app_ok", ulang, target=html.escape(shown),
+                                                           days=config.DIP_PLACE_DAYS),
                                    parse_mode=ParseMode.HTML)
     except Exception:
         pass
@@ -1296,7 +1297,11 @@ async def cmd_dip_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     for r in rows:
         mark = "🟢" if r["active"] else "⚪️"
         chk = "tekshiriladi" if r["chat_id"] else "tekshirilmaydi"
-        lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · {r['n']} kishi · {chk}")
+        exp = r["expires_at"]
+        if exp is not None and exp <= datetime.now(timezone.utc):
+            mark = "⌛️"
+        till = f" · {exp.astimezone(stats.TZ):%d.%m.%Y} gacha" if exp is not None else ""
+        lines.append(f"{mark} #{r['id']} {html.escape(r['title'])} — +{float(r['reward']):g} DIP · {r['n']} kishi · {chk}{till}")
         kb.append([InlineKeyboardButton(("⏸ O'chirish #" if r["active"] else "▶️ Yoqish #") + str(r["id"]),
                                         callback_data=f"dipt:{'off' if r['active'] else 'on'}:{r['id']}")])
     await update.effective_message.reply_text("<b>DIP Earn vazifalari</b>\n" + "\n".join(lines),
