@@ -85,6 +85,25 @@ svg.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;strok
  text-decoration:none;cursor:pointer;transition:color .3s}
 .nav a .i{display:block;line-height:1;margin-bottom:3px;transition:transform .35s var(--ease)}
 .nav a.on{color:#fff}.nav a.on .i{color:var(--g);transform:translateY(-1px) scale(1.08)}
+.nav .ind{transition:transform .45s var(--ease),width .45s var(--ease),opacity .25s}
+.nav a.coinb{flex:0 0 64px;overflow:visible;font-weight:700}
+.nav a.coinb .sp{display:block;height:23px}
+.coinb .cz{position:absolute;left:50%;top:-38px;width:58px;height:58px;margin-left:-29px;perspective:240px}
+/* tanga aynan o'rtada: chapda 2 ta, o'ngda 3 ta tugma — chap tomondagilar kengroq */
+.nav a[data-t=home],.nav a[data-t=signals]{flex:1.5}
+.coinb .cf{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0a0c0d;
+ background:radial-gradient(circle at 34% 28%,#fff 0,#e9ecee 18%,#a9afb4 52%,#5d6368 80%,#2f3337 100%);
+ box-shadow:0 0 0 3px #08090a,0 0 0 4px rgba(255,255,255,.14),0 8px 20px rgba(0,0,0,.6),0 0 26px rgba(46,204,143,.32);
+ animation:coinspin 8s cubic-bezier(.45,.05,.3,1) infinite;will-change:transform}
+.coinb .cf::after{content:"";position:absolute;inset:5px;border-radius:50%;border:1px solid rgba(0,0,0,.18);
+ background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.55) 48%,transparent 60%)}
+.nav a.coinb.on{color:#fff}
+.nav a.coinb.on .cf{box-shadow:0 0 0 3px #08090a,0 0 0 5px var(--g),0 8px 20px rgba(0,0,0,.6),0 0 30px rgba(46,204,143,.55)}
+.nav a.coinb:active .cz{transform:scale(.92)}
+.coinb .cz{transition:transform .2s var(--ease)}
+/* Yengil: 8 soniyada bir marta aylanadi (faqat transform — GPU), qolgan vaqt tinch */
+@keyframes coinspin{0%,80%{transform:rotateY(0)}95%,100%{transform:rotateY(360deg)}}
+@media (prefers-reduced-motion:reduce){.coinb .cf{animation:none}}
 
 .g{color:var(--g)}.r{color:var(--r)}.m{color:var(--mut)}
 h3{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:18px 2px 12px;display:flex;justify-content:space-between;align-items:baseline}
@@ -304,9 +323,14 @@ function openLink(u){if(!u)return;if(S.pub&&u.indexOf('http')==0&&u.indexOf(loca
 /* ---- pastki panel: siljiydigan indikator ---- */
 function nav(){var tabs=[['home','home'],['signals','trend'],['dip','dip'],['top','crown'],['tour','trophy'],['profile','user']];
  var n=document.getElementById('nav');
- if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){return'<a data-t="'+x[0]+'" onclick="go(\''+x[0]+'\')"><span class="i">'+ic(x[1],20)+'</span>'+esc(t(x[0]))+'</a>'}).join('');n.dataset.ok=1}
- var idx=TABS.indexOf(S.tab);n.querySelectorAll('a').forEach(function(a,k){a.classList.toggle('on',k==idx)});
- var ind=document.getElementById('ind');var w=(n.clientWidth-10)/TABS.length;ind.style.width=w+'px';ind.style.transform='translateX('+(idx*w)+'px)'}
+ /* 269: DIP — o'rtada katta, vaqti-vaqti bilan aylanadigan tanga */
+ if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){
+   if(x[0]=='dip')return'<a data-t="dip" class="coinb" onclick="go(\'dip\')"><span class="cz"><span class="cf">'+dipCoinFace()+'</span></span><span class="sp"></span>DIP</a>';
+   return'<a data-t="'+x[0]+'" onclick="go(\''+x[0]+'\')"><span class="i">'+ic(x[1],20)+'</span>'+esc(t(x[0]))+'</a>'}).join('');n.dataset.ok=1}
+ var on=null;n.querySelectorAll('a').forEach(function(a){var k=a.dataset.t==S.tab;a.classList.toggle('on',k);if(k)on=a});
+ var ind=document.getElementById('ind');if(!on||on.dataset.t=='dip'){ind.style.opacity=0;return}
+ ind.style.opacity=1;ind.style.width=on.offsetWidth+'px';ind.style.transform='translateX('+(on.offsetLeft-5)+'px)'}
+function dipCoinFace(){return'<svg width="30" height="30" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="20" r="15.5" stroke-width="1.6" stroke-opacity=".5"/><path d="M15 12.5h5.2a7.5 7.5 0 0 1 0 15H15z"/><path d="M12 20h5.5"/></svg>'}
 function go(tab){if(tab==S.tab)return;
   if(tab=='dip')S.dtop=null;
   S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}

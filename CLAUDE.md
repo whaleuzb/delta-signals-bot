@@ -7505,3 +7505,11 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
      sahifasida katta karta o'rniga ixcham "DIP balans" qatori (→ DIP tab).
      `dipRefresh()` — chiqarishdan keyin qaysi sahifa ochiq bo'lsa o'shani
      yangilaydi.
+269. **Pastki menyuda DIP — o'rtada katta tanga.** `nav()`: DIP tugmasi
+     (`a.coinb`) 58px kumushrang tanga (`dipCoinFace`), paneldan yuqoriga
+     chiqib turadi, faol bo'lsa yashil halqa. Animatsiya YENGIL: 8 soniyada
+     bir marta Y o'qi bo'yicha aylanadi (`@keyframes coinspin`, faqat
+     transform; `prefers-reduced-motion` da o'chadi) — 257 dagi qizish
+     muammosi qaytmasin, uzluksiz/og'ir animatsiya qo'shilmasin. Tanga aniq
+     markazda bo'lishi uchun chapdagi 2 tugma `flex:1.5`. Indikator endi
+     tugmaning haqiqiy `offsetLeft/offsetWidth` bo'yicha; DIP'da yashiriladi.
