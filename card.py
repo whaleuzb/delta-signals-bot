@@ -336,6 +336,18 @@ def _chip(img, xy, text, font, fg, bg, pad=(18, 9)):
     return x + w + pad[0] * 2
 
 
+def _tc_mark(px: int) -> Image.Image:
+    """Bot rasmi topilmasa — Trade Controller belgisi: lime doira ichida qora "TC"."""
+    k = 4
+    m = Image.new("RGBA", (px * k, px * k), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(m)
+    dd.ellipse((0, 0, px * k - 1, px * k - 1), fill=LIME)
+    f = _f(int(px * k * 0.42), bold=True)
+    l, t, r, b = dd.textbbox((0, 0), "TC", font=f)
+    dd.text(((px * k - (r - l)) / 2 - l, (px * k - (b - t)) / 2 - t), "TC", font=f, fill="#050506")
+    return m.resize((px, px), Image.LANCZOS)
+
+
 def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: float,
               money: float | None, leverage: int | None, sl: float | None, tp: float | None,
               candles: list, tf: str | None, username: str | None, ws_name: str,
@@ -351,13 +363,12 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     P = 64
 
     # Tepa: brend + "OCHIQ POZITSIYA" chipi
-    bx = P
-    if bot_logo:
-        bl = _circle_avatar(bot_logo, 60)
-        if bl is not None:
-            img.alpha_composite(bl, (P, P - 14))
-            d = ImageDraw.Draw(img, "RGBA")
-            bx = P + 60 + 18
+    bl = _circle_avatar(bot_logo, 60) if bot_logo else None
+    if bl is None:
+        bl = _tc_mark(60)
+    img.alpha_composite(bl, (P, P - 14))
+    d = ImageDraw.Draw(img, "RGBA")
+    bx = P + 60 + 18
     _tracked(d, (bx, P), "TRADE CONTROLLER", _f(24, bold=True), TXT, spacing=4.0)
     lab = i18n.t("card.open", lang)
     fch = _f(21, bold=True)

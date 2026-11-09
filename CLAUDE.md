@@ -7779,3 +7779,4 @@ ro'yxatdan o'tkazadi (#12 ga qarang). Qolganlari `.env.example` da.
 - `open_card` shriftlari ~15% kichraytirildi (juftlik 58, % 124, $ 34, narxlar 28, yorliqlar 19).
 - Tepada "TRADE CONTROLLER" oldida bot logosi (60px doira): `open_card(..., bot_logo=bytes)`. `bot._bot_logo(bot)` botning profil rasmini `get_user_profile_photos(bot.id)` orqali oladi, xotirada 6 soat saqlaydi; rasm yo'q bo'lsa logo chizilmaydi.
 - Pastdagi ajratuvchi chiziq shaffof oq o'rniga to'q rang (#26262B) — RGBA rasmda alfa aralashmay oq chiqayotgan edi.
+- 302b: foydalanuvchi "logo ko'rinmadi" — `_bot_logo` endi ikki yo'l bilan oladi (`getUserProfilePhotos(bot.id)`, so'ng `getChat(bot.id).photo.big_file_id`), natijani logga yozadi ("Bot logosi: N bayt / topilmadi"), topilmasa 10 daqiqa keshlaydi. Rasm baribir bo'lmasa karta `card._tc_mark` — lime doira ichida "TC" — chizadi, ya'ni logo joyi hech qachon bo'sh qolmaydi.

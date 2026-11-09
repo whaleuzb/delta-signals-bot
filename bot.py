@@ -1372,20 +1372,35 @@ _BOT_LOGO: dict = {"at": 0.0, "data": None}
 
 
 async def _bot_logo(bot) -> bytes | None:
-    """302: botning o'z profil rasmi (ulashish kartasi tepasida). Xotirada 6 soat saqlanadi."""
+    """302: botning o'z profil rasmi (ulashish kartasi tepasida). Topilsa 6 soat, topilmasa
+    10 daqiqa xotirada saqlanadi. Ikki yo'l: getUserProfilePhotos(bot.id), keyin getChat(bot.id).photo.
+    Hech biri bo'lmasa karta o'zining "TC" belgisini chizadi."""
     import time as _t
-    if _t.time() - _BOT_LOGO["at"] < 6 * 3600:
+    ttl = 6 * 3600 if _BOT_LOGO["data"] else 600
+    if _t.time() - _BOT_LOGO["at"] < ttl:
         return _BOT_LOGO["data"]
-    data = None
+    data, fid = None, None
     try:
         ph = await bot.get_user_profile_photos(bot.id, limit=1)
         if ph.total_count and ph.photos:
             sizes = ph.photos[0]
-            pick = next((x for x in sizes if x.width >= 160), sizes[-1])
-            f = await bot.get_file(pick.file_id)
-            data = bytes(await f.download_as_bytearray())
+            fid = next((x for x in sizes if x.width >= 160), sizes[-1]).file_id
     except Exception as e:
-        log.info("Bot logosi olinmadi: %s", e)
+        log.info("Bot logosi (profil rasmlari) olinmadi: %s", e)
+    if not fid:
+        try:
+            ch = await bot.get_chat(bot.id)
+            if ch.photo:
+                fid = ch.photo.big_file_id
+        except Exception as e:
+            log.info("Bot logosi (getChat) olinmadi: %s", e)
+    if fid:
+        try:
+            f = await bot.get_file(fid)
+            data = bytes(await f.download_as_bytearray())
+        except Exception as e:
+            log.info("Bot logosi yuklab olinmadi: %s", e)
+    log.info("Bot logosi: %s", f"{len(data)} bayt" if data else "topilmadi — TC belgisi")
     _BOT_LOGO.update(at=_t.time(), data=data)
     return data
 
