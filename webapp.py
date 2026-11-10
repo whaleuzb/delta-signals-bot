@@ -808,6 +808,28 @@ _CEX_CACHE: dict[tuple, tuple[float, dict]] = {}
 _CEX_TTL = 20.0
 
 
+async def _cx_call(op: str, ex: str, k: dict):
+    """326: `CEX_RELAY_URL` bo'lsa — Singapurdagi `cex` servisi orqali (ichki tarmoq),
+    bo'lmasa — shu yerdan to'g'ridan-to'g'ri (`cex` moduli)."""
+    import cex
+    url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
+    if not url:
+        return await (cex.verify(ex, k) if op == "verify" else cex.snapshot(ex, k))
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"{url}/{op}", json={"ex": ex, "k": k},
+                             headers={"X-Relay-Token": os.getenv("RELAY_TOKEN", "")})
+        r.raise_for_status()
+        d = r.json()
+    except Exception as e:
+        log.warning("cex servisiga ulanib bo'lmadi (%s): %s", op, type(e).__name__)
+        raise cex.ApiErr("net", type(e).__name__)
+    if d.get("err"):
+        raise cex.ApiErr(d["err"])
+    return d.get("snap")
+
+
 def _cex_keys(row) -> dict:
     import cex
     return {"key": cex.unseal(row["key_enc"]), "secret": cex.unseal(row["secret_enc"]),
@@ -829,7 +851,7 @@ async def _cex_one(uid: int, row, fresh: bool) -> dict:
         res = {**base, "err": "reconnect"}
     else:
         try:
-            res = {**base, **await cex.snapshot(ex, k)}
+            res = {**base, **await _cx_call("snapshot", ex, k)}
         except cex.ApiErr as e:
             res = {**base, "err": e.code}
         except Exception:
@@ -863,7 +885,7 @@ async def api_cexadd(request):
         return web.json_response({"ok": False, "err": "bad"}, headers=NO_CACHE)
     k = {"key": key, "secret": sec, "pass": pas}
     try:
-        await cex.verify(ex, k)
+        await _cx_call("verify", ex, k)
     except cex.ApiErr as e:
         log.info("Birja kaliti rad etildi (%s, uid=%s): %s", ex, uid, e.code)
         return web.json_response({"ok": False, "err": e.code}, headers=NO_CACHE)

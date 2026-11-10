@@ -7948,3 +7948,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - ⚠️ Web servis Railway `sfo` (AQSh) hududida — Binance 451 qaytaradi (`ApiErr("geo")`, ilovada tushunarli xabar). Bitget/BingX ham AQSh IP'larini cheklashi mumkin. Yechim — hudud o'zgartirish (foydalanuvchi qarori).
 - `coinIc('USDT')` endi bo'sh emas (ilgari "?" chiqardi).
 - Sinov: `test_324.py` 30/30 (imzolar, parsing, shifr, endpointlar), brauzer `t_cx.py`.
+
+## 326. Birja so'rovlari Singapurdagi `cex` servisi orqali
+- Foydalanuvchi: "Faqat birja ulash serverlarini singapurga ko'chirsakchi?" — bot/web/baza AQShda (sfo) qoladi (Telegram Bot API Amsterdamda, foydalanuvchilar O'zbekistonda), faqat birja so'rovlari Osiyodan.
+- `cexrelay.py` — Railway `cex` servisi (`python cexrelay.py`, Singapur, OMMAVIY DOMENSIZ, faqat ichki tarmoq `cex.railway.internal`, `::` da tinglaydi). `/verify`, `/snapshot`, `/healthz`. Bazaga ulanmaydi, kalit saqlamaydi/loglamaydi. `RELAY_TOKEN` bo'lsa `X-Relay-Token` tekshiriladi.
+- `webapp._cx_call(op, ex, k)`: `CEX_RELAY_URL` bo'lsa — relay (30 s timeout, ulanmasa `ApiErr("net")`), bo'lmasa — `cex` moduli to'g'ridan-to'g'ri (lokal/test).
+- Web env: `CEX_RELAY_URL=http://${{cex.RAILWAY_PRIVATE_DOMAIN}}:8080`, `RELAY_TOKEN=${{cex.RELAY_TOKEN}}`.
+- Sinov: `test_326.py` 8/8.
