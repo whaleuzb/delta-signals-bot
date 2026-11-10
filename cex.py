@@ -978,7 +978,208 @@ TRADE_READ = ("info", "spot_open", "fut_open")
 async def trade(ex: str, k: dict, op: str, a: dict):
     if ex not in TRADE_EX:
         raise ApiErr("noex", ex)
-    f = TRADE_OPS.get(op)
+    f = TRADE_OPS.get(op) or HIST_OPS.get(op)
     if f is None:
         raise ApiErr("bad", op)
     return await f(k, a or {})
+
+
+# ─────────────────────────── 334: savdo tarixi sinxronizatsiyasi (bazaga) ───────────────────────────
+# Binance futures `income` oddiy API ~3 oy beradi; undan eskisi — asinxron yuklab olish
+# (`/fapi/v1/income/asyn`, oyiga 5 so'rov, 1 yilgacha oraliq) → CSV havola.
+
+async def bn_income_raw(k, a) -> list:
+    """[start, end] (ms) oralig'idagi income yozuvlari, 7 kunlik oynalar, xom ko'rinishda."""
+    start, end = int(a["start"]), int(a["end"])
+    out, t = [], start
+    while t < end:
+        b = min(t + 7 * 86_400_000 - 1, end)
+        s2 = t
+        for _ in range(10):
+            d = await _bn(k, FAPI, "/fapi/v1/income", {"startTime": s2, "endTime": b, "limit": 1000})
+            if not isinstance(d, list) or not d:
+                break
+            out += d
+            if len(d) < 1000:
+                break
+            s2 = int(d[-1]["time"]) + 1
+        t = b + 1
+    return [{"key": "i" + str(x.get("tranId") or ""), "type": x.get("incomeType"), "sym": x.get("symbol") or "",
+             "amt": _f(x.get("income")), "asset": x.get("asset"), "t": int(x.get("time") or 0),
+             "trade": str(x.get("tradeId") or "")} for x in out if x.get("tranId")]
+
+
+async def bn_income_async_req(k, a) -> dict:
+    d = await _bn(k, FAPI, "/fapi/v1/income/asyn", {"startTime": int(a["start"]), "endTime": int(a["end"])})
+    return {"id": str(d.get("downloadId") or "")}
+
+
+async def bn_income_async_get(k, a) -> dict:
+    d = await _bn(k, FAPI, "/fapi/v1/income/asyn/id", {"downloadId": str(a["id"])})
+    return {"status": str(d.get("status") or ""), "url": d.get("url") or d.get("s3Link") or "",
+            "expired": bool(d.get("isExpired"))}
+
+
+def _norm(h: str) -> str:
+    return "".join(ch for ch in str(h).lower() if ch.isalnum())
+
+
+def _parse_income_csv(raw: bytes) -> list:
+    """Binance income CSV (zip ichida bo'lishi mumkin) → xom yozuvlar. Ustun nomlari
+    moslashuvchan aniqlanadi (time/date, type, amount/income, symbol, asset, tranId)."""
+    import csv, io, zipfile, hashlib as _h
+    from datetime import datetime, timezone
+    if raw[:2] == b"PK":
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            name = next((n for n in z.namelist() if n.lower().endswith(".csv")), z.namelist()[0])
+            raw = z.read(name)
+    text = raw.decode("utf-8-sig", errors="replace")
+    rd = csv.reader(io.StringIO(text))
+    rows = list(rd)
+    if not rows:
+        return []
+    hdr = [_norm(h) for h in rows[0]]
+
+    def col(*names):
+        for n in names:
+            if n in hdr:
+                return hdr.index(n)
+        for i, h in enumerate(hdr):
+            if any(n in h for n in names):
+                return i
+        return None
+    ct, cy, ca = col("time", "date", "dateutc", "timeutc"), col("incometype", "type"), col("income", "amount", "change")
+    cs, cas, cid = col("symbol", "pair", "contract"), col("asset", "coin"), col("tranid", "transactionid", "id")
+    ctr = col("tradeid")
+    if ct is None or cy is None or ca is None:
+        log.warning("Income CSV ustunlari tanilmadi: %s", rows[0][:12])
+        return []
+    out = []
+    for r in rows[1:]:
+        if len(r) <= max(ct, cy, ca):
+            continue
+        tv = r[ct].strip()
+        try:
+            tm = int(float(tv)) if tv.replace(".", "").isdigit() else int(
+                datetime.strptime(tv[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() * 1000)
+        except ValueError:
+            continue
+        ty = r[cy].strip().upper().replace(" ", "_")
+        if "REALIZED" in ty:
+            ty = "REALIZED_PNL"
+        elif "FUNDING" in ty:
+            ty = "FUNDING_FEE"
+        elif "COMMISSION" in ty or ty in ("FEE", "TRADING_FEE"):
+            ty = "COMMISSION"
+        sym = r[cs].strip().upper() if cs is not None and cs < len(r) else ""
+        tid = r[cid].strip() if cid is not None and cid < len(r) else ""
+        key = "i" + tid if tid else "h" + _h.sha1(f"{tm}|{ty}|{sym}|{r[ca]}".encode()).hexdigest()[:20]
+        out.append({"key": key, "type": ty, "sym": sym, "amt": _f(r[ca]),
+                    "asset": r[cas].strip() if cas is not None and cas < len(r) else "",
+                    "t": tm, "trade": r[ctr].strip() if ctr is not None and ctr < len(r) else ""})
+    log.info("Income CSV: %s qator, ustunlar %s", len(out), rows[0][:10])
+    return out
+
+
+async def bn_income_async_fetch(k, a) -> list:
+    url = str(a.get("url") or "")
+    if not url.startswith("https://"):
+        raise ApiErr("bad", "url")
+    try:
+        r = await _http.get(url, timeout=60)
+    except (httpx.TimeoutException, httpx.TransportError) as e:
+        raise ApiErr("net", type(e).__name__)
+    if r.status_code >= 400:
+        raise ApiErr("api", f"HTTP {r.status_code}")
+    return _parse_income_csv(r.content)
+
+
+async def bn_spot_candidates(k, a=None) -> list:
+    """Spot savdo bo'lishi mumkin bo'lgan juftliklar: hozirgi + 30 kunlik suratlar aktivlari × kotirovkalar."""
+    assets = set()
+    try:
+        for x, q in (await bn_spot(k)).items():
+            if q > 0:
+                assets.add(x)
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+    try:
+        snap = await _bn(k, SAPI, "/sapi/v1/accountSnapshot", {"type": "SPOT", "limit": 30})
+        for v in snap.get("snapshotVos") or []:
+            for b in (v.get("data") or {}).get("balances") or []:
+                if _f(b.get("free")) + _f(b.get("locked")) > 0:
+                    assets.add(b.get("asset"))
+    except ApiErr:
+        pass
+    assets = {x for x in assets if x and x not in STABLE}
+    return [x + q for x in sorted(assets)[:40] for q in QUOTES]
+
+
+async def bn_spot_mytrades(k, a) -> list:
+    """Bitta juftlik savdolari `from_id` dan (eskidan yangiga), 1000 tagacha."""
+    sym = _sym(a)
+    p = {"symbol": sym, "limit": 1000}
+    if a.get("from_id") is not None:
+        p["fromId"] = int(a["from_id"])
+    try:
+        d = await _bn(k, SAPI, "/api/v3/myTrades", p)
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        return []
+    return [{"key": f"s{sym}:{x.get('id')}", "id": int(x.get("id") or 0), "sym": sym, "oid": x.get("orderId"),
+             "side": "buy" if x.get("isBuyer") else "sell", "qty": _f(x.get("qty")), "quote": _f(x.get("quoteQty")),
+             "price": _f(x.get("price")), "fee": _f(x.get("commission")), "fee_a": x.get("commissionAsset"),
+             "t": int(x.get("time") or 0)} for x in (d if isinstance(d, list) else [])]
+
+
+async def bn_spot_sync(k, a) -> dict:
+    """Ko'p juftlik bir so'rovda: {syms: {SYM: from_id}} → savdolar (eskidan yangiga, juftlikka 5×1000 gacha),
+    yangi kursorlar va mavjud bo'lmagan juftliklar (bad)."""
+    cur = {str(x).upper(): (int(v) if v is not None else None) for x, v in (a.get("syms") or {}).items()}
+    rows, cursors, bad = [], {}, []
+    sem = asyncio.Semaphore(5)
+
+    async def one(sym, fid):
+        async with sem:
+            got = []
+            for _ in range(5):
+                p = {"symbol": sym, "limit": 1000, "fromId": fid if fid is not None else 0}
+                try:
+                    d = await _bn(k, SAPI, "/api/v3/myTrades", p)
+                except ApiErr as e:
+                    if e.code == "auth":
+                        raise
+                    if "-1121" in e.text or "Invalid symbol" in e.text:
+                        bad.append(sym)
+                    return got
+                lst = d if isinstance(d, list) else []
+                got += lst
+                if len(lst) < 1000:
+                    break
+                fid = int(lst[-1]["id"]) + 1
+            return got
+    res = await asyncio.gather(*(one(sy, fi) for sy, fi in cur.items()), return_exceptions=True)
+    for (sy, fi), r in zip(cur.items(), res):
+        if isinstance(r, ApiErr) and r.code == "auth":
+            raise r
+        if not isinstance(r, list):
+            continue
+        last = fi - 1 if fi else None
+        for x in r:
+            rows.append({"key": f"s{sy}:{x.get('id')}", "sym": sy, "oid": str(x.get("orderId")),
+                         "side": "buy" if x.get("isBuyer") else "sell", "qty": _f(x.get("qty")),
+                         "quote": _f(x.get("quoteQty")), "fee": _f(x.get("commission")),
+                         "fee_a": x.get("commissionAsset"), "t": int(x.get("time") or 0)})
+            last = max(last or 0, int(x.get("id") or 0))
+        if last is not None:
+            cursors[sy] = last
+    return {"rows": rows, "cursors": cursors, "bad": bad}
+
+
+HIST_OPS = {
+    "spot_sync": bn_spot_sync,
+    "inc_raw": bn_income_raw, "inc_async_req": bn_income_async_req, "inc_async_get": bn_income_async_get,
+    "inc_async_fetch": bn_income_async_fetch, "spot_cands": bn_spot_candidates, "spot_mytrades": bn_spot_mytrades,
+}

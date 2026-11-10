@@ -821,7 +821,7 @@ async def _cx_call(op: str, ex: str, k: dict, extra: dict | None = None):
         return await f(ex, k)
     import httpx
     try:
-        async with httpx.AsyncClient(timeout=90 if op == "trades" else 30) as c:
+        async with httpx.AsyncClient(timeout=90 if op in ("trades", "trade") else 30) as c:
             r = await c.post(f"{url}/{op}", json={"ex": ex, "k": k, **(extra or {})},
                              headers={"X-Relay-Token": os.getenv("RELAY_TOKEN", "")})
         r.raise_for_status()
@@ -962,6 +962,9 @@ async def cex_hist_loop(_app=None):
                     async with sem:
                         await _cex_one(r["user_id"], r, True)
                 await asyncio.gather(*(one(r) for r in rows), return_exceptions=True)
+                for r in rows:                      # 334: savdo tarixi (statistika uchun)
+                    if r["exchange"] == "binance":
+                        await _cx_sync(r["user_id"], r["exchange"], r)
             except Exception:
                 log.warning("Balans tarixi tsikli xato", exc_info=True)
             await asyncio.sleep(3600)
@@ -1019,6 +1022,11 @@ async def api_cexadd(request):
     t = asyncio.get_running_loop().create_task(_cex_backfill(uid, ex, k))
     _CEX_BG.add(t)
     t.add_done_callback(_CEX_BG.discard)
+    row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
+    if row is not None and ex == "binance":
+        t2 = asyncio.get_running_loop().create_task(_cx_sync(uid, ex, row))
+        _CEX_BG.add(t2)
+        t2.add_done_callback(_CEX_BG.discard)
     return web.json_response({"ok": True}, headers=NO_CACHE)
 
 
@@ -1096,6 +1104,243 @@ async def api_cextrades(request):
     if len(_CEX_TR) > 500:
         _CEX_TR.clear()
     _CEX_TR[key] = (time.monotonic(), res)
+    return web.json_response(res, headers=NO_CACHE)
+
+
+# ─────────────── 334: savdo tarixi sinxronizatsiyasi va statistika ───────────────
+_CX_SYNC_RUN: set = set()
+_CX_SYNC_GAP = 600          # ilova so'raganda — ko'pi bilan 10 daqiqada bir marta
+
+
+def _year_start_ms() -> int:
+    from datetime import datetime, timezone
+    n = datetime.now(timezone.utc)
+    return int(datetime(n.year, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def _dt(ms: int):
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ms / 1000, timezone.utc)
+
+
+def _inc_rows(lst: list) -> list:
+    return [{"key": x["key"], "kind": "inc", "typ": x.get("type"), "sym": x.get("sym") or "", "t": _dt(int(x["t"])),
+             "amt": float(x.get("amt") or 0), "fee_a": x.get("asset"), "ref": x.get("trade") or None}
+            for x in lst if x.get("t")]
+
+
+async def _cx_sync(uid: int, ex: str, row) -> None:
+    """Binance savdo tarixini bazaga: futures income (so'nggi ~85 kun oddiy API, undan eski —
+    yil boshigacha asinxron CSV) va spot fill'lari (juftlik kursorlari bilan)."""
+    if ex != "binance" or (uid, ex) in _CX_SYNC_RUN:
+        return
+    _CX_SYNC_RUN.add((uid, ex))
+    try:
+        k = _cex_keys(row)
+        st = await db.cex_sync_get(uid, ex)
+        now = int(time.time() * 1000)
+        if not st.get("cutoff"):
+            st["year_from"] = _year_start_ms()
+            st["cutoff"] = max(st["year_from"], now - 85 * 86_400_000)
+        call = lambda op, a: _cx_call("trade", ex, k, {"op": op, "a": a})
+        # 1) futures — oddiy API (cutoff dan hozirgacha, oxirgi sinxdan 1 soat ustma-ust)
+        try:
+            start = max(st["cutoff"], int(st.get("fut_last") or 0) - 3_600_000)
+            rows = await call("inc_raw", {"start": start, "end": now})
+            await db.cex_tr_add(uid, ex, _inc_rows(rows or []))
+            st["fut_last"] = now
+            st.pop("fut_err", None)
+        except cex_mod().ApiErr as e:
+            if e.code == "auth":
+                raise
+            st["fut_err"] = _cx_msg(e.text) or e.code
+        # 2) futures — yil boshidan cutoff gacha (asinxron yuklab olish, oyiga 5 ta limit)
+        asy = st.get("async") or {}
+        if st["year_from"] < st["cutoff"] and asy.get("status") not in ("done", "fail"):
+            try:
+                if not asy.get("id"):
+                    if int(asy.get("tries") or 0) >= 2:
+                        asy["status"] = "fail"
+                    else:
+                        r = await call("inc_async_req", {"start": st["year_from"], "end": st["cutoff"] - 1})
+                        asy.update({"id": r.get("id"), "status": "pending", "req_at": now,
+                                    "tries": int(asy.get("tries") or 0) + 1})
+                else:
+                    r = await call("inc_async_get", {"id": asy["id"]})
+                    if r.get("expired"):
+                        asy.update({"id": None, "status": "none"})
+                    elif str(r.get("status")).lower() == "completed" and r.get("url"):
+                        lst = await call("inc_async_fetch", {"url": r["url"]}) or []
+                        lst = [x for x in lst if st["year_from"] <= int(x["t"]) < st["cutoff"]]
+                        await db.cex_tr_add(uid, ex, _inc_rows(lst))
+                        asy.update({"status": "done", "n": len(lst)})
+                    elif now - int(asy.get("req_at") or now) > 2 * 86_400_000:
+                        asy.update({"status": "fail", "err": "timeout"})
+            except cex_mod().ApiErr as e:
+                if e.code == "auth":
+                    raise
+                asy.update({"status": "fail", "err": _cx_msg(e.text) or e.code})
+                log.info("Futures eski tarixi olinmadi (uid=%s): %s", uid, asy["err"])
+            st["async"] = asy
+        # 3) spot fill'lari
+        try:
+            sp = st.get("spot") or {}
+            bad = set(st.get("spot_bad") or [])
+            if now - int(st.get("spot_cands_at") or 0) > 6 * 3_600_000:
+                for sy in await call("spot_cands", {}) or []:
+                    if sy not in sp and sy not in bad:
+                        sp[sy] = None
+                st["spot_cands_at"] = now
+            for sy in await db.cex_tr_spot_syms(uid, ex):
+                sp.setdefault(sy, None)
+            todo = {sy: (None if v is None else int(v) + 1) for sy, v in sp.items() if sy not in bad}
+            if todo:
+                r = await call("spot_sync", {"syms": todo})
+                await db.cex_tr_add(uid, ex, [{"key": x["key"], "kind": "spot", "typ": x["side"], "sym": x["sym"],
+                                               "t": _dt(int(x["t"])), "qty": x["qty"], "quote": x["quote"],
+                                               "fee": x["fee"], "fee_a": x.get("fee_a"), "ref": x.get("oid")}
+                                              for x in r.get("rows") or []])
+                for sy, last in (r.get("cursors") or {}).items():
+                    sp[sy] = last
+                for sy in r.get("bad") or []:
+                    bad.add(sy)
+                    sp.pop(sy, None)
+            st["spot"], st["spot_bad"] = sp, sorted(bad)
+            st.pop("spot_err", None)
+        except cex_mod().ApiErr as e:
+            if e.code == "auth":
+                raise
+            st["spot_err"] = _cx_msg(e.text) or e.code
+        st["synced_at"] = int(time.time() * 1000)
+        await db.cex_sync_put(uid, ex, st)
+    except Exception:
+        log.warning("Savdo tarixi sinxronlanmadi (%s uid=%s)", ex, uid, exc_info=True)
+    finally:
+        _CX_SYNC_RUN.discard((uid, ex))
+
+
+def cex_mod():
+    import cex
+    return cex
+
+
+def _cx_summary(ev: list) -> dict:
+    from datetime import datetime, timezone
+    ev = sorted(ev, key=lambda e: e["t"])
+    n = len(ev)
+    wins = [e["pnl"] for e in ev if e["pnl"] > 0]
+    loss = [e["pnl"] for e in ev if e["pnl"] < 0]
+    cum, curve, months, syms = 0.0, [], {}, {}
+    for e in ev:
+        cum += e["pnl"]
+        curve.append([e["t"], round(cum, 2)])
+        m = datetime.fromtimestamp(e["t"] / 1000, timezone.utc).strftime("%Y-%m")
+        months[m] = months.get(m, 0.0) + e["pnl"]
+        s = syms.setdefault(e["sym"], [0.0, 0])
+        s[0] += e["pnl"]
+        s[1] += 1
+    if len(curve) > 200:
+        step = len(curve) / 200
+        curve = [curve[int(i * step)] for i in range(200)] + [curve[-1]]
+    return {"n": n, "pnl": round(sum(e["pnl"] for e in ev), 2), "wins": len(wins), "losses": len(loss),
+            "wr": (len(wins) / n * 100) if n else 0.0,
+            "avg_win": (sum(wins) / len(wins)) if wins else 0.0, "avg_loss": (sum(loss) / len(loss)) if loss else 0.0,
+            "pf": (sum(wins) / -sum(loss)) if loss else None,
+            "best": max((e["pnl"] for e in ev), default=0.0), "worst": min((e["pnl"] for e in ev), default=0.0),
+            "curve": curve, "months": sorted([[k, round(v, 2)] for k, v in months.items()]),
+            "syms": sorted([[k, round(v[0], 2), v[1]] for k, v in syms.items()], key=lambda x: -abs(x[1]))[:15]}
+
+
+def _cx_stats(rows, since_ms: int) -> dict:
+    """Saqlangan tarixdan: futures yopilishlari (REALIZED_PNL, 60 s ichidagi fill'lar bitta),
+    komissiya/funding; spot — o'rtacha tannarx bo'yicha realizatsiya qilingan PnL."""
+    fut, by_trade, fees, funding = [], {}, 0.0, 0.0
+    spot_orders = {}
+    for r in rows:
+        tm = int(r["t"].timestamp() * 1000)
+        if r["kind"] == "inc":
+            typ, sym, amt = r["typ"], r["sym"] or "", float(r["amt"] or 0)
+            if typ == "REALIZED_PNL":
+                e = fut[-1] if fut else None
+                if not (e and e["sym"] == sym and tm - e["t"] <= 60_000):
+                    e = {"sym": sym, "t": tm, "pnl": 0.0, "fee": 0.0, "mkt": "fut"}
+                    fut.append(e)
+                e["pnl"] += amt
+                e["t"] = tm
+                if r["ref"]:
+                    by_trade[(sym, r["ref"])] = e
+            elif typ == "FUNDING_FEE" and tm >= since_ms:
+                funding += amt
+        elif r["kind"] == "spot":
+            key = (r["sym"], r["ref"] or str(tm))
+            o = spot_orders.get(key)
+            if o is None:
+                o = spot_orders[key] = {"sym": r["sym"], "side": r["typ"], "qty": 0.0, "quote": 0.0, "t": tm}
+            o["qty"] += float(r["qty"] or 0)
+            o["quote"] += float(r["quote"] or 0)
+            o["t"] = max(o["t"], tm)
+    for r in rows:
+        if r["kind"] == "inc" and r["typ"] == "COMMISSION":
+            tm = int(r["t"].timestamp() * 1000)
+            e = by_trade.get((r["sym"] or "", r["ref"]))
+            if e is not None:
+                e["fee"] += float(r["amt"] or 0)
+            if tm >= since_ms:
+                fees += float(r["amt"] or 0)
+    spot_ev, held = [], {}
+    for o in sorted(spot_orders.values(), key=lambda o: o["t"]):
+        h = held.setdefault(o["sym"], [0.0, 0.0])
+        if o["side"] == "buy":
+            h[0] += o["qty"]
+            h[1] += o["quote"]
+        elif o["qty"] > 0 and h[0] > 0:
+            sold = min(o["qty"], h[0])
+            avg = h[1] / h[0]
+            pnl = o["quote"] * (sold / o["qty"]) - avg * sold
+            h[0] -= sold
+            h[1] -= avg * sold
+            spot_ev.append({"sym": o["sym"], "t": o["t"], "pnl": pnl, "mkt": "spot"})
+    fut_p = [e for e in fut if e["t"] >= since_ms]
+    spot_p = [e for e in spot_ev if e["t"] >= since_ms]
+    f = _cx_summary(fut_p)
+    f.update({"fees": round(fees, 2), "funding": round(funding, 2), "net": round(f["pnl"] + fees + funding, 2)})
+    sp = _cx_summary(spot_p)
+    al = _cx_summary(fut_p + spot_p)
+    al["net"] = round(al["pnl"] + fees + funding, 2)
+    return {"all": al, "fut": f, "spot": sp,
+            "first": int(rows[0]["t"].timestamp() * 1000) if rows else None}
+
+
+async def api_cexstats(request):
+    """334: birja statistikasi — davr: 30d | 90d | ytd | all. Kerak bo'lsa fonda sinxronizatsiya."""
+    import cex
+    body, uid = await _body(request)
+    ex = str(body.get("ex") or "")
+    if ex not in cex.EXCHANGES:
+        raise web.HTTPBadRequest()
+    per = body.get("per") if body.get("per") in ("30d", "90d", "ytd", "all") else "ytd"
+    row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
+    if row is None:
+        raise web.HTTPNotFound()
+    if ex != "binance":
+        return web.json_response({"supported": False}, headers=NO_CACHE)
+    st = await db.cex_sync_get(uid, ex)
+    now = int(time.time() * 1000)
+    if (not st.get("synced_at") or now - int(st["synced_at"]) > _CX_SYNC_GAP * 1000
+            or (bool(body.get("fresh")) and now - int(st["synced_at"]) > 60_000)) and (uid, ex) not in _CX_SYNC_RUN:
+        t = asyncio.get_running_loop().create_task(_cx_sync(uid, ex, row))
+        _CEX_BG.add(t)
+        t.add_done_callback(_CEX_BG.discard)
+    since = {"30d": now - 30 * 86_400_000, "90d": now - 90 * 86_400_000,
+             "ytd": _year_start_ms(), "all": 0}[per]
+    rows = await db.cex_tr_rows(uid, ex)
+    res = _cx_stats(rows, since)
+    asy = st.get("async") or {}
+    res.update({"supported": True, "per": per, "since": since,
+                "sync": {"running": (uid, ex) in _CX_SYNC_RUN, "at": st.get("synced_at"),
+                         "old": asy.get("status") or ("done" if st.get("year_from") and st.get("year_from") >= st.get("cutoff", 0) else "none"),
+                         "old_err": asy.get("err"), "year_from": st.get("year_from"), "cutoff": st.get("cutoff"),
+                         "err": st.get("fut_err") or st.get("spot_err")}})
     return web.json_response(res, headers=NO_CACHE)
 
 
@@ -1191,6 +1436,7 @@ def routes() -> list:
         web.post("/api/app/cexhist", api_cexhist),
         web.post("/api/app/cextrades", api_cextrades),
         web.post("/api/app/cextrade", api_cextrade),
+        web.post("/api/app/cexstats", api_cexstats),
     ]
 
 
@@ -1380,6 +1626,8 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_tr_cnt": "{n} ta savdo", "cx_margin": "Marja",
+    "cx_pos_open": "{n} ta ochiq", "cx_st_ytd": "Yil boshidan", "cx_acc": "Hisob", "cx_assets_n": "aktiv", "cx_no_pos": "Ochiq pozitsiya yo'q", "cx_drag": "TP va SL chiziqlarini grafikda surib o'zgartirish mumkin.", "cx_per_ytd": "{y} yil boshidan", "cx_st_all": "Hammasi", "cx_st_net": "Sof natija", "cx_st_pf": "Profit factor", "cx_st_avg": "O'rtacha foyda / zarar", "cx_st_best": "Eng yaxshi savdo", "cx_st_worst": "Eng yomon savdo", "cx_st_months": "Oylar bo'yicha", "cx_st_syms": "Juftliklar bo'yicha", "cx_st_sync": "Savdo tarixi Binance'dan yuklanmoqda…", "cx_st_old_pending": "{y} yil boshidan to'liq futures tarixi Binance'dan yuklab olinmoqda — bir necha daqiqadan bir necha soatgacha. Hozircha so'nggi ~3 oy ko'rinadi.", "cx_st_old_fail": "{y} yil boshidagi eski futures tarixi olinmadi — so'nggi ~3 oy ko'rsatilmoqda. {e}", "cx_st_only": "Statistika hozircha faqat Binance uchun.", "cx_st_empty": "Bu davrda yopilgan savdo yo'q", "cx_st_synced": "Yangilangan", "cx_st_from": "tarix",
     "tr_trade": "savdo", "tr_enable": "Bot ichidan savdo qilish uchun Binance kalitida «Enable Spot & Margin Trading» va/yoki «Enable Futures» ruxsatini yoqing (pul yechish — yoqilmaydi), so'ng «Kalitni yangilash».", "tr_noperm_spot": "Kalitda Spot savdo ruxsati yo'q — Binance'da «Enable Spot & Margin Trading»ni yoqing.", "tr_noperm_fut": "Kalitda Futures ruxsati yo'q — Binance'da «Enable Futures»ni yoqing.", "tr_lev": "Leveraj", "tr_margin": "Marja, USDT", "tr_qty": "Miqdor", "tr_size": "Pozitsiya", "tr_open": "Ochiq orderlar", "tr_need_amt": "Summani kiriting", "tr_confirm": "Real order yuboriladi. Tasdiqlaysizmi?", "tr_sent": "Order yuborildi", "tr_cancel_q": "Orderni bekor qilasizmi?", "tr_cancelled": "Order bekor qilindi", "tr_close": "Yopish", "tr_close_txt": "Pozitsiyaning qancha qismi bozor narxida yopilsin?", "tr_close_q": "{s} pozitsiyasining {p}% bozor narxida yopiladi. Tasdiqlaysizmi?", "tr_closed": "Pozitsiya yopildi", "tr_tpsl_ok": "TP/SL saqlandi", "cx_e_noperm": "Kalitda bu savdo ruxsati yo'q", "cx_e_small": "Summa juda kichik (birja minimumidan kam)", "cx_e_nopos": "Bu juftlikda ochiq pozitsiya yo'q", "cx_e_noex": "Bu birjada savdo hozircha yo'q",
     "cx_trades": "Savdolar tarixi", "cx_tr_load": "Binance'dan yuklanmoqda — 10–20 soniya…", "cx_tr_only": "Savdolar tarixi hozircha faqat Binance uchun.", "cx_tr_n": "Savdolar", "cx_tr_fee": "Komissiya", "cx_tr_days": "oxirgi {n} kun", "cx_tr_none": "Savdolar topilmadi", "cx_tr_orders": "ta order", "cx_tr_spot_note": "hozirgi va oxirgi 30 kundagi coinlar bo'yicha", "cx_tr_refresh": "Yangilash",
     "cx_hist": "Balans tarixi", "cx_hist_empty": "Tarix to'planmoqda — balans har soat yozib boriladi", "cx_dn": "{n} kun",
@@ -1399,6 +1647,8 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_tr_cnt": "сделок: {n}", "cx_margin": "Маржа",
+    "cx_pos_open": "{n} открыто", "cx_st_ytd": "С начала года", "cx_acc": "Счёт", "cx_assets_n": "активов", "cx_no_pos": "Нет открытых позиций", "cx_drag": "Линии TP и SL можно двигать прямо на графике.", "cx_per_ytd": "С начала {y}", "cx_st_all": "Всё", "cx_st_net": "Чистый результат", "cx_st_pf": "Profit factor", "cx_st_avg": "Средняя прибыль / убыток", "cx_st_best": "Лучшая сделка", "cx_st_worst": "Худшая сделка", "cx_st_months": "По месяцам", "cx_st_syms": "По парам", "cx_st_sync": "Загружаем историю сделок с Binance…", "cx_st_old_pending": "Полная история фьючерсов с начала {y} года загружается с Binance — от нескольких минут до нескольких часов. Пока показаны последние ~3 месяца.", "cx_st_old_fail": "Старую историю фьючерсов с начала {y} получить не удалось — показаны последние ~3 месяца. {e}", "cx_st_only": "Статистика пока только для Binance.", "cx_st_empty": "За этот период закрытых сделок нет", "cx_st_synced": "Обновлено", "cx_st_from": "история с",
     "tr_trade": "торговля", "tr_enable": "Чтобы торговать из бота, включите в ключе Binance «Enable Spot & Margin Trading» и/или «Enable Futures» (вывод — не включать), затем «Обновить ключ».", "tr_noperm_spot": "У ключа нет права Spot-торговли — включите «Enable Spot & Margin Trading» на Binance.", "tr_noperm_fut": "У ключа нет права Futures — включите «Enable Futures» на Binance.", "tr_lev": "Плечо", "tr_margin": "Маржа, USDT", "tr_qty": "Количество", "tr_size": "Позиция", "tr_open": "Открытые ордера", "tr_need_amt": "Введите сумму", "tr_confirm": "Будет отправлен реальный ордер. Подтверждаете?", "tr_sent": "Ордер отправлен", "tr_cancel_q": "Отменить ордер?", "tr_cancelled": "Ордер отменён", "tr_close": "Закрыть", "tr_close_txt": "Какую часть позиции закрыть по рынку?", "tr_close_q": "Будет закрыто {p}% позиции {s} по рынку. Подтверждаете?", "tr_closed": "Позиция закрыта", "tr_tpsl_ok": "TP/SL сохранены", "cx_e_noperm": "У ключа нет права на эту торговлю", "cx_e_small": "Сумма слишком мала (меньше минимума биржи)", "cx_e_nopos": "По этой паре нет открытой позиции", "cx_e_noex": "Торговля на этой бирже пока недоступна",
     "cx_trades": "История сделок", "cx_tr_load": "Загружаем с Binance — 10–20 секунд…", "cx_tr_only": "История сделок пока только для Binance.", "cx_tr_n": "Сделки", "cx_tr_fee": "Комиссия", "cx_tr_days": "за {n} дн", "cx_tr_none": "Сделок не найдено", "cx_tr_orders": "ордеров", "cx_tr_spot_note": "по текущим монетам и монетам за 30 дней", "cx_tr_refresh": "Обновить",
     "cx_hist": "История баланса", "cx_hist_empty": "История собирается — баланс записывается каждый час", "cx_dn": "{n} дн",
@@ -1418,6 +1668,8 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_tr_cnt": "{n} trades", "cx_margin": "Margin",
+    "cx_pos_open": "{n} open", "cx_st_ytd": "Year to date", "cx_acc": "Account", "cx_assets_n": "assets", "cx_no_pos": "No open positions", "cx_drag": "Drag the TP and SL lines on the chart to change them.", "cx_per_ytd": "Since start of {y}", "cx_st_all": "All", "cx_st_net": "Net result", "cx_st_pf": "Profit factor", "cx_st_avg": "Avg win / loss", "cx_st_best": "Best trade", "cx_st_worst": "Worst trade", "cx_st_months": "By month", "cx_st_syms": "By pair", "cx_st_sync": "Loading trade history from Binance…", "cx_st_old_pending": "Full futures history since the start of {y} is being downloaded from Binance — from a few minutes to a few hours. The last ~3 months are shown meanwhile.", "cx_st_old_fail": "Older futures history since the start of {y} could not be fetched — showing the last ~3 months. {e}", "cx_st_only": "Statistics are available for Binance only for now.", "cx_st_empty": "No closed trades in this period", "cx_st_synced": "Updated", "cx_st_from": "history from",
     "tr_trade": "trade", "tr_enable": "To trade from the bot, enable «Enable Spot & Margin Trading» and/or «Enable Futures» on your Binance key (never withdrawals), then «Update key».", "tr_noperm_spot": "The key has no Spot trading permission — enable «Enable Spot & Margin Trading» on Binance.", "tr_noperm_fut": "The key has no Futures permission — enable «Enable Futures» on Binance.", "tr_lev": "Leverage", "tr_margin": "Margin, USDT", "tr_qty": "Quantity", "tr_size": "Position", "tr_open": "Open orders", "tr_need_amt": "Enter an amount", "tr_confirm": "A real order will be sent. Confirm?", "tr_sent": "Order sent", "tr_cancel_q": "Cancel this order?", "tr_cancelled": "Order cancelled", "tr_close": "Close", "tr_close_txt": "How much of the position to close at market?", "tr_close_q": "{p}% of the {s} position will be closed at market. Confirm?", "tr_closed": "Position closed", "tr_tpsl_ok": "TP/SL saved", "cx_e_noperm": "The key has no permission for this trade", "cx_e_small": "Amount too small (below exchange minimum)", "cx_e_nopos": "No open position in this pair", "cx_e_noex": "Trading on this exchange is not available yet",
     "cx_trades": "Trade history", "cx_tr_load": "Loading from Binance — 10–20 seconds…", "cx_tr_only": "Trade history is available for Binance only for now.", "cx_tr_n": "Trades", "cx_tr_fee": "Fees", "cx_tr_days": "last {n} days", "cx_tr_none": "No trades found", "cx_tr_orders": "orders", "cx_tr_spot_note": "for current coins and coins held in the last 30 days", "cx_tr_refresh": "Refresh",
     "cx_hist": "Balance history", "cx_hist_empty": "Collecting history — the balance is recorded every hour", "cx_dn": "{n}d",

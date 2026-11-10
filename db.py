@@ -682,6 +682,33 @@ CREATE TABLE IF NOT EXISTS cex_orders (
     at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS cex_orders_user ON cex_orders (user_id, at DESC);
+-- 334: birja savdo tarixi (statistika uchun). kind: 'inc' (futures income: REALIZED_PNL,
+-- COMMISSION, FUNDING_FEE ...) yoki 'spot' (spot savdo fill'i).
+CREATE TABLE IF NOT EXISTS cex_hist_tr (
+    user_id  BIGINT NOT NULL,
+    exchange TEXT NOT NULL,
+    key      TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    typ      TEXT,
+    sym      TEXT,
+    t        TIMESTAMPTZ NOT NULL,
+    amt      DOUBLE PRECISION,
+    qty      DOUBLE PRECISION,
+    quote    DOUBLE PRECISION,
+    fee      DOUBLE PRECISION,
+    fee_a    TEXT,
+    ref      TEXT,
+    PRIMARY KEY (user_id, exchange, key)
+);
+CREATE INDEX IF NOT EXISTS cex_hist_tr_t ON cex_hist_tr (user_id, exchange, t);
+-- 334: sinxronizatsiya holati (JSON): fut_from, fut_last, cutoff, async {id,status,from,to,err}, spot {sym: last_id}
+CREATE TABLE IF NOT EXISTS cex_sync (
+    user_id  BIGINT NOT NULL,
+    exchange TEXT NOT NULL,
+    state    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, exchange)
+);
 CREATE TABLE IF NOT EXISTS user_avatars (
     user_id BIGINT PRIMARY KEY,
     key     TEXT NOT NULL UNIQUE,
@@ -2942,6 +2969,8 @@ async def cex_del(uid: int, ex: str) -> bool:
     async with pool().acquire() as c:
         r = await c.execute("DELETE FROM cex_keys WHERE user_id=$1 AND exchange=$2", uid, ex)
         await c.execute("DELETE FROM cex_hist WHERE user_id=$1 AND exchange=$2", uid, ex)
+        await c.execute("DELETE FROM cex_hist_tr WHERE user_id=$1 AND exchange=$2", uid, ex)
+        await c.execute("DELETE FROM cex_sync WHERE user_id=$1 AND exchange=$2", uid, ex)
     return r.endswith(" 1")
 
 
@@ -2998,3 +3027,47 @@ async def cex_order_log(uid: int, ex: str, op: str, args: dict, ok: bool, result
         await c.execute("INSERT INTO cex_orders (user_id, exchange, op, args, ok, result) "
                         "VALUES ($1,$2,$3,$4::jsonb,$5,$6::jsonb)",
                         uid, ex, op, _json.dumps(args)[:4000], ok, _json.dumps(result, default=str)[:4000])
+
+
+# ─────────────── 334: birja savdo tarixi ───────────────
+async def cex_sync_get(uid: int, ex: str) -> dict:
+    import json as _json
+    async with pool().acquire() as c:
+        v = await c.fetchval("SELECT state FROM cex_sync WHERE user_id=$1 AND exchange=$2", uid, ex)
+    if v is None:
+        return {}
+    return _json.loads(v) if isinstance(v, str) else dict(v)
+
+
+async def cex_sync_put(uid: int, ex: str, state: dict) -> None:
+    import json as _json
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO cex_sync (user_id, exchange, state, at) VALUES ($1,$2,$3::jsonb,now()) "
+                        "ON CONFLICT (user_id, exchange) DO UPDATE SET state=EXCLUDED.state, at=now()",
+                        uid, ex, _json.dumps(state))
+
+
+async def cex_tr_add(uid: int, ex: str, rows: list) -> int:
+    """rows: dict(key, kind, typ, sym, t(datetime), amt, qty, quote, fee, fee_a, ref)."""
+    if not rows:
+        return 0
+    async with pool().acquire() as c:
+        await c.executemany(
+            "INSERT INTO cex_hist_tr (user_id, exchange, key, kind, typ, sym, t, amt, qty, quote, fee, fee_a, ref) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING",
+            [(uid, ex, r["key"], r["kind"], r.get("typ"), r.get("sym"), r["t"], r.get("amt"), r.get("qty"),
+              r.get("quote"), r.get("fee"), r.get("fee_a"), r.get("ref")) for r in rows])
+    return len(rows)
+
+
+async def cex_tr_rows(uid: int, ex: str, since=None):
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT kind, typ, sym, t, amt, qty, quote, fee, fee_a, ref FROM cex_hist_tr "
+                             "WHERE user_id=$1 AND exchange=$2 AND ($3::timestamptz IS NULL OR t >= $3) ORDER BY t",
+                             uid, ex, since)
+
+
+async def cex_tr_spot_syms(uid: int, ex: str) -> list:
+    async with pool().acquire() as c:
+        return [r["sym"] for r in await c.fetch(
+            "SELECT DISTINCT sym FROM cex_hist_tr WHERE user_id=$1 AND exchange=$2 AND kind='spot'", uid, ex)]
