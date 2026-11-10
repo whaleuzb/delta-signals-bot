@@ -803,6 +803,91 @@ async def coin_svg(request):
                             headers={"Cache-Control": "public, max-age=604800"})
 
 
+# ─────────────── 324: birja hisoblari (faqat o'qish) ───────────────
+_CEX_CACHE: dict[tuple, tuple[float, dict]] = {}
+_CEX_TTL = 20.0
+
+
+def _cex_keys(row) -> dict:
+    import cex
+    return {"key": cex.unseal(row["key_enc"]), "secret": cex.unseal(row["secret_enc"]),
+            "pass": cex.unseal(row["pass_enc"]) if row["pass_enc"] else ""}
+
+
+async def _cex_one(uid: int, row, fresh: bool) -> dict:
+    import cex
+    ex = row["exchange"]
+    ck = (uid, ex)
+    hit = _CEX_CACHE.get(ck)
+    if hit and not fresh and time.monotonic() - hit[0] < _CEX_TTL:
+        return hit[1]
+    base = {"ex": ex, "name": cex.NAMES.get(ex, ex), "mask": row["key_mask"]}
+    try:
+        k = _cex_keys(row)
+    except Exception:
+        # Shifr kaliti o'zgargan (EXCH_ENC_KEY/BOT_TOKEN) — qayta ulash kerak.
+        res = {**base, "err": "reconnect"}
+    else:
+        try:
+            res = {**base, **await cex.snapshot(ex, k)}
+        except cex.ApiErr as e:
+            res = {**base, "err": e.code}
+        except Exception:
+            log.warning("Birja hisobi o'qilmadi (%s)", ex, exc_info=True)
+            res = {**base, "err": "api"}
+    if len(_CEX_CACHE) > 2000:
+        _CEX_CACHE.clear()
+    _CEX_CACHE[ck] = (time.monotonic(), res)
+    return res
+
+
+async def api_cex(request):
+    body, uid = await _body(request)
+    rows = await db.cex_list(uid)
+    fresh = bool(body.get("fresh")) and _act_allowed(uid)
+    res = await asyncio.gather(*(_cex_one(uid, r, fresh) for r in rows))
+    return web.json_response({"acc": list(res)}, headers=NO_CACHE)
+
+
+async def api_cexadd(request):
+    import cex
+    body, uid = await _body(request)
+    if not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
+    ex = str(body.get("ex") or "")
+    key = str(body.get("key") or "").strip()
+    sec = str(body.get("secret") or "").strip()
+    pas = str(body.get("pass") or "").strip()
+    if ex not in cex.EXCHANGES or not (8 <= len(key) <= 200) or not (8 <= len(sec) <= 200) \
+            or len(pas) > 100 or (ex in cex.NEEDS_PASS and not pas):
+        return web.json_response({"ok": False, "err": "bad"}, headers=NO_CACHE)
+    k = {"key": key, "secret": sec, "pass": pas}
+    try:
+        await cex.verify(ex, k)
+    except cex.ApiErr as e:
+        log.info("Birja kaliti rad etildi (%s, uid=%s): %s", ex, uid, e.code)
+        return web.json_response({"ok": False, "err": e.code}, headers=NO_CACHE)
+    except Exception:
+        log.warning("Birja kalitini tekshirishda xato (%s)", ex, exc_info=True)
+        return web.json_response({"ok": False, "err": "api"}, headers=NO_CACHE)
+    await db.cex_put(uid, ex, cex.seal(key), cex.seal(sec), cex.seal(pas) if pas else None,
+                     cex.mask(key))
+    _CEX_CACHE.pop((uid, ex), None)
+    log.info("Birja hisobi ulandi (%s, uid=%s)", ex, uid)
+    return web.json_response({"ok": True}, headers=NO_CACHE)
+
+
+async def api_cexdel(request):
+    import cex
+    body, uid = await _body(request)
+    ex = str(body.get("ex") or "")
+    if ex not in cex.EXCHANGES:
+        raise web.HTTPBadRequest()
+    ok = await db.cex_del(uid, ex)
+    _CEX_CACHE.pop((uid, ex), None)
+    return web.json_response({"ok": ok}, headers=NO_CACHE)
+
+
 async def app_page(request):
     # 252: bot nomi sahifaga yoziladi — Telegram tashqarisida (brauzer,
     # to'lov boti) ochilganda ham "Botni ochish" havolasi ishlasin.
@@ -836,6 +921,9 @@ def routes() -> list:
         web.post("/api/app/group", api_group),
         web.post("/api/app/tour", api_tour),
         web.post("/api/app/tspark", api_tspark),
+        web.post("/api/app/cex", api_cex),
+        web.post("/api/app/cexadd", api_cexadd),
+        web.post("/api/app/cexdel", api_cexdel),
     ]
 
 
@@ -1022,6 +1110,56 @@ T = {
     },
 }
 
+
+# 324: Wallet — birja hisoblari
+T["uz"].update({
+    "loading": "Yuklanmoqda…", "cx_sub": "Birja hisoblaringiz bir joyda", "cx_total": "Umumiy balans",
+    "cx_n": "ta birja", "cx_mine": "Ulangan birjalar", "cx_connect": "Birjani ulash", "cx_more": "Yana ulash",
+    "cx_intro": "Birja hisobingizni ulang — balans, aktivlar va ochiq fyuchers pozitsiyalaringiz shu yerda ko'rinadi.",
+    "cx_ro": "Faqat o'qish kaliti", "cx_link": "Ulash", "cx_pos_n": "pozitsiya", "cx_pos": "Ochiq pozitsiyalar",
+    "cx_assets": "Spot aktivlar", "cx_entry": "Kirish", "cx_empty": "Hisobda aktiv yoki pozitsiya yo'q.",
+    "cx_rekey": "Kalitni yangilash", "cx_del": "Uzish", "cx_del_q": "Birja hisobini uzasizmi? Kalit bazadan o'chiriladi.",
+    "cx_deleted": "Hisob uzildi, kalit o'chirildi", "cx_upd": "Yangilanmoqda…",
+    "cx_how": "Birjada yangi API kalit yarating va FAQAT «O'qish» (Read-only) ruxsatini bering. Savdo va pul yechish ruxsatlarini yoqmang. Kalitlar shifrlangan holda saqlanadi.",
+    "cx_fill": "Barcha maydonlarni to'ldiring", "cx_check": "Tekshirilmoqda…", "cx_ok": "Birja hisobi ulandi ✅",
+    "cx_safe": "Bot faqat balans va pozitsiyalarni o'qiydi — savdo qilmaydi va pul yecha olmaydi. Kalitlar shifrlangan, istalgan payt uzishingiz mumkin.",
+    "cx_e_auth": "Kalit noto'g'ri yoki muddati o'tgan", "cx_e_withdraw": "Bu kalitda pul yechish ruxsati bor — xavfsizlik uchun qabul qilinmaydi. Faqat o'qish kalitini yarating.",
+    "cx_e_geo": "Birja server hududidan so'rovni blokladi — tez orada tuzatiladi", "cx_e_net": "Birja javob bermadi, keyinroq urinib ko'ring",
+    "cx_e_api": "Birjadan ma'lumot olinmadi", "cx_e_bad": "Kalit formati noto'g'ri", "cx_e_reconnect": "Kalitni qayta ulang",
+    "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
+})
+T["ru"].update({
+    "loading": "Загрузка…", "cx_sub": "Ваши биржевые счета в одном месте", "cx_total": "Общий баланс",
+    "cx_n": "бирж", "cx_mine": "Подключённые биржи", "cx_connect": "Подключить биржу", "cx_more": "Подключить ещё",
+    "cx_intro": "Подключите биржевой счёт — баланс, активы и открытые фьючерсные позиции будут видны здесь.",
+    "cx_ro": "Ключ только для чтения", "cx_link": "Подключить", "cx_pos_n": "поз.", "cx_pos": "Открытые позиции",
+    "cx_assets": "Спот-активы", "cx_entry": "Вход", "cx_empty": "На счёте нет активов и позиций.",
+    "cx_rekey": "Обновить ключ", "cx_del": "Отключить", "cx_del_q": "Отключить биржевой счёт? Ключ будет удалён.",
+    "cx_deleted": "Счёт отключён, ключ удалён", "cx_upd": "Обновляем…",
+    "cx_how": "Создайте на бирже новый API-ключ ТОЛЬКО с правом «Чтение» (Read-only). Не включайте торговлю и вывод. Ключи хранятся в зашифрованном виде.",
+    "cx_fill": "Заполните все поля", "cx_check": "Проверяем…", "cx_ok": "Биржевой счёт подключён ✅",
+    "cx_safe": "Бот только читает баланс и позиции — не торгует и не может выводить средства. Ключи зашифрованы, отключить можно в любой момент.",
+    "cx_e_auth": "Неверный или просроченный ключ", "cx_e_withdraw": "У ключа есть право вывода — из соображений безопасности не принимается. Создайте ключ только для чтения.",
+    "cx_e_geo": "Биржа блокирует регион сервера — скоро исправим", "cx_e_net": "Биржа не ответила, попробуйте позже",
+    "cx_e_api": "Не удалось получить данные биржи", "cx_e_bad": "Неверный формат ключа", "cx_e_reconnect": "Подключите ключ заново",
+    "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
+})
+T["en"].update({
+    "loading": "Loading…", "cx_sub": "All your exchange accounts in one place", "cx_total": "Total balance",
+    "cx_n": "exchanges", "cx_mine": "Connected exchanges", "cx_connect": "Connect an exchange", "cx_more": "Connect more",
+    "cx_intro": "Connect your exchange account — balance, assets and open futures positions will show up here.",
+    "cx_ro": "Read-only key", "cx_link": "Connect", "cx_pos_n": "positions", "cx_pos": "Open positions",
+    "cx_assets": "Spot assets", "cx_entry": "Entry", "cx_empty": "No assets or positions on this account.",
+    "cx_rekey": "Update key", "cx_del": "Disconnect", "cx_del_q": "Disconnect this exchange? The key will be deleted.",
+    "cx_deleted": "Disconnected, key deleted", "cx_upd": "Refreshing…",
+    "cx_how": "Create a new API key on the exchange with READ-ONLY permission. Do not enable trading or withdrawals. Keys are stored encrypted.",
+    "cx_fill": "Fill in all fields", "cx_check": "Checking…", "cx_ok": "Exchange connected ✅",
+    "cx_safe": "The bot only reads balances and positions — it cannot trade or withdraw. Keys are encrypted and you can disconnect any time.",
+    "cx_e_auth": "Invalid or expired key", "cx_e_withdraw": "This key can withdraw funds — rejected for safety. Create a read-only key.",
+    "cx_e_geo": "The exchange blocks the server region — fix coming soon", "cx_e_net": "The exchange did not respond, try later",
+    "cx_e_api": "Could not load exchange data", "cx_e_bad": "Invalid key format", "cx_e_reconnect": "Please reconnect the key",
+    "cx_e_rate": "Too many attempts — try in a minute", "cx_e_perm": "The key has no read permission",
+})
 
 # 240: sahifa alohida faylda (webapp.html) — JS'ni Python satri ichida
 # ekranlash shart bo'lmasin. __T__ — tarjimalar.

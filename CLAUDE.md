@@ -7933,3 +7933,18 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `_process_markettwits_message`: tiker topilmasa sarlavha (`📰 <b>MarketTwits</b>`) QO'YILMAYDI — post faqat xabar matni. Tiker bo'lsa sarlavha avvalgidek aktiv nomi (masalan BTCUSDT).
 - `_app_newsshare`: eski postlar ulashilganda boshidagi `📰 <b>MarketTwits</b>` sarlavhasi kesib tashlanadi.
 - Manba nomi foydalanuvchiga ko'rinmasin — kelajakda ham post/ulashish matnida "MarketTwits" yozilmasin.
+
+## 325. Wallet: birja hisoblarini ulash (MEXC, Bitget, BingX, Binance) — 1-bosqich, FAQAT O'QISH
+- Foydalanuvchi: "Mexc bitget bingx va binance ulaydigan qilib ko'raylik".
+- `cex.py`: har birja uchun imzolangan GET so'rovlar (savdo/POST YO'Q): spot balans, fyuchers (USDT-M) balansi, ochiq pozitsiyalar.
+  - Binance: HMAC hex query, `X-MBX-APIKEY`; `/api/v3/account`, `/fapi/v2/account`, `/fapi/v2/positionRisk`; `/sapi/v1/account/apiRestrictions` → `enableWithdrawals` bo'lsa RAD.
+  - MEXC: spot Binance uslubida (`X-MEXC-APIKEY`); fyuchers `ApiKey`/`Request-Time`/`Signature=hex(key+ts+params)`; qty = holdVol × contractSize; uPnL fairPrice'dan hisoblanadi. `canWithdraw` HISOB holati — unga qarab rad etilMAYDI.
+  - Bitget v2: `ACCESS-SIGN = base64(hmac(ts+GET+path?query))` + passphrase; `authorities`da "withdraw" bo'lsa RAD.
+  - BingX: HMAC hex query, `X-BX-APIKEY`; swap balans ham obyekt, ham ro'yxat bo'lishi mumkin.
+  - Spot aktivlar $ qiymati MEXC narx ro'yxatidan (`exchange.price_list`), stable = 1; $1 dan kichiklar yashiriladi.
+- Kalitlar: `cex_keys` jadvali, AES-GCM (`cex.seal`), shifr kaliti `EXCH_ENC_KEY` env (bo'lmasa BOT_TOKEN'dan). BOT_TOKEN/EXCH_ENC_KEY o'zgarsa — kalitlar ochilmaydi, ilovada "Kalitni qayta ulang". Kalit brauzerga HECH QACHON qaytmaydi (faqat `key_mask`).
+- Web (`webapp.py`): `/api/app/cex` (ro'yxat + snapshot, 20 s kesh), `/api/app/cexadd` (birjada tekshirib saqlaydi), `/api/app/cexdel`. Ulash `_act_allowed` limiti ostida.
+- Ilova: Wallet bo'limi — umumiy balans, ulangan birjalar, batafsil oyna (Spot/Futures, pozitsiyalar, aktivlar, Kalitni yangilash/Uzish), ulanmaganlar "Ulash".
+- ⚠️ Web servis Railway `sfo` (AQSh) hududida — Binance 451 qaytaradi (`ApiErr("geo")`, ilovada tushunarli xabar). Bitget/BingX ham AQSh IP'larini cheklashi mumkin. Yechim — hudud o'zgartirish (foydalanuvchi qarori).
+- `coinIc('USDT')` endi bo'sh emas (ilgari "?" chiqardi).
+- Sinov: `test_324.py` 30/30 (imzolar, parsing, shifr, endpointlar), brauzer `t_cx.py`.

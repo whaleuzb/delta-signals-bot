@@ -412,10 +412,59 @@ function render(){nav();pill();var v=document.getElementById('view');var w=cur()
  v.insertAdjacentHTML('beforeend','<div class="endsp"></div>');
  S.anim=false;S.dir='';bindSlider()}
 
-/* 321: Wallet — hozircha "Tez orada" */
-function walletView(v){v.innerHTML='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('wallet',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('w_sub'))+'</div></div></div>'
- +'<div class="slide glass acc rise" style="min-height:0;padding:34px 20px;text-align:center"><div style="display:inline-flex;width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:rgba(194,242,58,.12);color:var(--g);margin-bottom:14px">'+ic('wallet',30)+'</div>'
- +'<div style="font-size:26px;font-weight:900;letter-spacing:-.03em">'+esc(t('w_soon'))+'</div><div class="rs" style="margin-top:8px;line-height:1.5">'+esc(t('w_txt'))+'</div></div>'}
+/* 324: Wallet — birja hisoblari (MEXC, Bitget, BingX, Binance), faqat o'qish */
+var CEX=[['mexc','MEXC','#2f7bff','MX'],['bitget','Bitget','#00c2c2','BG'],['bingx','BingX','#3b5bff','BX'],['binance','Binance','#f0b90b','BN']];
+function cexMeta(ex){for(var k=0;k<CEX.length;k++)if(CEX[k][0]==ex)return CEX[k];return[ex,ex,'#888','?']}
+function cexBadge(ex,z){var m=cexMeta(ex);z=z||38;return'<div class="av" style="width:'+z+'px;height:'+z+'px;color:'+m[2]+';background:'+m[2]+'1f;border-color:'+m[2]+'40;font-size:'+Math.round(z*.34)+'px">'+m[3]+'</div>'}
+function cexLoad(fresh){if(S.cexL)return;S.cexL=1;api('cex',{fresh:!!fresh}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};S.cexL=0;if(S.tab=='wallet')render()}).catch(function(){S.cexL=0;S.cex=S.cex||{acc:[],at:Date.now(),fail:1};if(S.tab=='wallet')render()})}
+function cexErr(c){return t('cx_e_'+c)!=('cx_e_'+c)?t('cx_e_'+c):t('cx_e_api')}
+function n2(v){return(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
+ var h='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('wallet',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('cx_sub'))+'</div></div></div>';
+ if(!c){v.innerHTML=h+'<div class="empty glass rise">'+esc(t('loading'))+'</div>';return}
+ var acc=c.acc||[],tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});
+ if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
+  +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+n2(tot)+'</div>'
+  +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div></div>';
+  h+='<div class="sect rise">'+esc(t('cx_mine'))+'</div>'+acc.map(function(a){var m=cexMeta(a.ex),np=(a.pos||[]).length;
+   return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+'</div><div class="rs">'
+   +(a.err?'<span class="r">'+esc(cexErr(a.err))+'</span>':esc(a.mask)+(np?' · '+np+' '+esc(t('cx_pos_n')):''))+'</div></div>'
+   +(a.err?'':'<div class="rv">$'+n2(a.total||0)+(a.fut&&a.fut.upnl?'<small class="'+(a.fut.upnl>=0?'g':'r')+'">'+fm(a.fut.upnl)+'</small>':'')+'</div>')+'</div>'}).join('')}
+ var have={};acc.forEach(function(a){have[a.ex]=1});var rest=CEX.filter(function(x){return!have[x[0]]});
+ if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
+  if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
+  h+=rest.map(function(x){return'<div class="row glass rise" onclick="cexAdd(\''+x[0]+'\')">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t('cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
+ h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
+ v.innerHTML=h}
+function cexAcc(ex){var a=null;((S.cex||{}).acc||[]).forEach(function(x){if(x.ex==ex)a=x});return a}
+function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
+ var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' <span class="rs" style="font-weight:600">'+esc(a.mask)+'</span></h4>';
+ if(a.err)h+='<p class="r">'+esc(cexErr(a.err))+'</p>';
+ else{h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
+   +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Spot</div><div style="font-weight:800;font-size:17px">$'+n2(a.spot_usd||0)+'</div></div>'
+   +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Futures</div><div style="font-weight:800;font-size:17px">'+(a.fut?'$'+n2(a.fut.eq||0):'—')+'</div>'+(a.fut&&a.fut.upnl?'<div class="rs '+(a.fut.upnl>=0?'g':'r')+'">uPnL '+fm(a.fut.upnl)+'</div>':'')+'</div></div>';
+  var P=a.pos||[];if(P.length){h+='<div class="rs" style="margin:0 2px 6px;font-weight:700">'+esc(t('cx_pos'))+'</div>'+P.map(function(p){
+   return'<div class="glass" style="border-radius:14px;padding:10px 12px;margin-bottom:6px"><div style="display:flex;align-items:center;gap:8px">'+coinIc(p.sym,20)+'<b>'+esc(p.sym)+'</b><span class="chip glass on" style="padding:2px 8px;font-size:10.5px;color:'+(p.side=='long'?'var(--g)':'var(--r)')+'">'+(p.side=='long'?'LONG':'SHORT')+(p.lev?' '+(+p.lev)+'x':'')+'</span><span style="margin-left:auto;font-weight:800" class="'+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'</span></div>'
+   +'<div class="rs" style="margin-top:5px">'+esc(t('df_qty'))+' '+(+p.qty)+' · '+esc(t('cx_entry'))+' '+fp(p.entry)+(p.mark?' · '+esc(t('df_mark'))+' '+fp(p.mark):'')+(p.liq?' · LIQ '+fp(p.liq):'')+'</div></div>'}).join('')}
+  var A=a.assets||[];if(A.length){h+='<div class="rs" style="margin:10px 2px 6px;font-weight:700">'+esc(t('cx_assets'))+'</div>'+A.map(function(x){
+   return'<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(x.a,20)+'<b style="font-size:13px">'+esc(x.a)+'</b><span class="rs" style="margin:0">'+(+x.q.toPrecision(8))+'</span><span style="margin-left:auto;font-weight:700;font-size:13px">'+(x.usd!=null?'$'+n2(x.usd):'—')+'</span></div>'}).join('')}
+  if(!P.length&&!A.length)h+='<p>'+esc(t('cx_empty'))+'</p>'}
+ h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button>'
+  +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
+ sheetOpen(h)}
+function cexIn(id,ph){return'<input id="'+id+'" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="'+esc(ph)+'" style="width:100%;font-size:15px;font-weight:600;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px;font-family:ui-monospace,monospace">'}
+function cexAdd(ex){var m=cexMeta(ex);tick();
+ sheetOpen('<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' — '+esc(t('cx_link'))+'</h4>'
+  +'<p style="line-height:1.5">'+esc(t('cx_how'))+'</p>'
+  +cexIn('cx_k','API Key')+cexIn('cx_s','Secret Key')+(ex=='bitget'?cexIn('cx_p','Passphrase'):'')
+  +'<button class="btn p full" id="cx_go" onclick="cexSave(\''+ex+'\')">'+esc(t('cx_link'))+'</button>')}
+function cexSave(ex){var g=function(id){var e=document.getElementById(id);return e?e.value.trim():''};var k=g('cx_k'),s=g('cx_s'),p=g('cx_p');
+ if(!k||!s||(ex=='bitget'&&!p)){toast(esc(t('cx_fill')));return}
+ var b=document.getElementById('cx_go');if(b){b.disabled=true;b.textContent=t('cx_check')}
+ api('cexadd',{ex:ex,key:k,secret:s,pass:p}).then(function(d){if(d.ok){haptic&&haptic('success');sheetClose();toast(esc(t('cx_ok')));S.cex=null;cexLoad(1)}
+  else{toast(esc(cexErr(d.err)));if(b){b.disabled=false;b.textContent=t('cx_link')}}})
+ .catch(function(e){toast(esc(t(e==429?'cx_e_rate':'cx_e_net')));if(b){b.disabled=false;b.textContent=t('cx_link')}})}
+function cexDel(ex){confirmBox(t('cx_del_q'),function(){api('cexdel',{ex:ex}).then(function(){sheetClose();S.cex={acc:((S.cex||{}).acc||[]).filter(function(a){return a.ex!=ex}),at:Date.now()};render();toast(esc(t('cx_deleted')))}).catch(function(){toast(esc(t('cx_e_net')))})})}
 /* ---- bosh sahifa: slayder + kartalar ---- */
 function home(v,w){var tot=totals();var n=S.items.length;var busy=0;S.items.forEach(function(i){if(i.alloc)busy+=i.alloc});
  var best=null;S.items.forEach(function(i){if(i.live!=null&&(!best||i.live>best.live))best=i});
@@ -605,7 +654,7 @@ setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.df||g.drag||g.pend||d
 /* 297/298: pozitsiya kartasi — Dip Funded mobil kartasi kabi (tanga belgisi, P&L/ROI, 6 maydon, ichida tugmalar),
    yorliqlar: Pozitsiya | Buyurtmalar; qo'shimcha ma'lumot «Batafsil» ichida */
 var COINS=__COINS__;
-function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase().replace(/(USDT|USDC|BUSD|USD|PERP)$/,'').toLowerCase();
+function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase();b=(b.replace(/(USDT|USDC|BUSD|USD|PERP)$/,'')||b).toLowerCase();
  if(COINS.indexOf(b)>=0)return'<img src="/coins/'+b+'.svg" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none">';
  return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>'}
 /* 300: natijani ulashish — rasm + matn + "Botni ochish" (referal ulashishdek) */

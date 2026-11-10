@@ -649,6 +649,17 @@ CREATE TABLE IF NOT EXISTS dip_apps (
     status     TEXT NOT NULL DEFAULT 'new',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 324: birja API kalitlari (faqat o'qish). key/secret/pass — AES-GCM (cex.seal).
+CREATE TABLE IF NOT EXISTS cex_keys (
+    user_id    BIGINT NOT NULL,
+    exchange   TEXT NOT NULL,
+    key_enc    TEXT NOT NULL,
+    secret_enc TEXT NOT NULL,
+    pass_enc   TEXT,
+    key_mask   TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, exchange)
+);
 CREATE TABLE IF NOT EXISTS user_avatars (
     user_id BIGINT PRIMARY KEY,
     key     TEXT NOT NULL UNIQUE,
@@ -2886,3 +2897,26 @@ async def user_manage_workspaces(uid: int) -> list[asyncpg.Record]:
         return await c.fetch(
             "SELECT * FROM workspaces WHERE owner_id=$1 AND NOT archived "
             "ORDER BY (type='personal') DESC, is_channel, id", uid)
+
+
+# ─────────────── 324: birja API kalitlari ───────────────
+async def cex_put(uid: int, ex: str, key_enc: str, secret_enc: str,
+                  pass_enc: str | None, key_mask: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute(
+            "INSERT INTO cex_keys (user_id, exchange, key_enc, secret_enc, pass_enc, key_mask) "
+            "VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (user_id, exchange) DO UPDATE SET "
+            "key_enc=EXCLUDED.key_enc, secret_enc=EXCLUDED.secret_enc, pass_enc=EXCLUDED.pass_enc, "
+            "key_mask=EXCLUDED.key_mask, created_at=now()",
+            uid, ex, key_enc, secret_enc, pass_enc, key_mask)
+
+
+async def cex_list(uid: int):
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT * FROM cex_keys WHERE user_id=$1 ORDER BY created_at", uid)
+
+
+async def cex_del(uid: int, ex: str) -> bool:
+    async with pool().acquire() as c:
+        r = await c.execute("DELETE FROM cex_keys WHERE user_id=$1 AND exchange=$2", uid, ex)
+    return r.endswith(" 1")

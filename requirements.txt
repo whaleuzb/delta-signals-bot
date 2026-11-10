@@ -6,3 +6,4 @@ aiohttp==3.10.11
 pillow==11.0.0
 telethon==1.44.0
 qrcode==8.2
+cryptography==43.0.3
