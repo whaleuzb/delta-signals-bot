@@ -830,6 +830,27 @@ async def _cx_call(op: str, ex: str, k: dict):
     return d.get("snap")
 
 
+async def cex_relay_check(_app=None):
+    """Ishga tushganda: Singapurdagi `cex` servisiga ichki tarmoq orqali ulanish bormi (logga)."""
+    url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
+    if not url:
+        return
+    import httpx
+
+    async def run():
+        for k in range(6):
+            try:
+                async with httpx.AsyncClient(timeout=10) as c:
+                    r = await c.get(url + "/healthz")
+                log.info("cex servisi (Singapur): ulanish bor — HTTP %s", r.status_code)
+                return
+            except Exception as e:
+                last = type(e).__name__
+            await asyncio.sleep(15)
+        log.warning("cex servisiga ulanib bo'lmadi (%s) — birja hisoblari ishlamaydi", last)
+    asyncio.get_running_loop().create_task(run())
+
+
 def _cex_keys(row) -> dict:
     import cex
     return {"key": cex.unseal(row["key_enc"]), "secret": cex.unseal(row["secret_enc"]),

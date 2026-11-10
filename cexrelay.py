@@ -29,6 +29,9 @@ import cex  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("cexrelay")
+# httpx har so'rov URL'ini INFO'da yozadi — imzolangan so'rovlar logga tushmasin.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 
 
 def _auth(request) -> bool:
