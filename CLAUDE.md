@@ -8094,3 +8094,15 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `announce_channel_job` (ishga tushgandan 90 s keyin, bir marta — `ANNOUNCE_CH_KEY`): kanal `workspaces` dan (`is_channel`, nomi "mamurjon mt…" yoki id=290), o'sha rasm + matn `send_photo`.
 - Kanalda web_app tugma ishlamaydi → url tugma `t.me/<bot>?startapp=wallet`; `webapp.html` `start_param` TABS nomi bo'lsa (`wallet`) o'sha bo'limni ochadi.
 - Sinov `test_345.py` (bir marta yuboradi, ikkinchisida yo'q).
+
+## 346. Dip Funded — birjalar qatorida (kontekst `cx:dipfunded`), eski boshqaruv olib tashlandi
+- Foydalanuvchi: "Dipfundedni ham birjalar qatoriga qo'shamiz… ulash/uzish… statistikasi birjalarnikidek… avvalgi boshqaruv kerak emas… yuqorida hisoblar orasida tursin… ko'p hisobli odamlarga hisob almashtirish alohida bo'lsin".
+- Ulanish: Dip Funded Telegram orqali (tg_id) — kalit yo'q. "Uzish" faqat shu ilovada (`bot_settings` `dfoff:<uid>`, `/api/app/dfoff`, `api_me` → `df_off`); Dip Funded akkaunti o'zgarmaydi. Ulanmagan bo'lsa (`not_linked`/`profile`) — `dfLinkSheet` (sayt havolasi + Tekshirish).
+- Ilova (`webapp.html`, 346 bloki): `dfEntry()` — S.cex.acc ga qo'shiladigan soxta birja yozuvi (`ex:'dipfunded'`, `df:1`, equity); `cxList()` (pill ro'yxati va Birja bo'limi), `cexAcc('dipfunded')`, `cexMeta/cexBadge` (dfLogo). Ma'lumot: `dfxLoad` (`dfacc` → `S.dfx {accs, main, cur}`; tanlangan hisob `localStorage tc_dfacc`), `dfOneLoad` (`dfone` → `S.dfs`).
+- Hisob almashtirish: `dfSwitch(id)` — Bosh sahifa tepasida chiplar, pastda "Hisoblarim" ro'yxati, Birja oynasida (`dfOpen`) ham.
+- Bosh (`dfHome`): slaydlar (equity, ochiq natija, yil boshidan), Balans/Bo'sh, kunlik/maks. zarar/maqsad/savdo kunlari, Spot savdo + Grafik, pozitsiyalar kartasi, Statistika + Turnir, Savdolar tarixi (`dfTrades`), Prop hisob olish / Sayt.
+- Savdo (`tvView` DF rejimi): faqat Spot; Buy — Limit/Market, summa USDT (`amount`), TP/SL tezkor %; Sell — bozor narxida pozitsiya ulushi (`fraction`); order book `depth` ex=dipfunded → web MEXC'ga yo'naltiradi (kalit qatorisiz); pastda Ochiq orderlar (✕ → `cancel`) va Pozitsiyalar (`dfPosCard` — birja kartasi ko'rinishida). `dfAct` — sahifasiz `dftrade`.
+- Grafik (`dfTerm`): ✕ (`dfLineX`: SL/TP olib tashlash, limit bekor, kirish — sotish oynasi), «+ TP/+ SL/+ Limit» (`cxAdd`; `nl` → `dfBuySheet('limit')` narx bilan), pend paytida surish mumkin.
+- Statistika: `cxStats('dipfunded')` → `/api/app/cexstats {ex:'dipfunded', acc}` → `_df_stats` (bot amali `dfstats`: hisobning BARCHA yopilgan savdolari 100 tadan sahifalab) → `_cx_summary` (30k/90k/yil boshidan/hammasi), Futures/Spot chiplari yo'q.
+- Eski boshqaruv: `openDf`/`dfAcc` sahifalari va "Botda boshqarish" olib tashlandi (`openDf()`/`dfAcc(id)` → `dfGo`); `?df=1` → `dfGo`; bot `_df_open` (💼 Dip Funded, /dipfunded) endi ilovani ochadigan tugma (`df.app_open`, `df.app_btn`).
+- Sinov: `test_346.py` 4/4 (sahifalab yig'ish, not_linked), brauzer `t_dfx.py` (ro'yxat, almashtirish, xarid limit+TP/SL, 50% sotish, SL olib tashlash, limit bekor, + Limit, statistika).

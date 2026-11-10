@@ -404,7 +404,7 @@ function go(tab){if(tab==S.tab)return;
 function pill(){var w=cur();var el=document.getElementById('wsPill');
  if(!w){el.textContent='Trade Controller';return}
  /* 331: ulangan birjalar ham shu ro'yxatda — tanlansa Birja bo'limida o'sha birja ochiladi */
- var CX=((S.cex||{}).acc||[]);
+ var CX=cxList();
  var opts=S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('');
  if(CX.length)opts+='<optgroup label="'+esc(t('wallet'))+'">'+CX.map(function(a){return'<option value="cx:'+esc(a.ex)+'"'+(S.cur=='cx:'+a.ex?' selected':'')+'>'+esc(cexMeta(a.ex)[1])+(a.err?'':' · $'+n2(a.total||0))+'</option>'}).join('')+'</optgroup>';
  el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1||CX.length?ic('chev',14)+'<select id="wsSel">'+opts+'</select>':'');
@@ -416,7 +416,7 @@ function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null
 function render(){var ae=document.activeElement;if(ae&&ae.id&&ae.id.indexOf('tv_')==0&&S.tab=='signals')return;nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
  if(S.tab=='wallet')walletView(v);else if(S.tab=='top')topView(v);else if(S.tab=='dip')dipView(v);else if(S.tab=='tour')tourView(v);else if(S.tab=='profile')profile(v,w);
- else if(!w)noWs(v);else if(w.type=='cex'){if(S.tab=='signals')tvView(v,w);else cxHome(v,w)}else if(S.tab=='signals')signals(v,w);else home(v,w);
+ else if(!w)noWs(v);else if(w.type=='cex'){if(S.tab=='signals')tvView(v,w);else if(w.ex=='dipfunded')dfHome(v);else cxHome(v,w)}else if(S.tab=='signals')signals(v,w);else home(v,w);
  var k=0;v.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(k++*60)+'ms'});
  if(S.anim){setTimeout(countUp,80)}
  v.insertAdjacentHTML('beforeend','<div class="endsp"></div>');
@@ -424,7 +424,7 @@ function render(){var ae=document.activeElement;if(ae&&ae.id&&ae.id.indexOf('tv_
 
 /* 324: Wallet — birja hisoblari (MEXC, Bitget, BingX, Binance), faqat o'qish */
 var CEX=[['mexc','MEXC','#0055ff','MX'],['bitget','Bitget','#00c2c2','BG'],['bingx','BingX','#3b5bff','BX'],['binance','Binance','#f0b90b','BN']];
-function cexMeta(ex){for(var k=0;k<CEX.length;k++)if(CEX[k][0]==ex)return CEX[k];return[ex,ex,'#888','?']}
+function cexMeta(ex){if(ex=='dipfunded')return['dipfunded','Dip Funded','#c2f23a','DF'];for(var k=0;k<CEX.length;k++)if(CEX[k][0]==ex)return CEX[k];return[ex,ex,'#888','?']}
 /* 332: birja logolari (SVG, 24×24). Binance — simple-icons; qolganlari brend shakli/rangi bo'yicha. */
 var CXL={
  binance:'<path fill="#F0B90B" d="M16.624 13.9202l2.7175 2.7154-7.353 7.353-7.353-7.352 2.7175-2.7164 4.6355 4.6595 4.6356-4.6595zm4.6366-4.6366L24 12l-2.7154 2.7164L18.5682 12l2.6924-2.7164zm-9.272.001l2.7163 2.6914-2.7164 2.7174v-.001L9.2721 12l2.7164-2.7154zm-9.2722-.001L5.4088 12l-2.6914 2.6924L0 12l2.7164-2.7164zM11.9885.0115l7.353 7.329-2.7174 2.7154-4.6356-4.6356-4.6355 4.6595-2.7174-2.7154 7.353-7.353z"/>',
@@ -432,14 +432,14 @@ var CXL={
  bitget:'<png>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',
  bingx:'<path fill="none" stroke="#2A6BFF" stroke-width="3.2" stroke-linecap="round" d="M5 5.5c3.2 0 4.5 2.2 7 6.5s3.8 6.5 7 6.5"/><path fill="none" stroke="#5E95FF" stroke-width="3.2" stroke-linecap="round" d="M19 5.5c-3.2 0-4.5 2.2-7 6.5s-3.8 6.5-7 6.5"/>'
 };
-function cexBadge(ex,z){var m=cexMeta(ex);z=z||38;var L=CXL[ex];if(!L)return'<div class="av" style="width:'+z+'px;height:'+z+'px;color:'+m[2]+';background:'+m[2]+'1f;border-color:'+m[2]+'40;font-size:'+Math.round(z*.34)+'px">'+m[3]+'</div>';
+function cexBadge(ex,z){var m=cexMeta(ex);z=z||38;if(ex=='dipfunded')return'<div style="width:'+z+'px;height:'+z+'px;display:flex;align-items:center;justify-content:center;flex:none">'+dfLogo(z)+'</div>';var L=CXL[ex];if(!L)return'<div class="av" style="width:'+z+'px;height:'+z+'px;color:'+m[2]+';background:'+m[2]+'1f;border-color:'+m[2]+'40;font-size:'+Math.round(z*.34)+'px">'+m[3]+'</div>';
  /* "<png>" — foydalanuvchi bergan rasmiy belgi (MEXC, 2025 yangi logo), rasm o'zi */
  if(L.indexOf('<png>')==0)return'<div class="av" style="width:'+z+'px;height:'+z+'px;background:#fff;border-color:'+m[2]+'40;padding:0"><img src="data:image/png;base64,'+L.slice(5)+'" width="'+z+'" height="'+z+'" style="display:block;width:100%;height:100%" alt=""></div>';
  var big=L.indexOf('<svg512>')==0,vb=big?'0 0 512 512':'0 0 24 24',u=Math.round(z*(big?.9:.62));if(big)L=L.slice(8);
  return'<div class="av" style="width:'+z+'px;height:'+z+'px;background:'+(big?'#fff':'#141417')+';border-color:'+m[2]+'40"><svg width="'+u+'" height="'+u+'" viewBox="'+vb+'" style="display:block">'+L.replace(/mxg/g,'mxg'+(++CXN))+'</svg></div>'}
 var CXN=0;
 function cexLoad(fresh){if(S.cexL)return;S.cexL=1;api('cex',{fresh:!!fresh}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};S.cexL=0;
-  if(typeof S.cur=='string'&&S.cur.indexOf('cx:')==0&&!cexAcc(S.cur.slice(3))){S.cur=(S.ws[0]||{}).id;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}}
+  if(typeof S.cur=='string'&&S.cur.indexOf('cx:')==0&&S.cur!='cx:dipfunded'&&!cexAcc(S.cur.slice(3))){S.cur=(S.ws[0]||{}).id;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}}
   var w=cur(),g=S.page;if(g&&g.cx){if(!g.drag&&!g.pend)termRender()}
   if(S.tab=='wallet'||(w&&w.type=='cex'&&(S.tab=='home'||S.tab=='signals')&&!document.getElementById('sheet').classList.contains('show')))render();else pill()}).catch(function(){S.cexL=0;S.cex=S.cex||{acc:[],at:Date.now(),fail:1};if(S.tab=='wallet')render()})}
 function cexErr(c){return t('cx_e_'+c)!=('cx_e_'+c)?t('cx_e_'+c):t('cx_e_api')}
@@ -447,19 +447,20 @@ function n2(v){return(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximu
 function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  var h='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('xchg',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('cx_sub'))+'</div></div></div>';
  if(!c){v.innerHTML=h+'<div class="empty glass rise">'+esc(t('loading'))+'</div>';return}
- var acc=c.acc||[],tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});
+ var acc=cxList(),tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err&&!a.df){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});if(S.dflink&&!S.dfoff&&!S.dfx)dfxLoad();
  if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
   +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+n2(tot)+'</div>'
   +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div>'
   +'</div>';
   h+='<div class="sect rise">'+esc(t('cx_mine'))+'</div>'+acc.map(function(a){var m=cexMeta(a.ex),np=(a.pos||[]).length;
-   return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+'</div><div class="rs">'
+   return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+(a.df?' <span class="b bx">Prop</span>':'')+'</div><div class="rs">'
    +(a.err?'<span class="r">'+esc(cexErr(a.err))+'</span>':esc(a.mask)+(np?' · '+np+' '+esc(t('cx_pos_n')):''))+'</div></div>'
    +(a.err?'':'<div class="rv">$'+n2(a.total||0)+(a.fut&&a.fut.upnl?'<small class="'+(a.fut.upnl>=0?'g':'r')+'">'+fm(a.fut.upnl)+'</small>':'')+'</div>')+'</div>'}).join('')}
  var have={};acc.forEach(function(a){have[a.ex]=1});var rest=CEX.filter(function(x){return!have[x[0]]});
+ if(S.dflink&&!have.dipfunded)rest=rest.concat([['dipfunded','Dip Funded']]);
  if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
-  h+=rest.map(function(x){return'<div class="row glass rise" onclick="cexAdd(\''+x[0]+'\')">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t('cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
+  h+=rest.map(function(x){var df=x[0]=='dipfunded';return'<div class="row glass rise" onclick="'+(df?'dfConnect()':'cexAdd(\''+x[0]+'\')')+'">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t(df?'dfx_ro':'cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
  h+='<div class="rise" style="margin-top:14px">'+dfAd()+tourAd()+'</div>';
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
  v.innerHTML=h}
@@ -480,10 +481,10 @@ function cxhDet(ex,d){S.cxhD=d;var el=document.getElementById('cxh_det');if(!el)
  var c=(S.cxh||{})[cxhKey(ex,d)];if(!c)el.innerHTML='<div class="sk" style="height:90px"></div>';
  cxhLoad(ex,d,function(p){var e=document.getElementById('cxh_det');if(!e)return;
   e.innerHTML=p.length>1?'<div class="rs" style="margin:0 2px 6px">'+balChg(p)+'</div>'+balChart(p,90,'cxd'):'<div class="rs" style="padding:14px 2px;line-height:1.5">'+esc(t('cx_hist_empty'))+'</div>'})}
-function cexAcc(ex){var a=null;((S.cex||{}).acc||[]).forEach(function(x){if(x.ex==ex)a=x});return a}
+function cexAcc(ex){if(ex=='dipfunded')return dfEntry();var a=null;((S.cex||{}).acc||[]).forEach(function(x){if(x.ex==ex)a=x});return a}
 /* 336: Birja bo'limidagi oyna — faqat ulanish holati, ruxsatlar, balans, kalitni yangilash/uzish
    (pozitsiyalar, tarix, statistika — birja workspace'ining Bosh/Signallar/Statistika bo'limlarida) */
-function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
+function cexOpen(ex){if(ex=='dipfunded'){dfOpen();return}var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
  var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0;font-size:13px">'+esc(l)+'</span><b class="'+(c||'')+'" style="font-size:14px">'+v+'</b></div>'};
  var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' <span class="rs" style="font-weight:600">'+esc(a.mask)+'</span></h4>';
  if(a.err)h+='<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(255,92,92,.35)"><b class="r">✕ '+esc(cexErr(a.err))+'</b></div>';
@@ -499,7 +500,7 @@ function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
  sheetOpen(h)}
 function cexRecheck(ex){toast(esc(t('cx_upd')));S.cexL=0;api('cex',{fresh:true}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};render();cexOpen(ex)}).catch(function(){toast(esc(t('cx_e_net')))})}
-function cexGoWs(ex){sheetClose();S.cur='cx:'+ex;S.anim=true;S.items=[];S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}S.tab='home';tick();render();load()}
+function cexGoWs(ex){sheetClose();if(ex=='dipfunded'){dfGo();return}S.cur='cx:'+ex;S.anim=true;S.items=[];S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}S.tab='home';tick();render();load()}
 /* 333: birja — workspace sifatida (Bosh, pozitsiyalar, terminal, statistika) */
 function cxRefresh(){var w=cur();if(!w||w.type!='cex')return;cexLoad(1);cxOrders(w.ex)}
 function cxOrders(ex){var a=cexAcc(ex);if(ex!='binance'||(a&&a.trade&&!a.trade.fut&&!a.trade.spot&&false))return;
@@ -578,28 +579,32 @@ function cxOrdRow(ex,o,tr){return'<div class="sig glass rise" style="padding:12p
    +(tr.fut?'<button class="btn" style="margin:0;color:var(--r)" onclick="cxCancel(\''+ex+'\',\''+esc(o.sym)+'\','+o.id+')">✕</button>':'')+'</div></div>'}
 /* 339: Savdo ekrani (birja kontekstida "Signallar" o'rnida) — Binance uslubi: chapda forma, o'ngda order book, pastda orderlar/pozitsiyalar/aktivlar */
 function tvS(){var w=cur();S.tv=S.tv||{};var T=S.tv;if(T.ex!=w.ex){S.tv=T={ex:w.ex,mkt:'spot',sym:'BTCUSDT',side:'buy',type:'limit',price:'',amt:'',total:'',tpsl:false,tp:'',sl:'',lev:null,info:null,book:null,open:null,tab:'orders'}}return T}
-function tvView(v,w){var a=w.acc,ex=w.ex,T=tvS();if(!a){v.innerHTML='<div class="spk"><div class="sk"></div></div>';return}
- var tr=a.trade||{},can=ex=='binance'&&tr[T.mkt],fut=T.mkt=='fut',i=T.info,b=T.book,base=T.sym.replace(/(USDT|USDC|FDUSD)$/,'');
+function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLoad();v.innerHTML='<div class="spk"><div class="sk"></div></div>';return}T=tvS();
+ if(DF){T.mkt='spot';var ds=S.dfs,b0=T.sym.replace(/USDT$/,''),pp=ds&&(ds.positions||[]).filter(function(x){return x.symbol==b0})[0];if(!ds)dfOneLoad();
+  T.info=ds?{sym:T.sym,mkt:'spot',price:+((ds.prices||{})[b0]||0),avail:{quote:+ds.available||0,base:pp?+pp.qty||0:0},perm:{spot:ds.tradable}}:null;if(T.side=='sell')T.type='market';if(!T.price&&T.info&&T.info.price)T.price=String(+T.info.price.toPrecision(10))}
+ var tr=a.trade||{},can=DF?!!(S.dfs&&S.dfs.tradable):ex=='binance'&&tr[T.mkt],fut=T.mkt=='fut',i=T.info,b=T.book,base=T.sym.replace(/(USDT|USDC|FDUSD)$/,'');
  if(ex=='binance'&&(!T.info||T.info.sym!=T.sym||T.info.mkt!=T.mkt))tvLoad();else if(ex!='binance'&&!T.book)tvBookLoad();
  var h='<div class="rise" style="display:flex;align-items:center;gap:8px;margin:2px 0 10px"><div onclick="tvPick()" style="display:flex;align-items:center;gap:7px;cursor:pointer">'+coinIc(T.sym,26)
   +'<div><div style="font-weight:900;font-size:19px;letter-spacing:-.02em">'+esc(base)+'/USDT <span style="opacity:.5;font-size:13px">▾</span></div><div id="tv_chg" style="font-size:12px;font-weight:700" class="'+(b&&b.chg<0?'r':'g')+'">'+(b?fpc(b.chg):'')+'</div></div></div>'
-  +'<div class="bk glass" onclick="cxTerm(\''+ex+'\',S.tv.sym,S.tv.mkt)" style="margin-left:auto;width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:12px">'+ic('candle',19)+'</div>'
-  +'<div class="seg glass" style="width:150px;margin-bottom:0"><div class="si" style="width:calc((100% - 8px)/2);transform:translateX('+(fut?100:0)+'%)"></div><a class="'+(fut?'':'on')+'" onclick="tvSet(\'mkt\',\'spot\')">Spot</a><a class="'+(fut?'on':'')+'" onclick="tvSet(\'mkt\',\'fut\')">Futures</a></div></div>';
- if(ex!='binance')h+='<div class="rs rise" style="margin:0 4px 10px;line-height:1.5">ℹ️ '+esc(t('tv_only_bn'))+'</div>';
+  +'<div class="bk glass" onclick="'+(DF?'dfTerm(dfCur(),S.tv.sym.replace(/USDT$/,\'\'))':'cxTerm(\''+ex+'\',S.tv.sym,S.tv.mkt)')+'" style="margin-left:auto;width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:12px">'+ic('candle',19)+'</div>'
+  +(DF?'<span class="b bx" style="flex:none">Spot</span>':'<div class="seg glass" style="width:150px;margin-bottom:0"><div class="si" style="width:calc((100% - 8px)/2);transform:translateX('+(fut?100:0)+'%)"></div><a class="'+(fut?'':'on')+'" onclick="tvSet(\'mkt\',\'spot\')">Spot</a><a class="'+(fut?'on':'')+'" onclick="tvSet(\'mkt\',\'fut\')">Futures</a></div>')+'</div>';
+ if(DF&&(S.dfx||{}).accs&&S.dfx.accs.length>1)h+='<div class="rs rise" style="margin:-4px 4px 10px">#'+dfCur()+' · Dip Funded</div>';
+ if(DF){if(S.dfs&&!S.dfs.tradable)h+='<div class="rs rise r" style="margin:0 4px 10px;line-height:1.5">'+esc(S.dfs.status_txt||'')+'</div>'}
+ else if(ex!='binance')h+='<div class="rs rise" style="margin:0 4px 10px;line-height:1.5">ℹ️ '+esc(t('tv_only_bn'))+'</div>';
  else if(!can)h+='<div class="rs rise r" style="margin:0 4px 10px;line-height:1.5">'+esc(t(fut?'tr_noperm_fut':'tr_noperm_spot'))+'</div>';
  var buy=T.side=='buy',col=buy?'#2ebd85':'#f6465d',dis=can&&i?'':' disabled';
  var F='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.12);margin-bottom:8px">'
   +'<a onclick="tvSet(\'side\',\'buy\')" style="text-align:center;padding:9px 0;font-weight:800;'+(buy?'background:#2ebd85;color:#fff':'color:var(--mut)')+'">'+(fut?'Long':'Buy')+'</a>'
   +'<a onclick="tvSet(\'side\',\'sell\')" style="text-align:center;padding:9px 0;font-weight:800;'+(!buy?'background:#f6465d;color:#fff':'color:var(--mut)')+'">'+(fut?'Short':'Sell')+'</a></div>';
  if(fut)F+='<div onclick="tvLev()" class="glass" style="border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;cursor:pointer"><span class="rs" style="margin:0">'+esc(t('tr_lev'))+'</span><b>'+(T.lev||(i&&i.lev)||10)+'x ▾</b></div>';
- F+='<div style="display:flex;gap:6px;margin-bottom:8px">'+['limit','market'].map(function(x){return'<span class="chip glass'+(T.type==x?' on':'')+'" style="flex:1;text-align:center" onclick="tvSet(\'type\',\''+x+'\')">'+(x=='limit'?'Limit':'Market')+'</span>'}).join('')+'</div>';
+ if(DF&&!buy)F+='<div class="rs" style="margin:0 2px 8px;line-height:1.4">'+esc(t('dfx_sell_note'))+'</div>';else F+='<div style="display:flex;gap:6px;margin-bottom:8px">'+['limit','market'].map(function(x){return'<span class="chip glass'+(T.type==x?' on':'')+'" style="flex:1;text-align:center" onclick="tvSet(\'type\',\''+x+'\')">'+(x=='limit'?'Limit':'Market')+'</span>'}).join('')+'</div>';
  var inp=function(id,ph,val,dis2){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val)+'"'+(dis2?' disabled':'')+' oninput="tvIn(\''+id+'\')" style="width:100%;font-size:15px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 11px;outline:none;margin-bottom:8px">'};
  if(T.type=='limit')F+='<div style="display:flex;gap:6px">'+'<div style="flex:1">'+inp('tv_p',t('tv_price'),T.price)+'</div><button class="btn" style="margin:0 0 8px;padding:0 10px" onclick="tvBbo()">BBO</button></div>';
  else F+='<div class="glass" style="border-radius:10px;padding:10px 11px;margin-bottom:8px;color:var(--mut);font-weight:700;font-size:14px">'+esc(t('tv_mkt_price'))+'</div>';
  F+=inp('tv_a',t('tv_amount',{b:base}),T.amt);
  F+='<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px">'+[0,25,50,75,100].map(function(x){return'<span onclick="tvPct('+x+')" style="cursor:pointer;width:14px;height:14px;transform:rotate(45deg);border:2px solid '+((T.pct||0)>=x&&x>0?col:'rgba(255,255,255,.35)')+';background:'+((T.pct||0)>=x&&x>0?col:'transparent')+';border-radius:3px;display:inline-block"></span>'}).join('<span style="flex:1;height:2px;background:rgba(255,255,255,.12);margin:0 3px"></span>')+'</div>';
  F+=inp('tv_t',t('tv_total'),T.total);
- if(fut){F+='<label style="display:flex;align-items:center;gap:8px;margin:0 2px 8px;font-size:13px;font-weight:700"><input type="checkbox" '+(T.tpsl?'checked':'')+' onchange="tvSet(\'tpsl\',this.checked)" style="width:18px;height:18px;accent-color:#c2f23a"> TP/SL</label>';
+ if(fut||(DF&&buy)){F+='<label style="display:flex;align-items:center;gap:8px;margin:0 2px 8px;font-size:13px;font-weight:700"><input type="checkbox" '+(T.tpsl?'checked':'')+' onchange="tvSet(\'tpsl\',this.checked)" style="width:18px;height:18px;accent-color:#c2f23a"> TP/SL</label>';
   if(T.tpsl){var qb=function(k,x){return'<button onclick="tvQ(\''+k+'\','+x+')" style="flex:1;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--mut);font-weight:700;font-size:11px;padding:6px 0;border-radius:6px;cursor:pointer">'+(k=='tp'?'+':'−')+x+'%</button>'};
    F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div>'+inp('tv_tp','TP',T.tp)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[2,5,10].map(function(x){return qb('tp',x)}).join('')+'</div></div><div>'+inp('tv_sl','SL',T.sl)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[1,2,5].map(function(x){return qb('sl',x)}).join('')+'</div></div></div>'}}
  var av=i?(fut?i.avail.quote:(buy?i.avail.quote:i.avail.base)):null,lv=T.lev||(i&&i.lev)||10,px=tvPx();
@@ -608,16 +613,16 @@ function tvView(v,w){var a=w.acc,ex=w.ex,T=tvS();if(!a){v.innerHTML='<div class=
  F+='<button class="btn full" id="tv_go"'+dis+' onclick="tvGo()" style="width:100%;margin:0;padding:12px;background:'+col+';color:#fff;border-color:transparent;font-weight:800;font-size:15px">'+(fut?(buy?'Long ':'Short '):(buy?'Buy ':'Sell '))+esc(base)+'</button>';
  h+='<div class="rise" style="display:grid;grid-template-columns:57% 43%;gap:10px;align-items:start"><div>'+F+'</div><div id="tv_book">'+tvBookHtml()+'</div></div>';
  /* pastki yorliqlar */
- var P=(a.pos||[]),O=tvOrders(),A=(a.assets||[]).filter(function(x){return['USDT','USDC','FDUSD'].indexOf(x.a)<0});
+ var P=DF?((S.dfs||{}).positions||[]):(a.pos||[]),O=tvOrders(),A=DF?[]:(a.assets||[]).filter(function(x){return['USDT','USDC','FDUSD'].indexOf(x.a)<0});
  var tb=function(k,l){return'<a onclick="tvSet(\'tab\',\''+k+'\')" style="padding:10px 2px;margin-right:14px;font-weight:800;font-size:13px;white-space:nowrap;'+(T.tab==k?'color:var(--ink);border-bottom:2px solid #f0b90b':'color:var(--mut)')+'">'+esc(l)+'</a>'};
- h+='<div class="rise" style="display:flex;margin:18px 2px 10px;border-bottom:1px solid rgba(255,255,255,.08)">'+tb('orders',t('tv_orders')+' ('+O.length+')')+tb('pos',t('tv_pos')+' ('+P.length+')')+tb('hold',t('tv_hold')+' ('+A.length+')')+'</div>';
- if(T.tab=='pos')h+=P.length?P.map(function(p){return cxPosCard(ex,p,tr)}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('cx_no_pos'))+'</div></div>';
+ h+='<div class="rise" style="display:flex;margin:18px 2px 10px;border-bottom:1px solid rgba(255,255,255,.08)">'+tb('orders',t('tv_orders')+' ('+O.length+')')+tb('pos',t('tv_pos')+' ('+P.length+')')+(DF?'':tb('hold',t('tv_hold')+' ('+A.length+')'))+'</div>';
+ if(T.tab=='pos')h+=P.length?P.map(function(p){return DF?dfPosCard(p):cxPosCard(ex,p,tr)}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('cx_no_pos'))+'</div></div>';
  else if(T.tab=='hold')h+=A.length?A.map(function(x){return'<div class="row glass rise" onclick="tvSellAsset(\''+esc(x.a)+'\','+x.q+')">'+coinIc(x.a,28)+'<div class="rm"><div class="rn">'+esc(x.a)+'</div><div class="rs">'+(+x.q.toPrecision(8))+'</div></div><div class="rv">'+(x.usd!=null?'$'+n2(x.usd):'—')+(ex=='binance'&&tr.spot?'<small style="color:#f6465d">Sell ›</small>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+esc(t('cx_empty'))+'</div>';
  else h+=O.length?O.map(function(o){return'<div class="sig glass rise" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:9px">'+coinIc(o.sym,26)
    +'<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(o.sym)+' <span class="b '+(o.side=='buy'?'bl':'bs')+'">'+o.side.toUpperCase()+'</span> <span class="rs" style="display:inline">'+esc(String(o.type).replace(/_/g,' ').toUpperCase())+'</span></div><div class="rs">'+(o.trigger?'⚡ '+fp(o.trigger):fp(o.price))+(o.qty?' · '+(+o.qty):'')+(o.filled?' · '+esc(t('tv_filled'))+' '+(+o.filled):'')+'</div></div>'
    +(can?'<button class="btn" style="margin:0;color:var(--r);flex:none;width:42px;padding:8px 0" onclick="tvCancel(\''+esc(o.sym)+'\','+o.id+','+(o.algo?1:0)+')">✕</button>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('tv_no_orders'))+'</div></div>';
  v.innerHTML=h;tvPoll()}
-function tvOrders(){var T=S.tv,ex=T.ex;if(T.mkt=='fut')return((S.cxo||{})[ex]||[]);return T.sopen||[]}
+function tvOrders(){var T=S.tv,ex=T.ex;if(ex=='dipfunded')return((S.dfs||{}).orders||[]).map(function(o){return{sym:o.symbol+'USDT',id:o.id,side:'buy',type:'limit',price:+o.limit,qty:o.limit?+(+o.amount/+o.limit).toPrecision(6):0,df:1}});if(T.mkt=='fut')return((S.cxo||{})[ex]||[]);return T.sopen||[]}
 function tvPx(){var T=S.tv;if(T.type=='limit'){var p=parseFloat(T.price);if(p>0)return p}var b=T.book;return b&&b.last?b.last:(T.info?T.info.price:0)}
 function tvBookHtml(){var T=S.tv,b=T.book;if(!b)return T.bkerr?'<div class="rs" style="text-align:center;padding:40px 6px;line-height:1.5">'+esc(t('tv_book_err'))+'</div>':'<div class="spk" style="height:300px;margin:0"><div class="sk"></div></div>';
  var A=b.asks.slice(0,7).reverse(),B=b.bids.slice(0,7),mx=Math.max.apply(null,A.concat(B).map(function(x){return x[0]*x[1]}).concat([1]));
@@ -656,13 +661,20 @@ function tvPct(p){var T=S.tv,i=T.info,px=tvPx();if(!i||!px)return;T.pct=p;var fu
  else if(T.side=='buy'){T.total=String(Math.floor(i.avail.quote*p)/100);tvCalc('total')}
  else{T.amt=String(+(i.avail.base*p/100).toPrecision(8));tvCalc('amt')}tick();tvRe()}
 function tvLev(){var T=S.tv;sheetOpen('<h4>'+esc(t('tr_lev'))+'</h4><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+[1,2,3,5,10,20,25,50].map(function(x){return'<button class="btn" style="margin:0'+((T.lev||10)==x?';border-color:#c2f23a;color:#c2f23a':'')+'" onclick="S.tv.lev='+x+';sheetClose();tvRe()">'+x+'x</button>'}).join('')+'</div>')}
-function tvPick(){var T=S.tv,kind=T.mkt=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(b){tvSet('sym',b.replace(/USDT$/,'')+'USDT')}};pairPick(o);
+function tvPick(){var T=S.tv;if(T.ex=='dipfunded'){var s=S.dfs;if(!s)return;var held={};(s.positions||[]).forEach(function(x){held[x.symbol]=1});
+  pairPick({title:t('df_pick'),list:Object.keys(s.prices||{}).sort().map(function(k){return[k,s.prices[k]]}),held:held,pick:function(b){tvSet('sym',b+'USDT')}});return}
+ var kind=T.mkt=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(b){tvSet('sym',b.replace(/USDT$/,'')+'USDT')}};pairPick(o);
  pairsGet(kind).then(function(p){o.list=p;o.loading=false;if(S.pp===o)ppList()}).catch(function(){o.loading=false;if(S.pp===o)ppList()})}
 function tvSellAsset(a,q){var T=S.tv;if(T.ex!='binance')return;T.mkt='spot';T.sym=a+'USDT';T.side='sell';T.type='market';T.info=null;T.book=null;T.price='';T.amt=String(q);T.total='';T.pct=0;T.tab='orders';tick();tvRe();window.scrollTo({top:0,behavior:'smooth'})}
-function tvCancel(sym,id,algo){var T=S.tv;confirmBox(t('tr_cancel_q'),function(){api('cextrade',{ex:T.ex,op:T.mkt=='fut'?'fut_cancel':'spot_cancel',a:{sym:sym,id:id,algo:!!algo}}).then(function(d){
+function tvCancel(sym,id,algo){var T=S.tv;if(T.ex=='dipfunded'){confirmBox(t('tr_cancel_q'),function(){dfAct({op:'cancel',order_id:id})});return}confirmBox(t('tr_cancel_q'),function(){api('cextrade',{ex:T.ex,op:T.mkt=='fut'?'fut_cancel':'spot_cancel',a:{sym:sym,id:id,algo:!!algo}}).then(function(d){
  if(d.ok){toast(esc(t('tr_cancelled')));tvOrdLoad()}else toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}).catch(function(){toast(esc(t('cx_e_net')))})})}
 function tvGo(){var T=S.tv,i=T.info,fut=T.mkt=='fut';if(!i)return;var amt=parseFloat(T.amt),tot=parseFloat(T.total),px=tvPx(),a={sym:T.sym,type:T.type};
  if(!(amt>0)&&!(tot>0)){toast(esc(t('tr_need_amt')));return}
+ if(T.ex=='dipfunded'){var bs=T.sym.replace(/USDT$/,''),d={symbol:bs},sm;
+  if(T.side=='buy'){d.op='buy';d.amount=tot>0?Math.round(tot*100)/100:Math.round(amt*px*100)/100;if(T.type=='limit'){var lp=parseFloat(T.price);if(!(lp>0)){toast(esc(t('df_limit_p')));return}d.limit=lp}
+   if(T.tpsl){var tp2=parseFloat(T.tp),sl2=parseFloat(T.sl);if(tp2>0)d.tp=tp2;if(sl2>0)d.sl=sl2}sm='BUY '+T.sym+' · $'+n2(d.amount)+' · '+(d.limit?'Limit '+d.limit:'Market')+(d.tp?' · TP '+d.tp:'')+(d.sl?' · SL '+d.sl:'')}
+  else{var hq=i.avail.base||0;if(!(hq>0)){toast(esc(t('cx_no_pos')));return}var q2=amt>0?amt:(tot>0&&px?tot/px:0);d.op='sell';d.fraction=Math.min(1,Math.max(0.0001,q2/hq));sm='SELL '+T.sym+' · '+Math.round(d.fraction*100)+'% · Market'}
+  confirmBox(t('tr_confirm')+'\n\n'+sm,function(){dfAct(d,function(){T.amt='';T.total='';T.pct=0})});return}
  if(T.type=='limit'){var p=parseFloat(T.price);if(!(p>0)){toast(esc(t('df_limit_p')));return}a.price=p}
  if(fut){var lv=T.lev||i.lev||10;if(!(tot>0))tot=amt*px;a.side=T.side=='buy'?'long':'short';a.lev=lv;a.margin=Math.round(tot/lv*100)/100;if(T.tpsl){var tp=parseFloat(T.tp),sl=parseFloat(T.sl);if(tp>0)a.tp=tp;if(sl>0)a.sl=sl}}
  else{a.side=T.side;if(amt>0)a.qty=amt;else a.quote=tot}
@@ -744,10 +756,10 @@ function cxEditLim(id){var g=S.page,i=termItem();if(!g||!i)return;var o=i.orders
 function cxEditLimGo(id){var g=S.page,i=termItem(),v=num(document.getElementById('limIn').value);if(!v||!g||!i)return;var o=i.orders.filter(function(x){return x.id==id})[0];if(!o)return;sheetClose();g.pend={k:'o'+id,lb:'Limit',from:o.limit,to:termRound(v)};cxSave()}
 /* 334: birja statistikasi — saqlangan savdo tarixidan (yil boshidan) */
 function cxStatLoad(ex,per,cb){S.cxst=S.cxst||{};var c=S.cxst[ex]=S.cxst[ex]||{},k='L'+per;if(c[k])return;c[k]=1;
- api('cexstats',{ex:ex,per:per}).then(function(d){c[k]=0;c[per]=d;if(per=='ytd')c.ytd=d.supported&&d.all?d.all:{n:0};
+ api('cexstats',{ex:ex,per:per,acc:ex=='dipfunded'?dfCur():undefined}).then(function(d){c[k]=0;c[per]=d;if(per=='ytd')c.ytd=d.supported&&d.all?d.all:{n:0};
   if(cb)cb(d);else{var w=cur();if(w&&w.ex==ex&&S.tab=='home'&&!S.page)render()}}).catch(function(){c[k]=0})}
 function cxStats(ex){tick();S.page={id:'cxst',ex:ex,per:(S.cxstPer||'ytd'),mkt:'all',d:null,polls:0};var p=document.getElementById('page');p.scrollTop=0;cxStRender();if(!p.classList.contains('show'))pageShow();cxStGet()}
-function cxStGet(fresh){var g=S.page;if(!g||g.id!='cxst')return;api('cexstats',{ex:g.ex,per:g.per,fresh:!!fresh}).then(function(d){if(S.page!==g)return;g.d=d;
+function cxStGet(fresh){var g=S.page;if(!g||g.id!='cxst')return;api('cexstats',{ex:g.ex,per:g.per,fresh:!!fresh,acc:g.ex=='dipfunded'?dfCur():undefined}).then(function(d){if(S.page!==g)return;g.d=d;
   S.cxst=S.cxst||{};var c=S.cxst[g.ex]=S.cxst[g.ex]||{};c[g.per]=d;if(g.per=='ytd')c.ytd=d.supported&&d.all?d.all:{n:0};cxStRender();
   if(d.sync&&(d.sync.running||d.sync.old=='pending')&&g.polls<30){g.polls++;setTimeout(function(){if(S.page===g)cxStGet()},d.sync.running?6000:30000)}}).catch(function(){})}
 function cxStSet(k,v){var g=S.page;if(!g)return;g[k]=v;if(k=='per'){S.cxstPer=v;g.d=null;cxStRender();cxStGet()}else{tick();cxStRender()}}
@@ -757,7 +769,9 @@ function cxStRender(){var g=S.page;if(!g||g.id!='cxst')return;var p=document.get
  h+='<div class="chips" style="margin-bottom:8px">'+ch('per','30d',t('cx_dn',{n:30}))+ch('per','90d',t('cx_dn',{n:90}))+ch('per','ytd',t('cx_per_ytd',{y:yr}))+ch('per','all',t('cx_st_all'))+'</div>';
  if(!d){p.innerHTML=h+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
  if(!d.supported){p.innerHTML=h+'<div class="empty glass">'+esc(t('cx_st_only'))+'</div>';return}
- h+='<div class="chips" style="margin-bottom:10px">'+ch('mkt','all',t('cx_st_all'))+ch('mkt','fut','Futures')+ch('mkt','spot','Spot')+'</div>';
+ if(d.err){p.innerHTML=h+'<div class="empty glass">'+esc(t('df_unav'))+'</div><button class="btn full" style="margin-top:10px" onclick="cxStGet(1)">'+esc(t('cx_tr_refresh'))+'</button>';return}
+ if(!d.df)h+='<div class="chips" style="margin-bottom:10px">'+ch('mkt','all',t('cx_st_all'))+ch('mkt','fut','Futures')+ch('mkt','spot','Spot')+'</div>';
+ else h+='<div class="rs" style="margin:0 4px 10px">#'+dfCur()+' · Spot</div>';
  var sy=d.sync||{};
  if(sy.running)h+='<div class="rs" style="margin:0 4px 10px">⏳ '+esc(t('cx_st_sync'))+'</div>';
  if(sy.old=='pending'||sy.old=='none'&&sy.year_from&&sy.cutoff&&sy.year_from<sy.cutoff)h+='<div class="rs" style="margin:0 4px 10px;line-height:1.5">⏳ '+esc(t('cx_st_old_pending',{y:yr}))+'</div>';
@@ -1059,8 +1073,8 @@ function termBind(){var sv=document.getElementById('tsvg');if(!sv)return;var g=S
   var y0=ys(e),x0=xs(e);
   if(y0>TER.H){g.tz={x0:e.clientX,vn0:g.vn};e.preventDefault();return}
   if(x0>TER.W-TER.PR){g.pz={y0:e.clientY,ys0:g.ys||1};e.preventDefault();return}
-  if(g.cx&&g.xb){var hb=g.xb.filter(function(b){return Math.abs(b.x-x0)<13&&Math.abs(b.y-y0)<12})[0];if(hb){cxLineX(hb.k);e.preventDefault();return}}
-  if(g.pend&&!g.cx)return;var L=termLines(i,g),sc=termScale(g,L,i),y=y0,best=null,bd=16;
+  if((g.cx||g.df)&&g.xb){var hb=g.xb.filter(function(b){return Math.abs(b.x-x0)<13&&Math.abs(b.y-y0)<12})[0];if(hb){(g.df?dfLineX:cxLineX)(hb.k);e.preventDefault();return}}
+  if(g.pend&&!g.cx&&!g.df)return;var L=termLines(i,g),sc=termScale(g,L,i),y=y0,best=null,bd=16;
   var pT=0,pB=0;L.forEach(function(l){var yy=termY(l.p,sc);if(yy<8)yy=9+16*(pT++);else if(yy>TER.H-8)yy=TER.H-9-16*(pB++);if(!l.dr||l.hit)return;var d=Math.abs(yy-y);if(d<bd){bd=d;best=l}});
   if(best){g.drag={k:best.k,p:best.p,from:best.p,lb:best.lb,sc:sc};tick()}
   else g.pan={x0:e.clientX,off0:g.off};e.preventDefault()};
@@ -1332,31 +1346,134 @@ function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(
 function dfErr(d){var c=d&&d.code;if(c=='not_linked'||c=='profile')return'<div class="empty glass rise">'+ic('link',36)+'<div style="margin:8px 0 14px">'+esc(t('df_nolink'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button></div>';
  return'<div class="empty glass rise">'+esc(t('df_unav'))+'</div>'}
 function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}}
-function openDf(inner){if(!inner)tick();S.page={id:'df'};var p=document.getElementById('page');
- p.innerHTML=dfHead()+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';if(!inner)pageShow();
- dfCall('dfacc').then(function(r){if(!S.page||S.page.id!='df')return;var h=dfHead();
-  h+='<button class="btn p full rise" style="width:100%;padding:12px;font-size:14px;margin-bottom:12px" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button>';
-  if(!r.ok)h+=dfErr(r.d);else{var L=r.d.accounts||[];
-   h+=L.length?L.map(function(a){var pos=(a.pnl_pct||0)>=0;return'<div class="row glass rise'+(a.id==r.d.main?' acc':'')+'" onclick="dfAcc('+a.id+')"><div class="av" style="font-size:12px">#'+a.id+'</div><div class="rm"><div class="rn">'+esc(a.name)+'</div><div class="rs">'+esc(a.status_txt)+'</div></div>'
-    +(a.equity!=null?'<div class="rv '+(pos?'g':'r')+'">'+f0(+a.equity)+'<small>'+fpc(+a.pnl_pct||0)+'</small></div>':'')+'</div>'}).join(''):'<div class="empty glass rise">'+esc(t('df_none'))+'</div>'}
-  h+='<button class="btn full rise" style="width:100%;margin-top:8px" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button>';
-  p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*50)+'ms'})})}
 function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col=u>=80?'var(--r)':u>=50?'#e8e8ea':'var(--g)';
  return'<div style="margin:8px 0"><div class="rs" style="display:flex;justify-content:space-between"><span>'+esc(lbl)+'</span><span>'+txt+'</span></div><div class="bar" style="margin-top:6px"><i style="left:0;width:'+u+'%;background:'+col+'"></i></div></div>'}
-function dfAcc(id){tick();S.page={id:'df',acc:id};var p=document.getElementById('page');p.scrollTop=0;
- p.innerHTML=dfHead(1)+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';
- dfCall('dfone',id).then(function(r){if(!S.page||S.page.acc!=id)return;var h=dfHead(1);if(!r.ok){p.innerHTML=h+dfErr(r.d);return}var a=r.d;S.dfs=a;
-  h+='<div class="slide glass acc rise" style="min-height:0;margin-bottom:12px"><div class="k">#'+a.id+' · '+esc(a.name)+'</div><div class="v">'+f0(+a.equity)+'</div><div class="d"><span class="'+((+a.pnl||0)>=0?'g':'r')+'">'+fm(+a.pnl||0)+'</span> · '+esc(a.status_txt)+'</div></div>';
-  h+='<div class="tiles"><div class="tile2 glass rise"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">'+f0(+a.balance)+'</div></div><div class="tile2 glass rise"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">'+f0(+a.available)+'</div></div></div>';
-  if(a.tradable){h+='<div class="eq glass rise">';if(a.daily)h+=bar(t('df_daily'),a.daily.used_pct,f0(+a.daily.left));if(a.max)h+=bar(t('df_maxdd'),a.max.used_pct,f0(+a.max.left));
-   if(a.target&&a.target.progress!=null)h+=bar(t('df_target'),a.target.progress,f0(+a.target.amount));if(a.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+a.days.done+' / '+a.days.min+'</div>';h+='</div>'}
-  h+='<div class="sect rise">'+esc(t('df_pos'))+' · '+a.positions.length+'</div>';
-  h+=a.positions.map(function(x){return'<div class="row glass rise" onclick="dfTerm('+a.id+',\''+esc(x.symbol)+'\')">'+coinIc(x.symbol,26)+'<div class="rm"><div class="rn">'+esc(x.symbol)+'</div><div class="rs">'+f0(+x.value)+' · '+fp(x.avg)+' → '+fp(x.price)+(x.sl!=null?' · SL '+fp(x.sl):'')+(x.tp!=null?' · TP '+fp(x.tp):'')+'</div></div><div class="rv '+((+x.upnl||0)>=0?'g':'r')+'">'+fm(+x.upnl||0)+'<small>'+fpc(+x.upnl_pct||0)+'</small></div></div>'}).join('');
-  if(a.orders.length)h+='<div class="sect rise">'+esc(t('df_orders'))+' · '+a.orders.length+'</div>'+a.orders.map(function(o){return'<div class="row glass rise" style="cursor:default"><div class="rm"><div class="rn">#'+o.id+' '+esc(o.symbol)+'</div><div class="rs">≤ '+fp(o.limit)+' · '+f0(+o.amount)+'</div></div></div>'}).join('');
-  var fs=(a.positions[0]||{}).symbol||'BTC';
-  if(a.tradable)h=h.replace('<div class="tiles">','<button class="btn p full rise" style="width:100%;padding:13px;font-size:15px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="dfTerm('+a.id+',\''+esc(fs)+'\')">'+ic('bars',16)+' '+esc(t('df_term'))+'</button><div class="tiles">');
-  h+='<div style="display:flex;gap:8px;margin-top:10px" class="rise"><button class="btn" onclick="actWs(\'df\').then(function(r){if(r&&r.ok)setTimeout(function(){try{tg.close()}catch(e){}},700)})">'+esc(t('df_inbot'))+'</button></div>';
-  p.innerHTML='<div class="anim">'+h+'</div>';var q=0;p.querySelectorAll('.rise').forEach(function(e){e.style.animationDelay=(q++*45)+'ms'})})}
+/* ===== 346: Dip Funded — birjalar qatorida (kontekst `cx:dipfunded`): ulash/uzish, hisob almashtirish,
+   Bosh sahifa, Savdo ekrani (tvView DF rejimi), grafik (dfTerm), statistika (cxStats). Eski "hisoblar" sahifalari o'rnida. */
+function dfCur(){return S.dfx&&S.dfx.cur}
+function dfEntry(){var x=S.dfx;if(S.dfoff||!S.dflink||!x||x.err=='not_linked'||x.err=='profile'||x.err=='off')return null;
+ var s=S.dfs&&S.dfs.id==x.cur?S.dfs:null,a=(x.accs||[]).filter(function(z){return z.id==x.cur})[0];
+ return{ex:'dipfunded',df:1,mask:a?'#'+a.id+' · '+a.name:'',total:s?+s.equity||0:(a?+a.equity||0:0),spot_usd:s?+s.available||0:0,pos:[],assets:[],
+  err:x.err?'net':null,trade:{spot:!!(s&&s.tradable)}}}
+function cxList(){var L=((S.cex||{}).acc||[]).slice(),d=dfEntry();if(d)L.push(d);return L}
+function dfxLoad(force){if(S.dfxL||(!force&&S.dfx&&Date.now()-S.dfx.at<60000))return;if(!S.dflink||S.dfoff)return;S.dfxL=1;
+ dfCall('dfacc').then(function(r){S.dfxL=0;if(r.pending)return;
+  if(!r.ok){S.dfx={accs:[],err:(r.d&&r.d.code)||'unavailable',at:Date.now()};dfxAfter();return}
+  var L=r.d.accounts||[],sv=null;try{sv=+localStorage.getItem('tc_dfacc')}catch(e){}
+  var cur=(L.filter(function(a){return a.id==sv})[0]||L.filter(function(a){return a.id==r.d.main})[0]||L[0]||{}).id;
+  S.dfx={accs:L,main:r.d.main,cur:cur,at:Date.now()};if(cur)dfOneLoad();else dfxAfter()}).catch(function(){S.dfxL=0})}
+function dfOneLoad(){var id=dfCur();if(!id||S.dfoL)return Promise.resolve();S.dfoL=1;
+ return dfCall('dfone',id).then(function(r){S.dfoL=0;if(r.ok&&r.d&&r.d.id==dfCur())S.dfs=r.d;dfxAfter()}).catch(function(){S.dfoL=0})}
+function dfxAfter(){var w=cur(),g=S.page;if(typeof S.cur=='string'&&S.cur=='cx:dipfunded'&&!dfEntry()){S.cur=(S.ws[0]||{}).id;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}}
+ if(g&&g.df){if(!g.drag&&!g.pend)termRender();return}if(g)return;
+ if(document.getElementById('sheet').classList.contains('show')){pill();return}
+ if(S.tab=='wallet'||(w&&w.ex=='dipfunded'&&(S.tab=='home'||S.tab=='signals')))render();else pill()}
+function dfSwitch(id){if(!S.dfx||id==S.dfx.cur)return;S.dfx.cur=id;S.dfs=null;try{localStorage.setItem('tc_dfacc',id)}catch(e){}
+ if(S.cxst)S.cxst.dipfunded=null;if(S.tv&&S.tv.ex=='dipfunded')S.tv=null;haptic('success');tick();render();dfOneLoad()}
+/* Dip Funded'ga o'tish (eski openDf/dfAcc o'rnida — reklama kartasi, bot menyusi ?df=1) */
+function dfGo(acc){if(S.page)closeGroup();if(!S.dflink){openLink(S.df||'https://dipfunded.com');return}
+ if(S.dfoff){dfConnect();return}var x=S.dfx;
+ if(x&&(x.err=='not_linked'||x.err=='profile')){dfLinkSheet();return}
+ if(acc&&x&&x.cur!=acc){x.cur=acc;S.dfs=null;try{localStorage.setItem('tc_dfacc',acc)}catch(e){}}
+ S.cur='cx:dipfunded';S.anim=true;S.items=[];S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}if(S.tab=='wallet'||S.tab=='top'||S.tab=='dip'||S.tab=='tour'||S.tab=='profile')S.tab='home';
+ tick();render();if(!x)dfxLoad();else dfOneLoad()}
+function dfLinkSheet(){sheetOpen('<h4 style="display:flex;align-items:center;gap:10px">'+dfLogo(30)+'Dip Funded</h4><p style="line-height:1.5">'+esc(t('dfx_link_txt'))+'</p>'
+ +'<button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button>'
+ +'<button class="btn full" style="width:100%;margin-top:8px" onclick="sheetClose();S.dfx=null;dfxLoad(1);toast(esc(t(\'cx_upd\')))">↻ '+esc(t('cx_recheck'))+'</button>')}
+function dfConnect(){api('dfoff',{off:false}).catch(function(){});S.dfoff=false;S.dfx=null;toast(esc(t('cx_upd')));
+ dfCall('dfacc').then(function(r){if(!r.ok&&r.d&&(r.d.code=='not_linked'||r.d.code=='profile')){S.dfx={accs:[],err:r.d.code,at:Date.now()};dfLinkSheet();render();return}
+  S.dfx=null;dfxLoad(1);setTimeout(function(){if(dfEntry())dfGo()},1500)})}
+function dfDisconnect(){confirmBox(t('dfx_off_q'),function(){api('dfoff',{off:true}).catch(function(){});S.dfoff=true;sheetClose();
+ if(S.cur=='cx:dipfunded'){S.cur=(S.ws[0]||{}).id;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}}toast(esc(t('dfx_off_ok')));render();load()})}
+/* Birja bo'limidagi oyna: holat, hisoblar (almashtirish), equity, havolalar, uzish */
+function dfOpen(){var x=S.dfx||{},s=S.dfs;tick();
+ var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0;font-size:13px">'+esc(l)+'</span><b class="'+(c||'')+'" style="font-size:14px">'+v+'</b></div>'};
+ var h='<h4 style="display:flex;align-items:center;gap:10px">'+dfLogo(30)+'Dip Funded</h4>';
+ h+=x.err?'<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(255,92,92,.35)"><b class="r">✕ '+esc(t('df_unav'))+'</b></div>'
+  :'<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(194,242,58,.3)"><b class="g">✓ '+esc(t('cx_ok_conn'))+'</b><div class="rs" style="margin-top:3px">'+esc(t('dfx_auto'))+'</div></div>';
+ if(s)h+=row(t('df_equity2'),'$'+n2(+s.equity||0))+row(t('df_balance'),'$'+n2(+s.balance||0))+row(t('df_free'),'$'+n2(+s.available||0));
+ h+=dfAccList(1);
+ h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"><button class="btn p" style="margin:0" onclick="sheetClose();dfGo()">'+esc(t('cx_open_ws'))+'</button>'
+  +'<button class="btn" style="margin:0" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button></div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="btn" style="margin:0" onclick="openLink(S.df)">'+esc(t('dfx_site'))+'</button>'
+  +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="dfDisconnect()">'+esc(t('cx_del'))+'</button></div>';
+ sheetOpen(h)}
+/* Hisoblar ro'yxati (ko'p hisobli odamlar uchun almashtirish) */
+function dfAccList(inSheet){var x=S.dfx||{},L=x.accs||[];if(L.length<2)return'';
+ return'<div class="sect" style="margin-top:12px">'+esc(t('dfx_accs'))+' · '+L.length+'</div>'+L.map(function(a){var on=a.id==x.cur,pos=(+a.pnl_pct||0)>=0;
+  return'<div class="row glass'+(on?' acc':'')+'" style="padding:10px 12px" onclick="'+(inSheet?'sheetClose();':'')+'dfSwitch('+a.id+')"><div class="av" style="font-size:11px;width:34px;height:34px">#'+a.id+'</div><div class="rm"><div class="rn" style="font-size:14px">'+esc(a.name)+(on?' <span class="b bl">✓</span>':'')+'</div><div class="rs">'+esc(a.status_txt)+'</div></div>'
+  +(a.equity!=null?'<div class="rv '+(pos?'g':'r')+'" style="font-size:14px">$'+n2(+a.equity)+'<small>'+fpc(+a.pnl_pct||0)+'</small></div>':'')+'</div>'}).join('')}
+/* Bosh sahifa (Dip Funded konteksti) */
+function dfHome(v){var x=S.dfx,s=S.dfs;
+ if(!x){dfxLoad();v.innerHTML='<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
+ if(x.err){v.innerHTML='<div class="card glass rise" onclick="dfxLoad(1)"><h2>Dip Funded</h2><div class="s r">'+esc(t('df_unav'))+'</div><div class="deco" style="opacity:1">'+dfLogo(44)+'</div></div>'+tourAd();return}
+ var L=x.accs||[];
+ if(!L.length){v.innerHTML='<div class="empty glass rise">'+dfLogo(44)+'<div style="margin:10px 0 14px">'+esc(t('df_none'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button></div>'+tourAd();return}
+ var h='';
+ if(L.length>1)h+='<div class="chips rise" style="margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">'+L.map(function(a){return'<span class="chip glass'+(a.id==x.cur?' on':'')+'" style="white-space:nowrap" onclick="dfSwitch('+a.id+')">#'+a.id+' · $'+n2(+a.equity||0)+'</span>'}).join('')+'</div>';
+ if(!s||s.id!=x.cur){if(!s)dfOneLoad();v.innerHTML=h+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
+ var P=s.positions||[],up=0;P.forEach(function(p){up+=+p.upnl||0});var st=(S.cxst||{}).dipfunded;if(!st)cxStatLoad('dipfunded','ytd');var sy=st&&st.ytd;
+ var sl=[];
+ sl.push('<div class="slide glass acc" onclick="dfOpen()"><div class="art" style="opacity:1">'+dfLogo(34)+'</div><div class="k"><span class="pulse"></span>#'+s.id+' · '+esc(s.name)+'</div>'
+  +'<div class="v">$'+n2(+s.equity||0)+'</div><div class="d"><span class="'+((+s.pnl||0)>=0?'g':'r')+'">'+fm(+s.pnl||0)+'</span> · '+esc(s.status_txt)+'</div></div>');
+ sl.push('<div class="slide glass'+(up>0?' acc':'')+'" onclick="go(\'signals\')"><div class="art">'+ic('trend',28)+'</div><div class="k">'+esc(t('pnl_total'))+'</div><div class="v '+(up>=0?'g':'r')+'">'+(P.length?fm(up):'—')+'</div>'
+  +'<div class="d">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="sch">'+mbars(P.map(function(p){return +p.upnl||0}),300,46)+'</div>':'')+'</div>');
+ if(sy&&sy.n)sl.push('<div class="slide glass" onclick="cxStats(\'dipfunded\')"><div class="art">'+ic('bars',28)+'</div><div class="k">'+esc(t('cx_st_ytd'))+'</div><div class="v '+(sy.pnl>=0?'g':'r')+'">'+fm(sy.pnl)+'</div>'
+  +'<div class="d">'+esc(t('cx_tr_cnt',{n:sy.n}))+' · '+Math.round(sy.wr)+'% WR</div>'+(sy.curve&&sy.curve.length>1?'<div class="sch">'+mline(sy.curve.map(function(z){return z[1]}),300,52,'dfs3')+'</div>':'')+'</div>');
+ S.nslides=sl.length;if(S.slide>=sl.length)S.slide=0;
+ h+='<div class="slider rise" id="slider">'+sl.join('')+'</div><div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>';
+ h+='<div class="tiles rise"><div class="tile2 glass"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">$'+n2(+s.balance||0)+'</div></div><div class="tile2 glass"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">$'+n2(+s.available||0)+'</div></div></div>';
+ if(s.tradable){h+='<div class="eq glass rise">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,'$'+n2(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,'$'+n2(+s.max.left));
+  if(s.target&&s.target.progress!=null)h+=bar(t('df_target'),s.target.progress,'$'+n2(+s.target.amount));if(s.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+s.days.done+' / '+s.days.min+'</div>';h+='</div>';
+  h+='<div class="rise" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><button class="btn p" style="margin:0;padding:13px;font-size:14px" onclick="go(\'signals\')">Spot '+esc(t('tr_trade'))+'</button><button class="btn" style="margin:0;padding:13px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:7px" onclick="dfTerm('+s.id+',\''+esc((P[0]||{}).symbol||'BTC')+'\')">'+ic('candle',16)+' '+esc(t('dfx_chart'))+'</button></div>'}
+ h+='<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('cx_pos'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="cch">'+mbars(P.map(function(p){return +p.upnl||0}),300,40)+'</div>':'<div class="deco">'+ic('trend',50)+'</div>')+'</div>'
+  +'<div class="row2"><div class="card glass rise" onclick="cxStats(\'dipfunded\')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(sy&&sy.n?t('cx_st_ytd'):t('stats_sub'))+'</div>'+(sy&&sy.n?'<div class="deco" style="right:12px;bottom:10px">'+mring(sy.wr,52)+'</div>':'<div class="deco">'+ic('bars',36)+'</div>')+'</div>'
+  +'<div class="card glass rise" onclick="go(\'tour\')"><h2>'+esc(t('tour'))+'</h2><div class="s">'+esc(t('tour_sub'))+'</div><div class="deco">'+ic('trophy',36)+'</div></div></div>'
+  +'<div class="card glass rise" onclick="dfTrades()"><h2>'+esc(t('cx_trades'))+'</h2><div class="s">Spot</div><div class="deco">'+ic('clock',40)+'</div></div>';
+ if(L.length>1)h+='<div class="rise">'+dfAccList(0)+'</div>';
+ h+='<div class="rise" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn" style="margin:0" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button><button class="btn" style="margin:0" onclick="openLink(S.df)">'+esc(t('dfx_site'))+'</button></div>';
+ v.innerHTML=h}
+/* Savdolar tarixi — hisobning yopilgan savdolari (statistika ma'lumotidan) */
+function dfTrades(){tick();S.page={id:'dftr',d:null};var p=document.getElementById('page');
+ var hd='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="background:none;border:0">'+dfLogo(34)+'</div><div><h2>'+esc(t('cx_trades'))+'</h2><div class="rs">Dip Funded · #'+dfCur()+'</div></div></div>';
+ p.innerHTML=hd+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';pageShow();var g=S.page;
+ api('act',{action:'dfstats',arg:dfCur()}).then(function(r){if(S.page!==g)return;var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
+  var L=(r.ok&&d&&d.trades)||[];if(!r.ok){p.innerHTML=hd+'<div class="empty glass">'+esc(t(r.pending?'slow':'df_unav'))+'</div>';return}
+  p.innerHTML=hd+(L.length?L.map(function(x){var pn=+x.pnl||0;return'<div class="row glass" style="cursor:default">'+coinIc(x.sym,26)+'<div class="rm"><div class="rn">'+esc(x.sym)+'</div><div class="rs">'+esc(String(x.t||'').slice(0,16))+' · '+fp(x.entry)+' → '+fp(x.exit)+'</div></div><div class="rv '+(pn>=0?'g':'r')+'">'+fm(pn)+'<small>'+fpc(+x.pnl_pct||0)+'</small></div></div>'}).join('')
+   :'<div class="empty glass">'+ic('clock',40)+'<div>'+esc(t('cx_st_empty'))+'</div></div>')+'<div class="endsp"></div>'}).catch(function(){})}
+/* Pozitsiya kartasi (Dip Funded, spot) — birja kartasi bilan bir xil ko'rinish */
+function dfPosCard(p){var key='df:'+p.symbol,more=(S.cxMore||{})[key],up=+p.upnl||0,cl=up>=0?'g':'r',s=S.dfs||{};
+ var it=function(k,v,c){return'<div class="mci"><span>'+esc(t(k))+'</span><b class="'+(c||'')+'">'+v+'</b></div>'},sg=function(x){return(x>=0?'+':'−')+n2(Math.abs(x))};
+ var h='<div class="tile2 glass rise" style="margin-bottom:10px;padding:14px 14px 12px"><div onclick="dfTerm('+s.id+',\''+esc(p.symbol)+'\')" style="cursor:pointer">'
+  +'<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">'+coinIc(p.symbol,26)+'<b style="font-size:17px;letter-spacing:-.01em">'+esc(p.symbol)+'USDT</b><span class="b bx">Spot</span><span class="b bl">LONG</span><span style="margin-left:auto;color:var(--mut);display:flex">'+ic('candle',18)+'</span></div>'
+  +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px"><div><span class="rs">'+esc(t('t_pnl'))+'</span><div class="'+cl+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+sg(up)+'</div></div>'
+  +'<div style="text-align:right"><span class="rs">'+esc(t('t_roi'))+'</span><div class="'+cl+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+fpc(+p.upnl_pct||0)+'</div></div></div>'
+  +'<div class="mcg">'+it('t_vol',n2(+p.value||0))+it('t_qty',String(+(+p.qty||0).toPrecision(8)))+it('t_entry_px',fp(p.avg))
+  +it('t_now',fp(p.price))+it('stop',p.sl!=null?fp(p.sl):'—',p.sl!=null?'r':'')+it('tp_btn',p.tp!=null?fp(p.tp):'—',p.tp!=null?'g':'')+'</div>';
+ if(more){var eq=+s.equity||0;h+='<div class="mcg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)">'+it('t_margin',n2((+p.avg||0)*(+p.qty||0)))+it('dfx_share',eq?(((+p.value||0)/eq*100).toFixed(1)+'%'):'—')+it('df_free',n2(+s.available||0))
+  +it('df_equity2',n2(eq))+it('df_daily',s.daily?n2(+s.daily.left):'—')+it('df_maxdd',s.max?n2(+s.max.left):'—')+'</div>'}
+ h+='</div><div class="mcb">'+(s.tradable?'<button class="btn" onclick="dfPTpsl(\''+esc(p.symbol)+'\')">TP/SL</button>':'')
+  +'<button class="btn" onclick="dfShare(\''+esc(p.symbol)+'\')">'+esc(t('t_share'))+'</button>'
+  +'<button class="btn" onclick="cxMoreT(\''+esc(key)+'\')">'+esc(t('t_more'))+' '+(more?'▴':'▾')+'</button>'
+  +(s.tradable?'<button class="btn" onclick="dfPSell(\''+esc(p.symbol)+'\')">'+esc(t('close'))+'</button>':'')+'</div></div>';
+ return h}
+function dfShare(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){return x.symbol==sym})[0];if(!p)return;
+ var txt='🟢 '+sym+'USDT · Dip Funded\n'+t('t_entry_px')+': '+fp(p.avg)+'\n'+t('t_now')+': '+fp(p.price)+'\nROI: '+fpc(+p.upnl_pct||0);
+ openLink('https://t.me/share/url?url='+encodeURIComponent(botUrl())+'&text='+encodeURIComponent(txt))}
+/* Sahifasiz amallar (Bosh/Savdo ekranidan): holat qaytadi → S.dfs */
+function dfAct(args,ok){args.acc=dfCur();toast(esc(t('wait')));
+ return api('act',{action:'dftrade',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
+  if(r.ok&&d){S.dfs=d;toast('✅ '+esc(noEmoji(d.msg||'OK')));haptic('success');if(ok)ok();if(S.cxst)S.cxst.dipfunded=null;tick();var y=window.scrollY;render();window.scrollTo(0,y);return true}
+  toast(esc(noEmoji((d&&d.text)||t('df_unav'))));haptic('error')}).catch(function(){toast('Error')})}
+function dfPTpsl(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){return x.symbol==sym})[0];if(!p)return;
+ sheetOpen('<h4>TP / SL · '+esc(sym)+'</h4><p>'+esc(t('df_tpsl_hint'))+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfp_sl','SL',p.sl)+dfIn('dfp_tp','TP',p.tp)+'</div>'
+  +'<button class="btn p full" style="width:100%" onclick="dfAct({op:\'protect\',symbol:\''+esc(sym)+'\',sl:dfV(\'dfp_sl\'),tp:dfV(\'dfp_tp\')},sheetClose)">'+esc(t('save'))+'</button>')}
+function dfPSell(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){return x.symbol==sym})[0];if(!p)return;
+ sheetOpen('<h4>'+coinIc(sym,20)+' SELL · '+esc(sym)+'</h4><p>'+esc(t('df_qty'))+': '+esc(p.qty||'')+' · $'+n2(+p.value||0)+'</p><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+  +[25,50,75,100].map(function(x){return'<button class="btn" style="margin:0'+(x==100?';background:rgba(255,92,92,.16);color:var(--r);border-color:rgba(255,92,92,.3)':'')+'" onclick="dfAct({op:\'sell\',symbol:\''+esc(sym)+'\',fraction:'+(x/100)+'},sheetClose)">'+x+'%</button>'}).join('')+'</div>')}
+/* eski kirish nuqtalari — endi Dip Funded konteksti */
+function openDf(){dfGo()}
+function dfAcc(id){dfGo(id)}
 /* ===== 310: Dip Funded terminali — botdan chiqmay savdo (grafik signal terminalidan) ===== */
 function dfTerm(acc,sym){tick();S.page={id:'term',df:{acc:acc,sym:sym||'BTC'},tf:'1h',c:null,adds:[],drag:null,pend:null};
  var p=document.getElementById('page');p.scrollTop=0;termRender();if(!p.classList.contains('show'))pageShow();termLoad();if(!S.dfs||S.dfs.id!=acc)dfRefresh()}
@@ -1369,12 +1486,21 @@ function dfLines(i,g){var L=[];if(i.pos){var av=+i.pos.avg,q=+i.pos.qty||0,up=+i
   L.push({k:'entry',p:av,c:'rgba(255,255,255,.75)',lb:fm(up)+' · '+fpc(+i.pos.upnl_pct||0),tc:up>=0?'#c2f23a':'#ff5c5c',np:1,dr:false});
   if(i.pos.sl!=null)L.push({k:'sl',p:+i.pos.sl,c:'#ff5c5c',lb:'SL',dr:true,f:at});if(i.pos.tp!=null)L.push({k:'tp',p:+i.pos.tp,c:'#c2f23a',lb:'TP',dr:true,f:at})}
  i.orders.forEach(function(o){L.push({k:'o'+o.id,p:+o.limit,c:'#b4b9ae',lb:'Limit',dr:true})});
+ if(!i.cx&&g.df){var tr0=S.dfs&&S.dfs.tradable;L.forEach(function(l){if(!tr0)l.dr=false;else if(l.k!='liq')l.x=1});
+  if(g.pend&&!L.some(function(l){return l.k==g.pend.k})){var k0=g.pend.k;L.push({k:k0,p:g.pend.to,c:k0=='sl'?'#ff5c5c':k0=='tp'?'#c2f23a':'#4ea1ff',lb:g.pend.lb,dr:true,x:1})}}
  if(g.drag)L.forEach(function(l){if(l.k==g.drag.k)l.p=g.drag.p});if(g.pend)L.forEach(function(l){if(l.k==g.pend.k)l.p=g.pend.to});return L}
 function dfDo(args,ok){var g=S.page;args.acc=g.df.acc;if(!args.symbol)args.symbol=g.df.sym;toast(esc(t('wait')));
  return api('act',{action:'dftrade',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
   if(r.ok&&d){S.dfs=d;toast(esc(noEmoji(d.msg||'OK')));haptic('success');if(ok)ok();if(S.page===g){g.pend=null;termRender();termLoad()}return}
   toast(esc(noEmoji((d&&d.text)||t('df_unav'))));haptic('error')}).catch(function(){toast('Error')})}
+function dfLineX(k){var g=S.page,i=termItem();if(!g||!i)return;
+ if(g.pend&&g.pend.k==k){termCancel();return}
+ if(!g.xarm||g.xarm.k!=k||Date.now()-g.xarm.t>3000){g.xarm={k:k,t:Date.now()};haptic('warning');toast(esc(t('cx_x_again')));termRedraw();setTimeout(function(){if(S.page===g&&g.xarm&&g.xarm.k==k){g.xarm=null;termRedraw()}},3100);return}
+ g.xarm=null;if(k=='entry'){dfSellSheet();return}
+ if(k=='sl'||k=='tp'){var a={op:'protect'};a[k]=null;dfDo(a);return}
+ if(k.charAt(0)=='o')dfDo({op:'cancel',order_id:+k.slice(1)})}
 function dfSave(){var g=S.page,pd=g.pend;if(!pd)return;var k=pd.k,a={};
+ if(k=='nl'){g.nlp=termRound(+pd.to);g.pend=null;termRender();dfBuySheet('limit');return}
  if(k=='sl'||k=='tp'){a.op='protect';a[k]=pd.to}else if(k.charAt(0)=='o'){a.op='modify';a.order_id=+k.slice(1);a.limit=pd.to}else{g.pend=null;termRender();return}dfDo(a)}
 function dfIn(id,ph,val){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px">'}
 function dfV(id){var e=document.getElementById(id);return e?num(e.value):null}
@@ -1382,7 +1508,7 @@ function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mo
  var ch=function(m,l){return'<span class="chip glass'+(mode==m?' on':'')+'" onclick="dfBuySheet(\''+m+'\')">'+esc(l)+'</span>'};
  sheetOpen('<h4>'+coinIc(i.symbol,20)+' BUY · '+esc(i.symbol)+'</h4><p>'+esc(t('df_free'))+': <b>'+f0(av)+'</b>'+(i.price!=null?' · '+fp(i.price):'')+'</p>'
   +'<div class="chips" style="margin-bottom:10px">'+ch('market',t('df_market'))+ch('limit',t('limit'))+'</div>'
-  +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),i.price!=null?termRound(i.price*.99):''):'')
+  +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),g.nlp?g.nlp:i.price!=null?termRound(i.price*.99):''):'')
   +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+'</div>'+dfIn('dfb_a','0','')
   +'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+Math.floor(av*x/100)+'">'+x+'%</span>'}).join('')+'</div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'')+dfIn('dfb_tp',t('df_tp_opt'),'')+'</div>'
@@ -1437,13 +1563,15 @@ function dfInfo(i,g,s){var tr=s.tradable,x=i.pos,n2=function(v){return v==null?'
  h+='<div class="mcb"><button class="btn" '+(tr?'':'disabled ')+'onclick="dfTpslSheet()">TP/SL</button><button class="btn" onclick="termMore()">'+esc(t('t_more'))+' '+(g.more?'▴':'▾')+'</button><button class="btn" '+(tr?'':'disabled ')+'onclick="dfSellSheet()">'+esc(t('close'))+'</button></div>';
  return h+'</div>'}
 function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
- var h='<div class="ghd"><div class="bk glass" onclick="dfAcc('+g.df.acc+')">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
+ var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span></div>'
-  +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
+ if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span></div>'
+  +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
+ else if(s&&s.id==g.df.acc&&s.tradable&&i.price){var ab=function(k,l,c){return'<button class="btn" style="margin:0;color:'+c+'" onclick="cxAdd(\''+k+'\')">+ '+l+'</button>'};
+  h+='<div class="mcb" style="margin-top:10px">'+(i.pos&&i.pos.tp==null?ab('tp','TP','#c2f23a'):'')+(i.pos&&i.pos.sl==null?ab('sl','SL','#ff5c5c'):'')+ab('nl','Limit','#4ea1ff')+'</div>'}
  if(!s||s.id!=g.df.acc){p.innerHTML=h+'<div class="spk"><div class="sk"></div></div>';termBind();return}
  var tr=s.tradable;
  h+='<div style="display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 0">'+'<button class="btn" style="margin:0;background:var(--g);color:#050506;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfBuySheet()">BUY '+esc(i.symbol)+'</button>'
@@ -1451,6 +1579,7 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
  g.ttab=g.ttab||'pos';
  h+=dfInfo(i,g,s);
  if(tr&&(s.daily||s.max)){h+='<div class="eq glass" style="margin-top:10px">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,f0(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,f0(+s.max.left));h+='</div>'}
+ if(tr)h+='<div class="rs" style="margin:10px 4px 0;line-height:1.5">💡 '+esc(t('cx_drag'))+'</div>';
  h+='<div class="endsp"></div>';p.innerHTML=h;termBind()}
 setInterval(function(){var g=S.page;if(!g||!g.df||g.drag||g.pend||document.hidden)return;dfRefresh()},12000);
 /* ===== 258: yangi signal (ilova ichida) ===== */
@@ -1666,7 +1795,7 @@ function act(id,a,arg,skip,args){var i=S.items.filter(function(x){return x.id==i
  var run=function(){var card=document.getElementById('s'+id);if(card){card.style.opacity=.6;card.querySelectorAll('button').forEach(function(b){b.disabled=true})}toast(esc(t('wait')));
   api('act',{sig:id,action:a,arg:arg,args:args}).then(function(r){if(r.pending){toast(esc(t('slow')))}else{toast(esc(noEmoji(String(r.msg||'OK').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error')}load()}).catch(function(){toast('Error');load()})};
  if(m&&!skip)confirmBox(m,run);else run()}
-function load(){var w=cur();if(!w){render();return}if(w.type=='cex'){cxRefresh();render();return}
+function load(){var w=cur();if(!w){render();return}if(w.type=='cex'){if(w.ex=='dipfunded'){if(S.dfx)dfOneLoad();else dfxLoad()}else cxRefresh();render();return}
  return api('open',{ws:w.id}).then(function(d){if(!S.items.length&&d.items.length)S.anim=true;S.items=d.items;w.open=d.items.length;render();loadSpark();if(S.page&&S.page.id=='term'&&!S.page.drag&&!S.page.pend){termRender();termLoad()}}).catch(function(){render()})}
 
 /* ---- yulduzli fon ---- */
@@ -1709,11 +1838,11 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
   S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
  if(/^nws_\d+$/.test(sp))newsShare(+sp.slice(4));
- api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+ api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.dfoff=!!d.df_off;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==+saved})[0]||S.ws[0]||{}).id;if(saved&&String(saved).indexOf('cx:')==0)S.cur=saved;
-  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(function(){if(+q.get('acc')){pageShow();dfAcc(+q.get('acc'))}else openDf()},50);if(q.get('ref'))setTimeout(openRef,50);
-  render();load();setTimeout(function(){if(!S.cex)cexLoad()},800);setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
+  var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(function(){dfGo(+q.get('acc')||null)},50);if(q.get('ref'))setTimeout(openRef,50);
+  render();load();setTimeout(function(){if(!S.cex)cexLoad();dfxLoad()},800);setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

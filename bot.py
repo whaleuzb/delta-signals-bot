@@ -1647,6 +1647,31 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_newsshare(ctx, uid, lang, a)
     if a["action"] == "dftrade":
         return await _app_dftrade(ctx, uid, lang, a)
+    if a["action"] == "dfstats":
+        # 346: Dip Funded statistikasi (birjalardek) — hisobning BARCHA yopilgan savdolari
+        # (sahifalab, 100 tadan), web davr bo'yicha hisoblaydi.
+        if not dipfunded.enabled():
+            return False, json.dumps({"code": "off"})
+        try:
+            acc, tr, off, head = int(a["arg"]), [], 0, {}
+            for _ in range(40):
+                d = await dipfunded.stats(uid, acc, limit=100, offset=off)
+                head = head or d
+                part = d.get("trades") or []
+                tr += [{"sym": x.get("symbol"), "t": x.get("time"), "pnl": x.get("pnl"),
+                        "qty": x.get("qty"), "entry": x.get("entry"), "exit": x.get("exit"),
+                        "pnl_pct": x.get("pnl_pct"), "id": x.get("id")} for x in part]
+                off += len(part)
+                if not part or off >= int(d.get("total") or 0):
+                    break
+            sm = head.get("summary") or {}
+            return True, json.dumps({"acc": acc, "starting": head.get("starting"),
+                                     "fees": sm.get("fees"), "trades": tr}, default=float)
+        except dipfunded.NotLinked as e:
+            return False, json.dumps({"code": str(e) or "not_linked"})
+        except Exception as e:
+            log.warning("Mini App Dip Funded statistikasi: %s", e)
+            return False, json.dumps({"code": "unavailable"})
     if a["action"] in ("dfacc", "dfone"):
         # 255: Dip Funded hisoblari Mini App uchun — JSON (veb servisda kalit yo'q).
         if not dipfunded.enabled():
@@ -6302,8 +6327,12 @@ async def df_settings_view(uid: int, lang: str, accounts: list | None):
 # ── Kirish nuqtalari ──
 
 async def _df_open(uid: int, lang: str):
-    """"💼 Dip Funded" va /dipfunded: asosiy hisob tanlangan bo'lsa — o'sha,
-    aks holda hisoblar ro'yxati."""
+    """346: "💼 Dip Funded" va /dipfunded — eski chat menyusi o'rniga ilova (Dip Funded
+    birjalar qatorida: hisob almashtirish, savdo, grafik, statistika)."""
+    if config.WEB_URL:
+        return i18n.t("df.app_open", lang), InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("df.app_btn", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app?df=1"),
+            api_kwargs={"style": "success"})]])
     s = await df_settings(uid)
     if s["main"]:
         try:
