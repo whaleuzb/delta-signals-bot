@@ -8055,3 +8055,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Backend: `cex.bn_depth` (op `depth`, imzosiz: depth limit=10 + ticker/24hr, spot/fapi) `TRADE_READ`da; web `api_cextrade` — `depth` `_act_allowed` limitiga kirmaydi, 1.5 s kesh (`_DEPTH`).
 - `render()` — `tv_*` maydonga yozilayotganda (fokus) qayta chizilmaydi (30 s yangilanish fokusni o'g'irlamasin).
 - Binance bo'lmagan birjalarda forma o'chiq + izoh, pozitsiyalar/aktivlar ko'rinadi. Brauzer sinovi `t_cxw.py`.
+
+## 340. Savdo ekrani — Dip Funded terminalidan olingan qulayliklar
+- Manba (faqat o'qildi, delta-prop o'zgartirilmadi): `static/js/terminal.js` (`loadBook`, `renderMid`), `terminal.html` (`mini-row`, `book-ratio`).
+- TP/SL tezkor tugmalari (`tvQ(k,x)`): TP +2/+5/+10%, SL −1/−2/−5% — joriy narxdan (`tvPx`), Short'da yo'nalish teskari.
+- Order book ostida xarid/sotuv nisbati chizig'i (10 daraja miqdorlari yig'indisi, yashil % | qizil %).
+- O'rta narx oldingi yangilanishga nisbatan yashil ↑ / qizil ↓ (`book.tick`, `T.tick0`; juftlik/bozor almashganda 0).

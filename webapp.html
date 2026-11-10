@@ -583,7 +583,8 @@ function tvView(v,w){var a=w.acc,ex=w.ex,T=tvS();if(!a){v.innerHTML='<div class=
  F+='<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px">'+[0,25,50,75,100].map(function(x){return'<span onclick="tvPct('+x+')" style="cursor:pointer;width:14px;height:14px;transform:rotate(45deg);border:2px solid '+((T.pct||0)>=x&&x>0?col:'rgba(255,255,255,.35)')+';background:'+((T.pct||0)>=x&&x>0?col:'transparent')+';border-radius:3px;display:inline-block"></span>'}).join('<span style="flex:1;height:2px;background:rgba(255,255,255,.12);margin:0 3px"></span>')+'</div>';
  F+=inp('tv_t',t('tv_total'),T.total);
  if(fut){F+='<label style="display:flex;align-items:center;gap:8px;margin:0 2px 8px;font-size:13px;font-weight:700"><input type="checkbox" '+(T.tpsl?'checked':'')+' onchange="tvSet(\'tpsl\',this.checked)" style="width:18px;height:18px;accent-color:#c2f23a"> TP/SL</label>';
-  if(T.tpsl)F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+inp('tv_tp','TP',T.tp)+inp('tv_sl','SL',T.sl)+'</div>'}
+  if(T.tpsl){var qb=function(k,x){return'<button onclick="tvQ(\''+k+'\','+x+')" style="flex:1;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--mut);font-weight:700;font-size:11px;padding:6px 0;border-radius:6px;cursor:pointer">'+(k=='tp'?'+':'−')+x+'%</button>'};
+   F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div>'+inp('tv_tp','TP',T.tp)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[2,5,10].map(function(x){return qb('tp',x)}).join('')+'</div></div><div>'+inp('tv_sl','SL',T.sl)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[1,2,5].map(function(x){return qb('sl',x)}).join('')+'</div></div></div>'}}
  var av=i?(fut?i.avail.quote:(buy?i.avail.quote:i.avail.base)):null,lv=T.lev||(i&&i.lev)||10,px=tvPx();
  F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px"><span class="rs" style="margin:0">'+esc(t('tv_avbl'))+'</span><b>'+(av==null?'—':(!fut&&!buy?(+av.toPrecision(8))+' '+esc(base):n2(av)+' USDT'))+'</b></div>';
  F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px 10px"><span class="rs" style="margin:0">'+esc(t('tv_max'))+'</span><b id="tv_max">'+(av!=null&&px?(+(fut?av*lv/px:(buy?av/px:av)).toPrecision(6))+' '+esc(base):'—')+'</b></div>';
@@ -606,8 +607,10 @@ function tvBookHtml(){var T=S.tv,b=T.book;if(!b)return'<div class="spk" style="h
  var row=function(x,c,bg){var w=Math.min(100,x[0]*x[1]/mx*100);return'<div onclick="tvSetP('+x[0]+')" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 2px;cursor:pointer;background:linear-gradient(to left,'+bg+' '+w.toFixed(0)+'%,transparent '+w.toFixed(0)+'%)"><span style="color:'+c+';font-weight:600">'+fp(x[0])+'</span><span style="color:var(--mut)">'+(+(x[1]).toPrecision(4))+'</span></div>'};
  return'<div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--mut);margin:0 2px 4px"><span>'+esc(t('tv_price_s'))+'</span><span>'+esc(t('tv_qty_s'))+'</span></div>'
   +A.map(function(x){return row(x,'#f6465d','rgba(246,70,93,.12)')}).join('')
-  +'<div style="text-align:center;padding:8px 0"><div style="font-weight:900;font-size:17px;color:'+(b.chg<0?'#f6465d':'#2ebd85')+'">'+fp(b.last)+'</div></div>'
-  +B.map(function(x){return row(x,'#2ebd85','rgba(46,189,133,.12)')}).join('')}
+  +'<div style="text-align:center;padding:8px 0"><div style="font-weight:900;font-size:17px;color:'+((b.tick||(b.chg<0?-1:1))<0?'#f6465d':'#2ebd85')+'">'+fp(b.last)+((b.tick||0)?(b.tick<0?' ↓':' ↑'):'')+'</div></div>'
+  +B.map(function(x){return row(x,'#2ebd85','rgba(46,189,133,.12)')}).join('')
+  +(function(){var bs=b.bids.reduce(function(a,x){return a+x[1]},0),as=b.asks.reduce(function(a,x){return a+x[1]},0),bp=bs+as?bs/(bs+as)*100:50;
+   return'<div style="display:flex;align-items:center;gap:5px;padding-top:8px;font-size:10.5px;font-weight:700"><span style="color:#2ebd85">'+bp.toFixed(0)+'%</span><div style="flex:1;height:4px;border-radius:2px;background:#f6465d;overflow:hidden"><i style="display:block;height:100%;width:'+bp.toFixed(1)+'%;background:#2ebd85"></i></div><span style="color:#f6465d">'+(100-bp).toFixed(0)+'%</span></div>'})()}
 function tvLoad(){var T=S.tv;if(!T||T.loading)return;T.loading=1;var sym=T.sym,mkt=T.mkt;
  api('cextrade',{ex:T.ex,op:'info',a:{mkt:mkt,sym:sym}}).then(function(d){T.loading=0;if(S.tv!==T||T.sym!=sym||T.mkt!=mkt)return;T.info=d.ok?d.r:{sym:sym,mkt:mkt,avail:{quote:0,base:0},perm:{},err:d};if(d.ok&&mkt=='fut'&&!T.lev)T.lev=d.r.lev||10;
   if(!T.price&&d.ok)T.price=String(+(+d.r.price).toPrecision(10));tvRe()}).catch(function(){T.loading=0});
@@ -615,13 +618,14 @@ function tvLoad(){var T=S.tv;if(!T||T.loading)return;T.loading=1;var sym=T.sym,m
 function tvOrdLoad(){var T=S.tv;if(T.mkt=='fut'){cxOrders(T.ex);return}
  api('cextrade',{ex:T.ex,op:'spot_open',a:{}}).then(function(d){if(S.tv!==T)return;T.sopen=d.ok?d.r:[];tvRe()}).catch(function(){})}
 function tvBookLoad(){var T=S.tv;if(!T||T.ex!='binance')return;var sym=T.sym,mkt=T.mkt;
- api('cextrade',{ex:T.ex,op:'depth',a:{mkt:mkt,sym:sym}}).then(function(d){if(S.tv!==T||T.sym!=sym||T.mkt!=mkt||!d.ok)return;var first=!T.book;T.book=d.r;
+ api('cextrade',{ex:T.ex,op:'depth',a:{mkt:mkt,sym:sym}}).then(function(d){if(S.tv!==T||T.sym!=sym||T.mkt!=mkt||!d.ok)return;var first=!T.book,pl=T.book&&T.book.last;T.book=d.r;d.r.tick=pl&&d.r.last!=pl?(d.r.last>pl?1:-1):(T.tick0||0);T.tick0=d.r.tick;
   var e=document.getElementById('tv_book');if(e)e.innerHTML=tvBookHtml();var c=document.getElementById('tv_chg');if(c){c.textContent=fpc(d.r.chg);c.className=d.r.chg<0?'r':'g'}
   if(first)tvRe()}).catch(function(){})}
 var TVP=0;function tvPoll(){clearInterval(TVP);TVP=setInterval(function(){var w=cur();if(!w||w.type!='cex'||S.tab!='signals'||document.hidden||S.page){clearInterval(TVP);return}tvBookLoad()},3000)}
 function tvRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!S.page&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
-function tvSet(k,v){var T=S.tv;T[k]=v;if(k=='mkt'||k=='sym'){T.info=null;T.book=null;T.price='';T.amt='';T.total='';T.pct=0;T.lev=null;if(k=='mkt')T.tab=v=='fut'?'pos':'orders'}
+function tvSet(k,v){var T=S.tv;T[k]=v;if(k=='mkt'||k=='sym'){T.info=null;T.book=null;T.tick0=0;T.price='';T.amt='';T.total='';T.pct=0;T.lev=null;if(k=='mkt')T.tab=v=='fut'?'pos':'orders'}
  if(k=='side'||k=='type'){T.pct=0}tick();tvRe()}
+function tvQ(k,x){var T=S.tv,px=tvPx();if(!px)return;var up=(T.side=='buy')==(k=='tp'),v=+(px*(1+(up?x:-x)/100)).toPrecision(6);T[k]=String(v);var e=document.getElementById('tv_'+k);if(e)e.value=T[k]}
 function tvSetP(p){var T=S.tv;if(T.type!='limit')return;T.price=String(p);var e=document.getElementById('tv_p');if(e)e.value=T.price;tvCalc('amt')}
 function tvBbo(){var T=S.tv,b=T.book;if(!b)return;tvSetP(T.side=='buy'?(b.bids[0]||[0])[0]:(b.asks[0]||[0])[0])}
 function tvIn(id){var T=S.tv,e=document.getElementById(id);if(!e)return;var v=e.value.replace(',','.');
