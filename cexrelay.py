@@ -91,6 +91,18 @@ async def history(request):
         return web.json_response({"err": "api"})
 
 
+async def trades(request):
+    ex, k = await _args(request)
+    try:
+        return web.json_response({"trades": await cex.trades(ex, k)})
+    except cex.ApiErr as e:
+        log.info("trades xato (%s): %s — %s", ex, e.code, e.text[:200])
+        return web.json_response({"err": e.code, "msg": e.text[:200]})
+    except Exception:
+        log.warning("trades xato (%s)", ex, exc_info=True)
+        return web.json_response({"err": "api"})
+
+
 async def health(_request):
     return web.Response(text="ok")
 
@@ -129,6 +141,7 @@ def build() -> web.Application:
     app.on_startup.append(_start_check)
     app.add_routes([web.post("/verify", verify), web.post("/snapshot", snapshot),
                     web.post("/history", history),
+                    web.post("/trades", trades),
                     web.get("/healthz", health)])
     return app
 

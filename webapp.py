@@ -814,11 +814,12 @@ async def _cx_call(op: str, ex: str, k: dict):
     import cex
     url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
     if not url:
-        f = {"verify": cex.verify, "snapshot": cex.snapshot, "history": cex.history}[op]
+        f = {"verify": cex.verify, "snapshot": cex.snapshot, "history": cex.history,
+             "trades": cex.trades}[op]
         return await f(ex, k)
     import httpx
     try:
-        async with httpx.AsyncClient(timeout=30) as c:
+        async with httpx.AsyncClient(timeout=90 if op == "trades" else 30) as c:
             r = await c.post(f"{url}/{op}", json={"ex": ex, "k": k},
                              headers={"X-Relay-Token": os.getenv("RELAY_TOKEN", "")})
         r.raise_for_status()
@@ -828,7 +829,7 @@ async def _cx_call(op: str, ex: str, k: dict):
         raise cex.ApiErr("net", type(e).__name__)
     if d.get("err"):
         raise cex.ApiErr(d["err"], str(d.get("msg") or ""))
-    return d.get("hist") if op == "history" else d.get("snap")
+    return {"history": d.get("hist"), "trades": d.get("trades")}.get(op, d.get("snap"))
 
 
 async def cex_relay_check(_app=None):
@@ -1062,6 +1063,40 @@ async def api_cexhist(request):
     return web.json_response({"days": days, "p": pts}, headers=NO_CACHE)
 
 
+_CEX_TR: dict[tuple, tuple[float, dict]] = {}
+_CEX_TR_TTL = 600.0
+
+
+async def api_cextrades(request):
+    """329: savdolar tarixi (Binance: fyuchers yopilishlari + spot orderlar), 10 daq kesh."""
+    import cex
+    body, uid = await _body(request)
+    ex = str(body.get("ex") or "")
+    if ex not in cex.EXCHANGES:
+        raise web.HTTPBadRequest()
+    key = (uid, ex)
+    hit = _CEX_TR.get(key)
+    fresh = bool(body.get("fresh"))
+    if hit and time.monotonic() - hit[0] < (_CEX_TR_TTL if not fresh else 60):
+        return web.json_response(hit[1], headers=NO_CACHE)
+    if not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
+    row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
+    if row is None:
+        raise web.HTTPNotFound()
+    try:
+        res = {"ok": True, "tr": await _cx_call("trades", ex, _cex_keys(row))}
+    except cex.ApiErr as e:
+        return web.json_response({"ok": False, "err": e.code, "msg": _cx_msg(e.text)}, headers=NO_CACHE)
+    except Exception:
+        log.warning("Savdolar tarixi olinmadi (%s)", ex, exc_info=True)
+        return web.json_response({"ok": False, "err": "api"}, headers=NO_CACHE)
+    if len(_CEX_TR) > 500:
+        _CEX_TR.clear()
+    _CEX_TR[key] = (time.monotonic(), res)
+    return web.json_response(res, headers=NO_CACHE)
+
+
 async def api_cexdel(request):
     import cex
     body, uid = await _body(request)
@@ -1071,6 +1106,7 @@ async def api_cexdel(request):
     ok = await db.cex_del(uid, ex)
     _CEX_CACHE.pop((uid, ex), None)
     _CEX_REC.pop((uid, ex), None)
+    _CEX_TR.pop((uid, ex), None)
     return web.json_response({"ok": ok}, headers=NO_CACHE)
 
 
@@ -1111,6 +1147,7 @@ def routes() -> list:
         web.post("/api/app/cexadd", api_cexadd),
         web.post("/api/app/cexdel", api_cexdel),
         web.post("/api/app/cexhist", api_cexhist),
+        web.post("/api/app/cextrades", api_cextrades),
     ]
 
 
@@ -1300,6 +1337,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_trades": "Savdolar tarixi", "cx_tr_load": "Binance'dan yuklanmoqda — 10–20 soniya…", "cx_tr_only": "Savdolar tarixi hozircha faqat Binance uchun.", "cx_tr_n": "Savdolar", "cx_tr_fee": "Komissiya", "cx_tr_days": "oxirgi {n} kun", "cx_tr_none": "Savdolar topilmadi", "cx_tr_orders": "ta order", "cx_tr_spot_note": "hozirgi va oxirgi 30 kundagi coinlar bo'yicha", "cx_tr_refresh": "Yangilash",
     "cx_hist": "Balans tarixi", "cx_hist_empty": "Tarix to'planmoqda — balans har soat yozib boriladi", "cx_dn": "{n} kun",
     "loading": "Yuklanmoqda…", "cx_sub": "Birja hisoblaringiz bir joyda", "cx_total": "Umumiy balans",
     "cx_n": "ta birja", "cx_mine": "Ulangan birjalar", "cx_connect": "Birjani ulash", "cx_more": "Yana ulash",
@@ -1317,6 +1355,7 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_trades": "История сделок", "cx_tr_load": "Загружаем с Binance — 10–20 секунд…", "cx_tr_only": "История сделок пока только для Binance.", "cx_tr_n": "Сделки", "cx_tr_fee": "Комиссия", "cx_tr_days": "за {n} дн", "cx_tr_none": "Сделок не найдено", "cx_tr_orders": "ордеров", "cx_tr_spot_note": "по текущим монетам и монетам за 30 дней", "cx_tr_refresh": "Обновить",
     "cx_hist": "История баланса", "cx_hist_empty": "История собирается — баланс записывается каждый час", "cx_dn": "{n} дн",
     "loading": "Загрузка…", "cx_sub": "Ваши биржевые счета в одном месте", "cx_total": "Общий баланс",
     "cx_n": "бирж", "cx_mine": "Подключённые биржи", "cx_connect": "Подключить биржу", "cx_more": "Подключить ещё",
@@ -1334,6 +1373,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_trades": "Trade history", "cx_tr_load": "Loading from Binance — 10–20 seconds…", "cx_tr_only": "Trade history is available for Binance only for now.", "cx_tr_n": "Trades", "cx_tr_fee": "Fees", "cx_tr_days": "last {n} days", "cx_tr_none": "No trades found", "cx_tr_orders": "orders", "cx_tr_spot_note": "for current coins and coins held in the last 30 days", "cx_tr_refresh": "Refresh",
     "cx_hist": "Balance history", "cx_hist_empty": "Collecting history — the balance is recorded every hour", "cx_dn": "{n}d",
     "loading": "Loading…", "cx_sub": "All your exchange accounts in one place", "cx_total": "Total balance",
     "cx_n": "exchanges", "cx_mine": "Connected exchanges", "cx_connect": "Connect an exchange", "cx_more": "Connect more",

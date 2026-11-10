@@ -456,3 +456,143 @@ async def history(ex: str, k: dict) -> list:
     if ex == "binance":
         return await bn_history(k)
     return []
+
+
+# ─────────────────────────── 329: savdolar tarixi ───────────────────────────
+QUOTES = ("USDT", "FDUSD", "USDC")
+
+
+async def bn_fut_trades(k, days: int = 180) -> dict:
+    """Fyuchers yopilgan savdolari — `/fapi/v1/income` (REALIZED_PNL, COMMISSION,
+    FUNDING_FEE), 7 kunlik oynalar bilan `days` kungacha. Bir yopilishning bir
+    nechta fill'i (60 s ichida, bir juftlik) bitta qatorga birlashtiriladi."""
+    now = _ms()
+    wins = []
+    t = now - days * 86_400_000
+    while t < now:
+        wins.append((t, min(t + 7 * 86_400_000 - 1, now)))
+        t += 7 * 86_400_000
+    sem = asyncio.Semaphore(4)
+
+    async def one(a, b):
+        out, start = [], a
+        async with sem:
+            for _ in range(5):
+                try:
+                    d = await _bn(k, "https://fapi.binance.com", "/fapi/v1/income",
+                                  {"startTime": start, "endTime": b, "limit": 1000})
+                except ApiErr as e:
+                    if e.code == "auth":
+                        raise
+                    return out
+                if not isinstance(d, list) or not d:
+                    break
+                out += d
+                if len(d) < 1000:
+                    break
+                start = int(d[-1]["time"]) + 1
+        return out
+
+    res = await asyncio.gather(*(one(a, b) for a, b in wins), return_exceptions=True)
+    for r in res:
+        if isinstance(r, ApiErr) and r.code == "auth":
+            raise r
+    rows = [x for r in res if isinstance(r, list) for x in r]
+    rows.sort(key=lambda x: int(x.get("time") or 0))
+    events, by_trade, funding = [], {}, 0.0
+    for x in rows:
+        typ, sym, tm = x.get("incomeType"), x.get("symbol") or "", int(x.get("time") or 0)
+        val = _f(x.get("income"))
+        if typ == "FUNDING_FEE":
+            funding += val
+        elif typ == "REALIZED_PNL":
+            ev = events[-1] if events else None
+            if not (ev and ev["sym"] == sym and tm - ev["t"] <= 60_000):
+                ev = {"sym": sym, "t": tm, "pnl": 0.0, "fee": 0.0, "n": 0}
+                events.append(ev)
+            ev["pnl"] += val
+            ev["n"] += 1
+            ev["t"] = tm
+            if x.get("tradeId"):
+                by_trade[(sym, str(x["tradeId"]))] = ev
+    for x in rows:
+        if x.get("incomeType") == "COMMISSION":
+            ev = by_trade.get((x.get("symbol") or "", str(x.get("tradeId") or "")))
+            if ev is not None:
+                ev["fee"] += _f(x.get("income"))
+    events.reverse()
+    pnl = sum(e["pnl"] for e in events)
+    fees = sum(_f(x.get("income")) for x in rows if x.get("incomeType") == "COMMISSION")
+    wins_n = sum(1 for e in events if e["pnl"] > 0)
+    return {"items": events[:500], "pnl": pnl, "fees": fees, "funding": funding,
+            "n": len(events), "wins": wins_n, "days": days}
+
+
+async def bn_spot_trades(k) -> dict:
+    """Spot savdolar — `/api/v3/myTrades` faqat juftlik bo'yicha. Nomzodlar: hozirgi
+    va oxirgi 30 kun ichida hisobda bo'lgan aktivlar × USDT/FDUSD/USDC.
+    Fill'lar `orderId` bo'yicha bitta qatorga birlashtiriladi."""
+    assets = set()
+    try:
+        for a, q in (await bn_spot(k)).items():
+            if q > 0:
+                assets.add(a)
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+    try:
+        snap = await _bn(k, "https://api.binance.com", "/sapi/v1/accountSnapshot",
+                         {"type": "SPOT", "limit": 30})
+        for v in snap.get("snapshotVos") or []:
+            for b in (v.get("data") or {}).get("balances") or []:
+                if _f(b.get("free")) + _f(b.get("locked")) > 0:
+                    assets.add(b.get("asset"))
+    except ApiErr:
+        pass
+    assets = {a for a in assets if a and a not in STABLE and a not in ("BNB_OLD",)}
+    pairs = [a + q for a in sorted(assets)[:40] for q in QUOTES]
+    sem = asyncio.Semaphore(5)
+
+    async def one(sym):
+        async with sem:
+            try:
+                return await _bn(k, "https://api.binance.com", "/api/v3/myTrades",
+                                 {"symbol": sym, "limit": 1000})
+            except ApiErr as e:
+                if e.code == "auth":
+                    raise
+                return []
+    res = await asyncio.gather(*(one(p) for p in pairs), return_exceptions=True)
+    for r in res:
+        if isinstance(r, ApiErr) and r.code == "auth":
+            raise r
+    orders = {}
+    for r in res:
+        if not isinstance(r, list):
+            continue
+        for x in r:
+            key = (x.get("symbol"), x.get("orderId"))
+            o = orders.get(key)
+            if o is None:
+                o = orders[key] = {"sym": x.get("symbol"), "side": "buy" if x.get("isBuyer") else "sell",
+                                   "qty": 0.0, "quote": 0.0, "t": 0, "fee": 0.0, "fee_a": x.get("commissionAsset")}
+            o["qty"] += _f(x.get("qty"))
+            o["quote"] += _f(x.get("quoteQty"))
+            o["fee"] += _f(x.get("commission"))
+            o["t"] = max(o["t"], int(x.get("time") or 0))
+    items = sorted(orders.values(), key=lambda o: -o["t"])
+    for o in items:
+        o["price"] = o["quote"] / o["qty"] if o["qty"] else 0.0
+    return {"items": items[:500], "n": len(items), "pairs": len(pairs)}
+
+
+async def trades(ex: str, k: dict) -> dict | None:
+    """Savdolar tarixi (hozircha faqat Binance). None — birja qo'llab-quvvatlanmaydi."""
+    if ex != "binance":
+        return None
+    fut, spot = await asyncio.gather(bn_fut_trades(k), bn_spot_trades(k), return_exceptions=True)
+    for r in (fut, spot):
+        if isinstance(r, ApiErr) and r.code in ("auth", "geo"):
+            raise r
+    return {"fut": fut if isinstance(fut, dict) else None,
+            "spot": spot if isinstance(spot, dict) else None}

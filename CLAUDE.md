@@ -7968,3 +7968,12 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `/api/app/cexhist {ex?, days: 7|30|90|365}`: ≤7 kun — soatlik, aks holda kunlik nuqtalar; har hisob oxirgi ma'lum qiymati bilan davom ettiriladi (oraliq boshidan oldingi oxirgi qator ham olinadi), `ex` bo'lmasa — yig'indi. Uzilganda tarix ham o'chadi (`cex_del`).
 - Ilova: umumiy balans kartasida 30 kunlik grafik + o'zgarish; birja oynasida "Balans tarixi" 7/30/90 kun (`balChart`, `cxhDet`, 2 daq kesh).
 - Sinov: `test_328.py` 12/12, brauzer `t_cxh.py`.
+
+## 329. Binance savdolar tarixi (Wallet)
+- Foydalanuvchi: "Binanceda shu paytgacha qilgan savdolari tarixi ham ko'rinadigan qilaylik".
+- `cex.trades(ex,k)` — hozircha faqat Binance (boshqalar `None` → ilovada "faqat Binance").
+  - Fyuchers: `/fapi/v1/income` 180 kun, 7 kunlik oynalar (sem=4, oynada 1000 dan ko'p bo'lsa sahifalanadi). REALIZED_PNL — bir juftlikda 60 s ichidagi fill'lar bitta yopilish; COMMISSION `tradeId` bo'yicha bog'lanadi; FUNDING_FEE jami. Natija: items (eng yangisi tepada, 500 gacha), pnl, fees, funding, n, wins. Binance income o'zi qancha eski ma'lumot bersa — shuncha.
+  - Spot: `/api/v3/myTrades` faqat juftlik bo'yicha → nomzodlar: hozirgi + accountSnapshot (30 kun) aktivlari (stable'siz, 40 tagacha) × USDT/FDUSD/USDC; har juftlikdan oxirgi 1000; fill'lar `orderId` bo'yicha. ⚠️ 30 kundan oldin to'liq sotilgan coinlar savdosi ko'rinmaydi (Binance'da umumiy spot tarix API'si yo'q).
+- Relay `/trades`; web `/api/app/cextrades {ex, fresh?}` — 10 daq kesh (fresh — 60 s), `_act_allowed`, relay timeout 90 s. Saqlanmaydi (bazaga yozilmaydi).
+- Ilova: Binance oynasida "📜 Savdolar tarixi" → Futures (PnL/savdolar/win rate, komissiya, funding, ro'yxat) | Spot (orderlar BUY/SELL, miqdor @ narx, summa), "Yangilash".
+- Sinov: `test_329.py` 13/13, brauzer `t_ctr.py`.

@@ -470,9 +470,44 @@ function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
   var A=a.assets||[];if(A.length){h+='<div class="rs" style="margin:10px 2px 6px;font-weight:700">'+esc(t('cx_assets'))+'</div>'+A.map(function(x){
    return'<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(x.a,20)+'<b style="font-size:13px">'+esc(x.a)+'</b><span class="rs" style="margin:0">'+(+x.q.toPrecision(8))+'</span><span style="margin-left:auto;font-weight:700;font-size:13px">'+(x.usd!=null?'$'+n2(x.usd):'—')+'</span></div>'}).join('')}
   if(!P.length&&!A.length)h+='<p>'+esc(t('cx_empty'))+'</p>'}
+ if(ex=='binance'&&!a.err)h+='<button class="btn p full" style="margin-top:12px" onclick="cexTrades(\''+ex+'\')">📜 '+esc(t('cx_trades'))+'</button>';
  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button>'
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
  sheetOpen(h);if(!a.err)cxhDet(ex,S.cxhD||30)}
+/* 329: savdolar tarixi (Binance) */
+function ctrDate(ms){var d=new Date(ms),z=function(x){return('0'+x).slice(-2)};return z(d.getDate())+'.'+z(d.getMonth()+1)+(d.getFullYear()!=new Date().getFullYear()?'.'+String(d.getFullYear()).slice(2):'')+' '+z(d.getHours())+':'+z(d.getMinutes())}
+function cexTrades(ex,fresh){tick();S.ctr={ex:ex,seg:(S.ctr&&S.ctr.seg)||'fut',d:null};ctrRender();
+ api('cextrades',{ex:ex,fresh:!!fresh}).then(function(d){if(!S.ctr||S.ctr.ex!=ex)return;S.ctr.d=d;ctrRender()})
+ .catch(function(e){if(!S.ctr)return;S.ctr.d={ok:false,err:e==429?'rate':'net'};ctrRender()})}
+function ctrSeg(x){S.ctr.seg=x;tick();ctrRender()}
+function ctrRender(){var c=S.ctr;if(!c)return;var m=cexMeta(c.ex);
+ var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(c.ex,30)+esc(m[1])+' · '+esc(t('cx_trades'))+'</h4>';
+ var ch=function(k,l){return'<span class="chip glass'+(c.seg==k?' on':'')+'" onclick="ctrSeg(\''+k+'\')">'+esc(l)+'</span>'};
+ h+='<div class="chips" style="margin-bottom:10px">'+ch('fut','Futures')+ch('spot','Spot')+'</div>';
+ var d=c.d;
+ if(!d){h+='<div class="rs" style="padding:8px 2px 4px">'+esc(t('cx_tr_load'))+'</div><div class="sk" style="height:56px;margin:8px 0"></div><div class="sk" style="height:56px"></div>'}
+ else if(!d.ok){h+='<p class="r">'+esc(cexErr(d.err))+'</p>'+(d.msg?'<p class="rs">'+esc(d.msg)+'</p>':'')}
+ else if(!d.tr){h+='<p>'+esc(t('cx_tr_only'))+'</p>'}
+ else{var box='<div style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px">';
+  if(c.seg=='fut'){var F=d.tr.fut;
+   if(!F)h+='<p class="rs">'+esc(t('cx_e_api'))+'</p>';
+   else{var wr=F.n?Math.round(F.wins/F.n*100):0;
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">'
+     +'<div class="glass" style="border-radius:12px;padding:8px 10px"><div class="rs">PnL</div><div style="font-weight:800" class="'+(F.pnl>=0?'g':'r')+'">'+fm(F.pnl)+'</div></div>'
+     +'<div class="glass" style="border-radius:12px;padding:8px 10px"><div class="rs">'+esc(t('cx_tr_n'))+'</div><div style="font-weight:800">'+F.n+'</div></div>'
+     +'<div class="glass" style="border-radius:12px;padding:8px 10px"><div class="rs">Win rate</div><div style="font-weight:800">'+wr+'%</div></div></div>'
+     +'<div class="rs" style="margin:0 2px 8px">'+esc(t('cx_tr_fee'))+' '+fm(F.fees)+' · Funding '+fm(F.funding)+' · '+esc(t('cx_tr_days',{n:F.days}))+'</div>';
+    h+=F.items.length?box+F.items.map(function(e){return'<div style="display:flex;align-items:center;gap:9px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(e.sym,22)
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">'+esc(e.sym)+'</div><div class="rs">'+ctrDate(e.t)+(e.fee?' · '+esc(t('cx_tr_fee'))+' '+fm(e.fee):'')+'</div></div>'
+      +'<div style="font-weight:800;font-size:14px" class="'+(e.pnl>=0?'g':'r')+'">'+fm(e.pnl)+'</div></div>'}).join('')+'</div>':'<p class="rs">'+esc(t('cx_tr_none'))+'</p>'}}
+  else{var P=d.tr.spot;
+   if(!P)h+='<p class="rs">'+esc(t('cx_e_api'))+'</p>';
+   else{h+='<div class="rs" style="margin:0 2px 8px">'+P.n+' '+esc(t('cx_tr_orders'))+' · '+esc(t('cx_tr_spot_note'))+'</div>';
+    h+=P.items.length?box+P.items.map(function(o){var b=o.side=='buy';return'<div style="display:flex;align-items:center;gap:9px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(o.sym,22)
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">'+esc(o.sym)+' <span style="font-size:10.5px;font-weight:800;color:'+(b?'var(--g)':'var(--r)')+'">'+(b?'BUY':'SELL')+'</span></div><div class="rs">'+ctrDate(o.t)+' · '+(+o.qty.toPrecision(8))+' @ '+fp(o.price)+'</div></div>'
+      +'<div style="font-weight:700;font-size:13.5px">$'+n2(o.quote)+'</div></div>'}).join('')+'</div>':'<p class="rs">'+esc(t('cx_tr_none'))+'</p>'}}
+  h+='<button class="btn" style="margin-top:10px" onclick="cexTrades(\''+c.ex+'\',1)">'+esc(t('cx_tr_refresh'))+'</button>'}
+ sheetOpen(h)}
 function cexIn(id,ph){return'<input id="'+id+'" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="'+esc(ph)+'" style="width:100%;font-size:15px;font-weight:600;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px;font-family:ui-monospace,monospace">'}
 function cexAdd(ex){var m=cexMeta(ex);tick();
  sheetOpen('<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' — '+esc(t('cx_link'))+'</h4>'
