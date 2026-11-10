@@ -336,6 +336,7 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  trophy:'<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3.5 4M17 6h3a3 3 0 0 1-3.5 4"/><path d="M12 14v4M8 21h8"/>',
  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
  wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>',
+ xchg:'<path d="M7 3v4M7 17v4M17 4v5M17 15v5"/><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="15" y="9" width="4" height="6" rx="1"/>',
  zap:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
  megaphone:'<path d="M3 10v4a1 1 0 0 0 1 1h3l5 4V5L7 9H4a1 1 0 0 0-1 1z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
  bot:'<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13.5h.01M14.5 13.5h.01"/>',
@@ -384,7 +385,7 @@ function botUrl(start){return 'https://t.me/'+S.bot+(start?'?start='+start:'')}
 function openLink(u){if(!u)return;if(S.pub&&u.indexOf('http')==0&&u.indexOf(location.origin)!=0){window.open(u,'_blank');return}if(u.indexOf(location.origin)==0||u.charAt(0)=='/'){try{sessionStorage.setItem('tc_from_app','1')}catch(e){}location.href=u;return}if(u.indexOf('https://t.me/')==0&&tg&&tg.openTelegramLink)tg.openTelegramLink(u);else if(tg&&tg.openLink&&u.indexOf('http')==0)tg.openLink(u);else location.href=u}
 
 /* ---- pastki panel: siljiydigan indikator ---- */
-function nav(){var tabs=[['home','home'],['wallet','wallet'],['signals','trend'],['dip','dip'],['top','crown'],['tour','trophy'],['profile','user']];
+function nav(){var tabs=[['home','home'],['wallet','xchg'],['signals','trend'],['dip','dip'],['top','crown'],['tour','trophy'],['profile','user']];
  var n=document.getElementById('nav');
  /* 269: DIP — o'rtada katta, vaqti-vaqti bilan aylanadigan tanga */
  if(!n.dataset.ok){n.innerHTML='<div class="ind" id="ind"></div>'+tabs.map(function(x){
@@ -400,8 +401,14 @@ function go(tab){if(tab==S.tab)return;
   S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}
 function pill(){var w=cur();var el=document.getElementById('wsPill');
  if(!w){el.textContent='Trade Controller';return}
- el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1?ic('chev',14)+'<select id="wsSel">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>':'');
- el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){S.cur=+s.value;S.anim=true;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',S.cur)}catch(e){}load()}}
+ /* 331: ulangan birjalar ham shu ro'yxatda — tanlansa Birja bo'limida o'sha birja ochiladi */
+ var CX=((S.cex||{}).acc||[]);
+ var opts=S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('');
+ if(CX.length)opts+='<optgroup label="'+esc(t('wallet'))+'">'+CX.map(function(a){return'<option value="cx:'+esc(a.ex)+'">'+esc(cexMeta(a.ex)[1])+(a.err?'':' · $'+n2(a.total||0))+'</option>'}).join('')+'</optgroup>';
+ el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1||CX.length?ic('chev',14)+'<select id="wsSel">'+opts+'</select>':'');
+ el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){var v=s.value;
+  if(v.indexOf('cx:')==0){s.value=S.cur;var ex=v.slice(3);if(S.tab!='wallet')go('wallet');setTimeout(function(){cexOpen(ex)},S.tab=='wallet'?60:420);return}
+  S.cur=+v;S.anim=true;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',S.cur)}catch(e){}load()}}
 function totals(){var m=0,has=false;S.items.forEach(function(i){if(i.money!=null){m+=i.money;has=true}});return has?m:null}
 function render(){nav();pill();var v=document.getElementById('view');var w=cur();
  v.className=(S.anim?'anim ':'')+(S.dir||'');
@@ -416,11 +423,11 @@ function render(){nav();pill();var v=document.getElementById('view');var w=cur()
 var CEX=[['mexc','MEXC','#2f7bff','MX'],['bitget','Bitget','#00c2c2','BG'],['bingx','BingX','#3b5bff','BX'],['binance','Binance','#f0b90b','BN']];
 function cexMeta(ex){for(var k=0;k<CEX.length;k++)if(CEX[k][0]==ex)return CEX[k];return[ex,ex,'#888','?']}
 function cexBadge(ex,z){var m=cexMeta(ex);z=z||38;return'<div class="av" style="width:'+z+'px;height:'+z+'px;color:'+m[2]+';background:'+m[2]+'1f;border-color:'+m[2]+'40;font-size:'+Math.round(z*.34)+'px">'+m[3]+'</div>'}
-function cexLoad(fresh){if(S.cexL)return;S.cexL=1;api('cex',{fresh:!!fresh}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};S.cexL=0;if(S.tab=='wallet')render()}).catch(function(){S.cexL=0;S.cex=S.cex||{acc:[],at:Date.now(),fail:1};if(S.tab=='wallet')render()})}
+function cexLoad(fresh){if(S.cexL)return;S.cexL=1;api('cex',{fresh:!!fresh}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};S.cexL=0;if(S.tab=='wallet')render();else pill()}).catch(function(){S.cexL=0;S.cex=S.cex||{acc:[],at:Date.now(),fail:1};if(S.tab=='wallet')render()})}
 function cexErr(c){return t('cx_e_'+c)!=('cx_e_'+c)?t('cx_e_'+c):t('cx_e_api')}
 function n2(v){return(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
- var h='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('wallet',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('cx_sub'))+'</div></div></div>';
+ var h='<div class="ghd rise" style="margin-bottom:14px"><div class="av" style="color:var(--g)">'+ic('xchg',22)+'</div><div><h2>'+esc(t('wallet'))+'</h2><div class="rs">'+esc(t('cx_sub'))+'</div></div></div>';
  if(!c){v.innerHTML=h+'<div class="empty glass rise">'+esc(t('loading'))+'</div>';return}
  var acc=c.acc||[],tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});
  if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
@@ -1410,6 +1417,6 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
   var saved=null;try{saved=+localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==saved})[0]||S.ws[0]||{}).id;
   var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(function(){if(+q.get('acc')){pageShow();dfAcc(+q.get('acc'))}else openDf()},50);if(q.get('ref'))setTimeout(openRef,50);
-  render();load();setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
+  render();load();setTimeout(function(){if(!S.cex)cexLoad()},800);setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>

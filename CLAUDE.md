@@ -7991,3 +7991,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Web `/api/app/cextrade {ex, op, a}`: `a` kalitlari oq ro'yxat (`_TRADE_ARGS`), ≤1000 bayt, `_act_allowed`; yozuvchi amallar `cex_orders` jadvaliga (args, ok, natija/xato — kalitsiz) va logga; balans/savdolar keshi tozalanadi. Relay `/trade`.
 - Ilova: Binance oynasida "Spot savdo"/"Futures savdo" (ruxsat bo'lmasa — ko'rsatma), pozitsiyada "TP / SL" va "Yopish" (25/50/75/100%), spot aktivni bosish — sotish oynasi. Savdo oynasi (`trOpen/trRender/trGo`): juftlik tanlash (`pairPick`), Long/Short yoki Buy/Sell, Market/Limit, leveraj chiplari, marja/summa + % chiplari, taxminiy hajm, TP/SL, ochiq orderlar (bekor qilish). HAR order/yopish/bekor — `confirmBox` tasdig'i.
 - Sinov: `test_330.py` 35/35 (imzo, yaxlitlash, hedge/one-way, Algo fallback, TP/SL almashtirish, ruxsat, endpoint jurnali), brauzer `t_tr.py`. ⚠️ Real Binance bilan foydalanuvchi kichik summada sinashi kerak.
+
+## 331. Workspace ro'yxatida birjalar; "Wallet" → "Birja"
+- Foydalanuvchi (yuqoridagi workspace tanlash ro'yxati skrinshoti): "buyerda ulangan birjalar chiqadigan qilaylik. Keyin wallet bo'limini birjaga o'zgartir".
+- `pill()`: `<select id="wsSel">`ga `<optgroup label="Birja">` — har ulangan birja `cx:<ex>` qiymati bilan ("Binance · $1,715.90"; xatoli bo'lsa summasiz). Tanlansa — select joriy workspace'ga qaytariladi, Birja bo'limiga o'tiladi va `cexOpen(ex)`. Workspace bitta bo'lsa ham birjalar bo'lsa ro'yxat ko'rinadi.
+- Ilova ochilganda 0.8 s dan keyin `cexLoad()` (ro'yxat to'lishi uchun); `cexLoad` boshqa bo'limda bo'lsa faqat `pill()` ni yangilaydi.
+- Tab nomi: uz "Birja", ru "Биржа", en "Exchange" (kalit `wallet` o'zgarmadi — ichki nom). Yangi belgi `I.xchg` (shamlar) — pastki panel va bo'lim sarlavhasida.
