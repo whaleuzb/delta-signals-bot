@@ -849,7 +849,7 @@ async def cex_relay_check(_app=None):
                 last = type(e).__name__
             await asyncio.sleep(15)
         log.warning("cex servisiga ulanib bo'lmadi (%s) — birja hisoblari ishlamaydi", last)
-    asyncio.get_running_loop().create_task(run())
+    _CEX_BG.add(asyncio.get_running_loop().create_task(run()))
 
 
 def _cex_keys(row) -> dict:
@@ -892,6 +892,7 @@ async def _cex_one(uid: int, row, fresh: bool) -> dict:
 
 # 328: balans tarixi — har hisob uchun soatiga ko'pi bilan bitta yozuv.
 _CEX_REC: dict[tuple, float] = {}
+_CEX_BG: set = set()          # fon vazifalari (GC ularni yo'qotmasin)
 _CEX_REC_GAP = 50 * 60
 
 
@@ -961,7 +962,8 @@ async def cex_hist_loop(_app=None):
             except Exception:
                 log.warning("Balans tarixi tsikli xato", exc_info=True)
             await asyncio.sleep(3600)
-    _app["cex_hist_task"] = asyncio.get_running_loop().create_task(run()) if _app is not None else None
+    t = asyncio.get_running_loop().create_task(run())
+    _CEX_BG.add(t)
 
 
 async def api_cex(request):
@@ -1011,10 +1013,9 @@ async def api_cexadd(request):
     _CEX_CACHE.pop((uid, ex), None)
     _CEX_REC.pop((uid, ex), None)
     log.info("Birja hisobi ulandi (%s, uid=%s)", ex, uid)
-    request.app.setdefault("cex_bg", set())
     t = asyncio.get_running_loop().create_task(_cex_backfill(uid, ex, k))
-    request.app["cex_bg"].add(t)
-    t.add_done_callback(request.app["cex_bg"].discard)
+    _CEX_BG.add(t)
+    t.add_done_callback(_CEX_BG.discard)
     return web.json_response({"ok": True}, headers=NO_CACHE)
 
 
