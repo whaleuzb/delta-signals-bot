@@ -551,12 +551,27 @@ function cxSignals(v,w){var a=w.acc,ex=w.ex;if(!a){v.innerHTML='<div class="spk"
    +(tr.fut?'<div class="acts" onclick="event.stopPropagation()"><button class="btn" onclick="trTpslSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">TP / SL</button><button class="btn" onclick="trCloseSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">'+esc(t('tr_close'))+'</button></div>':'')+'</div>'}).join('')
   :'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('cx_no_pos'))+'</div></div>';
  v.innerHTML=h}
-function cxPosCard(ex,p,tr){var lg=p.side=='long',tz=cxPosTpsl(ex,p),roi=cxRoi(p);
-   return'<div class="sig glass rise" onclick="cxTerm(\''+ex+'\',\''+esc(p.sym)+'\')" style="cursor:pointer"><div class="sh"><div><div class="sym">'+esc(p.sym)+'<span class="b '+(lg?'bl':'bs')+'">'+(lg?'LONG':'SHORT')+'</span>'+(p.lev?'<span class="b bx">'+(+p.lev)+'x</span>':'')+'</div>'
-   +'<div class="m" style="font-size:11px;margin-top:2px">'+esc(cexMeta(ex)[1])+' · '+(+p.qty)+'</div></div><div class="pnl '+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'<small>'+fpc(roi)+'</small></div></div>'
-   +'<div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(p.entry)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(p.mark)+'</div><div><b>LIQ</b>'+fp(p.liq)+'</div></div>'
-   +'<div class="kv" style="margin-top:4px"><div><b>TP</b>'+fp(tz.tp)+'</div><div><b>SL</b>'+fp(tz.sl)+'</div><div><b>'+esc(t('cx_margin'))+'</b>$'+n2(p.entry*p.qty/(p.lev||1))+'</div></div>'
-   +(tr.fut?'<div class="acts" onclick="event.stopPropagation()"><button class="btn" onclick="trTpslSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">TP / SL</button><button class="btn" onclick="trCloseSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">'+esc(t('tr_close'))+'</button></div>':'')+'</div>'}
+/* 341: birja pozitsiya kartasi — signal terminalidagi karta ko'rinishida (P&L/ROI, Hajm/Miqdor/Kirish, Joriy/Stop/TP, Batafsil) */
+function cxPosCard(ex,p,tr){var lg=p.side=='long',tz=cxPosTpsl(ex,p),roi=cxRoi(p),key=ex+':'+p.sym+':'+(p.ps||''),more=(S.cxMore||{})[key],up=p.upnl||0,cl=up>=0?'g':'r';
+ var it=function(k,v,c){return'<div class="mci"><span>'+esc(t(k))+'</span><b class="'+(c||'')+'">'+v+'</b></div>'},sg=function(x){return(x>=0?'+':'−')+n2(Math.abs(x))};
+ var mg=p.entry*p.qty/(p.lev||1),q="'"+esc(p.sym)+"','"+esc(p.ps||'BOTH')+"'";
+ var h='<div class="tile2 glass rise" style="margin-bottom:10px;padding:14px 14px 12px"><div onclick="cxTerm(\''+ex+'\',\''+esc(p.sym)+'\')" style="cursor:pointer">'
+  +'<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">'+coinIc(p.sym,26)+'<b style="font-size:17px;letter-spacing:-.01em">'+esc(p.sym)+'</b><span class="b bx">Futures '+(+p.lev||1)+'x</span><span class="b '+(lg?'bl':'bs')+'">'+(lg?'LONG':'SHORT')+'</span></div>'
+  +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px"><div><span class="rs">'+esc(t('t_pnl'))+'</span><div class="'+cl+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+sg(up)+'</div></div>'
+  +'<div style="text-align:right"><span class="rs">'+esc(t('t_roi'))+'</span><div class="'+cl+'" style="font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:3px">'+fpc(roi)+'</div></div></div>'
+  +'<div class="mcg">'+it('t_vol',n2(p.mark*p.qty))+it('t_qty',String(+(+p.qty).toPrecision(8)))+it('t_entry_px',fp(p.entry))
+  +it('t_now',fp(p.mark))+it('stop',tz.sl!=null?fp(tz.sl):'—',tz.sl!=null?'r':'')+it('tp_btn',tz.tp!=null?fp(tz.tp):'—',tz.tp!=null?'g':'')+'</div>';
+ if(more)h+='<div class="mcg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)">'+it('t_margin',n2(mg))+it('t_notional',n2(p.entry*p.qty))+it('t_liq',p.liq?fp(p.liq):'—',p.liq?'r':'')
+  +it('wallet',esc(cexMeta(ex)[1]))+it('tr_lev',(+p.lev||1)+'x')+it('cx_pmode',p.ps&&p.ps!='BOTH'?'Hedge':'One-way')+'</div>';
+ h+='</div><div class="mcb">'+(tr.fut?'<button class="btn" onclick="trTpslSheet('+q+')">TP/SL</button>':'')
+  +'<button class="btn" onclick="cxShare(\''+ex+'\','+q+')">'+esc(t('t_share'))+'</button>'
+  +'<button class="btn" onclick="cxMoreT(\''+esc(key)+'\')">'+esc(t('t_more'))+' '+(more?'▴':'▾')+'</button>'
+  +(tr.fut?'<button class="btn" onclick="trCloseSheet('+q+')">'+esc(t('close'))+'</button>':'')+'</div></div>';
+ return h}
+function cxMoreT(k){S.cxMore=S.cxMore||{};S.cxMore[k]=!S.cxMore[k];tick();var y=window.scrollY;render();window.scrollTo(0,y)}
+function cxShare(ex,sym,ps){var w=cur(),p=((w&&w.acc&&w.acc.pos)||[]).filter(function(x){return x.sym==sym&&(x.ps||'BOTH')==ps})[0];if(!p)return;
+ var txt=(p.side=='long'?'🟢 LONG ':'🔴 SHORT ')+p.sym+' '+(+p.lev||1)+'x\n'+t('t_entry_px')+': '+fp(p.entry)+'\n'+t('t_now')+': '+fp(p.mark)+'\nROI: '+fpc(cxRoi(p));
+ openLink('https://t.me/share/url?url='+encodeURIComponent(botUrl())+'&text='+encodeURIComponent(txt))}
 function cxOrdRow(ex,o,tr){return'<div class="sig glass rise" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:9px">'+coinIc(o.sym,26)
    +'<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(o.sym)+' <span class="b '+(o.side=='buy'?'bl':'bs')+'">'+o.side.toUpperCase()+'</span></div><div class="rs">'+esc(o.type.toUpperCase())+' · '+fp(o.price)+' · '+(+o.qty)+'</div></div>'
    +(tr.fut?'<button class="btn" style="margin:0;color:var(--r)" onclick="cxCancel(\''+ex+'\',\''+esc(o.sym)+'\','+o.id+')">✕</button>':'')+'</div></div>'}

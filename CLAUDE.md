@@ -8061,3 +8061,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - TP/SL tezkor tugmalari (`tvQ(k,x)`): TP +2/+5/+10%, SL −1/−2/−5% — joriy narxdan (`tvPx`), Short'da yo'nalish teskari.
 - Order book ostida xarid/sotuv nisbati chizig'i (10 daraja miqdorlari yig'indisi, yashil % | qizil %).
 - O'rta narx oldingi yangilanishga nisbatan yashil ↑ / qizil ↓ (`book.tick`, `T.tick0`; juftlik/bozor almashganda 0).
+
+## 341. Birja pozitsiya kartasi — signal terminali kartasi ko'rinishida
+- `cxPosCard` qayta yozildi (`termInfo` uslubi, `.tile2/.mcg/.mci/.mcb`): coin + juftlik + "Futures Nx" + LONG/SHORT; P&L (USDT) | ROI; Hajm/Miqdor/Kirish narxi; Joriy narx/Stop/TP (`cxPosTpsl`).
+- Tugmalar: TP/SL, Ulashish (`cxShare` — t.me/share matn + bot havolasi), Batafsil ▾ (`cxMoreT`, `S.cxMore[ex:sym:ps]`: Marja, Pozitsiya hajmi, Likvidatsiya, Birja, Leveraj, Rejim), Yopish. Karta ustiga bosish — `cxTerm`.
+- Yangi i18n: `cx_pmode`.
