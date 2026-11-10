@@ -7951,7 +7951,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 326. Birja so'rovlari Singapurdagi `cex` servisi orqali
 - Foydalanuvchi: "Faqat birja ulash serverlarini singapurga ko'chirsakchi?" — bot/web/baza AQShda (sfo) qoladi (Telegram Bot API Amsterdamda, foydalanuvchilar O'zbekistonda), faqat birja so'rovlari Osiyodan.
-- `cexrelay.py` — Railway `cex` servisi (`python cexrelay.py`, Singapur, OMMAVIY DOMENSIZ, faqat ichki tarmoq `cex.railway.internal`, `::` da tinglaydi). `/verify`, `/snapshot`, `/healthz`. Bazaga ulanmaydi, kalit saqlamaydi/loglamaydi. `RELAY_TOKEN` bo'lsa `X-Relay-Token` tekshiriladi.
+- `cexrelay.py` — Railway `cex` servisi (`python cexrelay.py`, Singapur, OMMAVIY DOMENSIZ, faqat ichki tarmoq `cex.railway.internal`, IPv4 0.0.0.0 + IPv6 :: (asyncio :: ni V6ONLY ochadi — Railway healthcheck IPv4)). `/verify`, `/snapshot`, `/healthz`. Bazaga ulanmaydi, kalit saqlamaydi/loglamaydi. `RELAY_TOKEN` bo'lsa `X-Relay-Token` tekshiriladi.
 - `webapp._cx_call(op, ex, k)`: `CEX_RELAY_URL` bo'lsa — relay (30 s timeout, ulanmasa `ApiErr("net")`), bo'lmasa — `cex` moduli to'g'ridan-to'g'ri (lokal/test).
 - Web env: `CEX_RELAY_URL=http://${{cex.RAILWAY_PRIVATE_DOMAIN}}:8080`, `RELAY_TOKEN=${{cex.RELAY_TOKEN}}`.
 - Sinov: `test_326.py` 8/8.

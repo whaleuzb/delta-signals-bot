@@ -117,17 +117,18 @@ def build() -> web.Application:
     return app
 
 
-def _host() -> str:
-    """"::" — Railway ichki tarmog'i IPv6 (dual-stack: IPv4 ham qabul qilinadi).
-    IPv6 yo'q muhitda (lokal sinov) — "0.0.0.0"."""
+def _hosts() -> list[str]:
+    """IPv4 (Railway sog'lik tekshiruvi, yangi ichki tarmoq) + IPv6 (eski ichki tarmoq).
+    `asyncio` "::" ni IPV6_V6ONLY bilan ochadi — shu sabab ikkalasi alohida.
+    IPv6 yo'q muhitda (lokal sinov) — faqat "0.0.0.0"."""
     import socket
     try:
         with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as t:
             t.bind(("::", 0))
-        return "::"
+        return ["0.0.0.0", "::"]
     except OSError:
-        return "0.0.0.0"
+        return ["0.0.0.0"]
 
 
 if __name__ == "__main__":
-    web.run_app(build(), host=_host(), port=int(os.getenv("PORT", "8080")))
+    web.run_app(build(), host=_hosts(), port=int(os.getenv("PORT", "8080")))
