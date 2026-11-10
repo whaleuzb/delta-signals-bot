@@ -22,7 +22,10 @@ import os
 
 from aiohttp import web
 
-import cex
+# `config` DATABASE_URL'ni talab qiladi — bu servis bazaga ULANMAYDI (ataylab
+# berilmaydi), shuning uchun bo'sh qiymat.
+os.environ.setdefault("DATABASE_URL", "")
+import cex  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("cexrelay")
@@ -111,6 +114,17 @@ def build() -> web.Application:
     return app
 
 
+def _host() -> str:
+    """"::" — Railway ichki tarmog'i IPv6 (dual-stack: IPv4 ham qabul qilinadi).
+    IPv6 yo'q muhitda (lokal sinov) — "0.0.0.0"."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as t:
+            t.bind(("::", 0))
+        return "::"
+    except OSError:
+        return "0.0.0.0"
+
+
 if __name__ == "__main__":
-    # "::" — Railway ichki tarmog'i IPv6 (IPv4 ham qabul qilinadi).
-    web.run_app(build(), host="::", port=int(os.getenv("PORT", "8080")))
+    web.run_app(build(), host=_host(), port=int(os.getenv("PORT", "8080")))
