@@ -1213,6 +1213,7 @@ def _spot_row(key, sym, oid, side, qty, quote, fee, fee_a, t):
 
 async def mx_hist(k, a) -> dict:
     since, now, errs = int(a.get("since") or 0), _ms(), []
+    ys = int(a.get("year_from") or since)        # spot: yangi juftlik — davr boshidan
     inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
     try:
         for page in range(1, 51):
@@ -1236,13 +1237,17 @@ async def mx_hist(k, a) -> dict:
         errs.append("fut: " + e.text[:120])
     for base in await _spot_cands_generic(mx_spot, k):
         sym = base + "USDT"
-        st = max(int(spot_t.get(sym) or 0) + 1, now - 29 * _DAY)
-        try:
-            d = await _mx_spot(k, "/api/v3/myTrades", {"symbol": sym, "startTime": st, "limit": 1000})
-        except ApiErr as e:
-            if e.code == "auth":
-                raise
-            continue
+        # 337: avval davr boshidan (since) so'raladi — birja rad etsa so'nggi 29 kun
+        st = max(int(spot_t.get(sym) or 0) + 1, ys)
+        d = None
+        for st_try in (st, max(st, now - 29 * _DAY)):
+            try:
+                d = await _mx_spot(k, "/api/v3/myTrades", {"symbol": sym, "startTime": st_try, "limit": 1000})
+                break
+            except ApiErr as e:
+                if e.code == "auth":
+                    raise
+                d = None
         for x in d if isinstance(d, list) else []:
             t = int(x.get("time") or 0)
             spot.append(_spot_row(f"m{sym}:{x.get('id')}", sym, x.get("orderId"), "buy" if x.get("isBuyer") else "sell",
@@ -1254,6 +1259,7 @@ async def mx_hist(k, a) -> dict:
 
 async def bg_hist(k, a) -> dict:
     since, now, errs = int(a.get("since") or 0), _ms(), []
+    ys = int(a.get("year_from") or since)        # spot: yangi juftlik — davr boshidan
     inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
     t_end = now
     try:
@@ -1295,14 +1301,32 @@ async def bg_hist(k, a) -> dict:
         errs.append("fut: " + e.text[:120])
     for base in await _spot_cands_generic(bg_spot, k):
         sym = base + "USDT"
-        st = max(int(spot_t.get(sym) or 0) + 1, now - 89 * _DAY)
-        try:
-            d = await _bg(k, "/api/v2/spot/trade/fills", {"symbol": sym, "startTime": st, "endTime": now, "limit": 100})
-        except ApiErr as e:
-            if e.code == "auth":
-                raise
-            continue
-        for x in d if isinstance(d, list) else []:
+        # 337: 89 kunlik oynalar bilan ortga — davr boshigacha yoki birja rad etguncha; oyna ichida idLessThan
+        lo = max(int(spot_t.get(sym) or 0) + 1, ys)
+        d, we = [], now
+        while we > lo:
+            ws = max(lo, we - 89 * _DAY)
+            cur_id, stop = None, False
+            for _ in range(20):
+                p = {"symbol": sym, "startTime": ws, "endTime": we, "limit": 100}
+                if cur_id:
+                    p["idLessThan"] = cur_id
+                try:
+                    part = await _bg(k, "/api/v2/spot/trade/fills", p)
+                except ApiErr as e:
+                    if e.code == "auth":
+                        raise
+                    stop = True
+                    break
+                part = part if isinstance(part, list) else []
+                d += part
+                if len(part) < 100:
+                    break
+                cur_id = part[-1].get("tradeId")
+            if stop:
+                break
+            we = ws - 1
+        for x in d:
             t = int(x.get("cTime") or 0)
             fd = x.get("feeDetail") or {}
             spot.append(_spot_row(f"b{sym}:{x.get('tradeId')}", sym, x.get("orderId"),
@@ -1314,6 +1338,7 @@ async def bg_hist(k, a) -> dict:
 
 async def bx_hist(k, a) -> dict:
     since, now, errs = int(a.get("since") or 0), _ms(), []
+    ys = int(a.get("year_from") or since)        # spot: yangi juftlik — davr boshidan
     inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
     t, empty_old = max(since, now - 365 * _DAY), 0
     while t < now:
@@ -1341,7 +1366,8 @@ async def bx_hist(k, a) -> dict:
         t = b + 1
     for base in await _spot_cands_generic(bx_spot, k):
         sym = base + "-USDT"
-        st0 = max(int(spot_t.get(base + "USDT") or 0) + 1, now - 29 * _DAY)
+        # 337: davr boshidan 7 kunlik oynalar — eski oyna rad etilsa keyingisiga o'tiladi (yangi oynalar baribir so'raladi)
+        st0 = max(int(spot_t.get(base + "USDT") or 0) + 1, ys)
         w = st0
         while w < now:
             we = min(w + 7 * _DAY - 1, now)
@@ -1350,7 +1376,8 @@ async def bx_hist(k, a) -> dict:
             except ApiErr as e:
                 if e.code == "auth":
                     raise
-                break
+                w = we + 1
+                continue
             lst = d.get("fills") if isinstance(d, dict) else d
             for x in lst or []:
                 tt = int(x.get("time") or 0)

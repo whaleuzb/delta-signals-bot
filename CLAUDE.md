@@ -8034,3 +8034,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi (birja oynasi skrinshoti): "bu bo'limdagi ma'lumotlar shart emas. Chunki statistikani qo'shdik. Umumiy balans va birja ulanishi tekshiruvlari va kalit yangilash yetadi".
 - `cexOpen(ex)`: faqat ulanish holati (✓ ishlayapti + tekshirilgan vaqt / ✕ xato), umumiy balans + Spot/Futures summalari, kalit ruxsatlari (o'qish; Binance — Spot/Futures savdo), tugmalar: Tekshirish (`cexRecheck` — fresh), Kalitni yangilash, Birjani ochish (`cexGoWs` — workspace'ga o'tish), Uzish. Balans tarixi grafigi, pozitsiyalar, aktivlar, savdo tugmalari, savdolar tarixi bu oynadan OLIB TASHLANDI (ular birja workspace'ida: Bosh/Signallar/Statistika).
 - `walletView` umumiy balans kartasidan 30 kunlik grafik ham olib tashlandi.
+
+## 337. Boshqa birjalardan maksimal tarix (fayl eksportisiz)
+- Foydalanuvchi: "export qilish foydalanuvchilarga muammo tug'diradi. Maksimum imkoniyatlarni och". Tekshiruv: Bitget API — 90 kun ("older data can be downloaded from web"), MEXC spot — ~30 kun, BingX — chegara hujjatda yo'q; asinxron yillik yuklab olish faqat Binance'da.
+- Har birjadan yil boshigacha (`year_from`) so'raladi, birja rad etguncha: MEXC spot — avval yil boshidan, rad → so'nggi 29 kun; Bitget spot — 89 kunlik oynalar ortga (`idLessThan`), rad → to'xtash; BingX spot — yil boshidan 7 kunlik oynalar, eski oyna rad etilsa keyingisiga o'tiladi. Futures (MEXC history_positions sahifalab, Bitget 89 kunlik oynalar ortga, BingX income 7 kunlik oynalar) — avvaldan shunday.
+- Yangi juftlik paydo bo'lsa ham spot tarixi `year_from` dan (`hist_sync` ga `year_from` uzatiladi), mavjudlari — `spot_t` kursoridan.
+- Ilova izohi endi haqiqiy: "{birja} API orqali eng eski savdo: dd.mm.yyyy …" — faqat birinchi yozuv yil boshidan 7 kundan keyin bo'lsa.
+- Sinov: `test_337.py` 4/4.

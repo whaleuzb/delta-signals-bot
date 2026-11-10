@@ -599,7 +599,8 @@ function cxStRender(){var g=S.page;if(!g||g.id!='cxst')return;var p=document.get
  var sy=d.sync||{};
  if(sy.running)h+='<div class="rs" style="margin:0 4px 10px">⏳ '+esc(t('cx_st_sync'))+'</div>';
  if(sy.old=='pending'||sy.old=='none'&&sy.year_from&&sy.cutoff&&sy.year_from<sy.cutoff)h+='<div class="rs" style="margin:0 4px 10px;line-height:1.5">⏳ '+esc(t('cx_st_old_pending',{y:yr}))+'</div>';
- if(ex!='binance')h+='<div class="rs" style="margin:0 4px 10px;line-height:1.5">ℹ️ '+esc(t('cx_st_depth',{e:cexMeta(ex)[1]}))+'</div>';
+ if(ex!='binance'&&d.first&&sy.year_from&&d.first>sy.year_from+7*864e5&&!sy.running){var fd=new Date(d.first),z=function(n){return('0'+n).slice(-2)};
+  h+='<div class="rs" style="margin:0 4px 10px;line-height:1.5">ℹ️ '+esc(t('cx_st_depth',{e:cexMeta(ex)[1],d:z(fd.getDate())+'.'+z(fd.getMonth()+1)+'.'+fd.getFullYear()}))+'</div>'}
  if(sy.old=='fail')h+='<div class="rs r" style="margin:0 4px 10px;line-height:1.5">⚠️ '+esc(t('cx_st_old_fail',{y:yr,e:sy.old_err||''}))+'</div>';
  var x=d[g.mkt]||d.all,net=x.net!=null?x.net:x.pnl;
  if(!x.n){p.innerHTML=h+'<div class="empty glass">'+ic('bars',40)+'<div>'+esc(t('cx_st_empty'))+'</div></div>'+(sy.running?'':'<button class="btn full" style="margin-top:10px" onclick="cxStGet(1)">'+esc(t('cx_tr_refresh'))+'</button>');return}
