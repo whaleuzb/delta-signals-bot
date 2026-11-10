@@ -8046,3 +8046,12 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "bosh menyudagi hisob tugmasini olib tashla birja bo'limida bor. Dipfunded reklamasi doim tursin hatto birja oynasida ham".
 - `dfAd()` — Dip Funded kartasi (openDf); `cxHome` oxirida (xato holatida ham) va `walletView` (Birja bo'limi) ichida. Oddiy workspace Bosh sahifasida avvaldan bor.
 - (davomi) "turnir ham": birja Bosh sahifasida Statistika yonida Turnir kartasi (oddiy Bosh kabi), Savdolar tarixi — alohida karta; `tourAd()` — Birja bo'limida va xato holatida ham.
+
+## 339. Birja kontekstida "Signallar" → "Savdo" ekrani (Binance uslubi)
+- Foydalanuvchi (Binance Spot ekrani skrinshoti): "Signallar bo'limini savdoga o'zgartiraylik. Savdo qilish huddi birjanikidek bo'lsin. Ochiq savdolar pastda tursin. U kartalar bizda tayyor."
+- `render()`: cex kontekstda Signallar tabi → `tvView`; `nav()` tab yorlig'ini kontekstga qarab almashtiradi ("Savdo" + `bars` belgisi / "Signallar").
+- `tvView` (holat `S.tv`): tepada juftlik (coinIc, ▾ → `tvPick`), 24 soatlik o'zgarish, Spot|Futures; chap (57%) — Buy/Sell (Long/Short), Leveraj (`tvLev`), Limit|Market, Narx + BBO, Miqdor (base), 0/25/50/75/100% olmos slayder (`tvPct`), Jami (USDT, miqdor bilan ikki tomonlama `tvCalc`), TP/SL (futures), Mavjud/Maks., tugma; o'ng — order book (`tvBookHtml`, 7+7 daraja, chuqurlik fon chiziqlari, narxni bosish → narx maydoniga), 3 s poll (`tvPoll`, faqat shu tab ochiq/ko'rinib turganda). Pastda yorliqlar: Ochiq orderlar (spot — `spot_open`, futures — `S.cxo`; ✕ → `tvCancel`), Pozitsiyalar (`cxPosCard` — avvalgi kartalar), Aktivlar (bosilsa — shu coin Market Sell, miqdor to'ldirilgan).
+- Yuborish (`tvGo`, tasdiq bilan): spot — `qty` (yoki faqat jami bo'lsa `quote`); futures — `margin = jami/leveraj`, `lev`, TP/SL.
+- Backend: `cex.bn_depth` (op `depth`, imzosiz: depth limit=10 + ticker/24hr, spot/fapi) `TRADE_READ`da; web `api_cextrade` — `depth` `_act_allowed` limitiga kirmaydi, 1.5 s kesh (`_DEPTH`).
+- `render()` — `tv_*` maydonga yozilayotganda (fokus) qayta chizilmaydi (30 s yangilanish fokusni o'g'irlamasin).
+- Binance bo'lmagan birjalarda forma o'chiq + izoh, pozitsiyalar/aktivlar ko'rinadi. Brauzer sinovi `t_cxw.py`.

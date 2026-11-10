@@ -967,12 +967,28 @@ async def bn_fut_tpsl(k, a) -> dict:
     return {"sym": sym, "tp": tp, "sl": sl, "warn": warn}
 
 
+async def bn_depth(k, a) -> dict:
+    """339: order book (10 daraja) + 24 soatlik o'zgarish — ochiq ma'lumot, imzosiz."""
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    if mkt == "spot":
+        d, t = await asyncio.gather(_get(SAPI + "/api/v3/depth", {}, f"symbol={sym}&limit=10"),
+                                    _get(SAPI + "/api/v3/ticker/24hr", {}, f"symbol={sym}"))
+    else:
+        d, t = await asyncio.gather(_get(FAPI + "/fapi/v1/depth", {}, f"symbol={sym}&limit=10"),
+                                    _get(FAPI + "/fapi/v1/ticker/24hr", {}, f"symbol={sym}"))
+    cv = lambda L: [[_f(x[0]), _f(x[1])] for x in (L or [])[:10]]
+    return {"sym": sym, "mkt": mkt, "bids": cv(d.get("bids")), "asks": cv(d.get("asks")),
+            "last": _f(t.get("lastPrice")), "chg": _f(t.get("priceChangePercent"))}
+
+
 TRADE_OPS = {
+    "depth": bn_depth,
     "info": bn_info, "spot_order": bn_spot_order, "spot_open": bn_spot_open,
     "spot_cancel": bn_spot_cancel, "fut_order": bn_fut_order, "fut_close": bn_fut_close,
     "fut_open": bn_fut_open, "fut_cancel": bn_fut_cancel, "fut_tpsl": bn_fut_tpsl,
 }
-TRADE_READ = ("info", "spot_open", "fut_open")
+TRADE_READ = ("info", "spot_open", "fut_open", "depth")
 
 
 async def trade(ex: str, k: dict, op: str, a: dict):

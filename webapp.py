@@ -1381,6 +1381,7 @@ async def api_cexstats(request):
     return web.json_response(res, headers=NO_CACHE)
 
 
+_DEPTH: dict = {}
 _TRADE_ARGS = {"mkt", "sym", "side", "type", "price", "quote", "qty", "margin", "lev",
                "tp", "sl", "frac", "ps", "id", "algo"}
 
@@ -1395,7 +1396,13 @@ async def api_cextrade(request):
     if ex not in cex.TRADE_EX or op not in cex.TRADE_OPS or not isinstance(a, dict) \
             or not set(a) <= _TRADE_ARGS or len(json.dumps(a)) > 1000:
         raise web.HTTPBadRequest()
-    if not _act_allowed(uid):
+    if op == "depth":
+        # 339: order book — tez-tez so'raladi (3 s), umumiy amal limitiga kirmaydi; 1.5 s kesh
+        ck = (str(a.get("mkt")), str(a.get("sym")).upper())
+        hit = _DEPTH.get(ck)
+        if hit and time.monotonic() - hit[0] < 1.5:
+            return web.json_response(hit[1], headers=NO_CACHE)
+    elif not _act_allowed(uid):
         raise web.HTTPTooManyRequests()
     row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
     if row is None:
@@ -1409,6 +1416,10 @@ async def api_cextrade(request):
     except Exception:
         log.warning("Savdo amali xato (%s %s)", ex, op, exc_info=True)
         res = {"ok": False, "err": "api"}
+    if op == "depth" and res.get("ok"):
+        if len(_DEPTH) > 500:
+            _DEPTH.clear()
+        _DEPTH[(str(a.get("mkt")), str(a.get("sym")).upper())] = (time.monotonic(), res)
     if write:
         log.info("Savdo: %s %s uid=%s %s → %s", ex, op, uid, json.dumps(a)[:200],
                  "ok" if res["ok"] else f"{res.get('err')} {res.get('msg', '')}")
@@ -1663,6 +1674,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_trade_tab": "Savdo", "tv_price": "Narx (USDT)", "tv_mkt_price": "Bozor narxida", "tv_amount": "Miqdor ({b})", "tv_total": "Jami (USDT)", "tv_avbl": "Mavjud", "tv_max": "Maks.", "tv_orders": "Ochiq orderlar", "tv_pos": "Pozitsiyalar", "tv_hold": "Aktivlar", "tv_no_orders": "Ochiq order yo'q", "tv_filled": "bajarildi", "tv_price_s": "Narx", "tv_qty_s": "Miqdor", "tv_only_bn": "Bot ichidan savdo hozircha faqat Binance'da. Pozitsiyalar va aktivlar pastda ko'rinadi.",
     "cx_ok_conn": "Ulanish ishlayapti", "cx_checked": "Tekshirildi", "cx_perm": "Kalit ruxsatlari", "cx_p_read": "O'qish (balans, tarix)", "cx_recheck": "Tekshirish", "cx_open_ws": "Birjani ochish",
     "cx_st_depth": "{e} API orqali eng eski savdo: {d}. Undan oldingi tarixni birja API orqali bermaydi — yangi savdolar har soat saqlanib, yillik statistika to\'lib boradi.",
     "cx_tr_cnt": "{n} ta savdo", "cx_margin": "Marja",
@@ -1686,6 +1698,7 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_trade_tab": "Торговля", "tv_price": "Цена (USDT)", "tv_mkt_price": "По рынку", "tv_amount": "Кол-во ({b})", "tv_total": "Итого (USDT)", "tv_avbl": "Доступно", "tv_max": "Макс.", "tv_orders": "Открытые ордера", "tv_pos": "Позиции", "tv_hold": "Активы", "tv_no_orders": "Нет открытых ордеров", "tv_filled": "исполнено", "tv_price_s": "Цена", "tv_qty_s": "Кол-во", "tv_only_bn": "Торговля из бота пока только на Binance. Позиции и активы — ниже.",
     "cx_ok_conn": "Подключение работает", "cx_checked": "Проверено", "cx_perm": "Права ключа", "cx_p_read": "Чтение (баланс, история)", "cx_recheck": "Проверить", "cx_open_ws": "Открыть биржу",
     "cx_st_depth": "Самая ранняя сделка, доступная через API {e}: {d}. Более раннюю историю биржа по API не отдаёт — новые сделки сохраняются каждый час, и годовая статистика будет накапливаться.",
     "cx_tr_cnt": "сделок: {n}", "cx_margin": "Маржа",
@@ -1709,6 +1722,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_trade_tab": "Trade", "tv_price": "Price (USDT)", "tv_mkt_price": "Market price", "tv_amount": "Amount ({b})", "tv_total": "Total (USDT)", "tv_avbl": "Avbl", "tv_max": "Max", "tv_orders": "Open orders", "tv_pos": "Positions", "tv_hold": "Holdings", "tv_no_orders": "No open orders", "tv_filled": "filled", "tv_price_s": "Price", "tv_qty_s": "Amount", "tv_only_bn": "In-bot trading is Binance-only for now. Positions and holdings are below.",
     "cx_ok_conn": "Connection works", "cx_checked": "Checked", "cx_perm": "Key permissions", "cx_p_read": "Read (balance, history)", "cx_recheck": "Check", "cx_open_ws": "Open exchange",
     "cx_st_depth": "Earliest trade available via the {e} API: {d}. The exchange does not provide older history via API — new trades are saved every hour, so the yearly stats will build up.",
     "cx_tr_cnt": "{n} trades", "cx_margin": "Margin",
