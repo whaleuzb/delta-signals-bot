@@ -8112,3 +8112,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Turnir hisobi: Dip Funded API (`_meta`) `tournament_id` bermaydi, sayt o'zgartirilmaydi — `_df_tour_acc`: nomzod Dip Classic $10,000 crypto active; `/stats` dan `username`, `/tournament?limit=100` reytingida shu nom (out emas) va foyda % hisobnikiga ±0.1 (yoki nomzod bitta) → o'sha hisob. 10 daqiqa kesh (`_DF_TOUR`). Javobda `tour:true`, nom `df.tour_name`.
 - Ilova: chiplarda 🏆, slayd/grafik sarlavhasida `dfAccName` (ro'yxatdagi nom).
 - Sinov: `test_346.py` 8/8.
+
+## 348. Birja bo'limidan Dip Funded va Turnir reklamasi olib tashlandi
+- Foydalanuvchi: "birjalar bo'limida dipfunded reklamasi va turnir reklamasini olib tashla". `walletView` oxiridagi `dfAd()+tourAd()` olib tashlandi (338 dagi "doim tursin" qoidasi Birja bo'limi uchun bekor; Bosh sahifalarda qoladi). Dip Funded endi Birja ro'yxatining o'zida (346).

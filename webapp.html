@@ -461,7 +461,6 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
   h+=rest.map(function(x){var df=x[0]=='dipfunded';return'<div class="row glass rise" onclick="'+(df?'dfConnect()':'cexAdd(\''+x[0]+'\')')+'">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t(df?'dfx_ro':'cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
- h+='<div class="rise" style="margin-top:14px">'+dfAd()+tourAd()+'</div>';
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
  v.innerHTML=h}
 /* 328: balans tarixi */
