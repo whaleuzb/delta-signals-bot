@@ -61,6 +61,10 @@ PAYMEMBERS_API_KEY = os.getenv("PAYMEMBERS_API_KEY", "")
 # xil. Bo'sh bo'lsa menyuda "Dip Funded" tugmasi umuman chiqmaydi.
 DIPFUNDED_URL = os.getenv("DIPFUNDED_URL", "https://dipfunded.com").rstrip("/")
 DIPFUNDED_API_KEY = os.getenv("DIPFUNDED_API_KEY", "")
+# 354: Delta Wear (kiyim do'koni) — xaridni tekshirish (DIP vazifasi)
+DELTAWEAR_URL = os.getenv("DELTAWEAR_URL", "https://perpetual-gentleness-production-2e17.up.railway.app").rstrip("/")
+DELTAWEAR_API_KEY = os.getenv("DELTAWEAR_API_KEY", "")
+DELTAWEAR_REWARD = float(os.getenv("DELTAWEAR_REWARD", "1000"))
 
 GUIDE_URL = os.getenv(
     "GUIDE_URL",

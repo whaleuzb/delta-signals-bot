@@ -51,6 +51,7 @@ import paymembers
 import resultlink
 import dipfunded
 import dfapp
+import deltawear
 import tournament
 import stats
 import tgsource
@@ -1205,6 +1206,57 @@ async def verify_tasks_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.info("Earn: #%s endi tekshiriladi (bot admin)", r["id"])
 
 
+async def _dw_task(uid: int, lang, t_, a) -> tuple[bool, str]:
+    """354: "Delta Wear'dan kiyim xarid qiling" — xarid Delta Wear'da tekshiriladi
+    (Telegram ID / do'kon botidagi telefon; bo'lmasa buyurtma raqami + telefon).
+    Bitta buyurtma faqat bitta odamga (`dwclaim:<order>`), vazifa odamga bir marta."""
+    try:
+        f = json.loads(a["args"] or "{}")
+    except ValueError:
+        f = {}
+    try:
+        oid = int(f.get("order")) if f.get("order") else None
+    except (TypeError, ValueError):
+        oid = None
+    phone = re.sub(r"\D", "", str(f.get("phone") or ""))[:15] or None
+    try:
+        orders = await deltawear.purchases(uid, oid, phone)
+    except deltawear.Unavailable as e:
+        log.warning("Delta Wear tekshiruvi: %s", e)
+        return False, i18n.t("dw.unav", lang)
+    if not orders:
+        return False, ("DWNEED:" if not (oid and phone) else "") + i18n.t(
+            "dw.need" if not (oid and phone) else "dw.not_found", lang)
+    for o in orders:
+        key = f"dwclaim:{int(o['id'])}"
+        who = await db.get_setting(key)
+        if who and who != str(uid):
+            continue
+        reward = float(t_["reward"])
+        if not await db.dip_task_complete(t_["id"], uid, reward):
+            return False, i18n.t("earn.already", lang)
+        await db.set_setting(key, str(uid))
+        log.info("Delta Wear xaridi tasdiqlandi: uid=%s buyurtma #%s", uid, o["id"])
+        return True, i18n.t("earn.got", lang, n=f"{reward:g}", bal=f"{await db.dip_balance(uid):g}")
+    return False, i18n.t("dw.claimed", lang)
+
+
+async def ensure_dw_task(ctx) -> None:
+    """354: Earn'da Delta Wear vazifasi bo'lsin (kalit bor bo'lsa) — bir marta yaratiladi."""
+    if not deltawear.enabled():
+        return
+    try:
+        if any(t_["kind"] == "dw" for t_ in await db.dip_tasks_all()):
+            return
+        tid = await db.dip_task_add("dw", "Delta Wear", "https://deltawear.co", None,
+                                    config.DELTAWEAR_REWARD,
+                                    note="Delta Wear'dan kiyim xarid qiling — xarid tasdiqlangach "
+                                         f"{config.DELTAWEAR_REWARD:g} DIP")
+        log.info("Earn: Delta Wear vazifasi yaratildi (#%s)", tid)
+    except Exception:
+        log.warning("Delta Wear vazifasi yaratilmadi", exc_info=True)
+
+
 async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
     """282: DIP Earn vazifasi — kanal/guruh bo'lsa obuna bot orqali tekshiriladi,
     bot/havola vazifalarida tekshirib bo'lmaydi (bosilgani yetarli)."""
@@ -1215,6 +1267,8 @@ async def _app_diptask(ctx, uid: int, lang, a) -> tuple[bool, str]:
     t_ = await db.dip_task_get(tid) if tid else None
     if not t_ or not t_["active"] or t_["expired"]:
         return False, i18n.t("earn.gone", lang)
+    if t_["kind"] == "dw":
+        return await _dw_task(uid, lang, t_, a)
     if t_["kind"] in ("channel", "group") and not t_["chat_id"]:
         # 299: kanal/guruhda DIP faqat bot tekshira olsa beriladi — adolatli bo'lsin.
         cid, _title, _st = await resolve_task_chat(ctx.bot, t_["url"])
@@ -11955,6 +12009,7 @@ def main() -> None:
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
     app.job_queue.run_once(announce_channel_job, 90)
+    app.job_queue.run_once(ensure_dw_task, 30)
     app.job_queue.run_once(promo_emoji_job, 15)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).

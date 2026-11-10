@@ -8143,3 +8143,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Oyna (`sgRender`): kirish/SL/TP; "Qayerda ochamiz" — `sgDests`: Binance Futures (savdo ruxsati), Binance Spot (faqat LONG), Dip Funded #hisob (LONG, savdo mumkin bo'lsa). Market | Limit (signal kirishi; PENDING bo'lsa Limit tanlangan), summa USDT (+10/25/50/100% mavjuddan — Binance `info`, DF `available`), Futures — signal leveraji (yo'q bo'lsa 10x).
 - Yuborish (`sgGo`, tasdiq bilan): Futures `fut_order {side, lev, margin, sl, tp}`; Spot `spot_order {side:buy, quote}` (TP/SL yo'q — izoh); DF `dftrade buy {amount, limit?, sl, tp}`. Manzil yo'q bo'lsa — ulash yo'riqnomasi va Birja bo'limiga tugma.
 - i18n: `sig.open_cex` (bot), webapp `sg_*`. Sinov: brauzer `t_sg.py` (uchala manzil), tugma — qo'lda tekshirildi; `test_tracker.py` o'tdi.
+
+## 354. Earn: "Delta Wear'dan kiyim xarid qiling" — 1000 DIP, xarid haqiqatan tekshiriladi
+- Delta Wear (deltawear.co, repo `whaleuzb/deltawear-webhook`, Railway `dynamic-enchantment/perpetual-gentleness`): `POST /api/tc/purchase` (X-Api-Key = DW `TC_API_KEY`) — faqat `TASDIQ` holatidagi buyurtmalar; moslik: `orders.chat_id` = Telegram ID, yoki do'kon botidagi telefon (`telegram_users`), yoki buyurtma raqami + telefon (oxirgi 9 raqam) birga. Manzil qaytmaydi. DW commit ffbb7dc.
+- Bu tomonda: `deltawear.py` (`purchases`), `config.DELTAWEAR_URL/API_KEY/REWARD` (bot servisida `DELTAWEAR_API_KEY` = DW `TC_API_KEY`). `ensure_dw_task` (ishga tushgandan 30 s) — Earn'da `kind='dw'` vazifa bir marta (1000 DIP, muddatsiz; 300 dagi qayta tekshiruvga tushmaydi — chat_id yo'q).
+- `_app_diptask` → `_dw_task`: avtomatik topilmasa `DWNEED:` (ilova `dwSheet` — buyurtma raqami + telefon so'raydi); bitta buyurtma bitta odamga (`bot_settings dwclaim:<order>`), vazifa odamga bir marta (`dip_task_done`).
+- Sinov: `test_354.py` 10/10, DW `test_dw.py` 9/9, brauzer `t_dw.py`.
