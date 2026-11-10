@@ -449,7 +449,7 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
   +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+n2(tot)+'</div>'
   +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div>'
-  +'<div id="cxh_all" style="margin-top:10px">'+(function(){var c=(S.cxh||{})[cxhKey(null,30)];return c&&c.p.length>1?balChart(c.p,56,'cxa')+'<div class="rs" style="margin-top:4px">'+esc(t('cx_dn',{n:30}))+' · '+balChg(c.p)+'</div>':''})()+'</div></div>';
+  +'</div>';
   h+='<div class="sect rise">'+esc(t('cx_mine'))+'</div>'+acc.map(function(a){var m=cexMeta(a.ex),np=(a.pos||[]).length;
    return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+'</div><div class="rs">'
    +(a.err?'<span class="r">'+esc(cexErr(a.err))+'</span>':esc(a.mask)+(np?' · '+np+' '+esc(t('cx_pos_n')):''))+'</div></div>'
@@ -459,7 +459,7 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
   h+=rest.map(function(x){return'<div class="row glass rise" onclick="cexAdd(\''+x[0]+'\')">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t('cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
- v.innerHTML=h;if(acc.length)cxhAll()}
+ v.innerHTML=h}
 /* 328: balans tarixi */
 function cxhKey(ex,d){return(ex||'all')+'|'+d}
 function cxhLoad(ex,d,cb){S.cxh=S.cxh||{};var k=cxhKey(ex,d),c=S.cxh[k];if(c&&Date.now()-c.at<120000){cb&&cb(c.p);return}
@@ -478,33 +478,25 @@ function cxhDet(ex,d){S.cxhD=d;var el=document.getElementById('cxh_det');if(!el)
  cxhLoad(ex,d,function(p){var e=document.getElementById('cxh_det');if(!e)return;
   e.innerHTML=p.length>1?'<div class="rs" style="margin:0 2px 6px">'+balChg(p)+'</div>'+balChart(p,90,'cxd'):'<div class="rs" style="padding:14px 2px;line-height:1.5">'+esc(t('cx_hist_empty'))+'</div>'})}
 function cexAcc(ex){var a=null;((S.cex||{}).acc||[]).forEach(function(x){if(x.ex==ex)a=x});return a}
+/* 336: Birja bo'limidagi oyna — faqat ulanish holati, ruxsatlar, balans, kalitni yangilash/uzish
+   (pozitsiyalar, tarix, statistika — birja workspace'ining Bosh/Signallar/Statistika bo'limlarida) */
 function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
+ var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0;font-size:13px">'+esc(l)+'</span><b class="'+(c||'')+'" style="font-size:14px">'+v+'</b></div>'};
  var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' <span class="rs" style="font-weight:600">'+esc(a.mask)+'</span></h4>';
- if(a.err)h+='<p class="r">'+esc(cexErr(a.err))+'</p>';
- else{h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
-   +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Spot</div><div style="font-weight:800;font-size:17px">$'+n2(a.spot_usd||0)+'</div></div>'
-   +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Futures</div><div style="font-weight:800;font-size:17px">'+(a.fut?'$'+n2(a.fut.eq||0):'—')+'</div>'+(a.fut&&a.fut.upnl?'<div class="rs '+(a.fut.upnl>=0?'g':'r')+'">uPnL '+fm(a.fut.upnl)+'</div>':'')+'</div></div>';
-  var D=S.cxhD||30;h+='<div style="display:flex;align-items:center;margin:0 2px 6px"><span class="rs" style="font-weight:700;margin:0">'+esc(t('cx_hist'))+'</span><span class="chips" id="cxh_chips" style="margin:0 0 0 auto;gap:4px">'
-   +[7,30,90].map(function(x){return'<span class="chip glass'+(x==D?' on':'')+'" data-d="'+x+'" style="padding:3px 9px;font-size:11px" onclick="cxhDet(\''+ex+'\','+x+')">'+esc(t('cx_dn',{n:x}))+'</span>'}).join('')+'</span></div>'
-   +'<div id="cxh_det" style="margin-bottom:12px"></div>';
-  var P=a.pos||[];if(P.length){h+='<div class="rs" style="margin:0 2px 6px;font-weight:700">'+esc(t('cx_pos'))+'</div>'+P.map(function(p){
-   return'<div class="glass" style="border-radius:14px;padding:10px 12px;margin-bottom:6px"><div style="display:flex;align-items:center;gap:8px">'+coinIc(p.sym,20)+'<b>'+esc(p.sym)+'</b><span class="chip glass on" style="padding:2px 8px;font-size:10.5px;color:'+(p.side=='long'?'var(--g)':'var(--r)')+'">'+(p.side=='long'?'LONG':'SHORT')+(p.lev?' '+(+p.lev)+'x':'')+'</span><span style="margin-left:auto;font-weight:800" class="'+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'</span></div>'
-   +'<div class="rs" style="margin-top:5px">'+esc(t('df_qty'))+' '+(+p.qty)+' · '+esc(t('cx_entry'))+' '+fp(p.entry)+(p.mark?' · '+esc(t('df_mark'))+' '+fp(p.mark):'')+(p.liq?' · LIQ '+fp(p.liq):'')+'</div>'
-   +(ex=='binance'&&a.trade&&a.trade.fut?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><button class="btn" style="margin:0;padding:7px" onclick="trTpslSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">TP / SL</button><button class="btn" style="margin:0;padding:7px;color:var(--r)" onclick="trCloseSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">'+esc(t('tr_close'))+'</button></div>':'')
-   +'</div>'}).join('')}
-  var A=a.assets||[];if(A.length){h+='<div class="rs" style="margin:10px 2px 6px;font-weight:700">'+esc(t('cx_assets'))+'</div>'+A.map(function(x){
-   var sl=ex=='binance'&&a.trade&&a.trade.spot&&x.a!='USDT'&&x.a!='USDC'&&x.a!='FDUSD';
-   return'<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)'+(sl?';cursor:pointer':'')+'"'+(sl?' onclick="trOpen(\'spot\',\''+esc(x.a)+'USDT\',\'sell\')"':'')+'>'+coinIc(x.a,20)+'<b style="font-size:13px">'+esc(x.a)+'</b><span class="rs" style="margin:0">'+(+x.q.toPrecision(8))+'</span><span style="margin-left:auto;font-weight:700;font-size:13px">'+(x.usd!=null?'$'+n2(x.usd):'—')+'</span></div>'}).join('')}
-  if(!P.length&&!A.length)h+='<p>'+esc(t('cx_empty'))+'</p>'}
- if(ex=='binance'&&!a.err){var tr=a.trade||{};
-  if(tr.spot||tr.fut)h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">'
-   +'<button class="btn" style="margin:0;background:var(--g);color:#0b0b0c;border-color:transparent;font-weight:800" onclick="trOpen(\'spot\')"'+(tr.spot?'':' disabled')+'>Spot '+esc(t('tr_trade'))+'</button>'
-   +'<button class="btn" style="margin:0;background:var(--g);color:#0b0b0c;border-color:transparent;font-weight:800" onclick="trOpen(\'fut\')"'+(tr.fut?'':' disabled')+'>Futures '+esc(t('tr_trade'))+'</button></div>';
-  else h+='<div class="rs" style="margin-top:12px;line-height:1.5">💡 '+esc(t('tr_enable'))+'</div>';
-  h+='<button class="btn full" style="margin-top:8px" onclick="cexTrades(\''+ex+'\')">📜 '+esc(t('cx_trades'))+'</button>'}
- h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button>'
+ if(a.err)h+='<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(255,92,92,.35)"><b class="r">✕ '+esc(cexErr(a.err))+'</b></div>';
+ else h+='<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(194,242,58,.3)"><b class="g">✓ '+esc(t('cx_ok_conn'))+'</b>'+(S.cex&&S.cex.at?'<div class="rs" style="margin-top:3px">'+esc(t('cx_checked'))+': '+ctrDate(S.cex.at)+'</div>':'')+'</div>';
+ if(!a.err){h+=row(t('cx_total'),'$'+n2(a.total||0))+row('Spot','$'+n2(a.spot_usd||0))+row('Futures',a.fut?'$'+n2(a.fut.eq||0):'—');
+  var tr=a.trade||{},yn=function(v){return v?'<span class="g">✓</span>':'<span class="m">—</span>'};
+  h+='<div class="rs" style="margin:12px 2px 2px;font-weight:700">'+esc(t('cx_perm'))+'</div>'+row(t('cx_p_read'),yn(true))
+   +(ex=='binance'?row('Spot '+t('tr_trade'),yn(tr.spot))+row('Futures '+t('tr_trade'),yn(tr.fut)):'');
+  if(ex=='binance'&&!tr.spot&&!tr.fut)h+='<div class="rs" style="margin-top:10px;line-height:1.5">💡 '+esc(t('tr_enable'))+'</div>'}
+ h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"><button class="btn" style="margin:0" onclick="cexRecheck(\''+ex+'\')">↻ '+esc(t('cx_recheck'))+'</button>'
+  +'<button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button></div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="btn p" style="margin:0" onclick="cexGoWs(\''+ex+'\')">'+esc(t('cx_open_ws'))+'</button>'
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
- sheetOpen(h);if(!a.err)cxhDet(ex,S.cxhD||30)}
+ sheetOpen(h)}
+function cexRecheck(ex){toast(esc(t('cx_upd')));S.cexL=0;api('cex',{fresh:true}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};render();cexOpen(ex)}).catch(function(){toast(esc(t('cx_e_net')))})}
+function cexGoWs(ex){sheetClose();S.cur='cx:'+ex;S.anim=true;S.items=[];S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}S.tab='home';tick();render();load()}
 /* 333: birja — workspace sifatida (Bosh, pozitsiyalar, terminal, statistika) */
 function cxRefresh(){var w=cur();if(!w||w.type!='cex')return;cexLoad(1);cxOrders(w.ex)}
 function cxOrders(ex){var a=cexAcc(ex);if(ex!='binance'||(a&&a.trade&&!a.trade.fut&&!a.trade.spot&&false))return;

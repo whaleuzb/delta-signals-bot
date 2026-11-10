@@ -8029,3 +8029,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Web `_cx_sync_other`: `cutoff = year_from` (asinxron yo'q), keyingi sinxlar oxirgisidan 1 soat ustma-ust; `cexstats` endi barcha birjalar uchun; ulanganda va har soat — barcha birjalar. Ilovada Binance bo'lmasa: "{birja} tarixni ~90 kun (spot ~30 kun) beradi — keyin har soat saqlanib boradi".
 - ⚠️ Endpoint maydonlari hujjat/xotiradan — real kalit bilan tekshirilmagan; xato bo'lsa `cex_sync.state.fut_err` va web logida "<ex> tarixi qisman olindi".
 - Sinov: `test_335.py` 12/12.
+
+## 336. Birja bo'limi soddalashtirildi
+- Foydalanuvchi (birja oynasi skrinshoti): "bu bo'limdagi ma'lumotlar shart emas. Chunki statistikani qo'shdik. Umumiy balans va birja ulanishi tekshiruvlari va kalit yangilash yetadi".
+- `cexOpen(ex)`: faqat ulanish holati (✓ ishlayapti + tekshirilgan vaqt / ✕ xato), umumiy balans + Spot/Futures summalari, kalit ruxsatlari (o'qish; Binance — Spot/Futures savdo), tugmalar: Tekshirish (`cexRecheck` — fresh), Kalitni yangilash, Birjani ochish (`cexGoWs` — workspace'ga o'tish), Uzish. Balans tarixi grafigi, pozitsiyalar, aktivlar, savdo tugmalari, savdolar tarixi bu oynadan OLIB TASHLANDI (ular birja workspace'ida: Bosh/Signallar/Statistika).
+- `walletView` umumiy balans kartasidan 30 kunlik grafik ham olib tashlandi.

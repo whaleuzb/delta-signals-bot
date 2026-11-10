@@ -1659,6 +1659,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_ok_conn": "Ulanish ishlayapti", "cx_checked": "Tekshirildi", "cx_perm": "Kalit ruxsatlari", "cx_p_read": "O'qish (balans, tarix)", "cx_recheck": "Tekshirish", "cx_open_ws": "Birjani ochish",
     "cx_st_depth": "{e} tarixni faqat so'nggi ~90 kun (spot ~30 kun) beradi — undan keyingi savdolar har soat saqlanib boradi va yillik statistika to'lib boradi.",
     "cx_tr_cnt": "{n} ta savdo", "cx_margin": "Marja",
     "cx_pos_open": "{n} ta ochiq", "cx_st_ytd": "Yil boshidan", "cx_acc": "Hisob", "cx_assets_n": "aktiv", "cx_no_pos": "Ochiq pozitsiya yo'q", "cx_drag": "TP va SL chiziqlarini grafikda surib o'zgartirish mumkin.", "cx_per_ytd": "{y} yil boshidan", "cx_st_all": "Hammasi", "cx_st_net": "Sof natija", "cx_st_pf": "Profit factor", "cx_st_avg": "O'rtacha foyda / zarar", "cx_st_best": "Eng yaxshi savdo", "cx_st_worst": "Eng yomon savdo", "cx_st_months": "Oylar bo'yicha", "cx_st_syms": "Juftliklar bo'yicha", "cx_st_sync": "Savdo tarixi Binance'dan yuklanmoqda…", "cx_st_old_pending": "{y} yil boshidan to'liq futures tarixi Binance'dan yuklab olinmoqda — bir necha daqiqadan bir necha soatgacha. Hozircha so'nggi ~3 oy ko'rinadi.", "cx_st_old_fail": "{y} yil boshidagi eski futures tarixi olinmadi — so'nggi ~3 oy ko'rsatilmoqda. {e}", "cx_st_only": "Statistika hozircha faqat Binance uchun.", "cx_st_empty": "Bu davrda yopilgan savdo yo'q", "cx_st_synced": "Yangilangan", "cx_st_from": "tarix",
@@ -1681,6 +1682,7 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_ok_conn": "Подключение работает", "cx_checked": "Проверено", "cx_perm": "Права ключа", "cx_p_read": "Чтение (баланс, история)", "cx_recheck": "Проверить", "cx_open_ws": "Открыть биржу",
     "cx_st_depth": "{e} отдаёт историю только за последние ~90 дней (спот ~30 дней) — дальше сделки сохраняются каждый час, и годовая статистика будет накапливаться.",
     "cx_tr_cnt": "сделок: {n}", "cx_margin": "Маржа",
     "cx_pos_open": "{n} открыто", "cx_st_ytd": "С начала года", "cx_acc": "Счёт", "cx_assets_n": "активов", "cx_no_pos": "Нет открытых позиций", "cx_drag": "Линии TP и SL можно двигать прямо на графике.", "cx_per_ytd": "С начала {y}", "cx_st_all": "Всё", "cx_st_net": "Чистый результат", "cx_st_pf": "Profit factor", "cx_st_avg": "Средняя прибыль / убыток", "cx_st_best": "Лучшая сделка", "cx_st_worst": "Худшая сделка", "cx_st_months": "По месяцам", "cx_st_syms": "По парам", "cx_st_sync": "Загружаем историю сделок с Binance…", "cx_st_old_pending": "Полная история фьючерсов с начала {y} года загружается с Binance — от нескольких минут до нескольких часов. Пока показаны последние ~3 месяца.", "cx_st_old_fail": "Старую историю фьючерсов с начала {y} получить не удалось — показаны последние ~3 месяца. {e}", "cx_st_only": "Статистика пока только для Binance.", "cx_st_empty": "За этот период закрытых сделок нет", "cx_st_synced": "Обновлено", "cx_st_from": "история с",
@@ -1703,6 +1705,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_ok_conn": "Connection works", "cx_checked": "Checked", "cx_perm": "Key permissions", "cx_p_read": "Read (balance, history)", "cx_recheck": "Check", "cx_open_ws": "Open exchange",
     "cx_st_depth": "{e} only provides ~90 days of history (spot ~30 days) — new trades are saved every hour, so the yearly stats will build up.",
     "cx_tr_cnt": "{n} trades", "cx_margin": "Margin",
     "cx_pos_open": "{n} open", "cx_st_ytd": "Year to date", "cx_acc": "Account", "cx_assets_n": "assets", "cx_no_pos": "No open positions", "cx_drag": "Drag the TP and SL lines on the chart to change them.", "cx_per_ytd": "Since start of {y}", "cx_st_all": "All", "cx_st_net": "Net result", "cx_st_pf": "Profit factor", "cx_st_avg": "Avg win / loss", "cx_st_best": "Best trade", "cx_st_worst": "Worst trade", "cx_st_months": "By month", "cx_st_syms": "By pair", "cx_st_sync": "Loading trade history from Binance…", "cx_st_old_pending": "Full futures history since the start of {y} is being downloaded from Binance — from a few minutes to a few hours. The last ~3 months are shown meanwhile.", "cx_st_old_fail": "Older futures history since the start of {y} could not be fetched — showing the last ~3 months. {e}", "cx_st_only": "Statistics are available for Binance only for now.", "cx_st_empty": "No closed trades in this period", "cx_st_synced": "Updated", "cx_st_from": "history from",
