@@ -982,11 +982,48 @@ async def bn_depth(k, a) -> dict:
             "last": _f(t.get("lastPrice")), "chg": _f(t.get("priceChangePercent"))}
 
 
+async def bn_fut_modify(k, a) -> dict:
+    """342: futures limit order narxini o'zgartirish (grafikda chiziqni surish) — PUT /fapi/v1/order."""
+    _need(await bn_trade_perms(k), "fut")
+    sym = _sym(a)
+    oid = int(_pos(a, "id"))
+    fx = await bn_filters("fut", sym)
+    price = _s(_round(_pos(a, "price"), fx["tick"]))
+    o = await _bn(k, FAPI, "/fapi/v1/order", {"symbol": sym, "orderId": oid})
+    if str(o.get("type")).upper() != "LIMIT":
+        raise ApiErr("bad", "faqat LIMIT orderni surish mumkin")
+    d = await _bn_send(k, FAPI, "/fapi/v1/order", "PUT", {
+        "symbol": sym, "orderId": oid, "side": o["side"], "quantity": o["origQty"], "price": price})
+    return {"id": oid, "price": _f(price), "status": (d or {}).get("status") if isinstance(d, dict) else None}
+
+
+async def bn_spot_modify(k, a) -> dict:
+    """342: spot limit order narxini o'zgartirish — cancelReplace (bekor qilish + yangi, bir so'rovda)."""
+    _need(await bn_trade_perms(k), "spot")
+    sym = _sym(a)
+    oid = int(_pos(a, "id"))
+    fx = await bn_filters("spot", sym)
+    price = _s(_round(_pos(a, "price"), fx["tick"]))
+    o = await _bn(k, SAPI, "/api/v3/order", {"symbol": sym, "orderId": oid})
+    if str(o.get("type")).upper() not in ("LIMIT", "LIMIT_MAKER"):
+        raise ApiErr("bad", "faqat LIMIT orderni surish mumkin")
+    qty = _floor(_f(o.get("origQty")) - _f(o.get("executedQty")), fx["step"])
+    if qty <= 0:
+        raise ApiErr("small", sym)
+    d = await _bn_send(k, SAPI, "/api/v3/order/cancelReplace", "POST", {
+        "symbol": sym, "side": o["side"], "type": "LIMIT", "timeInForce": "GTC",
+        "cancelReplaceMode": "STOP_ON_FAILURE", "cancelOrderId": oid,
+        "quantity": _s(qty), "price": price})
+    nr = (d or {}).get("newOrderResponse") or {} if isinstance(d, dict) else {}
+    return {"id": nr.get("orderId"), "price": _f(price), "status": nr.get("status")}
+
+
 TRADE_OPS = {
     "depth": bn_depth,
     "info": bn_info, "spot_order": bn_spot_order, "spot_open": bn_spot_open,
     "spot_cancel": bn_spot_cancel, "fut_order": bn_fut_order, "fut_close": bn_fut_close,
     "fut_open": bn_fut_open, "fut_cancel": bn_fut_cancel, "fut_tpsl": bn_fut_tpsl,
+    "fut_modify": bn_fut_modify, "spot_modify": bn_spot_modify,
 }
 TRADE_READ = ("info", "spot_open", "fut_open", "depth")
 

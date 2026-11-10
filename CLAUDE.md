@@ -8066,3 +8066,12 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `cxPosCard` qayta yozildi (`termInfo` uslubi, `.tile2/.mcg/.mci/.mcb`): coin + juftlik + "Futures Nx" + LONG/SHORT; P&L (USDT) | ROI; Hajm/Miqdor/Kirish narxi; Joriy narx/Stop/TP (`cxPosTpsl`).
 - Tugmalar: TP/SL, Ulashish (`cxShare` — t.me/share matn + bot havolasi), Batafsil ▾ (`cxMoreT`, `S.cxMore[ex:sym:ps]`: Marja, Pozitsiya hajmi, Likvidatsiya, Birja, Leveraj, Rejim), Yopish. Karta ustiga bosish — `cxTerm`.
 - Yangi i18n: `cx_pmode`.
+
+## 342. Savdo → Grafik tugmasi; grafikda TP/SL va limitlar boshqaruvi
+- Savdo ekrani sarlavhasida 🕯 tugma (`ic('candle')`) → `cxTerm(ex, S.tv.sym, S.tv.mkt)`; pozitsiya kartasida ham belgi (karta bosilsa grafik).
+- `cxTerm(ex,sym,mkt)`: `g.cx.mkt` = 'fut'|'spot'. Spot: pozitsiya yo'q, orderlar `cxSpotOpen` → `g.so` (15 s yangilanadi). `cxCan(g)` — shu bozorga savdo ruxsati.
+- Chiziqlar (`cxLines`): limit orderlar Buy (yashil)/Sell (qizil) + miqdor, suriladi → `fut_modify` (PUT /fapi/v1/order, origQty bilan) yoki `spot_modify` (`/api/v3/order/cancelReplace`, STOP_ON_FAILURE, qolgan miqdor). Narx tick bo'yicha yaxlitlanadi.
+- ✕ belgisi (Dip Funded terminalidagi `lineAction` g'oyasi): yorliq yonida; 1-bosish qizartiradi + "yana bosing", 3 s ichida 2-bosish bajaradi (`cxLineX`): limit — bekor, TP/SL — olib tashlash (`fut_tpsl` boshqasi bilan), kirish chizig'i — yopish oynasi. Hit-box: `g.xb` (`termSvg` to'ldiradi), `termBind` pointerdown'da tekshiriladi.
+- «+ TP» / «+ SL» (pozitsiyada yo'q bo'lsa) va «+ Limit» (`cxAdd`): ±2% / 1% da vaqtinchalik chiziq (`g.pend`, from=null), cx'da pend paytida ham surish mumkin. Saqlash: TP/SL → `cxSave`; Limit («Davom etish») → Savdo formasi shu juftlik/bozor, Limit, narx to'ldirilgan, tomon narxga qarab.
+- Grafik ostida shu juftlik orderlari ro'yxati: ✏️ (`cxEditLim` — narx kiritish) va ✕ (`cxCancel(ex,sym,id,algo)` — spot/fut).
+- Yangi i18n: `cx_nl_go`, `cx_lim_ok`, `cx_nl_next`, `cx_closepos`, `cx_drag_spot`, `cx_lim_new`, `cx_x_again`. Brauzer sinovi `t_cxc.py`.
