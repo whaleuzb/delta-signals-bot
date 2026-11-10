@@ -7997,3 +7997,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `pill()`: `<select id="wsSel">`ga `<optgroup label="Birja">` — har ulangan birja `cx:<ex>` qiymati bilan ("Binance · $1,715.90"; xatoli bo'lsa summasiz). Tanlansa — select joriy workspace'ga qaytariladi, Birja bo'limiga o'tiladi va `cexOpen(ex)`. Workspace bitta bo'lsa ham birjalar bo'lsa ro'yxat ko'rinadi.
 - Ilova ochilganda 0.8 s dan keyin `cexLoad()` (ro'yxat to'lishi uchun); `cexLoad` boshqa bo'limda bo'lsa faqat `pill()` ni yangilaydi.
 - Tab nomi: uz "Birja", ru "Биржа", en "Exchange" (kalit `wallet` o'zgarmadi — ichki nom). Yangi belgi `I.xchg` (shamlar) — pastki panel va bo'lim sarlavhasida.
+
+## 332. Birja logolari
+- Foydalanuvchi: "Birjalarni logosi ko'rinib tursin".
+- `CXL` (webapp.html) — 24×24 SVG: Binance — simple-icons'dagi asl yo'l (#F0B90B); MEXC (ko'k "tog'lar"), Bitget (feruza zigzag), BingX (ko'k X) — ochiq SVG manbasi topilmadi (sandbox'dan faqat raw.githubusercontent ochiladi, simple-icons'da faqat Binance bor), shuning uchun brend shakli/rangiga yaqin qo'lda chizilgan. Asl SVG topilsa — `CXL`dagi yo'lni almashtirish kifoya.
+- `cexBadge(ex,z)` — qorong'i (#141417) fon ustida logo (z×0.62); `CXN` hisoblagich — gradient id'lari takrorlanmasin. Logo yo'q birja uchun eski harfli badge.
+- Native `<select>` (workspace ro'yxati) ichida rasm ko'rsatib bo'lmaydi — u yerda faqat nom va balans.
