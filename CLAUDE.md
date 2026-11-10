@@ -8084,3 +8084,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `cex.trade`: `op=="depth"` Binance bo'lmasa `DEPTH_EX`ga; web `api_cextrade` depth'ni barcha `DEPTH_EX` birjalariga ruxsat beradi, kesh kaliti `(ex, mkt, sym)`.
 - Frontend: `tvBookLoad` hamma birjada; yuklanmasa skelet o'rniga `tv_book_err`.
 - Javob formatlari haqiqiy API'da sinalmagan (sessiya proksisi birjalarni bloklaydi) — relay logida "Savdo amali xato … depth" ni kuzatish.
+
+## 344. E'lon: "Birjangiz endi ilova ichida" (faqat Spot — auditoriya spotchi)
+- `ANNOUNCE_KEY = announce_2026_11_exchange`, `announce/2026-11-exchange.{png,txt}`; tugma `ANNOUNCE_BTN` = "🏦 Birjani ulash" → `/app?tab=wallet` (Birja bo'limi).
+- Rasm: yangi dizayn (qora + #c2f23a), 4 birja logosi, 3 telefon (Savdo Spot, Spot grafik limit chiziqlari bilan, Spot statistika), pastda "Birjani ulash" tugmasi. Foydalanuvchi talabi: reklamada FAQAT Spot ko'rinsin.
+- Skrinshotlar `t_ann.py` (sinov ma'lumotlari), banner `banner.html` (scratchpad) → Playwright 1600×1000.

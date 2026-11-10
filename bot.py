@@ -11558,8 +11558,9 @@ async def _fix_whales_join(bot) -> None:
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
-ANNOUNCE_KEY = "announce_2026_11_miniapp"
-ANNOUNCE_FILE = "2026-11-miniapp"     # announce/<nom>.png va .txt
+ANNOUNCE_KEY = "announce_2026_11_exchange"
+ANNOUNCE_FILE = "2026-11-exchange"    # announce/<nom>.png va .txt
+ANNOUNCE_BTN = ("🏦 Birjani ulash", "?tab=wallet")   # 344: tugma matni + ilova manzili qo'shimchasi
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
@@ -11588,7 +11589,7 @@ def _announce_kb():
     if not config.WEB_URL:
         return None
     return InlineKeyboardMarkup([[InlineKeyboardButton(
-        "📱 Ilovani ochish", web_app=WebAppInfo(url=f"{config.WEB_URL}/app"),
+        ANNOUNCE_BTN[0], web_app=WebAppInfo(url=f"{config.WEB_URL}/app{ANNOUNCE_BTN[1]}"),
         api_kwargs={"style": "success"})]])
 
 

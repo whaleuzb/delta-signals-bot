@@ -1,0 +1,12 @@
+🏦 Trade Controller — birjangiz endi ilova ichida!
+
+Binance, Bitget, MEXC yoki BingX hisobingizni API kalit orqali ulang:
+
+🔹 Balans va aktivlar — bitta oynada
+🔹 Spot savdo — Limit / Market, jonli order book (hozircha Binance, qolgan birjalar tez orada)
+🔹 Grafik — limit orderlarni surib narxini o'zgartirish, ✕ bilan bekor qilish
+🔹 Statistika — yil boshidan savdo tarixi: PnL, win rate, oylar va juftliklar
+
+🔒 Kalitlar shifrlangan holda saqlanadi. Pul yechish ruxsati bor kalit qabul qilinmaydi.
+
+Ulash: pastdagi tugma → Birja bo'limi 👇
