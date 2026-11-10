@@ -8041,3 +8041,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Yangi juftlik paydo bo'lsa ham spot tarixi `year_from` dan (`hist_sync` ga `year_from` uzatiladi), mavjudlari — `spot_t` kursoridan.
 - Ilova izohi endi haqiqiy: "{birja} API orqali eng eski savdo: dd.mm.yyyy …" — faqat birinchi yozuv yil boshidan 7 kundan keyin bo'lsa.
 - Sinov: `test_337.py` 4/4.
+
+## 338. Birja Bosh sahifasidan "Hisob" olib tashlandi; Dip Funded reklamasi doim
+- Foydalanuvchi: "bosh menyudagi hisob tugmasini olib tashla birja bo'limida bor. Dipfunded reklamasi doim tursin hatto birja oynasida ham".
+- `dfAd()` — Dip Funded kartasi (openDf); `cxHome` oxirida (xato holatida ham) va `walletView` (Birja bo'limi) ichida. Oddiy workspace Bosh sahifasida avvaldan bor.

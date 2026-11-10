@@ -458,6 +458,7 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
   h+=rest.map(function(x){return'<div class="row glass rise" onclick="cexAdd(\''+x[0]+'\')">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t('cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
+ h+='<div class="rise" style="margin-top:14px">'+dfAd()+'</div>';
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
  v.innerHTML=h}
 /* 328: balans tarixi */
@@ -507,7 +508,7 @@ function cxPosTpsl(ex,p){var tp=null,sl=null;((S.cxo||{})[ex]||[]).forEach(funct
 function cxRoi(p){var m=p.entry*p.qty/(p.lev||1);return m?p.upnl/m*100:0}
 function cxHome(v,w){var a=w.acc,ex=w.ex,m=cexMeta(ex);
  if(!a){v.innerHTML='<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';if(!S.cex)cexLoad();return}
- if(a.err){v.innerHTML='<div class="card glass rise" onclick="cexOpen(\''+ex+'\')"><h2>'+esc(m[1])+'</h2><div class="s r">'+esc(cexErr(a.err))+'</div><div class="deco" style="opacity:1">'+cexBadge(ex,44)+'</div></div>';return}
+ if(a.err){v.innerHTML='<div class="card glass rise" onclick="cexOpen(\''+ex+'\')"><h2>'+esc(m[1])+'</h2><div class="s r">'+esc(cexErr(a.err))+'</div><div class="deco" style="opacity:1">'+cexBadge(ex,44)+'</div></div>'+dfAd();return}
  var P=a.pos||[],up=0;P.forEach(function(p){up+=p.upnl||0});
  var hc=(S.cxh||{})[cxhKey(ex,30)],hp=hc?hc.p:null;if(!hc)cxhLoad(ex,30,function(){var w2=cur();if(w2&&w2.ex==ex&&S.tab=='home')render()});
  var st=(S.cxst||{})[ex];if(!st)cxStatLoad(ex,'ytd');var sy=st&&st.ytd;
@@ -525,7 +526,9 @@ function cxHome(v,w){var a=w.acc,ex=w.ex,m=cexMeta(ex);
  +'<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('cx_pos'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="cch">'+mbars(P.map(function(p){return p.upnl||0}),300,40)+'</div>':'<div class="deco">'+ic('trend',50)+'</div>')+'</div>'
  +'<div class="row2"><div class="card glass rise" onclick="cxStats(\''+ex+'\')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(sy&&sy.n?t('cx_st_ytd'):t('stats_sub'))+'</div>'+(sy&&sy.n?'<div class="deco" style="right:12px;bottom:10px">'+mring(sy.wr,52)+'</div>':'<div class="deco">'+ic('bars',36)+'</div>')+'</div>'
  +'<div class="card glass rise" onclick="cexTrades(\''+ex+'\')"><h2>'+esc(t('cx_trades'))+'</h2><div class="s">Futures · Spot</div><div class="deco">'+ic('clock',36)+'</div></div></div>'
- +'<div class="card glass rise" onclick="cexOpen(\''+ex+'\')"><h2>'+esc(t('cx_acc'))+'</h2><div class="s">'+esc(a.mask||'')+' · '+(a.assets||[]).length+' '+esc(t('cx_assets_n'))+'</div><div class="deco" style="opacity:1">'+cexBadge(ex,44)+'</div></div>'}
+ +dfAd()}
+/* 338: Dip Funded reklamasi — har doim (oddiy Bosh, birja Bosh sahifasi, Birja bo'limi) */
+function dfAd(){return'<div class="card glass acc rise" onclick="openDf()"><h2>'+esc(t('df'))+'</h2><div class="s">'+esc(t('df_sub'))+'</div><div class="deco" style="opacity:1">'+dfLogo(52)+'</div></div>'}
 function cxSignals(v,w){var a=w.acc,ex=w.ex;if(!a){v.innerHTML='<div class="spk"><div class="sk"></div></div>';return}
  var P=(a.pos||[]).slice(),f=S.cxf||'all',up=0;P.forEach(function(p){up+=p.upnl||0});
  var O=((S.cxo||{})[ex]||[]).filter(function(o){return!o.trigger});
