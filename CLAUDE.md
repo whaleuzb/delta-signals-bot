@@ -8119,3 +8119,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 349. Dip Funded API: turnir belgisi (delta-prop o'zgarishi, egasi ruxsati bilan)
 - Foydalanuvchi tanlovi (11): delta-prop `tcapi._meta` ga `"tournament": acc.tournament_id is not None` qo'shildi (+ `tests/test_tcapi.py::test_accounts_tournament_flag`; delta-prop 474/474). Commit a9ff92c, branch `claude/nifty-ptolemy-y0c3yo` (repo default).
 - Bot `_df_tour_acc`: javobda `tournament` maydoni bo'lsa — faqat shu (aniq); bo'lmasa 347 dagi taxmin (zaxira). `test_346.py` 9/9.
+
+## 350. Dip Funded: web to'g'ridan-to'g'ri (DIPFUNDED_API_KEY web'da)
+- `dfapp.py` — umumiy modul (bot.py dan ko'chirildi): `df_status`, `df_name`, `DF_LIVE`, `df_tour_acc`, `state_json`, `trade`, `accounts`, `account`, `stats`; har biri `(ok, json)`. Bot'dagi eski nomlar alias (`_df_state_json`, `_app_dftrade`, `_df_status`…).
+- Web `_ws_act`: `dfacc/dfone/dfstats/dftrade` — `_df_direct()` (= `dipfunded.enabled()`, ya'ni web'da `DIPFUNDED_API_KEY`) bo'lsa navbatsiz `dfapp.*`; bo'lmasa avvalgidek `app_actions` navbati (bot). `_df_stats` ham shunday.
+- Railway web: `DIPFUNDED_API_KEY=${{bot.DIPFUNDED_API_KEY}}` (havola — qiymat ko'chirilmaydi).
+- Sinov: `test_346.py` 14/14 (to'g'ridan-to'g'ri yo'l), `test_310.py` navbat yo'lini `_df_direct=False` bilan tekshiradi.

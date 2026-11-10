@@ -23,6 +23,7 @@ from aiohttp import web
 import config
 import db
 import i18n
+import dfapp
 import tracker
 
 log = logging.getLogger("webapp")
@@ -378,6 +379,9 @@ async def _ws_act(body, uid: int, act: str):
                 if not (x > 0) or x != x or x > 1e12:
                     raise web.HTTPBadRequest()
                 clean[k] = x
+        if _df_direct():
+            ok, res = await dfapp.trade(uid, i18n.normalize(await db.get_user_lang(uid)), clean)
+            return web.json_response({"ok": ok, "msg": res}, headers=NO_CACHE)
         aid = await db.app_action_add(uid, 0, act, None, json.dumps(clean))
         return await _wait_action(aid)
     if act in ("diptask", "dipapply"):
@@ -412,8 +416,20 @@ async def _ws_act(body, uid: int, act: str):
         args = json.dumps({"ws": ws["id"]})
     else:
         args = None
+    if act in ("dfacc", "dfone", "dfstats") and _df_direct():
+        # 350: web'da Dip Funded kaliti bor — navbatsiz, to'g'ridan-to'g'ri (2–3 s tezroq)
+        lang = i18n.normalize(await db.get_user_lang(uid))
+        ok, res = (await dfapp.accounts(uid, lang) if act == "dfacc" else
+                   await dfapp.account(uid, int(arg), lang) if act == "dfone" else
+                   await dfapp.stats(uid, int(arg)))
+        return web.json_response({"ok": ok, "msg": res}, headers=NO_CACHE)
     aid = await db.app_action_add(uid, 0, act, arg, args)
     return await _wait_action(aid)
+
+
+def _df_direct() -> bool:
+    import dipfunded
+    return dipfunded.enabled()
 
 
 async def api_period(request):
@@ -1363,13 +1379,17 @@ async def api_dfoff(request):
 async def _df_stats(uid: int, acc: int, per: str) -> dict:
     """346: Dip Funded statistikasi birjalar formatida (spot). Savdolarni bot oladi (kalit botda)."""
     from datetime import datetime, timezone
-    aid = await db.app_action_add(uid, 0, "dfstats", float(acc), None)
-    a = None
-    for _ in range(60):
-        await asyncio.sleep(0.5)
-        a = await db.app_action_get(aid)
-        if a and a["status"] in ("ok", "fail", "stale"):
-            break
+    if _df_direct():
+        ok_, res_ = await dfapp.stats(uid, acc)
+        a = {"status": "ok" if ok_ else "fail", "result": res_}
+    else:
+        aid = await db.app_action_add(uid, 0, "dfstats", float(acc), None)
+        a = None
+        for _ in range(60):
+            await asyncio.sleep(0.5)
+            a = await db.app_action_get(aid)
+            if a and a["status"] in ("ok", "fail", "stale"):
+                break
     try:
         d = json.loads((a or {})["result"] or "null") if a else None
     except (ValueError, KeyError, TypeError):
