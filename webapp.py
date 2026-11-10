@@ -1227,6 +1227,10 @@ async def _cx_sync_other(uid: int, ex: str, k: dict, st: dict, now: int) -> None
     if not st.get("year_from"):
         st["year_from"] = _year_start_ms()
         st["cutoff"] = st["year_from"]          # asinxron yuklab olish yo'q
+    if not st.get("v337"):
+        # 337: spot endi yil boshidan so'raladi — eski (qisqa oraliqli) kursorlar bir marta tashlanadi
+        st.pop("spot_t", None)
+        st["v337"] = 1
     since = max(st["year_from"], int(st.get("fut_last") or 0) - 3_600_000)
     try:
         r = await _cx_call("trade", ex, k, {"op": "hist_sync", "a": {"since": since, "year_from": st["year_from"], "spot_t": st.get("spot_t") or {}}}) or {}
