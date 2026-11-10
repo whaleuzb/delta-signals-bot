@@ -74,8 +74,38 @@ async def health(_request):
     return web.Response(text="ok")
 
 
+_PING = {
+    "binance": "https://api.binance.com/api/v3/time",
+    "binance-fut": "https://fapi.binance.com/fapi/v1/time",
+    "mexc": "https://api.mexc.com/api/v3/time",
+    "mexc-fut": "https://contract.mexc.com/api/v1/contract/ping",
+    "bitget": "https://api.bitget.com/api/v2/public/time",
+    "bingx": "https://open-api.bingx.com/openApi/swap/v2/server/time",
+}
+
+
+async def _selfcheck(_app):
+    """Ishga tushganda: har birjaning ochiq API'si shu hududdan ochiladimi (451 = hudud bloki)."""
+    import httpx
+    out = []
+    async with httpx.AsyncClient(timeout=10) as c:
+        for name, url in _PING.items():
+            try:
+                r = await c.get(url)
+                out.append(f"{name}={r.status_code}")
+            except Exception as e:
+                out.append(f"{name}={type(e).__name__}")
+    log.info("Birjalarga ulanish tekshiruvi: %s", " ".join(out))
+
+
+async def _start_check(app):
+    import asyncio
+    app["chk"] = asyncio.create_task(_selfcheck(app))
+
+
 def build() -> web.Application:
     app = web.Application(client_max_size=64 * 1024)
+    app.on_startup.append(_start_check)
     app.add_routes([web.post("/verify", verify), web.post("/snapshot", snapshot),
                     web.get("/healthz", health)])
     return app
