@@ -11681,24 +11681,21 @@ PROMO_LATE = timedelta(hours=6)       # shundan kech bo'lsa — yuborilmaydi (es
 
 
 def _promo_kb():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📝 Ariza qoldirish", url="https://mamurjon.com/#plans",
-                              api_kwargs={"style": "success"})],
-        [InlineKeyboardButton("💬 Menejer: @managermtuz", url="https://t.me/managermtuz")]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("📖 Batafsil", url="https://mamurjon.com/#plans",
+                                                       api_kwargs={"style": "success"})]])
 
 
 async def _promo_send(bot, chat_id, caption: str) -> tuple[list[int], int]:
     from telegram import InputMediaPhoto
     files = [open(os.path.join(PROMO_DIR, f"{i}.jpg"), "rb") for i in (1, 2, 3)]
     try:
-        media = [InputMediaPhoto(f, caption=caption if i == 0 else None,
-                                 parse_mode=ParseMode.HTML if i == 0 else None) for i, f in enumerate(files)]
-        msgs = await bot.send_media_group(chat_id, media)
+        msgs = await bot.send_media_group(chat_id, [InputMediaPhoto(f) for f in files])
     finally:
         for f in files:
             f.close()
-    btn = await bot.send_message(chat_id, "👇 <b>Joyingizni band qiling</b> — qabul 15-noyabr, 23:59 gacha",
-                                 parse_mode=ParseMode.HTML, reply_markup=_promo_kb())
+    # Albomga tugma qo'yib bo'lmaydi — to'liq matn albom ostidagi postda, "Batafsil" tugmasi bilan.
+    btn = await bot.send_message(chat_id, caption, parse_mode=ParseMode.HTML, reply_markup=_promo_kb(),
+                                 disable_web_page_preview=True)
     return [m.message_id for m in msgs], btn.message_id
 
 
