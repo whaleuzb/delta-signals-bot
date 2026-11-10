@@ -962,9 +962,8 @@ async def cex_hist_loop(_app=None):
                     async with sem:
                         await _cex_one(r["user_id"], r, True)
                 await asyncio.gather(*(one(r) for r in rows), return_exceptions=True)
-                for r in rows:                      # 334: savdo tarixi (statistika uchun)
-                    if r["exchange"] == "binance":
-                        await _cx_sync(r["user_id"], r["exchange"], r)
+                for r in rows:                      # 334/335: savdo tarixi (statistika uchun) — barcha birjalar
+                    await _cx_sync(r["user_id"], r["exchange"], r)
             except Exception:
                 log.warning("Balans tarixi tsikli xato", exc_info=True)
             await asyncio.sleep(3600)
@@ -1023,7 +1022,7 @@ async def api_cexadd(request):
     _CEX_BG.add(t)
     t.add_done_callback(_CEX_BG.discard)
     row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
-    if row is not None and ex == "binance":
+    if row is not None:
         t2 = asyncio.get_running_loop().create_task(_cx_sync(uid, ex, row))
         _CEX_BG.add(t2)
         t2.add_done_callback(_CEX_BG.discard)
@@ -1132,13 +1131,16 @@ def _inc_rows(lst: list) -> list:
 async def _cx_sync(uid: int, ex: str, row) -> None:
     """Binance savdo tarixini bazaga: futures income (so'nggi ~85 kun oddiy API, undan eski —
     yil boshigacha asinxron CSV) va spot fill'lari (juftlik kursorlari bilan)."""
-    if ex != "binance" or (uid, ex) in _CX_SYNC_RUN:
+    if (uid, ex) in _CX_SYNC_RUN:
         return
     _CX_SYNC_RUN.add((uid, ex))
     try:
         k = _cex_keys(row)
         st = await db.cex_sync_get(uid, ex)
         now = int(time.time() * 1000)
+        if ex != "binance":
+            await _cx_sync_other(uid, ex, k, st, now)
+            return
         if not st.get("cutoff"):
             st["year_from"] = _year_start_ms()
             st["cutoff"] = max(st["year_from"], now - 85 * 86_400_000)
@@ -1217,6 +1219,39 @@ async def _cx_sync(uid: int, ex: str, row) -> None:
         log.warning("Savdo tarixi sinxronlanmadi (%s uid=%s)", ex, uid, exc_info=True)
     finally:
         _CX_SYNC_RUN.discard((uid, ex))
+
+
+async def _cx_sync_other(uid: int, ex: str, k: dict, st: dict, now: int) -> None:
+    """335: MEXC / Bitget / BingX — bitta relay chaqiruvi (`hist_sync`): birja bergancha tarix
+    (odatda ~90 kun, spot ~30 kun), keyin har soat qo'shilib boradi."""
+    if not st.get("year_from"):
+        st["year_from"] = _year_start_ms()
+        st["cutoff"] = st["year_from"]          # asinxron yuklab olish yo'q
+    since = max(st["year_from"], int(st.get("fut_last") or 0) - 3_600_000)
+    try:
+        r = await _cx_call("trade", ex, k, {"op": "hist_sync", "a": {"since": since, "spot_t": st.get("spot_t") or {}}}) or {}
+    except cex_mod().ApiErr as e:
+        if e.code == "auth":
+            raise
+        st["fut_err"] = _cx_msg(e.text) or e.code
+        st["synced_at"] = now
+        await db.cex_sync_put(uid, ex, st)
+        return
+    await db.cex_tr_add(uid, ex, _inc_rows(r.get("inc") or []))
+    await db.cex_tr_add(uid, ex, [{"key": x["key"], "kind": "spot", "typ": x["side"], "sym": x["sym"],
+                                   "t": _dt(int(x["t"])), "qty": x["qty"], "quote": x["quote"], "fee": x["fee"],
+                                   "fee_a": x.get("fee_a"), "ref": x.get("oid")} for x in r.get("spot") or []])
+    st["spot_t"] = r.get("spot_t") or st.get("spot_t") or {}
+    st["fut_last"] = now
+    st["depth"] = r.get("depth")
+    errs = r.get("errs") or []
+    if errs:
+        st["fut_err"] = "; ".join(errs)[:200]
+        log.info("%s tarixi qisman olindi (uid=%s): %s", ex, uid, st["fut_err"])
+    else:
+        st.pop("fut_err", None)
+    st["synced_at"] = int(time.time() * 1000)
+    await db.cex_sync_put(uid, ex, st)
 
 
 def cex_mod():
@@ -1322,8 +1357,6 @@ async def api_cexstats(request):
     row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
     if row is None:
         raise web.HTTPNotFound()
-    if ex != "binance":
-        return web.json_response({"supported": False}, headers=NO_CACHE)
     st = await db.cex_sync_get(uid, ex)
     now = int(time.time() * 1000)
     if (not st.get("synced_at") or now - int(st["synced_at"]) > _CX_SYNC_GAP * 1000
@@ -1340,7 +1373,7 @@ async def api_cexstats(request):
                 "sync": {"running": (uid, ex) in _CX_SYNC_RUN, "at": st.get("synced_at"),
                          "old": asy.get("status") or ("done" if st.get("year_from") and st.get("year_from") >= st.get("cutoff", 0) else "none"),
                          "old_err": asy.get("err"), "year_from": st.get("year_from"), "cutoff": st.get("cutoff"),
-                         "err": st.get("fut_err") or st.get("spot_err")}})
+                         "err": st.get("fut_err") or st.get("spot_err"), "depth": st.get("depth")}})
     return web.json_response(res, headers=NO_CACHE)
 
 
@@ -1626,6 +1659,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_st_depth": "{e} tarixni faqat so'nggi ~90 kun (spot ~30 kun) beradi — undan keyingi savdolar har soat saqlanib boradi va yillik statistika to'lib boradi.",
     "cx_tr_cnt": "{n} ta savdo", "cx_margin": "Marja",
     "cx_pos_open": "{n} ta ochiq", "cx_st_ytd": "Yil boshidan", "cx_acc": "Hisob", "cx_assets_n": "aktiv", "cx_no_pos": "Ochiq pozitsiya yo'q", "cx_drag": "TP va SL chiziqlarini grafikda surib o'zgartirish mumkin.", "cx_per_ytd": "{y} yil boshidan", "cx_st_all": "Hammasi", "cx_st_net": "Sof natija", "cx_st_pf": "Profit factor", "cx_st_avg": "O'rtacha foyda / zarar", "cx_st_best": "Eng yaxshi savdo", "cx_st_worst": "Eng yomon savdo", "cx_st_months": "Oylar bo'yicha", "cx_st_syms": "Juftliklar bo'yicha", "cx_st_sync": "Savdo tarixi Binance'dan yuklanmoqda…", "cx_st_old_pending": "{y} yil boshidan to'liq futures tarixi Binance'dan yuklab olinmoqda — bir necha daqiqadan bir necha soatgacha. Hozircha so'nggi ~3 oy ko'rinadi.", "cx_st_old_fail": "{y} yil boshidagi eski futures tarixi olinmadi — so'nggi ~3 oy ko'rsatilmoqda. {e}", "cx_st_only": "Statistika hozircha faqat Binance uchun.", "cx_st_empty": "Bu davrda yopilgan savdo yo'q", "cx_st_synced": "Yangilangan", "cx_st_from": "tarix",
     "tr_trade": "savdo", "tr_enable": "Bot ichidan savdo qilish uchun Binance kalitida «Enable Spot & Margin Trading» va/yoki «Enable Futures» ruxsatini yoqing (pul yechish — yoqilmaydi), so'ng «Kalitni yangilash».", "tr_noperm_spot": "Kalitda Spot savdo ruxsati yo'q — Binance'da «Enable Spot & Margin Trading»ni yoqing.", "tr_noperm_fut": "Kalitda Futures ruxsati yo'q — Binance'da «Enable Futures»ni yoqing.", "tr_lev": "Leveraj", "tr_margin": "Marja, USDT", "tr_qty": "Miqdor", "tr_size": "Pozitsiya", "tr_open": "Ochiq orderlar", "tr_need_amt": "Summani kiriting", "tr_confirm": "Real order yuboriladi. Tasdiqlaysizmi?", "tr_sent": "Order yuborildi", "tr_cancel_q": "Orderni bekor qilasizmi?", "tr_cancelled": "Order bekor qilindi", "tr_close": "Yopish", "tr_close_txt": "Pozitsiyaning qancha qismi bozor narxida yopilsin?", "tr_close_q": "{s} pozitsiyasining {p}% bozor narxida yopiladi. Tasdiqlaysizmi?", "tr_closed": "Pozitsiya yopildi", "tr_tpsl_ok": "TP/SL saqlandi", "cx_e_noperm": "Kalitda bu savdo ruxsati yo'q", "cx_e_small": "Summa juda kichik (birja minimumidan kam)", "cx_e_nopos": "Bu juftlikda ochiq pozitsiya yo'q", "cx_e_noex": "Bu birjada savdo hozircha yo'q",
@@ -1647,6 +1681,7 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_st_depth": "{e} отдаёт историю только за последние ~90 дней (спот ~30 дней) — дальше сделки сохраняются каждый час, и годовая статистика будет накапливаться.",
     "cx_tr_cnt": "сделок: {n}", "cx_margin": "Маржа",
     "cx_pos_open": "{n} открыто", "cx_st_ytd": "С начала года", "cx_acc": "Счёт", "cx_assets_n": "активов", "cx_no_pos": "Нет открытых позиций", "cx_drag": "Линии TP и SL можно двигать прямо на графике.", "cx_per_ytd": "С начала {y}", "cx_st_all": "Всё", "cx_st_net": "Чистый результат", "cx_st_pf": "Profit factor", "cx_st_avg": "Средняя прибыль / убыток", "cx_st_best": "Лучшая сделка", "cx_st_worst": "Худшая сделка", "cx_st_months": "По месяцам", "cx_st_syms": "По парам", "cx_st_sync": "Загружаем историю сделок с Binance…", "cx_st_old_pending": "Полная история фьючерсов с начала {y} года загружается с Binance — от нескольких минут до нескольких часов. Пока показаны последние ~3 месяца.", "cx_st_old_fail": "Старую историю фьючерсов с начала {y} получить не удалось — показаны последние ~3 месяца. {e}", "cx_st_only": "Статистика пока только для Binance.", "cx_st_empty": "За этот период закрытых сделок нет", "cx_st_synced": "Обновлено", "cx_st_from": "история с",
     "tr_trade": "торговля", "tr_enable": "Чтобы торговать из бота, включите в ключе Binance «Enable Spot & Margin Trading» и/или «Enable Futures» (вывод — не включать), затем «Обновить ключ».", "tr_noperm_spot": "У ключа нет права Spot-торговли — включите «Enable Spot & Margin Trading» на Binance.", "tr_noperm_fut": "У ключа нет права Futures — включите «Enable Futures» на Binance.", "tr_lev": "Плечо", "tr_margin": "Маржа, USDT", "tr_qty": "Количество", "tr_size": "Позиция", "tr_open": "Открытые ордера", "tr_need_amt": "Введите сумму", "tr_confirm": "Будет отправлен реальный ордер. Подтверждаете?", "tr_sent": "Ордер отправлен", "tr_cancel_q": "Отменить ордер?", "tr_cancelled": "Ордер отменён", "tr_close": "Закрыть", "tr_close_txt": "Какую часть позиции закрыть по рынку?", "tr_close_q": "Будет закрыто {p}% позиции {s} по рынку. Подтверждаете?", "tr_closed": "Позиция закрыта", "tr_tpsl_ok": "TP/SL сохранены", "cx_e_noperm": "У ключа нет права на эту торговлю", "cx_e_small": "Сумма слишком мала (меньше минимума биржи)", "cx_e_nopos": "По этой паре нет открытой позиции", "cx_e_noex": "Торговля на этой бирже пока недоступна",
@@ -1668,6 +1703,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_st_depth": "{e} only provides ~90 days of history (spot ~30 days) — new trades are saved every hour, so the yearly stats will build up.",
     "cx_tr_cnt": "{n} trades", "cx_margin": "Margin",
     "cx_pos_open": "{n} open", "cx_st_ytd": "Year to date", "cx_acc": "Account", "cx_assets_n": "assets", "cx_no_pos": "No open positions", "cx_drag": "Drag the TP and SL lines on the chart to change them.", "cx_per_ytd": "Since start of {y}", "cx_st_all": "All", "cx_st_net": "Net result", "cx_st_pf": "Profit factor", "cx_st_avg": "Avg win / loss", "cx_st_best": "Best trade", "cx_st_worst": "Worst trade", "cx_st_months": "By month", "cx_st_syms": "By pair", "cx_st_sync": "Loading trade history from Binance…", "cx_st_old_pending": "Full futures history since the start of {y} is being downloaded from Binance — from a few minutes to a few hours. The last ~3 months are shown meanwhile.", "cx_st_old_fail": "Older futures history since the start of {y} could not be fetched — showing the last ~3 months. {e}", "cx_st_only": "Statistics are available for Binance only for now.", "cx_st_empty": "No closed trades in this period", "cx_st_synced": "Updated", "cx_st_from": "history from",
     "tr_trade": "trade", "tr_enable": "To trade from the bot, enable «Enable Spot & Margin Trading» and/or «Enable Futures» on your Binance key (never withdrawals), then «Update key».", "tr_noperm_spot": "The key has no Spot trading permission — enable «Enable Spot & Margin Trading» on Binance.", "tr_noperm_fut": "The key has no Futures permission — enable «Enable Futures» on Binance.", "tr_lev": "Leverage", "tr_margin": "Margin, USDT", "tr_qty": "Quantity", "tr_size": "Position", "tr_open": "Open orders", "tr_need_amt": "Enter an amount", "tr_confirm": "A real order will be sent. Confirm?", "tr_sent": "Order sent", "tr_cancel_q": "Cancel this order?", "tr_cancelled": "Order cancelled", "tr_close": "Close", "tr_close_txt": "How much of the position to close at market?", "tr_close_q": "{p}% of the {s} position will be closed at market. Confirm?", "tr_closed": "Position closed", "tr_tpsl_ok": "TP/SL saved", "cx_e_noperm": "The key has no permission for this trade", "cx_e_small": "Amount too small (below exchange minimum)", "cx_e_nopos": "No open position in this pair", "cx_e_noex": "Trading on this exchange is not available yet",

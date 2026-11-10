@@ -8019,3 +8019,13 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `_cx_stats`: futures — REALIZED_PNL 60 s ichida bir juftlik bitta yopilish, komissiya tradeId bo'yicha, funding; spot — o'rtacha tannarx bo'yicha realizatsiya; davr 30d/90d/ytd/all; natija all/fut/spot: n, PnL, net (komissiya+funding), WR, PF, o'rtacha, eng yaxshi/yomon, egri chiziq (≤200 nuqta), oylar, juftliklar.
 - Ilova `cxStats(ex)`: davr chiplari, Hammasi/Futures/Spot, sinx holati (yuklanmoqda / eski tarix yuklanmoqda / olinmadi), sof natija + egri chiziq, plitkalar, oylar, juftliklar, Yangilash. Boshqa birjalar — "faqat Binance".
 - Sinov: `test_334.py` 17/17 (CSV, sinx bosqichlari, takrorlar yo'q, statistika hisoblari, endpoint), brauzer `t_cxw.py`. ⚠️ Asinxron CSV formati real Binance'da tekshirilmagan — relay logida "Income CSV: N qator, ustunlar …" ga qarash.
+
+## 335. Statistika MEXC, Bitget, BingX uchun ham
+- Foydalanuvchi: "statistika boshqa birjalar uchun ham ishlasin".
+- `cex.trade(ex,k,"hist_sync",{since, spot_t})` → `HIST_EX[ex]` (relay orqali, bitta chaqiruv). Natija Binance formatida (`inc`: REALIZED_PNL/COMMISSION/FUNDING_FEE; `spot`: fill'lar; `spot_t` — juftlik bo'yicha oxirgi vaqt; `errs`; `depth`):
+  - MEXC: futures `/api/v1/private/position/list/history_positions` (sahifalab, `realised` → REALIZED_PNL, kalit `m<positionId>`); spot `/api/v3/myTrades` (hozirgi aktivlar×USDT, ~30 kun).
+  - Bitget: `/api/v2/mix/position/history-position` (89 kunlik oynalar ortga, `idLessThan`/`endId`; pnl, openFee+closeFee → COMMISSION (manfiy), totalFunding); eski oraliq rad etilsa to'xtaydi; spot `/api/v2/spot/trade/fills` (~90 kun).
+  - BingX: `/openApi/swap/v2/user/income` (Binance kabi, 7 kunlik oynalar, TRADING_FEE → COMMISSION, `SOL-USDT` → `SOLUSDT`); spot `/openApi/spot/v1/trade/myTrades` (`fills`, 7 kunlik oynalar, ~30 kun).
+- Web `_cx_sync_other`: `cutoff = year_from` (asinxron yo'q), keyingi sinxlar oxirgisidan 1 soat ustma-ust; `cexstats` endi barcha birjalar uchun; ulanganda va har soat — barcha birjalar. Ilovada Binance bo'lmasa: "{birja} tarixni ~90 kun (spot ~30 kun) beradi — keyin har soat saqlanib boradi".
+- ⚠️ Endpoint maydonlari hujjat/xotiradan — real kalit bilan tekshirilmagan; xato bo'lsa `cex_sync.state.fut_err` va web logida "<ex> tarixi qisman olindi".
+- Sinov: `test_335.py` 12/12.

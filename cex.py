@@ -976,6 +976,10 @@ TRADE_READ = ("info", "spot_open", "fut_open")
 
 
 async def trade(ex: str, k: dict, op: str, a: dict):
+    if op == "hist_sync":                       # 335: boshqa birjalar tarixi (statistika)
+        if ex not in HIST_EX:
+            raise ApiErr("noex", ex)
+        return await HIST_EX[ex](k, a or {})
     if ex not in TRADE_EX:
         raise ApiErr("noex", ex)
     f = TRADE_OPS.get(op) or HIST_OPS.get(op)
@@ -1183,3 +1187,179 @@ HIST_OPS = {
     "inc_raw": bn_income_raw, "inc_async_req": bn_income_async_req, "inc_async_get": bn_income_async_get,
     "inc_async_fetch": bn_income_async_fetch, "spot_cands": bn_spot_candidates, "spot_mytrades": bn_spot_mytrades,
 }
+
+
+# ─────────────────────────── 335: MEXC / Bitget / BingX savdo tarixi ───────────────────────────
+# Natija Binance bilan bir xil ko'rinishda: inc — REALIZED_PNL / COMMISSION / FUNDING_FEE yozuvlari,
+# spot — fill'lar. Har birja o'zi bergancha (ko'pincha ~90 kun) — keyin har soat bazaga yig'iladi.
+# Har qadam alohida try: bitta endpoint ishlamasa qolganlari baribir saqlanadi, xato `errs` da.
+_DAY = 86_400_000
+
+
+async def _spot_cands_generic(spot_fn, k) -> list:
+    try:
+        bal = await spot_fn(k)
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        return []
+    return sorted(a for a, q in bal.items() if q > 0 and a not in STABLE)[:30]
+
+
+def _spot_row(key, sym, oid, side, qty, quote, fee, fee_a, t):
+    return {"key": key, "sym": sym, "oid": str(oid or ""), "side": side, "qty": qty, "quote": quote,
+            "fee": abs(fee), "fee_a": fee_a, "t": int(t)}
+
+
+async def mx_hist(k, a) -> dict:
+    since, now, errs = int(a.get("since") or 0), _ms(), []
+    inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
+    try:
+        for page in range(1, 51):
+            d = await _mx_fut(k, "/api/v1/private/position/list/history_positions",
+                              {"page_num": page, "page_size": 100})
+            lst = d if isinstance(d, list) else ((d or {}).get("resultList") or (d or {}).get("list") or [])
+            old = False
+            for p in lst:
+                t = int(p.get("updateTime") or p.get("createTime") or 0)
+                if t < since:
+                    old = True
+                    continue
+                pid = str(p.get("positionId") or "")
+                inc.append({"key": "m" + pid, "type": "REALIZED_PNL", "sym": str(p.get("symbol", "")).replace("_", ""),
+                            "amt": _f(p.get("realised")), "asset": "USDT", "t": t, "trade": pid})
+            if old or len(lst) < 100:
+                break
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        errs.append("fut: " + e.text[:120])
+    for base in await _spot_cands_generic(mx_spot, k):
+        sym = base + "USDT"
+        st = max(int(spot_t.get(sym) or 0) + 1, now - 29 * _DAY)
+        try:
+            d = await _mx_spot(k, "/api/v3/myTrades", {"symbol": sym, "startTime": st, "limit": 1000})
+        except ApiErr as e:
+            if e.code == "auth":
+                raise
+            continue
+        for x in d if isinstance(d, list) else []:
+            t = int(x.get("time") or 0)
+            spot.append(_spot_row(f"m{sym}:{x.get('id')}", sym, x.get("orderId"), "buy" if x.get("isBuyer") else "sell",
+                                  _f(x.get("qty")), _f(x.get("quoteQty")), _f(x.get("commission")),
+                                  x.get("commissionAsset"), t))
+            spot_t[sym] = max(int(spot_t.get(sym) or 0), t)
+    return {"inc": inc, "spot": spot, "spot_t": spot_t, "errs": errs, "depth": "MEXC: spot ~30 kun"}
+
+
+async def bg_hist(k, a) -> dict:
+    since, now, errs = int(a.get("since") or 0), _ms(), []
+    inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
+    t_end = now
+    try:
+        while t_end > since:
+            t_start = max(since, t_end - 89 * _DAY)
+            cursor = None
+            for _ in range(30):
+                p = {"productType": "USDT-FUTURES", "startTime": t_start, "endTime": t_end, "limit": 100}
+                if cursor:
+                    p["idLessThan"] = cursor
+                try:
+                    d = await _bg(k, "/api/v2/mix/position/history-position", p) or {}
+                except ApiErr as e:
+                    if e.code == "auth":
+                        raise
+                    errs.append("fut: " + e.text[:120])
+                    t_start = since          # eski oraliq qo'llab-quvvatlanmaydi — to'xtash
+                    break
+                lst = d.get("list") or []
+                for x in lst:
+                    pid, t = str(x.get("positionId") or ""), int(x.get("utime") or x.get("ctime") or 0)
+                    sym = str(x.get("symbol") or "").upper()
+                    inc.append({"key": "b" + pid, "type": "REALIZED_PNL", "sym": sym, "amt": _f(x.get("pnl")),
+                                "asset": "USDT", "t": t, "trade": pid})
+                    fee = abs(_f(x.get("openFee"))) + abs(_f(x.get("closeFee")))
+                    if fee:
+                        inc.append({"key": "bf" + pid, "type": "COMMISSION", "sym": sym, "amt": -fee,
+                                    "asset": "USDT", "t": t, "trade": pid})
+                    if _f(x.get("totalFunding")):
+                        inc.append({"key": "bu" + pid, "type": "FUNDING_FEE", "sym": sym,
+                                    "amt": _f(x.get("totalFunding")), "asset": "USDT", "t": t, "trade": ""})
+                if len(lst) < 100 or not d.get("endId"):
+                    break
+                cursor = d.get("endId")
+            t_end = t_start - 1
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        errs.append("fut: " + e.text[:120])
+    for base in await _spot_cands_generic(bg_spot, k):
+        sym = base + "USDT"
+        st = max(int(spot_t.get(sym) or 0) + 1, now - 89 * _DAY)
+        try:
+            d = await _bg(k, "/api/v2/spot/trade/fills", {"symbol": sym, "startTime": st, "endTime": now, "limit": 100})
+        except ApiErr as e:
+            if e.code == "auth":
+                raise
+            continue
+        for x in d if isinstance(d, list) else []:
+            t = int(x.get("cTime") or 0)
+            fd = x.get("feeDetail") or {}
+            spot.append(_spot_row(f"b{sym}:{x.get('tradeId')}", sym, x.get("orderId"),
+                                  "buy" if str(x.get("side")).lower() == "buy" else "sell", _f(x.get("size")),
+                                  _f(x.get("amount")), _f(fd.get("totalFee")), fd.get("feeCoin"), t))
+            spot_t[sym] = max(int(spot_t.get(sym) or 0), t)
+    return {"inc": inc, "spot": spot, "spot_t": spot_t, "errs": errs, "depth": "Bitget: ~90 kun"}
+
+
+async def bx_hist(k, a) -> dict:
+    since, now, errs = int(a.get("since") or 0), _ms(), []
+    inc, spot, spot_t = [], [], dict(a.get("spot_t") or {})
+    t, empty_old = max(since, now - 365 * _DAY), 0
+    while t < now:
+        b = min(t + 7 * _DAY - 1, now)
+        s2 = t
+        try:
+            for _ in range(10):
+                d = await _bx(k, "/openApi/swap/v2/user/income", {"startTime": s2, "endTime": b, "limit": 1000}) or []
+                lst = d if isinstance(d, list) else []
+                for x in lst:
+                    ty = str(x.get("incomeType") or "").upper()
+                    ty = "COMMISSION" if ty in ("TRADING_FEE", "COMMISSION") else ty
+                    inc.append({"key": "x" + str(x.get("tranId") or f"{x.get('time')}{ty}{x.get('symbol')}"),
+                                "type": ty, "sym": str(x.get("symbol") or "").replace("-", "").upper(),
+                                "amt": _f(x.get("income")), "asset": x.get("asset"), "t": int(x.get("time") or 0),
+                                "trade": str(x.get("tradeId") or "")})
+                if len(lst) < 1000:
+                    break
+                s2 = int(lst[-1].get("time") or b) + 1
+        except ApiErr as e:
+            if e.code == "auth":
+                raise
+            if b > now - 85 * _DAY:
+                errs.append("fut: " + e.text[:120])
+        t = b + 1
+    for base in await _spot_cands_generic(bx_spot, k):
+        sym = base + "-USDT"
+        st0 = max(int(spot_t.get(base + "USDT") or 0) + 1, now - 29 * _DAY)
+        w = st0
+        while w < now:
+            we = min(w + 7 * _DAY - 1, now)
+            try:
+                d = await _bx(k, "/openApi/spot/v1/trade/myTrades", {"symbol": sym, "startTime": w, "endTime": we, "limit": 500}) or {}
+            except ApiErr as e:
+                if e.code == "auth":
+                    raise
+                break
+            lst = d.get("fills") if isinstance(d, dict) else d
+            for x in lst or []:
+                tt = int(x.get("time") or 0)
+                spot.append(_spot_row(f"x{base}USDT:{x.get('id')}", base + "USDT", x.get("orderId"),
+                                      "buy" if x.get("isBuyer") else "sell", _f(x.get("qty")), _f(x.get("quoteQty")),
+                                      _f(x.get("commission")), x.get("commissionAsset"), tt))
+                spot_t[base + "USDT"] = max(int(spot_t.get(base + "USDT") or 0), tt)
+            w = we + 1
+    return {"inc": inc, "spot": spot, "spot_t": spot_t, "errs": errs, "depth": "BingX: spot ~30 kun"}
+
+
+HIST_EX = {"mexc": mx_hist, "bitget": bg_hist, "bingx": bx_hist}
