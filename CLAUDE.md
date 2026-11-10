@@ -7920,3 +7920,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi (chatga ulashilgan MOVRUSDT kartasi, pastki qismi kulrang): "Rasm yari yo'q".
 - Sabab: Telegram rasmni bizning `/sc/<key>.jpg` dan yuklaydi; oddiy (baseline) JPEG yuqoridan pastga chiziladi — yuklash sekin/uzilgan bo'lsa pastki qismi kulrang qoladi; `thumbnail_url` ham to'liq rasm edi (tez preview yo'q).
 - `bot._share_store(img)` → (url, thumb_url): asosiy rasm progressiv JPEG (q86, optimize — butun karta darhol xira ko'rinib tiniqlashadi, ~140→112 KB) + 360px miniatyura (`<key>t`, ~22 KB) `thumbnail_url` uchun. `_app_sigshare` va `_app_rcard` shundan foydalanadi.
+
+## 323. News Trade matnli postlarini ulashish
+- Foydalanuvchi (ulashish oynasida faqat "📰 News Trade"): "matnli xabarlar bunaqa chiqib qolyapti".
+- Sabab (loglar): post yuborilgach tugma qo'shuvchi `edit_message_reply_markup` kanal band paytida (jonli grafik tahrirlari, RetryAfter) `TimedOut` — tugma odatda baribir qo'shilardi, lekin `_news_share_save` ishlamay, ulashishda zaxira havola chiqardi.
+- `_add_share_button(..., sent=sent)` (9 ta chaqiruv): ma'lumot TAHRIRDAN OLDIN yuborilgan xabardan saqlanadi; TimedOut/NetworkError'da 2 s dan keyin bir qayta urinish ("not modified" — birinchisi o'tgan, xato emas).
+- `_app_newsshare` zaxirasi: ma'lumot yo'q bo'lsa — post havolasi katta link preview bilan (`LinkPreviewOptions(url, prefer_large_media, show_above_text)`); matn bor bo'lsa preview yo'q (takrorlanmasin).
+- Sinov: `test_323.py` 4/4, `test_315.py` 9/9.

@@ -9618,9 +9618,15 @@ async def _app_newsshare(ctx, uid: int, lang, a) -> tuple[bool, str]:
                                            parse_mode=ParseMode.HTML, reply_markup=kb)
     else:
         body = (hit[1] if hit else "") or f'📰 <a href="{post_url}">News Trade</a>'
+        # 323: matnli post ham, ma'lumoti topilmagan post ham — kanal postining katta
+        # ko'rinishi (link preview) bilan, faqat "News Trade" yozuvi qolib ketmasin.
+        from telegram import LinkPreviewOptions
         res = InlineQueryResultArticle(id=rid, title="News Trade", reply_markup=kb,
                                        input_message_content=InputTextMessageContent(
-                                           body[:4096], parse_mode=ParseMode.HTML))
+                                           body[:4096], parse_mode=ParseMode.HTML,
+                                           link_preview_options=None if (hit and hit[1]) else
+                                           LinkPreviewOptions(url=post_url, prefer_large_media=True,
+                                                              show_above_text=True)))
     try:
         pm = await ctx.bot.save_prepared_inline_message(
             user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True,
@@ -9632,7 +9638,7 @@ async def _app_newsshare(ctx, uid: int, lang, a) -> tuple[bool, str]:
 
 
 async def _add_share_button(bot_, chat_id, message_id: int,
-                            buttons: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
+                            buttons: InlineKeyboardMarkup | None, sent=None) -> InlineKeyboardMarkup:
     """Postni yuborgandan KEYIN chaqiriladi — havola `message_id`ga
     bog'liq, u esa faqat `send_photo`/`send_message` qaytargandan so'ng
     ma'lum bo'ladi (tugmani boshidanoq qo'shib bo'lmaydi). Shuning uchun
@@ -9642,9 +9648,24 @@ async def _add_share_button(bot_, chat_id, message_id: int,
     rows = list(buttons.inline_keyboard) if buttons else []
     rows.append([_share_button(message_id)])
     full = InlineKeyboardMarkup(rows)
+    # 323: ulashish uchun post ma'lumoti TAHRIRDAN OLDIN yuborilgan xabarning o'zidan —
+    # kanal band bo'lganda tahrir TimedOut bo'lib (tugma baribir qo'shilardi), matn
+    # saqlanmay, ulashishda faqat "News Trade" havolasi chiqardi.
+    if sent is not None:
+        await _news_share_save(message_id, sent)
     try:
-        m = await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
-        await _news_share_save(message_id, m)
+        try:
+            m = await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
+        except (TimedOut, NetworkError):
+            await asyncio.sleep(2)
+            try:
+                m = await bot_.edit_message_reply_markup(chat_id, message_id, reply_markup=full)
+            except BadRequest as e:
+                if "not modified" not in str(e).lower():     # birinchi urinish o'tgan bo'lsa
+                    raise
+                m = None
+        if m is not None:
+            await _news_share_save(message_id, m)
     except Exception:
         log.warning("Do'stlarga yuborish tugmasi qo'shilmadi (msg=%s)", message_id,
                     exc_info=True)
@@ -9776,7 +9797,7 @@ async def _process_news_event(ctx: ContextTypes.DEFAULT_TYPE, item: dict) -> Non
         eid, sent.message_id, caption,
         render_tf="1m" if (photo and symbol) else None,
         render_label="News" if (photo and symbol) else None)
-    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 async def _news_candles(symbol: str, market: str, event_at: datetime,
@@ -10127,7 +10148,7 @@ async def _process_exchange_listing(bot_, item: dict) -> None:
         eid, sent.message_id, caption,
         render_tf="1m" if (photo and symbol) else None,
         render_label="Listing" if (photo and symbol) else None)
-    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 async def binance_listing_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -10353,7 +10374,7 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
         eid, sent.message_id, caption,
         render_tf="1m" if (photo and symbol) else None,
         render_label="News" if (photo and symbol) else None)
-    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(bot_, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 _markettwits_started = False
@@ -10556,7 +10577,7 @@ async def econ_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             eid, sent.message_id, caption,
             render_tf="1m" if photo else None,
             render_label="BTC" if photo else None)
-        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 # ─────────────────────────── Hajm portlashi (surge) ───────────────────────────
@@ -10726,7 +10747,7 @@ async def _process_surge_candidate(ctx: ContextTypes.DEFAULT_TYPE, symbol: str,
         render_label="Portlash" if photo else None)
     if profile_bins:
         await db.set_news_profile(eid, *profile_bins)
-    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 # ─────────────────────────── MACD kesishmasi ───────────────────────────
@@ -10860,7 +10881,7 @@ async def _post_macd_alert(ctx: ContextTypes.DEFAULT_TYPE, hit: dict) -> None:
     except Exception:
         log.exception("MACD xabari postlanmadi (%s %s)", symbol, tf)
         return
-    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 async def macd_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -11109,7 +11130,7 @@ async def whale_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 render_marker_color=(None if profile_bins else marker_color) if photo else None)
             if profile_bins:
                 await db.set_news_profile(eid, *profile_bins)
-            await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+            await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 # ─────────────────────────── Yirik likvidatsiyalar ───────────────────────────
@@ -11212,7 +11233,7 @@ async def _process_liquidation_spike(ctx: ContextTypes.DEFAULT_TYPE,
         render_before_ms=liq_before_ms if photo else None,
         render_label="Likvidatsiya" if photo else None,
         render_marker_color=marker_color if photo else None)
-    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+    await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 async def liquidation_scan_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -11347,7 +11368,7 @@ async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await db.set_news_message(
             eid, sent.message_id, caption,
             render_tf=tf, render_before_ms=before_ms, render_label="Sinov")
-        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons)
+        await _add_share_button(ctx.bot, config.NEWS_CHANNEL_ID, sent.message_id, buttons, sent=sent)
 
 
 # ─────────────────────────── Telethon login (admin) ───────────────────────────
