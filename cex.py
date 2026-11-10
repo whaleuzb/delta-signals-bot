@@ -1018,6 +1018,106 @@ async def bn_spot_modify(k, a) -> dict:
     return {"id": nr.get("orderId"), "price": _f(price), "status": nr.get("status")}
 
 
+# ─── 343: boshqa birjalar order book'i (ochiq, imzosiz) — Savdo ekrani uchun ───
+def _lv(L, mul=1.0) -> list:
+    out = []
+    for x in L or []:
+        try:
+            p, q = float(x[0]), float(x[1]) * mul
+        except (TypeError, ValueError, IndexError):
+            continue
+        if p > 0:
+            out.append([p, q])
+    return out
+
+
+def _book(sym, mkt, bids, asks, last, chg) -> dict:
+    bids = sorted(bids, key=lambda x: -x[0])[:10]
+    asks = sorted(asks, key=lambda x: x[0])[:10]
+    if not last and bids and asks:
+        last = (bids[0][0] + asks[0][0]) / 2
+    return {"sym": sym, "mkt": mkt, "bids": bids, "asks": asks, "last": last, "chg": round(chg or 0.0, 2)}
+
+
+def _chg(last, opn, ratio=None) -> float:
+    last, opn = _f(last), _f(opn)
+    if last and opn:
+        return (last / opn - 1) * 100
+    return _f(ratio) * 100 if ratio is not None else 0.0
+
+
+def _data(d):
+    return d.get("data") if isinstance(d, dict) else None
+
+
+def _first(x):
+    return (x[0] if x else {}) if isinstance(x, list) else (x or {})
+
+
+BGAPI, MXAPI, MXFAPI, BXAPI = ("https://api.bitget.com", "https://api.mexc.com",
+                               "https://contract.mexc.com", "https://open-api.bingx.com")
+
+
+async def bg_depth(k, a) -> dict:
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    if mkt == "spot":
+        d, t = await asyncio.gather(_get(BGAPI + "/api/v2/spot/market/orderbook", {}, f"symbol={sym}&type=step0&limit=15"),
+                                    _get(BGAPI + "/api/v2/spot/market/tickers", {}, f"symbol={sym}"))
+    else:
+        q = f"symbol={sym}&productType=USDT-FUTURES"
+        d, t = await asyncio.gather(_get(BGAPI + "/api/v2/mix/market/merge-depth", {}, q + "&limit=15"),
+                                    _get(BGAPI + "/api/v2/mix/market/ticker", {}, q))
+    b, tk = _data(d) or {}, _first(_data(t))
+    if not b:
+        raise ApiErr("api", json.dumps(d)[:200])
+    return _book(sym, mkt, _lv(b.get("bids")), _lv(b.get("asks")), _f(tk.get("lastPr")),
+                 _chg(tk.get("lastPr"), tk.get("open") or tk.get("open24h"), tk.get("change24h")))
+
+
+async def mx_depth(k, a) -> dict:
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    if mkt == "spot":
+        d, t = await asyncio.gather(_get(MXAPI + "/api/v3/depth", {}, f"symbol={sym}&limit=10"),
+                                    _get(MXAPI + "/api/v3/ticker/24hr", {}, f"symbol={sym}"))
+        if not isinstance(d, dict) or "bids" not in d:
+            raise ApiErr("api", json.dumps(d)[:200])
+        return _book(sym, mkt, _lv(d.get("bids")), _lv(d.get("asks")), _f(t.get("lastPrice")),
+                     _chg(t.get("lastPrice"), t.get("openPrice"), t.get("priceChangePercent")))
+    cs = sym[:-4] + "_USDT"
+    d, t = await asyncio.gather(_get(MXFAPI + "/api/v1/contract/depth/" + cs, {}, "limit=10"),
+                                _get(MXFAPI + "/api/v1/contract/ticker", {}, "symbol=" + cs))
+    b, tk = _data(d) or {}, _first(_data(t))
+    if not b:
+        raise ApiErr("api", json.dumps(d)[:200])
+    m = await _mx_contract_size(cs)
+    return _book(sym, mkt, _lv(b.get("bids"), m), _lv(b.get("asks"), m), _f(tk.get("lastPrice")),
+                 _chg(None, None, tk.get("riseFallRate")))
+
+
+async def bx_depth(k, a) -> dict:
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    bs = sym[:-4] + "-" + sym[-4:]
+    ts = f"&timestamp={_ms()}"
+    if mkt == "spot":
+        d, t = await asyncio.gather(_get(BXAPI + "/openApi/spot/v1/market/depth", {}, f"symbol={bs}&limit=10" + ts),
+                                    _get(BXAPI + "/openApi/spot/v1/ticker/24hr", {}, f"symbol={bs}" + ts))
+    else:
+        d, t = await asyncio.gather(_get(BXAPI + "/openApi/swap/v2/quote/depth", {}, f"symbol={bs}&limit=10" + ts),
+                                    _get(BXAPI + "/openApi/swap/v2/quote/ticker", {}, f"symbol={bs}" + ts))
+    b, tk = _data(d) or {}, _first(_data(t))
+    if not b:
+        raise ApiErr("api", json.dumps(d)[:200])
+    pc = str(tk.get("priceChangePercent") or "").rstrip("%")
+    return _book(sym, mkt, _lv(b.get("bids")), _lv(b.get("asks")), _f(tk.get("lastPrice")),
+                 _chg(tk.get("lastPrice"), tk.get("openPrice"), (_f(pc) / 100) if pc else None))
+
+
+DEPTH_EX = {"binance": None, "bitget": bg_depth, "mexc": mx_depth, "bingx": bx_depth}
+
+
 TRADE_OPS = {
     "depth": bn_depth,
     "info": bn_info, "spot_order": bn_spot_order, "spot_open": bn_spot_open,
@@ -1033,6 +1133,8 @@ async def trade(ex: str, k: dict, op: str, a: dict):
         if ex not in HIST_EX:
             raise ApiErr("noex", ex)
         return await HIST_EX[ex](k, a or {})
+    if op == "depth" and ex != "binance" and DEPTH_EX.get(ex):   # 343: ochiq order book
+        return await DEPTH_EX[ex](k, a or {})
     if ex not in TRADE_EX:
         raise ApiErr("noex", ex)
     f = TRADE_OPS.get(op) or HIST_OPS.get(op)

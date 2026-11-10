@@ -39,6 +39,8 @@ Signal hayot sikli:
 
 ## BUZILMASIN — qiyin yo'l bilan topilgan qarorlar
 
+- **Birjalar tengligi (foydalanuvchi talabi, doimiy):** Binance'ga qo'shilgan HAR bir imkoniyat (savdo, order book, grafikda boshqaruv, tarix, statistika va h.k.) avtomatik ravishda MEXC, Bitget va BingX'ga ham qo'shiladi — alohida so'ralmasa ham, kelajakda ham. Birja API ruxsat bermasa (masalan, ochiq API yo'q) — buni foydalanuvchiga aniq aytish va ilovada izoh bilan ko'rsatish.
+
 Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ishlating.
 
 1. **1 daqiqalik klines, `ticker/price` emas.**
@@ -8075,3 +8077,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - «+ TP» / «+ SL» (pozitsiyada yo'q bo'lsa) va «+ Limit» (`cxAdd`): ±2% / 1% da vaqtinchalik chiziq (`g.pend`, from=null), cx'da pend paytida ham surish mumkin. Saqlash: TP/SL → `cxSave`; Limit («Davom etish») → Savdo formasi shu juftlik/bozor, Limit, narx to'ldirilgan, tomon narxga qarab.
 - Grafik ostida shu juftlik orderlari ro'yxati: ✏️ (`cxEditLim` — narx kiritish) va ✕ (`cxCancel(ex,sym,id,algo)` — spot/fut).
 - Yangi i18n: `cx_nl_go`, `cx_lim_ok`, `cx_nl_next`, `cx_closepos`, `cx_drag_spot`, `cx_lim_new`, `cx_x_again`. Brauzer sinovi `t_cxc.py`.
+
+## 343. Order book barcha birjalarda (Bitget, MEXC, BingX)
+- `cex.bg_depth/mx_depth/bx_depth` (ochiq, imzosiz): Bitget v2 spot `orderbook` + `tickers`, mix `merge-depth` + `ticker` (USDT-FUTURES); MEXC spot v3 `depth` + `ticker/24hr`, futures `contract/depth/{BTC_USDT}` (miqdor × `_mx_contract_size`) + `contract/ticker` (`riseFallRate`); BingX spot `market/depth` + `ticker/24hr`, swap v2 `quote/depth` + `quote/ticker` (`BTC-USDT`).
+- `_book` — asks o'sish, bids kamayish bo'yicha saralanadi (10 daraja); 24 soat % — imkon bo'lsa `last/open`dan hisoblanadi.
+- `cex.trade`: `op=="depth"` Binance bo'lmasa `DEPTH_EX`ga; web `api_cextrade` depth'ni barcha `DEPTH_EX` birjalariga ruxsat beradi, kesh kaliti `(ex, mkt, sym)`.
+- Frontend: `tvBookLoad` hamma birjada; yuklanmasa skelet o'rniga `tv_book_err`.
+- Javob formatlari haqiqiy API'da sinalmagan (sessiya proksisi birjalarni bloklaydi) — relay logida "Savdo amali xato … depth" ni kuzatish.
