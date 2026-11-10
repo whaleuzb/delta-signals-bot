@@ -570,9 +570,13 @@ function cxPosCard(ex,p,tr){var lg=p.side=='long',tz=cxPosTpsl(ex,p),roi=cxRoi(p
   +(tr.fut?'<button class="btn" onclick="trCloseSheet('+q+')">'+esc(t('close'))+'</button>':'')+'</div></div>';
  return h}
 function cxMoreT(k){S.cxMore=S.cxMore||{};S.cxMore[k]=!S.cxMore[k];tick();var y=window.scrollY;render();window.scrollTo(0,y)}
-function cxShare(ex,sym,ps){var w=cur(),p=((w&&w.acc&&w.acc.pos)||[]).filter(function(x){return x.sym==sym&&(x.ps||'BOTH')==ps})[0];if(!p)return;
+/* 351: natija kartasi (rasm) — signal kartasidek; bo'lmasa matn bilan ulashish */
+function cxShareImg(args,txt){toast(esc(t('wait')));api('act',{action:'cxshare',args:args}).then(function(r){var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
+  if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
+  if(r.pending){toast(esc(t('slow')));return}openLink('https://t.me/share/url?url='+encodeURIComponent((d&&d.link)||botUrl())+'&text='+encodeURIComponent(txt))}).catch(function(){toast('Error')})}
+function cxShare(ex,sym,ps){var w=cur(),p=((w&&w.acc&&w.acc.pos)||[]).filter(function(x){return x.sym==sym&&(x.ps||'BOTH')==ps})[0];if(!p)return;var tz=cxPosTpsl(ex,p);
  var txt=(p.side=='long'?'🟢 LONG ':'🔴 SHORT ')+p.sym+' '+(+p.lev||1)+'x\n'+t('t_entry_px')+': '+fp(p.entry)+'\n'+t('t_now')+': '+fp(p.mark)+'\nROI: '+fpc(cxRoi(p));
- openLink('https://t.me/share/url?url='+encodeURIComponent(botUrl())+'&text='+encodeURIComponent(txt))}
+ cxShareImg({sym:p.sym,side:p.side=='long'?'LONG':'SHORT',entry:p.entry,price:p.mark,lev:p.lev||1,roi:cxRoi(p),upnl:p.upnl||0,sl:tz.sl,tp:tz.tp,liq:p.liq||null,src:cexMeta(ex)[1]+' Futures',fut:true},txt)}
 function cxOrdRow(ex,o,tr){return'<div class="sig glass rise" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:9px">'+coinIc(o.sym,26)
    +'<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(o.sym)+' <span class="b '+(o.side=='buy'?'bl':'bs')+'">'+o.side.toUpperCase()+'</span></div><div class="rs">'+esc(o.type.toUpperCase())+' · '+fp(o.price)+' · '+(+o.qty)+'</div></div>'
    +(tr.fut?'<button class="btn" style="margin:0;color:var(--r)" onclick="cxCancel(\''+ex+'\',\''+esc(o.sym)+'\','+o.id+')">✕</button>':'')+'</div></div>'}
@@ -1459,7 +1463,7 @@ function dfPosCard(p){var key='df:'+p.symbol,more=(S.cxMore||{})[key],up=+p.upnl
  return h}
 function dfShare(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){return x.symbol==sym})[0];if(!p)return;
  var txt='🟢 '+sym+'USDT · Dip Funded\n'+t('t_entry_px')+': '+fp(p.avg)+'\n'+t('t_now')+': '+fp(p.price)+'\nROI: '+fpc(+p.upnl_pct||0);
- openLink('https://t.me/share/url?url='+encodeURIComponent(botUrl())+'&text='+encodeURIComponent(txt))}
+ cxShareImg({sym:sym+'USDT',side:'LONG',entry:+p.avg,price:+p.price,lev:1,roi:+p.upnl_pct||0,upnl:+p.upnl||0,sl:p.sl,tp:p.tp,src:'Dip Funded',fut:false},txt)}
 /* Sahifasiz amallar (Bosh/Savdo ekranidan): holat qaytadi → S.dfs */
 function dfAct(args,ok){args.acc=dfCur();toast(esc(t('wait')));
  return api('act',{action:'dftrade',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}

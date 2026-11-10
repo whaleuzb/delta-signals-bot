@@ -8125,3 +8125,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Web `_ws_act`: `dfacc/dfone/dfstats/dftrade` — `_df_direct()` (= `dipfunded.enabled()`, ya'ni web'da `DIPFUNDED_API_KEY`) bo'lsa navbatsiz `dfapp.*`; bo'lmasa avvalgidek `app_actions` navbati (bot). `_df_stats` ham shunday.
 - Railway web: `DIPFUNDED_API_KEY=${{bot.DIPFUNDED_API_KEY}}` (havola — qiymat ko'chirilmaydi).
 - Sinov: `test_346.py` 14/14 (to'g'ridan-to'g'ri yo'l), `test_310.py` navbat yo'lini `_df_direct=False` bilan tekshiradi.
+
+## 351. Birja / Dip Funded pozitsiyasi — natija kartasi (rasm) bilan ulashish
+- "Ulashish" (`cxShare` — birja futures pozitsiyasi, `dfShare` — Dip Funded) → `cxShareImg(args, txt)` → WS amali `cxshare` (web faqat son/qisqa matnlarni tozalaydi) → bot `_app_cxshare`: `card.open_card` (signal kartasi bilan bir xil: ROI, $, kirish/joriy/SL/TP/LIQ, 1h shamlar — fut → MEXC futures, spot → MEXC spot), `ws_name` = "Binance Futures" / "Dip Funded", taklif QR; `savePreparedInlineMessage` → ilovada `tg.shareMessage`. Bo'lmasa — eski matn ulashish (taklif havolasi bilan).
+- Sinov: `test_351.py` 5/5 (rasm, shamlar manbai, izoh, yomon argument, DF spot).

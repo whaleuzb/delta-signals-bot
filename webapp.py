@@ -30,7 +30,7 @@ log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share", "rcard")
-WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "dfstats", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply", "dftrade", "newsshare")       # 254: signalga emas, workspace/odamga
+WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "dfstats", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply", "dftrade", "newsshare", "cxshare")       # 254: signalga emas, workspace/odamga
 
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
@@ -335,6 +335,31 @@ async def _ws_act(body, uid: int, act: str):
         if not _can(ws, uid):
             raise web.HTTPForbidden()
         aid = await db.app_action_add(uid, 0, act, None, json.dumps(f)[:2000])
+        return await _wait_action(aid)
+    if act == "cxshare":
+        # 351: birja/Dip Funded pozitsiyasi kartasi — faqat sonlar va qisqa matnlar (bot chizadi).
+        f = body.get("args") if isinstance(body.get("args"), dict) else {}
+        clean = {}
+        try:
+            sym = str(f.get("sym") or "").upper().replace("/", "")
+            if not _DF_SYM.match(sym.replace("USDT", "") or "X") or len(sym) > 24:
+                raise ValueError
+            clean = {"sym": sym, "side": "SHORT" if f.get("side") == "SHORT" else "LONG",
+                     "lev": max(1, min(int(f.get("lev") or 1), 200)), "fut": bool(f.get("fut")),
+                     "src": str(f.get("src") or "")[:30]}
+            for k in ("entry", "price"):
+                clean[k] = float(f[k])
+                if not (0 < clean[k] < 1e12):
+                    raise ValueError
+            for k in ("roi", "upnl", "sl", "tp", "liq"):
+                if f.get(k) not in (None, ""):
+                    v = float(f[k])
+                    if v != v or abs(v) > 1e12:
+                        raise ValueError
+                    clean[k] = v
+        except (TypeError, ValueError, KeyError):
+            raise web.HTTPBadRequest()
+        aid = await db.app_action_add(uid, 0, act, None, json.dumps(clean))
         return await _wait_action(aid)
     if act == "newsshare":
         # 315: News Trade postini ulashish — faqat post raqami.

@@ -1565,6 +1565,64 @@ async def _app_dftrade(ctx, uid: int, lang, a) -> tuple[bool, str]:
     return await dfapp.trade(uid, lang, f)
 
 
+async def _app_cxshare(ctx, uid: int, lang, a) -> tuple[bool, str]:
+    """351: birja / Dip Funded pozitsiyasi natija kartasi (rasm) — signal kartasi bilan bir xil
+    (`card.open_card`), `savePreparedInlineMessage` + ilovada `shareMessage`."""
+    try:
+        f = json.loads(a["args"] or "{}")
+        sym = str(f["sym"]).upper()
+        side = "SHORT" if f.get("side") == "SHORT" else "LONG"
+        entry, price = float(f["entry"]), float(f["price"])
+        L = max(1, int(f.get("lev") or 1))
+        pnl = float(f.get("roi") or 0)
+        money = float(f["upnl"]) if f.get("upnl") is not None else None
+        sl = float(f["sl"]) if f.get("sl") else None
+        tp = float(f["tp"]) if f.get("tp") else None
+        liq = float(f["liq"]) if f.get("liq") else None
+        src = str(f.get("src") or "")[:30]
+        fut = bool(f.get("fut"))
+    except (KeyError, TypeError, ValueError):
+        return False, json.dumps({"code": "bad"})
+    code, link = await referral_token(uid, ctx.bot.username)
+    if not link or not config.WEB_URL:
+        return False, json.dumps({"code": "nolink"})
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    candles = []
+    try:
+        cs = await asyncio.wait_for(tracker.provider("futures" if fut else "crypto").klines(
+            sym, end_ms - 70 * _TF_MS["1h"], limit=80, tf="1h", end_ms=end_ms), 10)
+        candles = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close)] for c in cs]
+    except Exception:
+        log.info("Birja kartasi: shamlar olinmadi (%s)", sym)
+    try:
+        u = await db.get_user(uid)
+    except Exception:
+        u = None
+    buf = card.open_card(symbol=sym, side=side, entry=entry, price=price, pnl_pct=pnl, money=money,
+                         leverage=L, sl=sl, tp=tp, candles=candles, tf="1h",
+                         username=u["username"] if u else None, ws_name=src, logo=None,
+                         qr_url=link, qr_code=code, sig_id=None, when=datetime.now(stats.TZ), lang=lang,
+                         bot_logo=await _bot_logo(ctx.bot), liq=liq, marks=[])
+    img = Image.open(buf).convert("RGB")
+    url, thumb = await _share_store(img)
+    from telegram import InlineQueryResultPhoto
+    import uuid as _uuid
+    cap = i18n.t("share.caption", lang, sym=html.escape(sym), side=side + (f" {L}x" if L > 1 else ""),
+                 pnl=f"{'+' if pnl >= 0 else ''}{pnl:.2f}", ws=html.escape(src))
+    res = InlineQueryResultPhoto(
+        id=_uuid.uuid4().hex[:32], photo_url=url, thumbnail_url=thumb, photo_width=img.width, photo_height=img.height,
+        caption=cap, parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+            i18n.t("share.btn", lang), url=link, api_kwargs={"style": "success"})]]))
+    try:
+        pm = await ctx.bot.save_prepared_inline_message(
+            user_id=uid, result=res, allow_user_chats=True, allow_group_chats=True, allow_channel_chats=True)
+    except Exception as e:
+        log.warning("Birja natija posti tayyorlanmadi: %s", e)
+        return False, json.dumps({"link": link})
+    return True, json.dumps({"id": pm.id, "link": link})
+
+
 async def _app_exec(ctx, a) -> tuple[bool, str]:
     uid = a["uid"]
     lang = await user_lang(uid)
@@ -1591,6 +1649,8 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
         return await _app_dipapply(ctx, uid, lang, a)
     if a["action"] == "newsshare":
         return await _app_newsshare(ctx, uid, lang, a)
+    if a["action"] == "cxshare":
+        return await _app_cxshare(ctx, uid, lang, a)
     if a["action"] == "dftrade":
         return await _app_dftrade(ctx, uid, lang, a)
     if a["action"] == "dfstats":
