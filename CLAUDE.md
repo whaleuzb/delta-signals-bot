@@ -8045,3 +8045,4 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 338. Birja Bosh sahifasidan "Hisob" olib tashlandi; Dip Funded reklamasi doim
 - Foydalanuvchi: "bosh menyudagi hisob tugmasini olib tashla birja bo'limida bor. Dipfunded reklamasi doim tursin hatto birja oynasida ham".
 - `dfAd()` — Dip Funded kartasi (openDf); `cxHome` oxirida (xato holatida ham) va `walletView` (Birja bo'limi) ichida. Oddiy workspace Bosh sahifasida avvaldan bor.
+- (davomi) "turnir ham": birja Bosh sahifasida Statistika yonida Turnir kartasi (oddiy Bosh kabi), Savdolar tarixi — alohida karta; `tourAd()` — Birja bo'limida va xato holatida ham.
