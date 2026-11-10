@@ -8129,3 +8129,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 351. Birja / Dip Funded pozitsiyasi — natija kartasi (rasm) bilan ulashish
 - "Ulashish" (`cxShare` — birja futures pozitsiyasi, `dfShare` — Dip Funded) → `cxShareImg(args, txt)` → WS amali `cxshare` (web faqat son/qisqa matnlarni tozalaydi) → bot `_app_cxshare`: `card.open_card` (signal kartasi bilan bir xil: ROI, $, kirish/joriy/SL/TP/LIQ, 1h shamlar — fut → MEXC futures, spot → MEXC spot), `ws_name` = "Binance Futures" / "Dip Funded", taklif QR; `savePreparedInlineMessage` → ilovada `tg.shareMessage`. Bo'lmasa — eski matn ulashish (taklif havolasi bilan).
 - Sinov: `test_351.py` 5/5 (rasm, shamlar manbai, izoh, yomon argument, DF spot).
+
+## 352. Telegram bildirishnomalar (birja + Dip Funded)
+- `notify.py` (web servis, `web.py` `on_startup` → `notify.loop`): har ~120 s. Birja: `snapshot` + Binance'da `fut_open`/`spot_open` (o'qib bo'lmasa — faqat pozitsiyalar). Holat xotirada (`STATE`); qayta ishga tushgandan keyingi birinchi aylanish — faqat baza.
+- Hodisalar (`cex_events`): limit order yo'qolgan va pozitsiya (fut) yoki aktiv (spot) o'zgargan → "bajarildi" (shu juftlikka "yangi pozitsiya" takrorlanmaydi); yo'qolgan-u o'zgarish yo'q → bekor (xabarsiz); pozitsiya yo'qoldi → yopildi, sabab: yo'qolgan shartli order turi (take_profit/stop), ikkalasi bo'lsa natija belgisi; yangi pozitsiya; qisman yopildi / qo'shildi.
+- Dip Funded (`df_events`, `df_risk`): web'da kalit bo'lsa (`dipfunded.enabled()`), kuzatiladiganlar — ilovada Dip Funded ochganlar (`bot_settings` `dfw:<uid>`, `db.setting_users`), `dfoff` bo'lsa yo'q. Yopilish sababi narx TP/SL ga yaqinligidan; kunlik zarar ≥80% — kuniga bir marta, maks. zarar ≥80% — 60% dan tushguncha bir marta.
+- Xabar: Bot API `sendMessage` (web'dagi BOT_TOKEN), "📱 Ilovada ochish" (web_app; DF — `?df=1&acc=`). Matnlar `i18n` `ntf.*`. O'chirish: Birja bo'limida "🔔 Bildirishnomalar" (`ntfToggle`, `/api/app/ntf`, `ntf_off:<uid>`, `api_me.ntf_off`).
+- Sinov: `test_352.py` 15/15.

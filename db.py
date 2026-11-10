@@ -2880,6 +2880,19 @@ async def get_setting(key: str) -> str | None:
         return await c.fetchval("SELECT value FROM bot_settings WHERE key=$1", key)
 
 
+async def setting_users(prefix: str) -> list[int]:
+    """352: `<prefix><uid>` ko'rinishidagi sozlamalar egalari (masalan `dfw:` — Dip Funded kuzatuvi)."""
+    async with pool().acquire() as c:
+        rows = await c.fetch("SELECT key FROM bot_settings WHERE key LIKE $1 AND value IS NOT NULL", prefix + "%")
+    out = []
+    for r in rows:
+        try:
+            out.append(int(r["key"][len(prefix):]))
+        except ValueError:
+            pass
+    return out
+
+
 async def set_setting(key: str, value: str | None) -> None:
     async with pool().acquire() as c:
         await c.execute(

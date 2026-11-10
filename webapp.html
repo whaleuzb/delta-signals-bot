@@ -461,6 +461,7 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
   h+=rest.map(function(x){var df=x[0]=='dipfunded';return'<div class="row glass rise" onclick="'+(df?'dfConnect()':'cexAdd(\''+x[0]+'\')')+'">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t(df?'dfx_ro':'cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
+ if(acc.length)h+='<div class="row glass rise" style="margin-top:12px" onclick="ntfToggle()"><div class="av" style="font-size:18px">🔔</div><div class="rm"><div class="rn">'+esc(t('ntf_title'))+'</div><div class="rs">'+esc(t('ntf_sub'))+'</div></div><div class="rv" style="font-size:13px"><span class="'+(S.ntfoff?'r':'g')+'">'+esc(t(S.ntfoff?'ntf_off':'ntf_on'))+'</span></div></div>';
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
  v.innerHTML=h}
 /* 328: balans tarixi */
@@ -498,6 +499,7 @@ function cexOpen(ex){if(ex=='dipfunded'){dfOpen();return}var a=cexAcc(ex);if(!a)
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><button class="btn p" style="margin:0" onclick="cexGoWs(\''+ex+'\')">'+esc(t('cx_open_ws'))+'</button>'
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
  sheetOpen(h)}
+function ntfToggle(){S.ntfoff=!S.ntfoff;api('ntf',{off:S.ntfoff}).catch(function(){});haptic('success');toast(esc(t(S.ntfoff?'ntf_off':'ntf_on')));render()}
 function cexRecheck(ex){toast(esc(t('cx_upd')));S.cexL=0;api('cex',{fresh:true}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};render();cexOpen(ex)}).catch(function(){toast(esc(t('cx_e_net')))})}
 function cexGoWs(ex){sheetClose();if(ex=='dipfunded'){dfGo();return}S.cur='cx:'+ex;S.anim=true;S.items=[];S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(e){}S.tab='home';tick();render();load()}
 /* 333: birja — workspace sifatida (Bosh, pozitsiyalar, terminal, statistika) */
@@ -1842,7 +1844,7 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
   S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
  if(/^nws_\d+$/.test(sp))newsShare(+sp.slice(4));
- api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.dfoff=!!d.df_off;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+ api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.dfoff=!!d.df_off;S.ntfoff=!!d.ntf_off;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==+saved})[0]||S.ws[0]||{}).id;if(saved&&String(saved).indexOf('cx:')==0)S.cur=saved;

@@ -39,6 +39,7 @@ import tournament
 import stats
 import tracker
 import webapp
+import notify
 
 log = logging.getLogger("web")
 
@@ -475,6 +476,7 @@ def build_app() -> web.Application:
     app.on_startup.append(on_start)
     app.on_startup.append(webapp.cex_relay_check)
     app.on_startup.append(webapp.cex_hist_loop)
+    app.on_startup.append(notify.loop)
     app.on_cleanup.append(on_stop)
     return app
 
