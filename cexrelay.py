@@ -103,6 +103,25 @@ async def trades(request):
         return web.json_response({"err": "api"})
 
 
+async def trade(request):
+    ex, k = await _args(request)
+    try:
+        b = await request.json()
+    except Exception:
+        raise web.HTTPBadRequest()
+    op, a = str(b.get("op") or ""), b.get("a") or {}
+    if not isinstance(a, dict):
+        raise web.HTTPBadRequest()
+    try:
+        return web.json_response({"r": await cex.trade(ex, k, op, a)})
+    except cex.ApiErr as e:
+        log.info("trade %s rad (%s): %s — %s", op, ex, e.code, e.text[:200])
+        return web.json_response({"err": e.code, "msg": e.text[:200]})
+    except Exception:
+        log.warning("trade %s xato (%s)", op, ex, exc_info=True)
+        return web.json_response({"err": "api"})
+
+
 async def health(_request):
     return web.Response(text="ok")
 
@@ -142,6 +161,7 @@ def build() -> web.Application:
     app.add_routes([web.post("/verify", verify), web.post("/snapshot", snapshot),
                     web.post("/history", history),
                     web.post("/trades", trades),
+                    web.post("/trade", trade),
                     web.get("/healthz", health)])
     return app
 

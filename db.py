@@ -670,6 +670,18 @@ CREATE TABLE IF NOT EXISTS cex_hist (
     fut      DOUBLE PRECISION,
     PRIMARY KEY (user_id, exchange, at)
 );
+-- 330: ilovadan birjaga yuborilgan savdo amallari jurnali (kalitsiz).
+CREATE TABLE IF NOT EXISTS cex_orders (
+    id       BIGSERIAL PRIMARY KEY,
+    user_id  BIGINT NOT NULL,
+    exchange TEXT NOT NULL,
+    op       TEXT NOT NULL,
+    args     JSONB,
+    ok       BOOLEAN NOT NULL,
+    result   JSONB,
+    at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS cex_orders_user ON cex_orders (user_id, at DESC);
 CREATE TABLE IF NOT EXISTS user_avatars (
     user_id BIGINT PRIMARY KEY,
     key     TEXT NOT NULL UNIQUE,
@@ -2978,3 +2990,11 @@ async def cex_hist_rows(uid: int, since, ex: str | None = None):
             "AND ($3::text IS NULL OR exchange=$3) AND exchange IN (SELECT exchange FROM cex_keys WHERE user_id=$1) "
             "AND at < $2 ORDER BY exchange, at DESC)",
             uid, since, ex)
+
+
+async def cex_order_log(uid: int, ex: str, op: str, args: dict, ok: bool, result) -> None:
+    import json as _json
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO cex_orders (user_id, exchange, op, args, ok, result) "
+                        "VALUES ($1,$2,$3,$4::jsonb,$5,$6::jsonb)",
+                        uid, ex, op, _json.dumps(args)[:4000], ok, _json.dumps(result, default=str)[:4000])

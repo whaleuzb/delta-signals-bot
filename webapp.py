@@ -808,19 +808,21 @@ _CEX_CACHE: dict[tuple, tuple[float, dict]] = {}
 _CEX_TTL = 20.0
 
 
-async def _cx_call(op: str, ex: str, k: dict):
+async def _cx_call(op: str, ex: str, k: dict, extra: dict | None = None):
     """326: `CEX_RELAY_URL` bo'lsa — Singapurdagi `cex` servisi orqali (ichki tarmoq),
     bo'lmasa — shu yerdan to'g'ridan-to'g'ri (`cex` moduli)."""
     import cex
     url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
     if not url:
+        if op == "trade":
+            return await cex.trade(ex, k, (extra or {}).get("op"), (extra or {}).get("a"))
         f = {"verify": cex.verify, "snapshot": cex.snapshot, "history": cex.history,
              "trades": cex.trades}[op]
         return await f(ex, k)
     import httpx
     try:
         async with httpx.AsyncClient(timeout=90 if op == "trades" else 30) as c:
-            r = await c.post(f"{url}/{op}", json={"ex": ex, "k": k},
+            r = await c.post(f"{url}/{op}", json={"ex": ex, "k": k, **(extra or {})},
                              headers={"X-Relay-Token": os.getenv("RELAY_TOKEN", "")})
         r.raise_for_status()
         d = r.json()
@@ -829,7 +831,7 @@ async def _cx_call(op: str, ex: str, k: dict):
         raise cex.ApiErr("net", type(e).__name__)
     if d.get("err"):
         raise cex.ApiErr(d["err"], str(d.get("msg") or ""))
-    return {"history": d.get("hist"), "trades": d.get("trades")}.get(op, d.get("snap"))
+    return {"history": d.get("hist"), "trades": d.get("trades"), "trade": d.get("r")}.get(op, d.get("snap"))
 
 
 async def cex_relay_check(_app=None):
@@ -1097,6 +1099,46 @@ async def api_cextrades(request):
     return web.json_response(res, headers=NO_CACHE)
 
 
+_TRADE_ARGS = {"mkt", "sym", "side", "type", "price", "quote", "qty", "margin", "lev",
+               "tp", "sl", "frac", "ps", "id", "algo"}
+
+
+async def api_cextrade(request):
+    """330: ilovadan savdo (hozircha Binance Spot + Futures). O'qish amallari
+    (info/open) — jurnalsiz; o'zgartiruvchilar `cex_orders`ga yoziladi."""
+    import cex
+    body, uid = await _body(request)
+    ex, op = str(body.get("ex") or ""), str(body.get("op") or "")
+    a = body.get("a") or {}
+    if ex not in cex.TRADE_EX or op not in cex.TRADE_OPS or not isinstance(a, dict) \
+            or not set(a) <= _TRADE_ARGS or len(json.dumps(a)) > 1000:
+        raise web.HTTPBadRequest()
+    if not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
+    row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
+    if row is None:
+        raise web.HTTPNotFound()
+    write = op not in cex.TRADE_READ
+    try:
+        r = await _cx_call("trade", ex, _cex_keys(row), {"op": op, "a": a})
+        res = {"ok": True, "r": r}
+    except cex.ApiErr as e:
+        res = {"ok": False, "err": e.code, "msg": _cx_msg(e.text)}
+    except Exception:
+        log.warning("Savdo amali xato (%s %s)", ex, op, exc_info=True)
+        res = {"ok": False, "err": "api"}
+    if write:
+        log.info("Savdo: %s %s uid=%s %s → %s", ex, op, uid, json.dumps(a)[:200],
+                 "ok" if res["ok"] else f"{res.get('err')} {res.get('msg', '')}")
+        try:
+            await db.cex_order_log(uid, ex, op, a, res["ok"], res.get("r") if res["ok"] else res)
+        except Exception:
+            log.warning("Savdo jurnali yozilmadi", exc_info=True)
+        _CEX_CACHE.pop((uid, ex), None)
+        _CEX_TR.pop((uid, ex), None)
+    return web.json_response(res, headers=NO_CACHE)
+
+
 async def api_cexdel(request):
     import cex
     body, uid = await _body(request)
@@ -1148,6 +1190,7 @@ def routes() -> list:
         web.post("/api/app/cexdel", api_cexdel),
         web.post("/api/app/cexhist", api_cexhist),
         web.post("/api/app/cextrades", api_cextrades),
+        web.post("/api/app/cextrade", api_cextrade),
     ]
 
 
@@ -1337,6 +1380,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "tr_trade": "savdo", "tr_enable": "Bot ichidan savdo qilish uchun Binance kalitida «Enable Spot & Margin Trading» va/yoki «Enable Futures» ruxsatini yoqing (pul yechish — yoqilmaydi), so'ng «Kalitni yangilash».", "tr_noperm_spot": "Kalitda Spot savdo ruxsati yo'q — Binance'da «Enable Spot & Margin Trading»ni yoqing.", "tr_noperm_fut": "Kalitda Futures ruxsati yo'q — Binance'da «Enable Futures»ni yoqing.", "tr_lev": "Leveraj", "tr_margin": "Marja, USDT", "tr_qty": "Miqdor", "tr_size": "Pozitsiya", "tr_open": "Ochiq orderlar", "tr_need_amt": "Summani kiriting", "tr_confirm": "Real order yuboriladi. Tasdiqlaysizmi?", "tr_sent": "Order yuborildi", "tr_cancel_q": "Orderni bekor qilasizmi?", "tr_cancelled": "Order bekor qilindi", "tr_close": "Yopish", "tr_close_txt": "Pozitsiyaning qancha qismi bozor narxida yopilsin?", "tr_close_q": "{s} pozitsiyasining {p}% bozor narxida yopiladi. Tasdiqlaysizmi?", "tr_closed": "Pozitsiya yopildi", "tr_tpsl_ok": "TP/SL saqlandi", "cx_e_noperm": "Kalitda bu savdo ruxsati yo'q", "cx_e_small": "Summa juda kichik (birja minimumidan kam)", "cx_e_nopos": "Bu juftlikda ochiq pozitsiya yo'q", "cx_e_noex": "Bu birjada savdo hozircha yo'q",
     "cx_trades": "Savdolar tarixi", "cx_tr_load": "Binance'dan yuklanmoqda — 10–20 soniya…", "cx_tr_only": "Savdolar tarixi hozircha faqat Binance uchun.", "cx_tr_n": "Savdolar", "cx_tr_fee": "Komissiya", "cx_tr_days": "oxirgi {n} kun", "cx_tr_none": "Savdolar topilmadi", "cx_tr_orders": "ta order", "cx_tr_spot_note": "hozirgi va oxirgi 30 kundagi coinlar bo'yicha", "cx_tr_refresh": "Yangilash",
     "cx_hist": "Balans tarixi", "cx_hist_empty": "Tarix to'planmoqda — balans har soat yozib boriladi", "cx_dn": "{n} kun",
     "loading": "Yuklanmoqda…", "cx_sub": "Birja hisoblaringiz bir joyda", "cx_total": "Umumiy balans",
@@ -1346,15 +1390,16 @@ T["uz"].update({
     "cx_assets": "Spot aktivlar", "cx_entry": "Kirish", "cx_empty": "Hisobda aktiv yoki pozitsiya yo'q.",
     "cx_rekey": "Kalitni yangilash", "cx_del": "Uzish", "cx_del_q": "Birja hisobini uzasizmi? Kalit bazadan o'chiriladi.",
     "cx_deleted": "Hisob uzildi, kalit o'chirildi", "cx_upd": "Yangilanmoqda…",
-    "cx_how": "Birjada yangi API kalit yarating: FAQAT «O'qish» (Read-only) ruxsati, IP cheklovi — yo'q (Unrestricted). Binance'da kalit turi — «System generated». Savdo va pul yechish ruxsatlarini yoqmang. Kalitlar shifrlangan holda saqlanadi.",
+    "cx_how": "Birjada yangi API kalit yarating: FAQAT «O'qish» (Read-only) ruxsati, IP cheklovi — yo'q (Unrestricted). Binance'da kalit turi — «System generated». Bot ichidan savdo uchun — «Spot & Margin Trading» va «Futures» ruxsatlarini ham yoqing. Pul yechish ruxsatini HECH QACHON yoqmang. Kalitlar shifrlangan holda saqlanadi.",
     "cx_fill": "Barcha maydonlarni to'ldiring", "cx_check": "Tekshirilmoqda…", "cx_ok": "Birja hisobi ulandi ✅",
-    "cx_safe": "Bot faqat balans va pozitsiyalarni o'qiydi — savdo qilmaydi va pul yecha olmaydi. Kalitlar shifrlangan, istalgan payt uzishingiz mumkin.",
+    "cx_safe": "Bot pul yecha olmaydi — pul yechish ruxsati bor kalit qabul qilinmaydi. Savdo faqat siz tasdiqlagan orderlar bilan. Kalitlar shifrlangan, istalgan payt uzishingiz mumkin.",
     "cx_e_auth": "Birja kalitni qabul qilmadi. Tekshiring: IP cheklovi o'chirilgan (Unrestricted), kalit turi «System generated» (HMAC), API Key va Secret to'liq nusxalangan", "cx_e_withdraw": "Bu kalitda pul yechish ruxsati bor — xavfsizlik uchun qabul qilinmaydi. Faqat o'qish kalitini yarating.",
     "cx_e_geo": "Birja server hududidan so'rovni blokladi — tez orada tuzatiladi", "cx_e_net": "Birja javob bermadi, keyinroq urinib ko'ring",
     "cx_e_api": "Birjadan ma'lumot olinmadi", "cx_e_bad": "Kalit formati noto'g'ri", "cx_e_reconnect": "Kalitni qayta ulang",
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "tr_trade": "торговля", "tr_enable": "Чтобы торговать из бота, включите в ключе Binance «Enable Spot & Margin Trading» и/или «Enable Futures» (вывод — не включать), затем «Обновить ключ».", "tr_noperm_spot": "У ключа нет права Spot-торговли — включите «Enable Spot & Margin Trading» на Binance.", "tr_noperm_fut": "У ключа нет права Futures — включите «Enable Futures» на Binance.", "tr_lev": "Плечо", "tr_margin": "Маржа, USDT", "tr_qty": "Количество", "tr_size": "Позиция", "tr_open": "Открытые ордера", "tr_need_amt": "Введите сумму", "tr_confirm": "Будет отправлен реальный ордер. Подтверждаете?", "tr_sent": "Ордер отправлен", "tr_cancel_q": "Отменить ордер?", "tr_cancelled": "Ордер отменён", "tr_close": "Закрыть", "tr_close_txt": "Какую часть позиции закрыть по рынку?", "tr_close_q": "Будет закрыто {p}% позиции {s} по рынку. Подтверждаете?", "tr_closed": "Позиция закрыта", "tr_tpsl_ok": "TP/SL сохранены", "cx_e_noperm": "У ключа нет права на эту торговлю", "cx_e_small": "Сумма слишком мала (меньше минимума биржи)", "cx_e_nopos": "По этой паре нет открытой позиции", "cx_e_noex": "Торговля на этой бирже пока недоступна",
     "cx_trades": "История сделок", "cx_tr_load": "Загружаем с Binance — 10–20 секунд…", "cx_tr_only": "История сделок пока только для Binance.", "cx_tr_n": "Сделки", "cx_tr_fee": "Комиссия", "cx_tr_days": "за {n} дн", "cx_tr_none": "Сделок не найдено", "cx_tr_orders": "ордеров", "cx_tr_spot_note": "по текущим монетам и монетам за 30 дней", "cx_tr_refresh": "Обновить",
     "cx_hist": "История баланса", "cx_hist_empty": "История собирается — баланс записывается каждый час", "cx_dn": "{n} дн",
     "loading": "Загрузка…", "cx_sub": "Ваши биржевые счета в одном месте", "cx_total": "Общий баланс",
@@ -1373,6 +1418,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "tr_trade": "trade", "tr_enable": "To trade from the bot, enable «Enable Spot & Margin Trading» and/or «Enable Futures» on your Binance key (never withdrawals), then «Update key».", "tr_noperm_spot": "The key has no Spot trading permission — enable «Enable Spot & Margin Trading» on Binance.", "tr_noperm_fut": "The key has no Futures permission — enable «Enable Futures» on Binance.", "tr_lev": "Leverage", "tr_margin": "Margin, USDT", "tr_qty": "Quantity", "tr_size": "Position", "tr_open": "Open orders", "tr_need_amt": "Enter an amount", "tr_confirm": "A real order will be sent. Confirm?", "tr_sent": "Order sent", "tr_cancel_q": "Cancel this order?", "tr_cancelled": "Order cancelled", "tr_close": "Close", "tr_close_txt": "How much of the position to close at market?", "tr_close_q": "{p}% of the {s} position will be closed at market. Confirm?", "tr_closed": "Position closed", "tr_tpsl_ok": "TP/SL saved", "cx_e_noperm": "The key has no permission for this trade", "cx_e_small": "Amount too small (below exchange minimum)", "cx_e_nopos": "No open position in this pair", "cx_e_noex": "Trading on this exchange is not available yet",
     "cx_trades": "Trade history", "cx_tr_load": "Loading from Binance — 10–20 seconds…", "cx_tr_only": "Trade history is available for Binance only for now.", "cx_tr_n": "Trades", "cx_tr_fee": "Fees", "cx_tr_days": "last {n} days", "cx_tr_none": "No trades found", "cx_tr_orders": "orders", "cx_tr_spot_note": "for current coins and coins held in the last 30 days", "cx_tr_refresh": "Refresh",
     "cx_hist": "Balance history", "cx_hist_empty": "Collecting history — the balance is recorded every hour", "cx_dn": "{n}d",
     "loading": "Loading…", "cx_sub": "All your exchange accounts in one place", "cx_total": "Total balance",

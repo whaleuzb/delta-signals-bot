@@ -466,14 +466,80 @@ function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
    +'<div id="cxh_det" style="margin-bottom:12px"></div>';
   var P=a.pos||[];if(P.length){h+='<div class="rs" style="margin:0 2px 6px;font-weight:700">'+esc(t('cx_pos'))+'</div>'+P.map(function(p){
    return'<div class="glass" style="border-radius:14px;padding:10px 12px;margin-bottom:6px"><div style="display:flex;align-items:center;gap:8px">'+coinIc(p.sym,20)+'<b>'+esc(p.sym)+'</b><span class="chip glass on" style="padding:2px 8px;font-size:10.5px;color:'+(p.side=='long'?'var(--g)':'var(--r)')+'">'+(p.side=='long'?'LONG':'SHORT')+(p.lev?' '+(+p.lev)+'x':'')+'</span><span style="margin-left:auto;font-weight:800" class="'+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'</span></div>'
-   +'<div class="rs" style="margin-top:5px">'+esc(t('df_qty'))+' '+(+p.qty)+' · '+esc(t('cx_entry'))+' '+fp(p.entry)+(p.mark?' · '+esc(t('df_mark'))+' '+fp(p.mark):'')+(p.liq?' · LIQ '+fp(p.liq):'')+'</div></div>'}).join('')}
+   +'<div class="rs" style="margin-top:5px">'+esc(t('df_qty'))+' '+(+p.qty)+' · '+esc(t('cx_entry'))+' '+fp(p.entry)+(p.mark?' · '+esc(t('df_mark'))+' '+fp(p.mark):'')+(p.liq?' · LIQ '+fp(p.liq):'')+'</div>'
+   +(ex=='binance'&&a.trade&&a.trade.fut?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><button class="btn" style="margin:0;padding:7px" onclick="trTpslSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">TP / SL</button><button class="btn" style="margin:0;padding:7px;color:var(--r)" onclick="trCloseSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">'+esc(t('tr_close'))+'</button></div>':'')
+   +'</div>'}).join('')}
   var A=a.assets||[];if(A.length){h+='<div class="rs" style="margin:10px 2px 6px;font-weight:700">'+esc(t('cx_assets'))+'</div>'+A.map(function(x){
-   return'<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(x.a,20)+'<b style="font-size:13px">'+esc(x.a)+'</b><span class="rs" style="margin:0">'+(+x.q.toPrecision(8))+'</span><span style="margin-left:auto;font-weight:700;font-size:13px">'+(x.usd!=null?'$'+n2(x.usd):'—')+'</span></div>'}).join('')}
+   var sl=ex=='binance'&&a.trade&&a.trade.spot&&x.a!='USDT'&&x.a!='USDC'&&x.a!='FDUSD';
+   return'<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)'+(sl?';cursor:pointer':'')+'"'+(sl?' onclick="trOpen(\'spot\',\''+esc(x.a)+'USDT\',\'sell\')"':'')+'>'+coinIc(x.a,20)+'<b style="font-size:13px">'+esc(x.a)+'</b><span class="rs" style="margin:0">'+(+x.q.toPrecision(8))+'</span><span style="margin-left:auto;font-weight:700;font-size:13px">'+(x.usd!=null?'$'+n2(x.usd):'—')+'</span></div>'}).join('')}
   if(!P.length&&!A.length)h+='<p>'+esc(t('cx_empty'))+'</p>'}
- if(ex=='binance'&&!a.err)h+='<button class="btn p full" style="margin-top:12px" onclick="cexTrades(\''+ex+'\')">📜 '+esc(t('cx_trades'))+'</button>';
+ if(ex=='binance'&&!a.err){var tr=a.trade||{};
+  if(tr.spot||tr.fut)h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">'
+   +'<button class="btn" style="margin:0;background:var(--g);color:#0b0b0c;border-color:transparent;font-weight:800" onclick="trOpen(\'spot\')"'+(tr.spot?'':' disabled')+'>Spot '+esc(t('tr_trade'))+'</button>'
+   +'<button class="btn" style="margin:0;background:var(--g);color:#0b0b0c;border-color:transparent;font-weight:800" onclick="trOpen(\'fut\')"'+(tr.fut?'':' disabled')+'>Futures '+esc(t('tr_trade'))+'</button></div>';
+  else h+='<div class="rs" style="margin-top:12px;line-height:1.5">💡 '+esc(t('tr_enable'))+'</div>';
+  h+='<button class="btn full" style="margin-top:8px" onclick="cexTrades(\''+ex+'\')">📜 '+esc(t('cx_trades'))+'</button>'}
  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button>'
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
  sheetOpen(h);if(!a.err)cxhDet(ex,S.cxhD||30)}
+/* 330: ilova ichida savdo (Binance Spot + Futures) */
+function trKeep(){var g=function(id){var e=document.getElementById(id);return e?e.value:undefined};var v=S.tr.v||{};['tr_p','tr_a','tr_tp','tr_sl'].forEach(function(id){var x=g(id);if(x!==undefined)v[id]=x});S.tr.v=v}
+function trOpen(mkt,sym,side){tick();var o=S.tr;S.tr={ex:'binance',mkt:mkt,sym:sym||(o&&o.mkt==mkt&&o.sym)||'BTCUSDT',side:side||(mkt=='fut'?'long':'buy'),type:'market',lev:null,info:null,open:null,v:{}};trRender();trLoad()}
+function trLoad(){var T=S.tr;if(!T)return;T.info=null;T.err=null;var sym=T.sym,mkt=T.mkt;
+ api('cextrade',{ex:T.ex,op:'info',a:{mkt:mkt,sym:sym}}).then(function(d){if(S.tr!==T||T.sym!=sym)return;if(d.ok){T.info=d.r;if(mkt=='fut'&&!T.lev)T.lev=d.r.lev||10}else T.err=d;trKeep();trRender()})
+ .catch(function(e){if(S.tr!==T)return;T.err={err:e==429?'rate':'net'};trRender()});trOrders()}
+function trOrders(){var T=S.tr;if(!T)return;api('cextrade',{ex:T.ex,op:T.mkt=='fut'?'fut_open':'spot_open',a:{}}).then(function(d){if(S.tr!==T)return;T.open=d.ok?d.r:[];trKeep();trRender()}).catch(function(){})}
+function trSet(k,v){trKeep();S.tr[k]=v;tick();trRender()}
+function trPct(p){var T=S.tr,i=T.info;if(!i)return;var e=document.getElementById('tr_a');if(!e)return;
+ var av=T.mkt=='spot'&&T.side=='sell'?i.avail.base:i.avail.quote;var x=av*p/100;e.value=T.mkt=='spot'&&T.side=='sell'?(+x.toPrecision(8)):Math.floor(x*100)/100;trKeep();trRender()}
+function trPick(){var T=S.tr,kind=T.mkt=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(b){S.tr=T;T.sym=b.replace(/USDT$/,'')+'USDT';T.v={};T.lev=null;trRender();trLoad()}};pairPick(o);
+ pairsGet(kind).then(function(p){o.list=p;o.loading=false;if(S.pp===o)ppList()}).catch(function(){o.loading=false;if(S.pp===o)ppList()})}
+function trRender(){var T=S.tr;if(!T)return;var i=T.info,fut=T.mkt=='fut',v=T.v||{},base=T.sym.replace(/(USDT|USDC|FDUSD)$/,'');
+ var h='<h4 style="display:flex;align-items:center;gap:8px"><span class="chip glass on" style="padding:3px 9px;font-size:11px">'+(fut?'Futures':'Spot')+'</span><span onclick="trPick()" style="display:flex;align-items:center;gap:6px;cursor:pointer">'+coinIc(T.sym,22)+esc(T.sym)+' <span style="opacity:.5">▾</span></span><span style="margin-left:auto;font-size:15px">'+(i?fp(i.price):'…')+'</span></h4>';
+ if(T.err){h+='<p class="r">'+esc(cexErr(T.err.err))+'</p>'+(T.err.msg?'<p class="rs">'+esc(T.err.msg)+'</p>':'');sheetOpen(h);return}
+ if(i&&!i.perm[T.mkt]){h+='<p class="r" style="line-height:1.5">'+esc(t(fut?'tr_noperm_fut':'tr_noperm_spot'))+'</p>';sheetOpen(h);return}
+ var sides=fut?[['long','Long','var(--g)'],['short','Short','var(--r)']]:[['buy','Buy','var(--g)'],['sell','Sell','var(--r)']];
+ h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+sides.map(function(x){var on=T.side==x[0];return'<button class="btn" style="margin:0;'+(on?'background:'+x[2]+';color:#0b0b0c;border-color:transparent':'')+'" onclick="trSet(\'side\',\''+x[0]+'\')">'+x[1]+'</button>'}).join('')+'</div>';
+ var ch=function(k,val,l){return'<span class="chip glass'+(T[k]==val?' on':'')+'" onclick="trSet(\''+k+'\','+JSON.stringify(val).replace(/"/g,"'")+')">'+esc(l)+'</span>'};
+ h+='<div class="chips" style="margin-bottom:10px">'+ch('type','market','Market')+ch('type','limit','Limit')+'</div>';
+ if(T.type=='limit')h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('tr_p',t('df_limit_p'),v.tr_p!=null?v.tr_p:(i?i.price:''));
+ if(fut){h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('tr_lev'))+': <b style="color:var(--ink)">'+(T.lev||'—')+'x</b></div><div class="chips" style="margin-bottom:10px;flex-wrap:wrap">'+[1,2,3,5,10,20,50].map(function(x){return ch('lev',x,x+'x')}).join('')+'</div>'}
+ var sell=!fut&&T.side=='sell',av=i?(sell?i.avail.base:i.avail.quote):null;
+ h+='<div class="rs" style="margin:0 2px 5px">'+esc(t(fut?'tr_margin':sell?'tr_qty':'df_amount'))+(av!=null?' · '+esc(t('df_free'))+': <b style="color:var(--ink)">'+(sell?(+av.toPrecision(8))+' '+esc(base):'$'+n2(av))+'</b>':'')+'</div>'+dfIn('tr_a','0',v.tr_a||'')
+  +'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="trPct('+x+')">'+x+'%</span>'}).join('')+'</div>';
+ var amt=parseFloat(v.tr_a),px=T.type=='limit'?parseFloat(v.tr_p):(i?i.price:NaN);
+ if(amt>0&&px>0){var line=fut?(esc(t('tr_size'))+' ≈ $'+n2(amt*(T.lev||1))+' · '+(+(amt*(T.lev||1)/px).toPrecision(6))+' '+esc(base)):sell?('≈ $'+n2(amt*px)):('≈ '+(+(amt/px).toPrecision(6))+' '+esc(base));h+='<div class="rs" style="margin:-4px 2px 10px">'+line+'</div>'}
+ if(fut)h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('tr_tp',t('df_tp_opt'),v.tr_tp||'')+dfIn('tr_sl',t('df_sl_opt'),v.tr_sl||'')+'</div>';
+ var col=(T.side=='long'||T.side=='buy')?'var(--g)':'var(--r)',lab=(fut?(T.side=='long'?'Long ':'Short '):(T.side=='buy'?'Buy ':'Sell '))+T.sym+(fut&&T.lev?' '+T.lev+'x':'');
+ h+='<button class="btn full" id="tr_go" style="width:100%;margin-top:4px;background:'+col+';color:#0b0b0c;border-color:transparent;font-weight:800"'+(i?'':' disabled')+' onclick="trGo()">'+esc(lab)+'</button>';
+ var O=T.open;if(O&&O.length){h+='<div class="rs" style="margin:14px 2px 6px;font-weight:700">'+esc(t('tr_open'))+' ('+O.length+')</div><div style="max-height:30vh;overflow-y:auto">'+O.map(function(o){
+  var tp=o.type.replace(/_/g,' ').toUpperCase();return'<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06)">'+coinIc(o.sym,20)
+  +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+esc(o.sym)+' <span style="font-size:10.5px;color:'+(o.side=='buy'?'var(--g)':'var(--r)')+'">'+o.side.toUpperCase()+'</span> <span class="rs" style="display:inline">'+esc(tp)+'</span></div>'
+  +'<div class="rs">'+(o.trigger?'⚡ '+fp(o.trigger):fp(o.price))+(o.qty?' · '+(+o.qty)+'':'')+(o.close?' · close':'')+'</div></div>'
+  +'<span class="chip glass" style="color:var(--r)" onclick="trCancel(\''+esc(o.sym)+'\','+o.id+','+(o.algo?1:0)+')">✕</span></div>'}).join('')+'</div>'}
+ sheetOpen(h)}
+function trGo(){trKeep();var T=S.tr,i=T.info,v=T.v,fut=T.mkt=='fut';if(!i)return;var a={sym:T.sym,side:T.side,type:T.type},amt=parseFloat(v.tr_a);
+ if(!(amt>0)){toast(esc(t('tr_need_amt')));return}
+ if(T.type=='limit'){var p=parseFloat(v.tr_p);if(!(p>0)){toast(esc(t('df_limit_p')));return}a.price=p}
+ if(fut){a.margin=amt;a.lev=T.lev||10;var tp=parseFloat(v.tr_tp),sl=parseFloat(v.tr_sl);if(tp>0)a.tp=tp;if(sl>0)a.sl=sl}
+ else if(T.side=='buy')a.quote=amt;else a.qty=amt;
+ var sum=(fut?(T.side=='long'?'LONG':'SHORT')+' '+T.sym+' '+a.lev+'x · '+t('tr_margin')+' $'+n2(amt):(T.side=='buy'?'BUY ':'SELL ')+T.sym+' · '+(T.side=='buy'?'$'+n2(amt):amt))+' · '+(T.type=='limit'?'Limit '+a.price:'Market')+(a.tp?' · TP '+a.tp:'')+(a.sl?' · SL '+a.sl:'');
+ confirmBox(t('tr_confirm')+'\n\n'+sum,function(){var b=document.getElementById('tr_go');if(b){b.disabled=true;b.textContent=t('cx_check')}
+  api('cextrade',{ex:T.ex,op:fut?'fut_order':'spot_order',a:a}).then(function(d){
+   if(d.ok){haptic('success');var r=d.r||{};toast('✅ '+esc(t('tr_sent'))+(r.status?' · '+esc(r.status):'')+((r.warn||[]).length?'<br><span class="r" style="font-size:12px">'+esc(r.warn.join('; '))+'</span>':''));T.v={};S.cex=null;cexLoad(1);trLoad()}
+   else{haptic('error');toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''));trRender()}})
+  .catch(function(e){toast(esc(t(e==429?'cx_e_rate':'cx_e_net')));trRender()})})}
+function trCancel(sym,id,algo){var T=S.tr;confirmBox(t('tr_cancel_q'),function(){api('cextrade',{ex:T.ex,op:T.mkt=='fut'?'fut_cancel':'spot_cancel',a:{sym:sym,id:id,algo:!!algo}}).then(function(d){
+ if(d.ok){toast(esc(t('tr_cancelled')));trOrders()}else toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}).catch(function(){toast(esc(t('cx_e_net')))})})}
+function trCloseSheet(sym,ps){tick();sheetOpen('<h4>'+coinIc(sym,20)+' '+esc(t('tr_close'))+' · '+esc(sym)+'</h4><p>'+esc(t('tr_close_txt'))+'</p><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+ +[25,50,75,100].map(function(x){return'<button class="btn" style="margin:0'+(x==100?';background:rgba(255,92,92,.16);color:var(--r);border-color:rgba(255,92,92,.3)':'')+'" onclick="trClose(\''+esc(sym)+'\',\''+esc(ps||'BOTH')+'\','+(x/100)+')">'+x+'%</button>'}).join('')+'</div>')}
+function trClose(sym,ps,frac){confirmBox(t('tr_close_q',{p:Math.round(frac*100),s:sym}),function(){api('cextrade',{ex:'binance',op:'fut_close',a:{sym:sym,ps:ps,frac:frac}}).then(function(d){
+ if(d.ok){haptic('success');sheetClose();toast('✅ '+esc(t('tr_closed')));S.cex=null;cexLoad(1)}else{haptic('error');toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}}).catch(function(){toast(esc(t('cx_e_net')))})})}
+function trTpslSheet(sym,ps){tick();sheetOpen('<h4>TP / SL · '+esc(sym)+'</h4><p>'+esc(t('df_tpsl_hint'))+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('ts_tp','TP','')+dfIn('ts_sl','SL','')+'</div>'
+ +'<button class="btn p full" style="width:100%" onclick="trTpsl(\''+esc(sym)+'\',\''+esc(ps||'BOTH')+'\')">'+esc(t('save'))+'</button>')}
+function trTpsl(sym,ps){var a={sym:sym,ps:ps},tp=parseFloat(dfV('ts_tp')),sl=parseFloat(dfV('ts_sl'));if(tp>0)a.tp=tp;if(sl>0)a.sl=sl;
+ api('cextrade',{ex:'binance',op:'fut_tpsl',a:a}).then(function(d){if(d.ok){var w=(d.r||{}).warn||[];haptic(w.length?'warning':'success');sheetClose();toast((w.length?'⚠️ '+esc(w.join('; ')):'✅ '+esc(t('tr_tpsl_ok'))))}
+ else toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}).catch(function(){toast(esc(t('cx_e_net')))})}
 /* 329: savdolar tarixi (Binance) */
 function ctrDate(ms){var d=new Date(ms),z=function(x){return('0'+x).slice(-2)};return z(d.getDate())+'.'+z(d.getMonth()+1)+(d.getFullYear()!=new Date().getFullYear()?'.'+String(d.getFullYear()).slice(2):'')+' '+z(d.getHours())+':'+z(d.getMinutes())}
 function cexTrades(ex,fresh){tick();S.ctr={ex:ex,seg:(S.ctr&&S.ctr.seg)||'fut',d:null};ctrRender();

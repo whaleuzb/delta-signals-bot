@@ -7977,3 +7977,17 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Relay `/trades`; web `/api/app/cextrades {ex, fresh?}` — 10 daq kesh (fresh — 60 s), `_act_allowed`, relay timeout 90 s. Saqlanmaydi (bazaga yozilmaydi).
 - Ilova: Binance oynasida "📜 Savdolar tarixi" → Futures (PnL/savdolar/win rate, komissiya, funding, ro'yxat) | Spot (orderlar BUY/SELL, miqdor @ narx, summa), "Yangilash".
 - Sinov: `test_329.py` 13/13, brauzer `t_ctr.py`.
+
+## 330. Ilova ichida savdo — Binance Spot + USDT-M Futures (REAL PUL)
+- Foydalanuvchi: "endi app ichida savdo qiladigan qilaylik" → tanlov: Binance, Spot va Futures ikkalasi.
+- `cex.trade(ex,k,op,a)` (`TRADE_EX=("binance",)`), amallar `TRADE_OPS`: info, spot_order, spot_open, spot_cancel, fut_order, fut_close, fut_open, fut_cancel, fut_tpsl. `_bn_send` — imzolangan POST/DELETE (`_req` umumiy, `_get` uning ustida).
+  - Ruxsat: har yozuvchi amaldan oldin `bn_trade_perms` (`apiRestrictions`: enableSpotAndMarginTrading / enableFutures) → yo'q bo'lsa `ApiErr("noperm")`. Pul yechish ruxsatli kalit baribir ulanmaydi (`verify`).
+  - Filtrlar `bn_filters` (spot — juftlik bo'yicha, fyuchers — butun exchangeInfo, 1 soat kesh): miqdor step'ga PASTGA (`_floor`, Decimal), narx tick'ka (`_round`). Market — MARKET_LOT_SIZE step.
+  - Spot: market BUY — `quoteOrderQty` (USDT, 0.01 ga pastga); limit BUY — qty = summa/narx; SELL — coin miqdori.
+  - Futures: avval `/fapi/v1/leverage`, keyin qty = marja×leveraj/narx (market — mark narx). Hedge rejim (`positionSide/dual`) — `positionSide` LONG/SHORT; one-way — yo'q. TP/SL — `closePosition` shartli orderlar: avval Algo API (`/fapi/v1/algoOrder`, algoType=CONDITIONAL, triggerPrice — 2025-12 dan Binance shartli orderlarni shu yerga ko'chirgan), endpoint yo'q (404/-1100/-1102) bo'lsa eski `/fapi/v1/order` stopPrice. TP/SL xatosi asosiy orderni bekor qilmaydi — `warn` ro'yxati.
+  - Yopish (`fut_close`, frac 0–1): one-way — `reduceOnly`, hedge — `positionSide` (reduceOnly YUBORILMAYDI); 100% — aniq pozitsiya miqdori.
+  - `fut_tpsl`: shu pozitsiyaning eski TP/SL (trigger + closePosition yoki *_market) oddiy va algo orderlari bekor → yangilari qo'yiladi; bo'sh qiymat — olib tashlanadi. Oddiy limit orderlarga tegilmaydi.
+- Snapshot (binance): `trade: {spot, fut}` ruxsatlari, pozitsiyada `ps` (positionSide).
+- Web `/api/app/cextrade {ex, op, a}`: `a` kalitlari oq ro'yxat (`_TRADE_ARGS`), ≤1000 bayt, `_act_allowed`; yozuvchi amallar `cex_orders` jadvaliga (args, ok, natija/xato — kalitsiz) va logga; balans/savdolar keshi tozalanadi. Relay `/trade`.
+- Ilova: Binance oynasida "Spot savdo"/"Futures savdo" (ruxsat bo'lmasa — ko'rsatma), pozitsiyada "TP / SL" va "Yopish" (25/50/75/100%), spot aktivni bosish — sotish oynasi. Savdo oynasi (`trOpen/trRender/trGo`): juftlik tanlash (`pairPick`), Long/Short yoki Buy/Sell, Market/Limit, leveraj chiplari, marja/summa + % chiplari, taxminiy hajm, TP/SL, ochiq orderlar (bekor qilish). HAR order/yopish/bekor — `confirmBox` tasdig'i.
+- Sinov: `test_330.py` 35/35 (imzo, yaxlitlash, hedge/one-way, Algo fallback, TP/SL almashtirish, ruxsat, endpoint jurnali), brauzer `t_tr.py`. ⚠️ Real Binance bilan foydalanuvchi kichik summada sinashi kerak.
