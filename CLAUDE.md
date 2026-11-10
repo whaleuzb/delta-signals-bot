@@ -8158,3 +8158,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Order ID — MATN hamma joyda (`_oid`: harf/raqam/_-; Bitget/BingX 19 xonali, MEXC "C02__…"); ilovada onclick'larda qo'shtirnoqda, `+k.slice(1)` olib tashlandi.
 - Ilova: `ex=='binance'` cheklovlari olib tashlandi (tvView, cexOpen ruxsatlari, cxOrders, tvSellAsset, aktivlar Sell); `cxEx()` — joriy birja (trOpen/trClose/trTpsl); `sgDests` — barcha birjalar (Futures: MEXC'dan tashqari, Spot: LONG). Bildirishnomalar orderlari ham barcha birjalarda.
 - Bitget/BingX pozitsiyalarida `ps` (hedge tomoni). Sinov: `test_355.py` 30/30 (so'rov shakli, imzo, katta ID), `test_330` yangilandi (noma'lum birja — noex), brauzer `t_bg.py`. Haqiqiy API'da sinalmagan — birinchi orderlarni kichik summada tekshirish.
+
+## 356. Rejalashtirilgan reklama: MT Community jamoaviy guruhga qabul (albom + tugma)
+- Foydalanuvchi: 3 ta rasm + mamurjon.com dagi qabul ma'lumoti (mundarija, muddat) — 11-noyabr 09:00 (Toshkent) da "Mamurjon mt" kanali, News Trade (`NEWS_CHANNEL_ID`) va botda hammaga.
+- Ma'lumot manbai: `https://mamurjon.com/api/config` (offline-group "Jamoaviy": 2–3 oy, $1299; `enrollEnd` 2026-11-15 23:59 +05; DIQQAT: o'sha paytda `available: false` edi). Narx postga qo'yilmadi.
+- `announce/promo-2026-11-mt/{1,2,3}.jpg, caption.txt`; `promo_job` (har 60 s): `PROMO_AT` 04:00 UTC dan keyin, 6 soatdan kech emas, `PROMO_KEY` bayrog'i avval qo'yiladi. Albomga Telegram tugma qo'ymaydi → albom (izoh 1-rasmda) + ostida tugmali xabar ("📝 Ariza qoldirish" mamurjon.com/#plans, "💬 Menejer" @managermtuz). Bot foydalanuvchilariga: admin nusxasi → `run_broadcast` (`msg_ids` albom + `after` tugmali xabar).
+- Sinov `test_356.py` 9/9. Broadcast paytida push qilinmasin (09:00 dan keyin ~2–3 daqiqa).

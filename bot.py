@@ -9259,6 +9259,8 @@ async def run_broadcast(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # Albom (214) — `copy_messages` qismlarni BITTA albom qilib nusxalaydi.
         if len(msg_ids) > 1:
             await ctx.bot.copy_messages(uid, from_chat, msg_ids)
+            if d.get("after"):     # 356: albom ostidagi tugmali xabar (albomga tugma qo'yib bo'lmaydi)
+                await ctx.bot.copy_message(uid, from_chat, d["after"], reply_markup=d.get("markup"))
         else:
             # 253: copy_message tugmani o'zi ko'chirmaydi — alohida beriladi.
             await ctx.bot.copy_message(uid, from_chat, msg_ids[0],
@@ -11670,6 +11672,80 @@ async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("E'lon kanalga yuborilmadi (ws=%s)", row["id"])
 
 
+# 356: rejalashtirilgan reklama posti — albom (3 rasm + izoh) va ostida tugmali xabar:
+# "Mamurjon mt" kanali, News Trade kanali (NEWS_CHANNEL_ID) va botdagi hamma foydalanuvchilar.
+PROMO_KEY = "promo_2026_11_mt_group"
+PROMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce", "promo-2026-11-mt")
+PROMO_AT = datetime(2026, 11, 11, 4, 0, tzinfo=timezone.utc)    # 09:00 Toshkent (UTC+5)
+PROMO_LATE = timedelta(hours=6)       # shundan kech bo'lsa — yuborilmaydi (eskirgan reklama)
+
+
+def _promo_kb():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Ariza qoldirish", url="https://mamurjon.com/#plans",
+                              api_kwargs={"style": "success"})],
+        [InlineKeyboardButton("💬 Menejer: @managermtuz", url="https://t.me/managermtuz")]])
+
+
+async def _promo_send(bot, chat_id, caption: str) -> tuple[list[int], int]:
+    from telegram import InputMediaPhoto
+    files = [open(os.path.join(PROMO_DIR, f"{i}.jpg"), "rb") for i in (1, 2, 3)]
+    try:
+        media = [InputMediaPhoto(f, caption=caption if i == 0 else None,
+                                 parse_mode=ParseMode.HTML if i == 0 else None) for i, f in enumerate(files)]
+        msgs = await bot.send_media_group(chat_id, media)
+    finally:
+        for f in files:
+            f.close()
+    btn = await bot.send_message(chat_id, "👇 <b>Joyingizni band qiling</b> — qabul 15-noyabr, 23:59 gacha",
+                                 parse_mode=ParseMode.HTML, reply_markup=_promo_kb())
+    return [m.message_id for m in msgs], btn.message_id
+
+
+async def promo_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    now = datetime.now(timezone.utc)
+    if now < PROMO_AT or now > PROMO_AT + PROMO_LATE or not config.ADMIN_IDS:
+        return
+    if await db.get_setting(PROMO_KEY):
+        return
+    await db.set_setting(PROMO_KEY, "started")       # avval bayroq — qayta ishga tushishda ikki marta ketmasin
+    try:
+        with open(os.path.join(PROMO_DIR, "caption.txt"), encoding="utf-8") as f:
+            caption = f.read().strip()
+    except Exception:
+        log.exception("Reklama posti: izoh o'qilmadi")
+        return
+    admin = min(config.ADMIN_IDS)
+    # kanallar
+    chans = []
+    try:
+        async with db.pool().acquire() as c:
+            row = await c.fetchrow(
+                "SELECT group_chat_id FROM workspaces WHERE is_channel AND group_chat_id IS NOT NULL "
+                "AND (lower(name) LIKE 'mamurjon mt%' OR id=290) ORDER BY (id=290) DESC, id LIMIT 1")
+        if row:
+            chans.append(("Mamurjon mt", row["group_chat_id"]))
+    except Exception:
+        log.exception("Reklama posti: Mamurjon mt kanali topilmadi")
+    if config.NEWS_CHANNEL_ID:
+        chans.append(("News Trade", config.NEWS_CHANNEL_ID))
+    for name, cid in chans:
+        try:
+            await _promo_send(ctx.bot, cid, caption)
+            log.info("Reklama posti kanalga yuborildi: %s", name)
+        except Exception:
+            log.exception("Reklama posti kanalga yuborilmadi: %s", name)
+    # bot foydalanuvchilari — admin'ga yuborilgan nusxa hammaga ko'chiriladi
+    try:
+        ids, btn = await _promo_send(ctx.bot, admin, caption)
+    except Exception:
+        log.exception("Reklama posti adminga yuborilmadi — broadcast boshlanmadi")
+        return
+    log.info("Reklama posti broadcast boshlandi (albom %s, tugma %s)", ids, btn)
+    ctx.job_queue.run_once(run_broadcast, 3, data={
+        "admin": admin, "from_chat": admin, "msg_ids": ids, "after": btn, "markup": _promo_kb()})
+
+
 def _announce_kb():
     """253: e'lon ostidagi tugma — Mini App (shaxsiy chatda web_app ishlaydi)."""
     if not config.WEB_URL:
@@ -12010,6 +12086,7 @@ def main() -> None:
     app.job_queue.run_once(announce_job, 60)
     app.job_queue.run_once(announce_channel_job, 90)
     app.job_queue.run_once(ensure_dw_task, 30)
+    app.job_queue.run_repeating(promo_job, interval=60, first=45)
     app.job_queue.run_once(promo_emoji_job, 15)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
