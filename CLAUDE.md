@@ -8089,3 +8089,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `ANNOUNCE_KEY = announce_2026_11_exchange`, `announce/2026-11-exchange.{png,txt}`; tugma `ANNOUNCE_BTN` = "🏦 Birjani ulash" → `/app?tab=wallet` (Birja bo'limi).
 - Rasm: yangi dizayn (qora + #c2f23a), 4 birja logosi, 3 telefon (Savdo Spot, Spot grafik limit chiziqlari bilan, Spot statistika), pastda "Birjani ulash" tugmasi. Foydalanuvchi talabi: reklamada FAQAT Spot ko'rinsin.
 - Skrinshotlar `t_ann.py` (sinov ma'lumotlari), banner `banner.html` (scratchpad) → Playwright 1600×1000.
+
+## 345. E'lon "Mamurjon mt" kanaliga ham
+- `announce_channel_job` (ishga tushgandan 90 s keyin, bir marta — `ANNOUNCE_CH_KEY`): kanal `workspaces` dan (`is_channel`, nomi "mamurjon mt…" yoki id=290), o'sha rasm + matn `send_photo`.
+- Kanalda web_app tugma ishlamaydi → url tugma `t.me/<bot>?startapp=wallet`; `webapp.html` `start_param` TABS nomi bo'lsa (`wallet`) o'sha bo'limni ochadi.
+- Sinov `test_345.py` (bir marta yuboradi, ikkinchisida yo'q).

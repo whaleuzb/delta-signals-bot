@@ -1703,7 +1703,7 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
  var q0=new URLSearchParams(location.search);
  try{var nv=performance.getEntriesByType('navigation')[0];var sv=sessionStorage.getItem('tc_nav');if(nv&&nv.type=='reload'&&sv)q0=new URLSearchParams(sv)}catch(e){}
  var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
- if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));
+ if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));if(TABS.indexOf(sp)>=0&&!q0.get('tab'))q0.set('tab',sp);
  if(!tg||!tg.initData){S.pub=true;S.bot=BOT;var nl=q0.get('lang');S.lang=T[nl]?nl:'uz';try{var sl0=localStorage.getItem('tc_lang');if(sl0&&T[sl0])S.lang=sl0}catch(e){}
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};

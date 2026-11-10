@@ -11584,6 +11584,35 @@ async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "markup": _announce_kb()})
 
 
+# 345: o'sha e'lon "Mamurjon mt" kanaliga ham (bir marta). Kanalda web_app tugma
+# ishlamaydi — `t.me/<bot>?startapp=wallet` (ilova Birja bo'limida ochiladi).
+ANNOUNCE_CH_KEY = "announce_2026_11_exchange_ch"
+
+
+async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if await db.get_setting(ANNOUNCE_CH_KEY):
+        return
+    async with db.pool().acquire() as c:
+        row = await c.fetchrow(
+            "SELECT id, group_chat_id FROM workspaces WHERE is_channel AND group_chat_id IS NOT NULL "
+            "AND (lower(name) LIKE 'mamurjon mt%' OR id=290) ORDER BY (id=290) DESC, id LIMIT 1")
+    if not row:
+        log.warning("E'lon: 'Mamurjon mt' kanali topilmadi")
+        return
+    await db.set_setting(ANNOUNCE_CH_KEY, "started")
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        ANNOUNCE_BTN[0], url=f"https://t.me/{BOT_USERNAME}?startapp=wallet",
+        api_kwargs={"style": "success"})]]) if BOT_USERNAME else None
+    try:
+        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
+            caption = f.read().strip()
+        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
+            await ctx.bot.send_photo(row["group_chat_id"], f, caption=caption[:1024], reply_markup=kb)
+        log.info("E'lon kanalga yuborildi (ws=%s)", row["id"])
+    except Exception:
+        log.exception("E'lon kanalga yuborilmadi (ws=%s)", row["id"])
+
+
 def _announce_kb():
     """253: e'lon ostidagi tugma — Mini App (shaxsiy chatda web_app ishlaydi)."""
     if not config.WEB_URL:
@@ -11922,6 +11951,7 @@ def main() -> None:
     app.job_queue.run_repeating(member_count_job, interval=6 * 3600, first=200)
     app.job_queue.run_repeating(df_tour_job, interval=120, first=20)
     app.job_queue.run_once(announce_job, 60)
+    app.job_queue.run_once(announce_channel_job, 90)
     app.job_queue.run_once(promo_emoji_job, 15)
     app.job_queue.run_repeating(housekeeping_job, interval=86400, first=240)
     # Pay Members to'lov botlari hali faolmi (182-band).
