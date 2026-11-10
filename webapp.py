@@ -826,7 +826,7 @@ async def _cx_call(op: str, ex: str, k: dict):
         log.warning("cex servisiga ulanib bo'lmadi (%s): %s", op, type(e).__name__)
         raise cex.ApiErr("net", type(e).__name__)
     if d.get("err"):
-        raise cex.ApiErr(d["err"])
+        raise cex.ApiErr(d["err"], str(d.get("msg") or ""))
     return d.get("snap")
 
 
@@ -892,6 +892,18 @@ async def api_cex(request):
     return web.json_response({"acc": list(res)}, headers=NO_CACHE)
 
 
+def _cx_msg(text: str) -> str:
+    """Birja javobidan foydalanuvchiga ko'rsatiladigan qisqa matn (JSON bo'lsa — `msg`)."""
+    t = (text or "").strip()
+    try:
+        d = json.loads(t)
+        if isinstance(d, dict):
+            t = str(d.get("msg") or d.get("message") or t)
+    except ValueError:
+        pass
+    return t[:160]
+
+
 async def api_cexadd(request):
     import cex
     body, uid = await _body(request)
@@ -908,8 +920,9 @@ async def api_cexadd(request):
     try:
         await _cx_call("verify", ex, k)
     except cex.ApiErr as e:
-        log.info("Birja kaliti rad etildi (%s, uid=%s): %s", ex, uid, e.code)
-        return web.json_response({"ok": False, "err": e.code}, headers=NO_CACHE)
+        log.info("Birja kaliti rad etildi (%s, uid=%s): %s — %s", ex, uid, e.code, e.text[:200])
+        return web.json_response({"ok": False, "err": e.code, "msg": _cx_msg(e.text)},
+                                 headers=NO_CACHE)
     except Exception:
         log.warning("Birja kalitini tekshirishda xato (%s)", ex, exc_info=True)
         return web.json_response({"ok": False, "err": "api"}, headers=NO_CACHE)
@@ -1163,10 +1176,10 @@ T["uz"].update({
     "cx_assets": "Spot aktivlar", "cx_entry": "Kirish", "cx_empty": "Hisobda aktiv yoki pozitsiya yo'q.",
     "cx_rekey": "Kalitni yangilash", "cx_del": "Uzish", "cx_del_q": "Birja hisobini uzasizmi? Kalit bazadan o'chiriladi.",
     "cx_deleted": "Hisob uzildi, kalit o'chirildi", "cx_upd": "Yangilanmoqda…",
-    "cx_how": "Birjada yangi API kalit yarating va FAQAT «O'qish» (Read-only) ruxsatini bering. Savdo va pul yechish ruxsatlarini yoqmang. Kalitlar shifrlangan holda saqlanadi.",
+    "cx_how": "Birjada yangi API kalit yarating: FAQAT «O'qish» (Read-only) ruxsati, IP cheklovi — yo'q (Unrestricted). Binance'da kalit turi — «System generated». Savdo va pul yechish ruxsatlarini yoqmang. Kalitlar shifrlangan holda saqlanadi.",
     "cx_fill": "Barcha maydonlarni to'ldiring", "cx_check": "Tekshirilmoqda…", "cx_ok": "Birja hisobi ulandi ✅",
     "cx_safe": "Bot faqat balans va pozitsiyalarni o'qiydi — savdo qilmaydi va pul yecha olmaydi. Kalitlar shifrlangan, istalgan payt uzishingiz mumkin.",
-    "cx_e_auth": "Kalit noto'g'ri yoki muddati o'tgan", "cx_e_withdraw": "Bu kalitda pul yechish ruxsati bor — xavfsizlik uchun qabul qilinmaydi. Faqat o'qish kalitini yarating.",
+    "cx_e_auth": "Birja kalitni qabul qilmadi. Tekshiring: IP cheklovi o'chirilgan (Unrestricted), kalit turi «System generated» (HMAC), API Key va Secret to'liq nusxalangan", "cx_e_withdraw": "Bu kalitda pul yechish ruxsati bor — xavfsizlik uchun qabul qilinmaydi. Faqat o'qish kalitini yarating.",
     "cx_e_geo": "Birja server hududidan so'rovni blokladi — tez orada tuzatiladi", "cx_e_net": "Birja javob bermadi, keyinroq urinib ko'ring",
     "cx_e_api": "Birjadan ma'lumot olinmadi", "cx_e_bad": "Kalit formati noto'g'ri", "cx_e_reconnect": "Kalitni qayta ulang",
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
@@ -1179,10 +1192,10 @@ T["ru"].update({
     "cx_assets": "Спот-активы", "cx_entry": "Вход", "cx_empty": "На счёте нет активов и позиций.",
     "cx_rekey": "Обновить ключ", "cx_del": "Отключить", "cx_del_q": "Отключить биржевой счёт? Ключ будет удалён.",
     "cx_deleted": "Счёт отключён, ключ удалён", "cx_upd": "Обновляем…",
-    "cx_how": "Создайте на бирже новый API-ключ ТОЛЬКО с правом «Чтение» (Read-only). Не включайте торговлю и вывод. Ключи хранятся в зашифрованном виде.",
+    "cx_how": "Создайте на бирже новый API-ключ: ТОЛЬКО «Чтение» (Read-only), без ограничения по IP (Unrestricted). На Binance тип ключа — «System generated». Не включайте торговлю и вывод. Ключи хранятся в зашифрованном виде.",
     "cx_fill": "Заполните все поля", "cx_check": "Проверяем…", "cx_ok": "Биржевой счёт подключён ✅",
     "cx_safe": "Бот только читает баланс и позиции — не торгует и не может выводить средства. Ключи зашифрованы, отключить можно в любой момент.",
-    "cx_e_auth": "Неверный или просроченный ключ", "cx_e_withdraw": "У ключа есть право вывода — из соображений безопасности не принимается. Создайте ключ только для чтения.",
+    "cx_e_auth": "Биржа не приняла ключ. Проверьте: ограничение по IP выключено (Unrestricted), тип ключа «System generated» (HMAC), API Key и Secret скопированы полностью", "cx_e_withdraw": "У ключа есть право вывода — из соображений безопасности не принимается. Создайте ключ только для чтения.",
     "cx_e_geo": "Биржа блокирует регион сервера — скоро исправим", "cx_e_net": "Биржа не ответила, попробуйте позже",
     "cx_e_api": "Не удалось получить данные биржи", "cx_e_bad": "Неверный формат ключа", "cx_e_reconnect": "Подключите ключ заново",
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
@@ -1195,10 +1208,10 @@ T["en"].update({
     "cx_assets": "Spot assets", "cx_entry": "Entry", "cx_empty": "No assets or positions on this account.",
     "cx_rekey": "Update key", "cx_del": "Disconnect", "cx_del_q": "Disconnect this exchange? The key will be deleted.",
     "cx_deleted": "Disconnected, key deleted", "cx_upd": "Refreshing…",
-    "cx_how": "Create a new API key on the exchange with READ-ONLY permission. Do not enable trading or withdrawals. Keys are stored encrypted.",
+    "cx_how": "Create a new API key: READ-ONLY permission, no IP restriction (Unrestricted). On Binance choose the «System generated» key type. Do not enable trading or withdrawals. Keys are stored encrypted.",
     "cx_fill": "Fill in all fields", "cx_check": "Checking…", "cx_ok": "Exchange connected ✅",
     "cx_safe": "The bot only reads balances and positions — it cannot trade or withdraw. Keys are encrypted and you can disconnect any time.",
-    "cx_e_auth": "Invalid or expired key", "cx_e_withdraw": "This key can withdraw funds — rejected for safety. Create a read-only key.",
+    "cx_e_auth": "The exchange rejected the key. Check: IP restriction is off (Unrestricted), key type is «System generated» (HMAC), API Key and Secret are copied in full", "cx_e_withdraw": "This key can withdraw funds — rejected for safety. Create a read-only key.",
     "cx_e_geo": "The exchange blocks the server region — fix coming soon", "cx_e_net": "The exchange did not respond, try later",
     "cx_e_api": "Could not load exchange data", "cx_e_bad": "Invalid key format", "cx_e_reconnect": "Please reconnect the key",
     "cx_e_rate": "Too many attempts — try in a minute", "cx_e_perm": "The key has no read permission",

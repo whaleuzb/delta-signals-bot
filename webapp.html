@@ -462,7 +462,7 @@ function cexSave(ex){var g=function(id){var e=document.getElementById(id);return
  if(!k||!s||(ex=='bitget'&&!p)){toast(esc(t('cx_fill')));return}
  var b=document.getElementById('cx_go');if(b){b.disabled=true;b.textContent=t('cx_check')}
  api('cexadd',{ex:ex,key:k,secret:s,pass:p}).then(function(d){if(d.ok){haptic&&haptic('success');sheetClose();toast(esc(t('cx_ok')));S.cex=null;cexLoad(1)}
-  else{toast(esc(cexErr(d.err)));if(b){b.disabled=false;b.textContent=t('cx_link')}}})
+  else{toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''));if(b){b.disabled=false;b.textContent=t('cx_link')}}})
  .catch(function(e){toast(esc(t(e==429?'cx_e_rate':'cx_e_net')));if(b){b.disabled=false;b.textContent=t('cx_link')}})}
 function cexDel(ex){confirmBox(t('cx_del_q'),function(){api('cexdel',{ex:ex}).then(function(){sheetClose();S.cex={acc:((S.cex||{}).acc||[]).filter(function(a){return a.ex!=ex}),at:Date.now()};render();toast(esc(t('cx_deleted')))}).catch(function(){toast(esc(t('cx_e_net')))})})}
 /* ---- bosh sahifa: slayder + kartalar ---- */

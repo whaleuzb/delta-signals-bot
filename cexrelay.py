@@ -58,7 +58,9 @@ async def verify(request):
     try:
         await cex.verify(ex, k)
     except cex.ApiErr as e:
-        return web.json_response({"err": e.code})
+        # Birja javobi (kalitsiz) — sababni ko'rish uchun logga va foydalanuvchiga.
+        log.info("verify rad (%s): %s — %s", ex, e.code, e.text[:200])
+        return web.json_response({"err": e.code, "msg": e.text[:200]})
     except Exception:
         log.warning("verify xato (%s)", ex, exc_info=True)
         return web.json_response({"err": "api"})
@@ -70,7 +72,8 @@ async def snapshot(request):
     try:
         return web.json_response({"snap": await cex.snapshot(ex, k)})
     except cex.ApiErr as e:
-        return web.json_response({"err": e.code})
+        log.info("snapshot xato (%s): %s — %s", ex, e.code, e.text[:200])
+        return web.json_response({"err": e.code, "msg": e.text[:200]})
     except Exception:
         log.warning("snapshot xato (%s)", ex, exc_info=True)
         return web.json_response({"err": "api"})

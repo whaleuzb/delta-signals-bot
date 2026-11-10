@@ -7955,3 +7955,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `webapp._cx_call(op, ex, k)`: `CEX_RELAY_URL` bo'lsa — relay (30 s timeout, ulanmasa `ApiErr("net")`), bo'lmasa — `cex` moduli to'g'ridan-to'g'ri (lokal/test).
 - Web env: `CEX_RELAY_URL=http://${{cex.RAILWAY_PRIVATE_DOMAIN}}:8080`, `RELAY_TOKEN=${{cex.RELAY_TOKEN}}`.
 - Sinov: `test_326.py` 8/8.
+
+## 327. Birja kaliti rad etilganda — birja javobi ko'rinadi
+- Foydalanuvchi: "binance ulanmadi" — loglarda faqat `auth` (sabab noma'lum).
+- `cexrelay`: rad/xato bo'lsa birja javobi (`ApiErr.text`, kalitsiz) logga va `{"err","msg"}` javobga; `webapp._cx_msg` JSON'dan `msg` ni ajratib foydalanuvchiga (toastda kichik qator).
+- `cx_e_auth`/`cx_how` matnlari: IP cheklovi yo'q (Unrestricted), Binance'da «System generated» (HMAC) kalit turi. Bizning servisning chiquvchi IP'si doimiy EMAS (Railway statik IP — Pro) — IP'ga bog'langan kalit ishlamaydi.
