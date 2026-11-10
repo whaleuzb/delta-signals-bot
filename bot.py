@@ -1680,11 +1680,16 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
             if a["action"] == "dfacc":
                 data = await dipfunded.accounts(uid)
                 s_ = await df_settings(uid)
+                # 347: yopilgan hisoblar (failed, ended…) ilovada ko'rinmaydi
+                live = [x for x in (data.get("accounts") or []) if x.get("status") in DF_LIVE]
+                tour = await _df_tour_acc(uid, live)
                 out = {"main": s_["main"], "accounts": [
-                    {"id": x["id"], "name": _df_name(x), "status": x["status"],
+                    {"id": x["id"], "name": (i18n.t("df.tour_name", lang, size=f"{int(x['size']):,}")
+                                             if x["id"] == tour else _df_name(x)),
+                     "tour": x["id"] == tour, "status": x["status"],
                      "phase": x.get("phase"), "status_txt": _df_status(x, lang),
                      "equity": x.get("equity"), "pnl_pct": x.get("pnl_pct")}
-                    for x in (data.get("accounts") or [])]}
+                    for x in live]}
             else:
                 data = await dipfunded.account(uid, int(a["arg"]))
                 out = _df_state_json(data, lang)
@@ -5837,6 +5842,38 @@ def _df_status(a: dict, lang: str) -> str:
     if a["status"] == "active":
         return i18n.t("df.st_active", lang, n=a["phase"])
     return i18n.t(f"df.st_{a['status']}", lang)
+
+
+DF_LIVE = ("active", "funded", "passed", "review")   # 347: ilovada ko'rinadigan holatlar
+_DF_TOUR: dict = {}    # uid -> (vaqt, hisob id | None)
+
+
+async def _df_tour_acc(uid: int, accs: list) -> int | None:
+    """347: qaysi hisob turnir hisobi. Dip Funded API buni bermaydi (sayt o'zgartirilmaydi) —
+    turnir hisobi Dip Classic $10,000 (crypto); reytingdagi foydalanuvchi nomi va foyda %
+    hisobnikiga mos kelsa — o'sha. 10 daqiqa kesh."""
+    hit = _DF_TOUR.get(uid)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    cand = [x for x in accs if int(x.get("size") or 0) == 10_000 and (x.get("market") or "crypto") == "crypto"
+            and "Classic" in str(x.get("program") or "") and x.get("status") == "active"]
+    found = None
+    if cand:
+        try:
+            st = await dipfunded.stats(uid, cand[0]["id"], limit=1)
+            name = st.get("username")
+            board = (await dipfunded.fetch_tour(limit=100)).get("board") or []
+            rows = [r for r in board if name and r.get("name") == name and not r.get("out")]
+            if rows:
+                pct = float(rows[0].get("pct") or 0)
+                best = min(cand, key=lambda x: abs(float(x.get("pnl_pct") or 0) - pct))
+                if abs(float(best.get("pnl_pct") or 0) - pct) < 0.1 or len(cand) == 1:
+                    found = best["id"]
+        except Exception as e:
+            log.info("Turnir hisobi aniqlanmadi (uid=%s): %s", uid, e)
+            return hit[1] if hit else None
+    _DF_TOUR[uid] = (time.time(), found)
+    return found
 
 
 def _df_name(a: dict) -> str:

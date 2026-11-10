@@ -3910,6 +3910,7 @@ STRINGS.update({
                        "ru": "⚠️ Dip Funded сейчас не отвечает. Попробуйте чуть позже.",
                        "en": "⚠️ Dip Funded is not responding right now. Please try again shortly."},
     "df.err_generic": {"uz": "Amal bajarilmadi.", "ru": "Действие не выполнено.", "en": "The action failed."},
+    "df.tour_name": {"uz": "🏆 Turnir hisobi ${size}", "ru": "🏆 Турнирный счёт ${size}", "en": "🏆 Tournament account ${size}"},
     "df.app_open": {"uz": "💼 <b>Dip Funded</b> endi ilova ichida — birjalar qatorida: hisoblar, savdo, grafik va statistika.",
                     "ru": "💼 <b>Dip Funded</b> теперь в приложении — рядом с биржами: счета, торговля, график и статистика.",
                     "en": "💼 <b>Dip Funded</b> now lives in the app, next to exchanges: accounts, trading, chart and stats."},

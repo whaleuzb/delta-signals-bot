@@ -8106,3 +8106,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Statistika: `cxStats('dipfunded')` → `/api/app/cexstats {ex:'dipfunded', acc}` → `_df_stats` (bot amali `dfstats`: hisobning BARCHA yopilgan savdolari 100 tadan sahifalab) → `_cx_summary` (30k/90k/yil boshidan/hammasi), Futures/Spot chiplari yo'q.
 - Eski boshqaruv: `openDf`/`dfAcc` sahifalari va "Botda boshqarish" olib tashlandi (`openDf()`/`dfAcc(id)` → `dfGo`); `?df=1` → `dfGo`; bot `_df_open` (💼 Dip Funded, /dipfunded) endi ilovani ochadigan tugma (`df.app_open`, `df.app_btn`).
 - Sinov: `test_346.py` 4/4 (sahifalab yig'ish, not_linked), brauzer `t_dfx.py` (ro'yxat, almashtirish, xarid limit+TP/SL, 50% sotish, SL olib tashlash, limit bekor, + Limit, statistika).
+
+## 347. Dip Funded: yopilgan hisoblar ko'rinmaydi, turnir hisobi "🏆 Turnir hisobi"
+- `bot` `dfacc`: faqat `DF_LIVE` = active, funded, passed, review (failed, ended… yashirin).
+- Turnir hisobi: Dip Funded API (`_meta`) `tournament_id` bermaydi, sayt o'zgartirilmaydi — `_df_tour_acc`: nomzod Dip Classic $10,000 crypto active; `/stats` dan `username`, `/tournament?limit=100` reytingida shu nom (out emas) va foyda % hisobnikiga ±0.1 (yoki nomzod bitta) → o'sha hisob. 10 daqiqa kesh (`_DF_TOUR`). Javobda `tour:true`, nom `df.tour_name`.
+- Ilova: chiplarda 🏆, slayd/grafik sarlavhasida `dfAccName` (ro'yxatdagi nom).
+- Sinov: `test_346.py` 8/8.

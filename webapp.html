@@ -1351,6 +1351,7 @@ function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col
 /* ===== 346: Dip Funded — birjalar qatorida (kontekst `cx:dipfunded`): ulash/uzish, hisob almashtirish,
    Bosh sahifa, Savdo ekrani (tvView DF rejimi), grafik (dfTerm), statistika (cxStats). Eski "hisoblar" sahifalari o'rnida. */
 function dfCur(){return S.dfx&&S.dfx.cur}
+function dfAccName(id,def){var a=((S.dfx||{}).accs||[]).filter(function(z){return z.id==id})[0];return a?a.name:(def||'')}
 function dfEntry(){var x=S.dfx;if(S.dfoff||!S.dflink||!x||x.err=='not_linked'||x.err=='profile'||x.err=='off')return null;
  var s=S.dfs&&S.dfs.id==x.cur?S.dfs:null,a=(x.accs||[]).filter(function(z){return z.id==x.cur})[0];
  return{ex:'dipfunded',df:1,mask:a?'#'+a.id+' · '+a.name:'',total:s?+s.equity||0:(a?+a.equity||0:0),spot_usd:s?+s.available||0:0,pos:[],assets:[],
@@ -1410,11 +1411,11 @@ function dfHome(v){var x=S.dfx,s=S.dfs;
  var L=x.accs||[];
  if(!L.length){v.innerHTML='<div class="empty glass rise">'+dfLogo(44)+'<div style="margin:10px 0 14px">'+esc(t('df_none'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button></div>'+tourAd();return}
  var h='';
- if(L.length>1)h+='<div class="chips rise" style="margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">'+L.map(function(a){return'<span class="chip glass'+(a.id==x.cur?' on':'')+'" style="white-space:nowrap" onclick="dfSwitch('+a.id+')">#'+a.id+' · $'+n2(+a.equity||0)+'</span>'}).join('')+'</div>';
+ if(L.length>1)h+='<div class="chips rise" style="margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">'+L.map(function(a){return'<span class="chip glass'+(a.id==x.cur?' on':'')+'" style="white-space:nowrap" onclick="dfSwitch('+a.id+')">'+(a.tour?'🏆 ':'')+'#'+a.id+' · $'+n2(+a.equity||0)+'</span>'}).join('')+'</div>';
  if(!s||s.id!=x.cur){if(!s)dfOneLoad();v.innerHTML=h+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
  var P=s.positions||[],up=0;P.forEach(function(p){up+=+p.upnl||0});var st=(S.cxst||{}).dipfunded;if(!st)cxStatLoad('dipfunded','ytd');var sy=st&&st.ytd;
  var sl=[];
- sl.push('<div class="slide glass acc" onclick="dfOpen()"><div class="art" style="opacity:1">'+dfLogo(34)+'</div><div class="k"><span class="pulse"></span>#'+s.id+' · '+esc(s.name)+'</div>'
+ sl.push('<div class="slide glass acc" onclick="dfOpen()"><div class="art" style="opacity:1">'+dfLogo(34)+'</div><div class="k"><span class="pulse"></span>#'+s.id+' · '+esc(dfAccName(s.id,s.name))+'</div>'
   +'<div class="v">$'+n2(+s.equity||0)+'</div><div class="d"><span class="'+((+s.pnl||0)>=0?'g':'r')+'">'+fm(+s.pnl||0)+'</span> · '+esc(s.status_txt)+'</div></div>');
  sl.push('<div class="slide glass'+(up>0?' acc':'')+'" onclick="go(\'signals\')"><div class="art">'+ic('trend',28)+'</div><div class="k">'+esc(t('pnl_total'))+'</div><div class="v '+(up>=0?'g':'r')+'">'+(P.length?fm(up):'—')+'</div>'
   +'<div class="d">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="sch">'+mbars(P.map(function(p){return +p.upnl||0}),300,46)+'</div>':'')+'</div>');
@@ -1563,7 +1564,7 @@ function dfInfo(i,g,s){var tr=s.tradable,x=i.pos,n2=function(v){return v==null?'
  h+='<div class="mcb"><button class="btn" '+(tr?'':'disabled ')+'onclick="dfTpslSheet()">TP/SL</button><button class="btn" onclick="termMore()">'+esc(t('t_more'))+' '+(g.more?'▴':'▾')+'</button><button class="btn" '+(tr?'':'disabled ')+'onclick="dfSellSheet()">'+esc(t('close'))+'</button></div>';
  return h+'</div>'}
 function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
- var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(s.name):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
+ var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(dfAccName(s.id,s.name)):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
