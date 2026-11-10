@@ -9609,6 +9609,9 @@ async def _app_newsshare(ctx, uid: int, lang, a) -> tuple[bool, str]:
     if hit is None:
         row = await db.news_share_get(mid)
         hit = (row["file_id"], row["body"]) if row else None
+    if hit and hit[1]:
+        # Eski postlarda "📰 MarketTwits" sarlavhasi bor — ulashishda olib tashlanadi.
+        hit = (hit[0], re.sub(r"^📰 <b>MarketTwits</b>\s*", "", hit[1]))
     post_url = f"https://t.me/{NEWS_CHANNEL_USERNAME}/{mid}"
     kb = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("nws.open_btn", lang), url=post_url,
                                                      api_kwargs={"style": "success"})]])
@@ -10330,20 +10333,21 @@ async def _process_markettwits_message(bot_, channel: str, msg_id: int,
     if eid is None:
         return   # boshqa parallel chaqiruv bu hodisani bizdan oldin yozgan
 
-    title = symbol or "MarketTwits"
+    # Tiker yo'q bo'lsa sarlavha QO'YILMAYDI — manba nomi ("MarketTwits")
+    # postda ko'rinmasin, faqat xabarning o'zi (foydalanuvchi talabi).
+    title = symbol
+    head = f"📰 <b>{html.escape(title, quote=False)}</b>\n\n" if title else ""
     # `quote=False` — Telegram HTML rejimida bu oddiy matn (atribut emas),
     # standart `html.escape()` esa '/" belgilarni ham `&#x27;`/`&quot;`ga
     # aylantirardi — Telegram buni ORQAGA parafrazamaydi (xuddi `&#10;`
     # xatosi kabi, foydalanuvchi production'da tasdiqladi), xom holda
     # ko'rinib qolardi.
     if display_body:
-        caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
-                  f"{html.escape(display_body[:1000], quote=False)}")
+        caption = head + html.escape(display_body[:1000], quote=False)
     else:
         # Tarjima bo'lmagan holat — matn YO'Q, faqat o'zbekcha izoh va
         # asl xabarga havola (yuqoridagi izohga qarang).
-        caption = (f"📰 <b>{html.escape(title, quote=False)}</b>\n\n"
-                   f"Yangi bozor xabari chiqdi.\n"
+        caption = (head + ("" if head else "📰 ") + "Yangi bozor xabari chiqdi.\n"
                    f"🔗 <a href=\"{html.escape(source_url)}\">Asl xabarni o'qish</a>")
 
     # Tiker topilmasa (faqat mavzu-hashtag orqali o'tgan bo'lsa) chizadigan

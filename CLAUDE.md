@@ -7927,3 +7927,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `_add_share_button(..., sent=sent)` (9 ta chaqiruv): ma'lumot TAHRIRDAN OLDIN yuborilgan xabardan saqlanadi; TimedOut/NetworkError'da 2 s dan keyin bir qayta urinish ("not modified" — birinchisi o'tgan, xato emas).
 - `_app_newsshare` zaxirasi: ma'lumot yo'q bo'lsa — post havolasi katta link preview bilan (`LinkPreviewOptions(url, prefer_large_media, show_above_text)`); matn bor bo'lsa preview yo'q (takrorlanmasin).
 - Sinov: `test_323.py` 4/4, `test_315.py` 9/9.
+
+## 324. News Trade postlarida "MarketTwits" sarlavhasi olib tashlandi
+- Foydalanuvchi: "markettwits so'zini olib tashlasa bo'ladimi? Xabarni o'zi kelsin".
+- `_process_markettwits_message`: tiker topilmasa sarlavha (`📰 <b>MarketTwits</b>`) QO'YILMAYDI — post faqat xabar matni. Tiker bo'lsa sarlavha avvalgidek aktiv nomi (masalan BTCUSDT).
+- `_app_newsshare`: eski postlar ulashilganda boshidagi `📰 <b>MarketTwits</b>` sarlavhasi kesib tashlanadi.
+- Manba nomi foydalanuvchiga ko'rinmasin — kelajakda ham post/ulashish matnida "MarketTwits" yozilmasin.
