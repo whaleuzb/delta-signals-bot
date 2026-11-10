@@ -5852,6 +5852,8 @@ async def _df_tour_acc(uid: int, accs: list) -> int | None:
     """347: qaysi hisob turnir hisobi. Dip Funded API buni bermaydi (sayt o'zgartirilmaydi) —
     turnir hisobi Dip Classic $10,000 (crypto); reytingdagi foydalanuvchi nomi va foyda %
     hisobnikiga mos kelsa — o'sha. 10 daqiqa kesh."""
+    if any("tournament" in x for x in accs):      # 349: Dip Funded API belgisi (aniq)
+        return next((x["id"] for x in accs if x.get("tournament")), None)
     hit = _DF_TOUR.get(uid)
     if hit and time.time() - hit[0] < 600:
         return hit[1]

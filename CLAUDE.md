@@ -8115,3 +8115,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 348. Birja bo'limidan Dip Funded va Turnir reklamasi olib tashlandi
 - Foydalanuvchi: "birjalar bo'limida dipfunded reklamasi va turnir reklamasini olib tashla". `walletView` oxiridagi `dfAd()+tourAd()` olib tashlandi (338 dagi "doim tursin" qoidasi Birja bo'limi uchun bekor; Bosh sahifalarda qoladi). Dip Funded endi Birja ro'yxatining o'zida (346).
+
+## 349. Dip Funded API: turnir belgisi (delta-prop o'zgarishi, egasi ruxsati bilan)
+- Foydalanuvchi tanlovi (11): delta-prop `tcapi._meta` ga `"tournament": acc.tournament_id is not None` qo'shildi (+ `tests/test_tcapi.py::test_accounts_tournament_flag`; delta-prop 474/474). Commit a9ff92c, branch `claude/nifty-ptolemy-y0c3yo` (repo default).
+- Bot `_df_tour_acc`: javobda `tournament` maydoni bo'lsa — faqat shu (aniq); bo'lmasa 347 dagi taxmin (zaxira). `test_346.py` 9/9.
