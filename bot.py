@@ -5585,6 +5585,17 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await ask_personal_alloc(q.message, ws, sig_id, d, q.from_user.id)
 
 
+def _open_on_cex_kb(sig_id: int, d: dict, lang):
+    """353: guruh postida "🏦 Birjamda ochish" — Mini App to'g'ridan-to'g'ri (startapp=sg_<id>):
+    o'quvchi signalni o'z birjasi (Binance) yoki Dip Funded hisobida bir bosishda ochadi.
+    Main Mini App yoqilmagan bo'lsa yoki kripto bo'lmasa — tugmasiz. Post keyin tahrirlanmaydi."""
+    if not (BOT_USERNAME and MAIN_APP) or d.get("market", "crypto") not in ("crypto", "futures"):
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton(
+        i18n.t("sig.open_cex", lang), url=f"https://t.me/{BOT_USERNAME}?startapp=sg_{sig_id}",
+        api_kwargs={"style": "success"})]])
+
+
 async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
                          first_name: str | None, post_file_id: str | None = None,
                          chart_tf: str | None = None, photo: bytes | None = None) -> int:
@@ -5606,15 +5617,16 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
         body = pub(ws, body)
         body += await promo_line(ctx.bot, ws, body, 1024 if (post_file_id or photo) else 4096)
         try:
+            kb = _open_on_cex_kb(sig_id, d, ws_lang(ws))
             if post_file_id or photo:
                 sent = await ctx.bot.send_photo(
                     ws["group_chat_id"], post_file_id or InputFile(photo, "signal.png"), caption=body,
-                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"])
+                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"], reply_markup=kb)
             else:
                 sent = await ctx.bot.send_message(
                     ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
                     message_thread_id=ws["group_topic_id"],
-                    disable_web_page_preview=True)
+                    disable_web_page_preview=True, reply_markup=kb)
             group_msg_id = sent.message_id
             await db.set_group_msg(sig_id, group_msg_id)
             _promo_emoji_seen(sent, ws)

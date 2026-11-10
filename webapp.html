@@ -1170,6 +1170,7 @@ function termActs(i){var sid=i.id,pend=i.status=='PENDING',B=function(cls,on,txt
  else{var canAdd=i.filled==0&&i.sl!=null,canSell=true;
   h+='<div style="display:flex;gap:8px">'+B('p',"askAdd("+sid+")",'BUY · '+esc(t('add_btn')),!canAdd,big)+B('d',"sellSheet("+sid+")",'SELL · '+esc(t('close')),!canSell,big)+'</div>';
   if(i.can_size)h+='<div class="acts" style="margin-top:8px">'+B('',"askSize("+sid+")",'$ '+esc(t('size_btn')))+'</div>'}
+ if(i.market=='crypto'||i.market=='futures'||!i.market)h+='<div class="acts" style="margin-top:8px">'+B('',"sgOpen("+sid+")",'🏦 '+esc(t('sg_btn')))+'</div>';
  return h+'</div>'}
 function sellSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt){return'<button class="btn '+cls+'" style="margin:0" onclick="sheetClose();'+on+'">'+txt+'</button>'};
  sheetOpen('<h4>SELL · '+esc(i.symbol)+'</h4><p>'+(i.live!=null?fpc(i.live):'')+'</p>'
@@ -1480,6 +1481,48 @@ function dfPSell(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){retur
 /* eski kirish nuqtalari — endi Dip Funded konteksti */
 function openDf(){dfGo()}
 function dfAcc(id){dfGo(id)}
+/* ===== 353: "Birjamda ochish" — signalni o'z birjasi (Binance Spot/Futures) yoki Dip Funded hisobida bir bosishda ochish.
+   Kirish: guruh postidagi tugma (startapp=sg_<id>) yoki ilovadagi signal terminali. */
+function sgDests(g){var x=g.s,L=[],lg=x.side=='LONG';
+ cxList().forEach(function(a){if(a.err)return;var tr=a.trade||{};
+  if(a.ex=='binance'){if(tr.fut)L.push({k:'bnf',ex:'binance',mkt:'fut',lb:'Binance Futures'});if(tr.spot&&lg)L.push({k:'bns',ex:'binance',mkt:'spot',lb:'Binance Spot'})}
+  else if(a.df&&lg&&S.dfs&&S.dfs.tradable)L.push({k:'df',ex:'dipfunded',mkt:'spot',lb:'Dip Funded #'+dfCur()})});return L}
+function sgOpen(id){tick();S.sg={id:id,s:null,dest:null,type:null,amt:'',av:null};
+ if(!S.cex)cexLoad();if(S.dflink&&!S.dfoff&&!S.dfx)dfxLoad();
+ sheetOpen('<div id="sgbox"><div class="spk"><div class="sk"></div></div></div>');
+ api('sig',{id:id}).then(function(d){var g=S.sg;if(!g||g.id!=id)return;g.s=d;g.type=d.status=='PENDING'?'limit':'market';sgRender()}).catch(function(){var b=document.getElementById('sgbox');if(b)b.innerHTML='<p>'+esc(t('sg_none'))+'</p>'});
+ var n=0,iv=setInterval(function(){var g=S.sg;if(!g||g.id!=id||++n>8){clearInterval(iv);return}if(g.s&&!g.dest)sgRender()},1000)}
+function sgRender(){var g=S.sg,b=document.getElementById('sgbox');if(!g||!g.s||!b)return;var x=g.s,lg=x.side=='LONG',D=sgDests(g);
+ if(!g.dest&&D.length){g.dest=D[0].k;sgAvail()}var dd=D.filter(function(z){return z.k==g.dest})[0];
+ var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0">'+esc(l)+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
+ var h='<h4 style="display:flex;align-items:center;gap:9px">'+coinIc(x.sym,24)+esc(x.sym)+' <span class="b '+(lg?'bl':'bs')+'">'+x.side+'</span>'+(x.lev&&x.market=='futures'?'<span class="b bx">'+x.lev+'x</span>':'')+'</h4>'
+  +'<div class="rs" style="margin:-4px 2px 8px">'+esc(x.ws)+' · #'+x.id+(x.price?' · '+esc(t('t_now'))+' <b>'+fp(x.price)+'</b>':'')+'</div>'
+  +row(t('t_entry_px'),fp(x.entry))+row('SL',x.sl!=null?fp(x.sl):'—','r')+row('TP',x.tp_next!=null?fp(x.tp_next):'—','g');
+ if(x.status!='PENDING'&&x.status!='ACTIVE'){b.innerHTML=h+'<p style="margin-top:10px">'+esc(t('sg_closed'))+'</p>';return}
+ if(!D.length){b.innerHTML=h+'<p style="margin-top:12px;line-height:1.5">'+esc(t(lg?'sg_nodest':'sg_nodest_s'))+'</p><button class="btn p full" style="width:100%" onclick="sheetClose();go(\'wallet\')">'+esc(t('cx_connect'))+'</button>';return}
+ h+='<div class="rs" style="margin:12px 2px 6px;font-weight:700">'+esc(t('sg_where'))+'</div><div class="chips" style="margin-bottom:8px">'+D.map(function(z){return'<span class="chip glass'+(z.k==g.dest?' on':'')+'" onclick="S.sg.dest=\''+z.k+'\';S.sg.av=null;sgAvail();sgRender()">'+esc(z.lb)+'</span>'}).join('')+'</div>';
+ h+='<div class="chips" style="margin-bottom:8px">'+['market','limit'].map(function(m){return'<span class="chip glass'+(g.type==m?' on':'')+'" onclick="S.sg.type=\''+m+'\';sgKeep();sgRender()">'+(m=='limit'?'Limit · '+fp(x.entry):'Market')+'</span>'}).join('')+'</div>';
+ h+='<div class="rs" style="margin:2px 2px 5px">'+esc(t(dd.mkt=='fut'?'sg_margin':'df_amount'))+(g.av!=null?' · '+esc(t('tv_avbl'))+' $'+n2(g.av):'')+'</div>'+dfIn('sg_a','USDT',g.amt)
+  +(g.av?'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(p){return'<span class="chip glass" onclick="document.getElementById(\'sg_a\').value='+Math.floor(g.av*p)/100+'">'+p+'%</span>'}).join('')+'</div>':'');
+ if(dd.mkt=='fut')h+='<div class="rs" style="margin:0 2px 8px">'+esc(t('tr_lev'))+': <b>'+(x.lev||10)+'x</b></div>';
+ if(dd.k=='bns')h+='<div class="rs" style="margin:0 2px 8px;line-height:1.4">ℹ️ '+esc(t('sg_spot_note'))+'</div>';
+ h+='<button class="btn full" style="width:100%;margin-top:4px;background:'+(lg?'#2ebd85':'#f6465d')+';color:#fff;border-color:transparent;font-weight:800" onclick="sgGo()">'+(lg?'Long':'Short')+' '+esc(x.sym.replace(/USDT$/,''))+' · '+esc(dd.lb)+'</button>';
+ b.innerHTML=h}
+function sgKeep(){var e=document.getElementById('sg_a');if(e&&S.sg)S.sg.amt=e.value}
+function sgAvail(){var g=S.sg;if(!g||!g.dest)return;var D=sgDests(g),dd=D.filter(function(z){return z.k==g.dest})[0];if(!dd)return;
+ if(dd.ex=='dipfunded'){g.av=S.dfs?+S.dfs.available||0:null;return}
+ api('cextrade',{ex:'binance',op:'info',a:{mkt:dd.mkt,sym:g.s.sym}}).then(function(d){if(S.sg!==g||g.dest!=dd.k||!d.ok)return;g.av=+((d.r.avail||{}).quote||0);sgKeep();sgRender()}).catch(function(){})}
+function sgGo(){var g=S.sg,x=g&&g.s;if(!x)return;sgKeep();var amt=num(g.amt),D=sgDests(g),dd=D.filter(function(z){return z.k==g.dest})[0];if(!dd)return;
+ if(!amt){toast(esc(t('tr_need_amt')));return}var lim=g.type=='limit',lg=x.side=='LONG',tp=x.tp_next,sl=x.sl;
+ var sum=(lg?'LONG ':'SHORT ')+x.sym+' · $'+n2(amt)+' · '+(lim?'Limit '+fp(x.entry):'Market')+(dd.mkt=='fut'?' · '+(x.lev||10)+'x':'')+(sl!=null&&dd.k!='bns'?' · SL '+fp(sl):'')+(tp!=null&&dd.k!='bns'?' · TP '+fp(tp):'')+'\n'+dd.lb;
+ confirmBox(t('tr_confirm')+'\n\n'+sum,function(){
+  if(dd.ex=='dipfunded'){var a={op:'buy',symbol:x.sym.replace(/USDT$/,''),amount:Math.round(amt*100)/100};if(lim)a.limit=x.entry;if(sl!=null)a.sl=sl;if(tp!=null)a.tp=tp;
+   dfAct(a,function(){sheetClose()});return}
+  var A={sym:x.sym,type:lim?'limit':'market'};if(lim)A.price=x.entry;
+  if(dd.mkt=='fut'){A.side=lg?'long':'short';A.lev=x.lev||10;A.margin=Math.round(amt*100)/100;if(sl!=null)A.sl=sl;if(tp!=null)A.tp=tp}else{A.side='buy';A.quote=Math.round(amt*100)/100}
+  toast(esc(t('wait')));api('cextrade',{ex:'binance',op:dd.mkt=='fut'?'fut_order':'spot_order',a:A}).then(function(d){
+   if(d.ok){haptic('success');var r=d.r||{};toast('✅ '+esc(t('tr_sent'))+((r.warn||[]).length?'<br><span class="r" style="font-size:12px">'+esc(r.warn.join('; '))+'</span>':''));sheetClose();cexLoad(1)}
+   else{haptic('error');toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}}).catch(function(e){toast(esc(t(e==429?'cx_e_rate':'cx_e_net')))})})}
 /* ===== 310: Dip Funded terminali — botdan chiqmay savdo (grafik signal terminalidan) ===== */
 function dfTerm(acc,sym){tick();S.page={id:'term',df:{acc:acc,sym:sym||'BTC'},tf:'1h',c:null,adds:[],drag:null,pend:null};
  var p=document.getElementById('page');p.scrollTop=0;termRender();if(!p.classList.contains('show'))pageShow();termLoad();if(!S.dfs||S.dfs.id!=acc)dfRefresh()}
@@ -1838,7 +1881,7 @@ setInterval(function(){if(!document.hidden)checkVer()},300000);
  var q0=new URLSearchParams(location.search);
  try{var nv=performance.getEntriesByType('navigation')[0];var sv=sessionStorage.getItem('tc_nav');if(nv&&nv.type=='reload'&&sv)q0=new URLSearchParams(sv)}catch(e){}
  var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
- if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));if(TABS.indexOf(sp)>=0&&!q0.get('tab'))q0.set('tab',sp);
+ if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));if(/^sg_\d+$/.test(sp))setTimeout(function(){sgOpen(+sp.slice(3))},700);if(TABS.indexOf(sp)>=0&&!q0.get('tab'))q0.set('tab',sp);
  if(!tg||!tg.initData){S.pub=true;S.bot=BOT;var nl=q0.get('lang');S.lang=T[nl]?nl:'uz';try{var sl0=localStorage.getItem('tc_lang');if(sl0&&T[sl0])S.lang=sl0}catch(e){}
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};

@@ -8136,3 +8136,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Dip Funded (`df_events`, `df_risk`): web'da kalit bo'lsa (`dipfunded.enabled()`), kuzatiladiganlar — ilovada Dip Funded ochganlar (`bot_settings` `dfw:<uid>`, `db.setting_users`), `dfoff` bo'lsa yo'q. Yopilish sababi narx TP/SL ga yaqinligidan; kunlik zarar ≥80% — kuniga bir marta, maks. zarar ≥80% — 60% dan tushguncha bir marta.
 - Xabar: Bot API `sendMessage` (web'dagi BOT_TOKEN), "📱 Ilovada ochish" (web_app; DF — `?df=1&acc=`). Matnlar `i18n` `ntf.*`. O'chirish: Birja bo'limida "🔔 Bildirishnomalar" (`ntfToggle`, `/api/app/ntf`, `ntf_off:<uid>`, `api_me.ntf_off`).
 - Sinov: `test_352.py` 15/15.
+
+## 353. "🏦 Birjamda ochish" — signalni o'z birjasi yoki Dip Funded'da bir bosishda ochish
+- Guruh/kanal postida (`publish_signal` → `_open_on_cex_kb`): url tugma `t.me/<bot>?startapp=sg_<id>` (faqat `MAIN_APP` va crypto/futures; post keyin tahrirlanmaydi — tugma saqlanadi). Ilova `start_param` `sg_<id>` → `sgOpen(id)`; ilovadagi signal terminalida ham tugma (`termActs`).
+- `/api/app/sig {id}` (`api_sig`): belgi, tomon, kirish, SL, TP lar, keyingi TP (`tp_next`), leveraj, holat, guruh nomi, joriy narx (signal postda ochiq — har qanday ilova foydalanuvchisiga).
+- Oyna (`sgRender`): kirish/SL/TP; "Qayerda ochamiz" — `sgDests`: Binance Futures (savdo ruxsati), Binance Spot (faqat LONG), Dip Funded #hisob (LONG, savdo mumkin bo'lsa). Market | Limit (signal kirishi; PENDING bo'lsa Limit tanlangan), summa USDT (+10/25/50/100% mavjuddan — Binance `info`, DF `available`), Futures — signal leveraji (yo'q bo'lsa 10x).
+- Yuborish (`sgGo`, tasdiq bilan): Futures `fut_order {side, lev, margin, sl, tp}`; Spot `spot_order {side:buy, quote}` (TP/SL yo'q — izoh); DF `dftrade buy {amount, limit?, sl, tp}`. Manzil yo'q bo'lsa — ulash yo'riqnomasi va Birja bo'limiga tugma.
+- i18n: `sig.open_cex` (bot), webapp `sg_*`. Sinov: brauzer `t_sg.py` (uchala manzil), tugma — qo'lda tekshirildi; `test_tracker.py` o'tdi.

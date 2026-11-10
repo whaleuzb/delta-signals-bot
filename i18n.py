@@ -3939,6 +3939,7 @@ STRINGS.update({
                      "ru": "🚨 <b>{src}</b>: использовано {used}% максимального лимита убытка — осталось {left}",
                      "en": "🚨 <b>{src}</b>: {used}% of the max loss limit used — {left} left"},
     "ntf.btn": {"uz": "📱 Ilovada ochish", "ru": "📱 Открыть в приложении", "en": "📱 Open in app"},
+    "sig.open_cex": {"uz": "🏦 Birjamda ochish", "ru": "🏦 Открыть на бирже", "en": "🏦 Open on my exchange"},
     "df.app_open": {"uz": "💼 <b>Dip Funded</b> endi ilova ichida — birjalar qatorida: hisoblar, savdo, grafik va statistika.",
                     "ru": "💼 <b>Dip Funded</b> теперь в приложении — рядом с биржами: счета, торговля, график и статистика.",
                     "en": "💼 <b>Dip Funded</b> now lives in the app, next to exchanges: accounts, trading, chart and stats."},
