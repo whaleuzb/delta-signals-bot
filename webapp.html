@@ -425,7 +425,8 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  var acc=c.acc||[],tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});
  if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
   +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+n2(tot)+'</div>'
-  +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div></div>';
+  +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div>'
+  +'<div id="cxh_all" style="margin-top:10px">'+(function(){var c=(S.cxh||{})[cxhKey(null,30)];return c&&c.p.length>1?balChart(c.p,56,'cxa')+'<div class="rs" style="margin-top:4px">'+esc(t('cx_dn',{n:30}))+' · '+balChg(c.p)+'</div>':''})()+'</div></div>';
   h+='<div class="sect rise">'+esc(t('cx_mine'))+'</div>'+acc.map(function(a){var m=cexMeta(a.ex),np=(a.pos||[]).length;
    return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+'</div><div class="rs">'
    +(a.err?'<span class="r">'+esc(cexErr(a.err))+'</span>':esc(a.mask)+(np?' · '+np+' '+esc(t('cx_pos_n')):''))+'</div></div>'
@@ -435,7 +436,24 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
   if(!acc.length)h+='<div class="rs rise" style="margin:-4px 4px 10px;line-height:1.5">'+esc(t('cx_intro'))+'</div>';
   h+=rest.map(function(x){return'<div class="row glass rise" onclick="cexAdd(\''+x[0]+'\')">'+cexBadge(x[0])+'<div class="rm"><div class="rn">'+esc(x[1])+'</div><div class="rs">'+esc(t('cx_ro'))+'</div></div><div class="rv" style="color:var(--g);font-size:13px">'+esc(t('cx_link'))+' ›</div></div>'}).join('')}
  h+='<div class="rs rise" style="margin:12px 4px 0;line-height:1.5;opacity:.8">🔒 '+esc(t('cx_safe'))+'</div>';
- v.innerHTML=h}
+ v.innerHTML=h;if(acc.length)cxhAll()}
+/* 328: balans tarixi */
+function cxhKey(ex,d){return(ex||'all')+'|'+d}
+function cxhLoad(ex,d,cb){S.cxh=S.cxh||{};var k=cxhKey(ex,d),c=S.cxh[k];if(c&&Date.now()-c.at<120000){cb&&cb(c.p);return}
+ if(S['cxhL'+k])return;S['cxhL'+k]=1;api('cexhist',{ex:ex||null,days:d}).then(function(r){S['cxhL'+k]=0;S.cxh[k]={p:r.p||[],at:Date.now()};cb&&cb(r.p||[])}).catch(function(){S['cxhL'+k]=0})}
+function balChart(p,H,id){if(!p||p.length<2)return'';var W=300,n=p.length,v=p.map(function(x){return x[1]}),mn=Math.min.apply(null,v),mx=Math.max.apply(null,v),pad=(mx-mn)*.12||Math.max(1,mx*.01);mn-=pad;mx+=pad;
+ var X=function(k){return(k/(n-1)*W).toFixed(1)},Y=function(y){return(H-(y-mn)/(mx-mn)*H).toFixed(1)},c=v[n-1]>=v[0]?'#c2f23a':'#ff5c5c';
+ var d=v.map(function(y,k){return X(k)+','+Y(y)}).join(' L');
+ return'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px;display:block"><defs><linearGradient id="'+id+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+c+'" stop-opacity=".28"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs>'
+ +'<path d="M'+d+' L'+W+','+H+' L0,'+H+'Z" fill="url(#'+id+'g)"/><path d="M'+d+'" fill="none" stroke="'+c+'" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>'}
+function balChg(p){if(!p||p.length<2)return'';var a=p[0][1],b=p[p.length-1][1],dd=b-a,pc=a?dd/a*100:0;return'<span class="'+(dd>=0?'g':'r')+'" style="font-weight:700">'+fm(dd)+' ('+fpc(pc)+')</span>'}
+function cxhAll(){var el=document.getElementById('cxh_all');if(!el)return;cxhLoad(null,30,function(p){var e=document.getElementById('cxh_all');if(!e)return;
+ e.innerHTML=p.length>1?balChart(p,56,'cxa')+'<div class="rs" style="margin-top:4px">'+esc(t('cx_dn',{n:30}))+' · '+balChg(p)+'</div>':''})}
+function cxhDet(ex,d){S.cxhD=d;var el=document.getElementById('cxh_det');if(!el)return;
+ document.querySelectorAll('#cxh_chips .chip').forEach(function(c){c.classList.toggle('on',+c.dataset.d==d)});
+ var c=(S.cxh||{})[cxhKey(ex,d)];if(!c)el.innerHTML='<div class="sk" style="height:90px"></div>';
+ cxhLoad(ex,d,function(p){var e=document.getElementById('cxh_det');if(!e)return;
+  e.innerHTML=p.length>1?'<div class="rs" style="margin:0 2px 6px">'+balChg(p)+'</div>'+balChart(p,90,'cxd'):'<div class="rs" style="padding:14px 2px;line-height:1.5">'+esc(t('cx_hist_empty'))+'</div>'})}
 function cexAcc(ex){var a=null;((S.cex||{}).acc||[]).forEach(function(x){if(x.ex==ex)a=x});return a}
 function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
  var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' <span class="rs" style="font-weight:600">'+esc(a.mask)+'</span></h4>';
@@ -443,6 +461,9 @@ function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
  else{h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
    +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Spot</div><div style="font-weight:800;font-size:17px">$'+n2(a.spot_usd||0)+'</div></div>'
    +'<div class="glass" style="border-radius:14px;padding:10px 12px"><div class="rs">Futures</div><div style="font-weight:800;font-size:17px">'+(a.fut?'$'+n2(a.fut.eq||0):'—')+'</div>'+(a.fut&&a.fut.upnl?'<div class="rs '+(a.fut.upnl>=0?'g':'r')+'">uPnL '+fm(a.fut.upnl)+'</div>':'')+'</div></div>';
+  var D=S.cxhD||30;h+='<div style="display:flex;align-items:center;margin:0 2px 6px"><span class="rs" style="font-weight:700;margin:0">'+esc(t('cx_hist'))+'</span><span class="chips" id="cxh_chips" style="margin:0 0 0 auto;gap:4px">'
+   +[7,30,90].map(function(x){return'<span class="chip glass'+(x==D?' on':'')+'" data-d="'+x+'" style="padding:3px 9px;font-size:11px" onclick="cxhDet(\''+ex+'\','+x+')">'+esc(t('cx_dn',{n:x}))+'</span>'}).join('')+'</span></div>'
+   +'<div id="cxh_det" style="margin-bottom:12px"></div>';
   var P=a.pos||[];if(P.length){h+='<div class="rs" style="margin:0 2px 6px;font-weight:700">'+esc(t('cx_pos'))+'</div>'+P.map(function(p){
    return'<div class="glass" style="border-radius:14px;padding:10px 12px;margin-bottom:6px"><div style="display:flex;align-items:center;gap:8px">'+coinIc(p.sym,20)+'<b>'+esc(p.sym)+'</b><span class="chip glass on" style="padding:2px 8px;font-size:10.5px;color:'+(p.side=='long'?'var(--g)':'var(--r)')+'">'+(p.side=='long'?'LONG':'SHORT')+(p.lev?' '+(+p.lev)+'x':'')+'</span><span style="margin-left:auto;font-weight:800" class="'+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'</span></div>'
    +'<div class="rs" style="margin-top:5px">'+esc(t('df_qty'))+' '+(+p.qty)+' · '+esc(t('cx_entry'))+' '+fp(p.entry)+(p.mark?' · '+esc(t('df_mark'))+' '+fp(p.mark):'')+(p.liq?' · LIQ '+fp(p.liq):'')+'</div></div>'}).join('')}
@@ -451,7 +472,7 @@ function cexOpen(ex){var a=cexAcc(ex);if(!a)return;var m=cexMeta(ex);tick();
   if(!P.length&&!A.length)h+='<p>'+esc(t('cx_empty'))+'</p>'}
  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0" onclick="sheetClose();cexAdd(\''+ex+'\')">'+esc(t('cx_rekey'))+'</button>'
   +'<button class="btn" style="margin:0;background:rgba(255,92,92,.14);color:var(--r);border-color:rgba(255,92,92,.3)" onclick="cexDel(\''+ex+'\')">'+esc(t('cx_del'))+'</button></div>';
- sheetOpen(h)}
+ sheetOpen(h);if(!a.err)cxhDet(ex,S.cxhD||30)}
 function cexIn(id,ph){return'<input id="'+id+'" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="'+esc(ph)+'" style="width:100%;font-size:15px;font-weight:600;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px;font-family:ui-monospace,monospace">'}
 function cexAdd(ex){var m=cexMeta(ex);tick();
  sheetOpen('<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' — '+esc(t('cx_link'))+'</h4>'

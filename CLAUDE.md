@@ -7960,3 +7960,11 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "binance ulanmadi" — loglarda faqat `auth` (sabab noma'lum).
 - `cexrelay`: rad/xato bo'lsa birja javobi (`ApiErr.text`, kalitsiz) logga va `{"err","msg"}` javobga; `webapp._cx_msg` JSON'dan `msg` ni ajratib foydalanuvchiga (toastda kichik qator).
 - `cx_e_auth`/`cx_how` matnlari: IP cheklovi yo'q (Unrestricted), Binance'da «System generated» (HMAC) kalit turi. Bizning servisning chiquvchi IP'si doimiy EMAS (Railway statik IP — Pro) — IP'ga bog'langan kalit ishlamaydi.
+
+## 328. Wallet: balans tarixi
+- Foydalanuvchi: "Balance tarixini ham olsin".
+- `cex_hist (user_id, exchange, at, total, spot, fut)`. Yozish: `webapp._cex_rec` — har muvaffaqiyatli snapshot'dan keyin, hisob uchun soatiga ko'pi bilan 1 ta (`_CEX_REC_GAP` 50 daq). `cex_hist_loop` (web on_startup): har soat barcha ulangan hisoblar (ilova ochilmasa ham), sem=3.
+- O'tmish: `cex.history` — faqat Binance (`/sapi/v1/accountSnapshot` SPOT+FUTURES, 30 kun kunlik): spot `totalAssetOfBtc` × o'sha kungi BTC yopilish narxi (MEXC 1d sham) + fyuchers stable `marginBalance`. Ulanganda `_cex_backfill` (fon), funksiyadan oldin ulanganlar — web ishga tushgandan 20 s keyin (`backfill_old`, tarixi 2 kundan yangi bo'lsa). Relay: `/history`.
+- `/api/app/cexhist {ex?, days: 7|30|90|365}`: ≤7 kun — soatlik, aks holda kunlik nuqtalar; har hisob oxirgi ma'lum qiymati bilan davom ettiriladi (oraliq boshidan oldingi oxirgi qator ham olinadi), `ex` bo'lmasa — yig'indi. Uzilganda tarix ham o'chadi (`cex_del`).
+- Ilova: umumiy balans kartasida 30 kunlik grafik + o'zgarish; birja oynasida "Balans tarixi" 7/30/90 kun (`balChart`, `cxhDet`, 2 daq kesh).
+- Sinov: `test_328.py` 12/12, brauzer `t_cxh.py`.

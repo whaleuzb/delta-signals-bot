@@ -407,3 +407,52 @@ async def snapshot(ex: str, k: dict) -> dict:
     pos = pos_r if not isinstance(pos_r, BaseException) else []
     return {"ex": ex, "spot_usd": spot_usd, "assets": assets[:40], "fut": fut, "pos": pos,
             "total": spot_usd + (fut["eq"] if fut else 0)}
+
+
+# ─────────────────────────── 328: balans tarixi ───────────────────────────
+
+async def bn_history(k, days: int = 30) -> list:
+    """Binance kunlik hisob suratlari (`/sapi/v1/accountSnapshot`, 30 kungacha):
+    spot `totalAssetOfBtc` × o'sha kungi BTC narxi (MEXC kunlik shami) + fyuchers
+    stable aktivlar `marginBalance`. Natija: [(ts_ms, total, spot, fut)]."""
+    import exchange
+    days = max(7, min(30, days))
+    spot_r, fut_r = await asyncio.gather(
+        _bn(k, "https://api.binance.com", "/sapi/v1/accountSnapshot", {"type": "SPOT", "limit": days}),
+        _bn(k, "https://api.binance.com", "/sapi/v1/accountSnapshot", {"type": "FUTURES", "limit": days}),
+        return_exceptions=True)
+    if isinstance(spot_r, BaseException):
+        raise spot_r
+    spot_btc = {int(v["updateTime"]): _f((v.get("data") or {}).get("totalAssetOfBtc"))
+                for v in spot_r.get("snapshotVos") or []}
+    fut = {}
+    if not isinstance(fut_r, BaseException):
+        for v in fut_r.get("snapshotVos") or []:
+            fut[int(v["updateTime"]) // 86_400_000] = sum(
+                _f(a.get("marginBalance") or a.get("walletBalance"))
+                for a in (v.get("data") or {}).get("assets") or [] if a.get("asset") in STABLE)
+    if not spot_btc:
+        return []
+    t0 = min(spot_btc) - 2 * 86_400_000
+    try:
+        cs = await exchange.klines("BTCUSDT", t0, limit=40, tf="1d", end_ms=max(spot_btc) + 86_400_000)
+        btc = {c.open_ms // 86_400_000: float(c.close) for c in cs}
+    except Exception:
+        btc = {}
+    out = []
+    for ts, b in sorted(spot_btc.items()):
+        day = ts // 86_400_000
+        px = btc.get(day) or btc.get(day - 1)
+        if px is None and b > 0:
+            continue
+        sp = b * (px or 0)
+        fu = fut.get(day, 0.0)
+        out.append((ts, sp + fu, sp, fu))
+    return out
+
+
+async def history(ex: str, k: dict) -> list:
+    """Birjaning o'z tarixi (hozircha faqat Binance beradi); qolganlari — bo'sh."""
+    if ex == "binance":
+        return await bn_history(k)
+    return []

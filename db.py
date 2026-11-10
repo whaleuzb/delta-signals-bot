@@ -660,6 +660,16 @@ CREATE TABLE IF NOT EXISTS cex_keys (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, exchange)
 );
+-- 328: birja hisobi balans tarixi (har soat + Binance'dan 30 kunlik o'tmish).
+CREATE TABLE IF NOT EXISTS cex_hist (
+    user_id  BIGINT NOT NULL,
+    exchange TEXT NOT NULL,
+    at       TIMESTAMPTZ NOT NULL,
+    total    DOUBLE PRECISION NOT NULL,
+    spot     DOUBLE PRECISION,
+    fut      DOUBLE PRECISION,
+    PRIMARY KEY (user_id, exchange, at)
+);
 CREATE TABLE IF NOT EXISTS user_avatars (
     user_id BIGINT PRIMARY KEY,
     key     TEXT NOT NULL UNIQUE,
@@ -2919,4 +2929,52 @@ async def cex_list(uid: int):
 async def cex_del(uid: int, ex: str) -> bool:
     async with pool().acquire() as c:
         r = await c.execute("DELETE FROM cex_keys WHERE user_id=$1 AND exchange=$2", uid, ex)
+        await c.execute("DELETE FROM cex_hist WHERE user_id=$1 AND exchange=$2", uid, ex)
     return r.endswith(" 1")
+
+
+async def cex_all():
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT * FROM cex_keys ORDER BY user_id")
+
+
+async def cex_hist_add(uid: int, ex: str, at, total: float, spot, fut) -> None:
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO cex_hist (user_id, exchange, at, total, spot, fut) "
+                        "VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING",
+                        uid, ex, at, total, spot, fut)
+
+
+async def cex_hist_add_many(uid: int, ex: str, rows: list) -> int:
+    """rows: [(at, total, spot, fut)] — mavjud vaqtlar o'tkazib yuboriladi."""
+    if not rows:
+        return 0
+    async with pool().acquire() as c:
+        await c.executemany("INSERT INTO cex_hist (user_id, exchange, at, total, spot, fut) "
+                            "VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING",
+                            [(uid, ex, *r) for r in rows])
+    return len(rows)
+
+
+async def cex_hist_first_at(uid: int, ex: str):
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT min(at) FROM cex_hist WHERE user_id=$1 AND exchange=$2", uid, ex)
+
+
+async def cex_hist_last_at(uid: int, ex: str):
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT max(at) FROM cex_hist WHERE user_id=$1 AND exchange=$2", uid, ex)
+
+
+async def cex_hist_rows(uid: int, since, ex: str | None = None):
+    """`since`dan keyingi qatorlar + har hisobning `since`dan oldingi OXIRGI qatori
+    (grafik boshida qiymat bo'lishi uchun)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT exchange, at, total FROM cex_hist WHERE user_id=$1 AND ($3::text IS NULL OR exchange=$3) "
+            "AND exchange IN (SELECT exchange FROM cex_keys WHERE user_id=$1) AND at >= $2 "
+            "UNION ALL "
+            "(SELECT DISTINCT ON (exchange) exchange, at, total FROM cex_hist WHERE user_id=$1 "
+            "AND ($3::text IS NULL OR exchange=$3) AND exchange IN (SELECT exchange FROM cex_keys WHERE user_id=$1) "
+            "AND at < $2 ORDER BY exchange, at DESC)",
+            uid, since, ex)

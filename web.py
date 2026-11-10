@@ -474,6 +474,7 @@ def build_app() -> web.Application:
     app.add_routes(webapp.routes())
     app.on_startup.append(on_start)
     app.on_startup.append(webapp.cex_relay_check)
+    app.on_startup.append(webapp.cex_hist_loop)
     app.on_cleanup.append(on_stop)
     return app
 

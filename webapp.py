@@ -814,7 +814,8 @@ async def _cx_call(op: str, ex: str, k: dict):
     import cex
     url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
     if not url:
-        return await (cex.verify(ex, k) if op == "verify" else cex.snapshot(ex, k))
+        f = {"verify": cex.verify, "snapshot": cex.snapshot, "history": cex.history}[op]
+        return await f(ex, k)
     import httpx
     try:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -827,7 +828,7 @@ async def _cx_call(op: str, ex: str, k: dict):
         raise cex.ApiErr("net", type(e).__name__)
     if d.get("err"):
         raise cex.ApiErr(d["err"], str(d.get("msg") or ""))
-    return d.get("snap")
+    return d.get("hist") if op == "history" else d.get("snap")
 
 
 async def cex_relay_check(_app=None):
@@ -881,7 +882,86 @@ async def _cex_one(uid: int, row, fresh: bool) -> dict:
     if len(_CEX_CACHE) > 2000:
         _CEX_CACHE.clear()
     _CEX_CACHE[ck] = (time.monotonic(), res)
+    if not res.get("err"):
+        try:
+            await _cex_rec(uid, ex, res)
+        except Exception:
+            log.warning("Balans tarixi yozilmadi (%s)", ex, exc_info=True)
     return res
+
+
+# 328: balans tarixi — har hisob uchun soatiga ko'pi bilan bitta yozuv.
+_CEX_REC: dict[tuple, float] = {}
+_CEX_REC_GAP = 50 * 60
+
+
+async def _cex_rec(uid: int, ex: str, res: dict) -> None:
+    from datetime import datetime, timezone
+    key = (uid, ex)
+    now = time.time()
+    last = _CEX_REC.get(key)
+    if last is None:
+        at = await db.cex_hist_last_at(uid, ex)
+        last = at.timestamp() if at else 0.0
+    if now - last < _CEX_REC_GAP:
+        _CEX_REC[key] = last
+        return
+    fut = (res.get("fut") or {}).get("eq")
+    await db.cex_hist_add(uid, ex, datetime.now(timezone.utc), float(res.get("total") or 0),
+                          float(res.get("spot_usd") or 0), float(fut) if fut is not None else None)
+    _CEX_REC[key] = now
+
+
+async def _cex_backfill(uid: int, ex: str, k: dict) -> None:
+    """Ulanganda: birja o'zi bergan o'tmish (Binance — 30 kun kunlik)."""
+    from datetime import datetime, timezone
+    try:
+        rows = await _cx_call("history", ex, k) or []
+    except Exception as e:
+        log.info("Balans o'tmishi olinmadi (%s): %s", ex, e)
+        return
+    n = await db.cex_hist_add_many(uid, ex, [
+        (datetime.fromtimestamp(r[0] / 1000, timezone.utc), float(r[1]), float(r[2]), float(r[3]))
+        for r in rows])
+    if n:
+        log.info("Balans o'tmishi yuklandi (%s, uid=%s): %s kun", ex, uid, n)
+
+
+async def cex_hist_loop(_app=None):
+    """Har soat: barcha ulangan hisoblar balansi tarixga (ilova ochilmasa ham)."""
+    async def backfill_old():
+        # Funksiyadan oldin ulangan (o'tmishi yuklanmagan) Binance hisoblari.
+        from datetime import datetime, timezone, timedelta
+        for r in await db.cex_all():
+            if r["exchange"] != "binance":
+                continue
+            first = await db.cex_hist_first_at(r["user_id"], r["exchange"])
+            if first is None or first > datetime.now(timezone.utc) - timedelta(days=2):
+                try:
+                    await _cex_backfill(r["user_id"], r["exchange"], _cex_keys(r))
+                except Exception:
+                    log.warning("Balans o'tmishi yuklanmadi", exc_info=True)
+
+    async def run():
+        await asyncio.sleep(20)
+        try:
+            await backfill_old()
+        except Exception:
+            log.warning("Balans o'tmishi tekshiruvi xato", exc_info=True)
+        await asyncio.sleep(100)
+        while True:
+            try:
+                rows = await db.cex_all()
+                sem = asyncio.Semaphore(3)
+
+                async def one(r):
+                    async with sem:
+                        await _cex_one(r["user_id"], r, True)
+                await asyncio.gather(*(one(r) for r in rows), return_exceptions=True)
+            except Exception:
+                log.warning("Balans tarixi tsikli xato", exc_info=True)
+            await asyncio.sleep(3600)
+    _app["cex_hist_task"] = asyncio.get_running_loop().create_task(run()) if _app is not None else None
 
 
 async def api_cex(request):
@@ -929,8 +1009,56 @@ async def api_cexadd(request):
     await db.cex_put(uid, ex, cex.seal(key), cex.seal(sec), cex.seal(pas) if pas else None,
                      cex.mask(key))
     _CEX_CACHE.pop((uid, ex), None)
+    _CEX_REC.pop((uid, ex), None)
     log.info("Birja hisobi ulandi (%s, uid=%s)", ex, uid)
+    request.app.setdefault("cex_bg", set())
+    t = asyncio.get_running_loop().create_task(_cex_backfill(uid, ex, k))
+    request.app["cex_bg"].add(t)
+    t.add_done_callback(request.app["cex_bg"].discard)
     return web.json_response({"ok": True}, headers=NO_CACHE)
+
+
+async def api_cexhist(request):
+    """328: balans tarixi grafigi. ex bo'lmasa — barcha hisoblar yig'indisi.
+    7 kungacha — soatlik, undan ko'p — kunlik nuqtalar; har hisob oxirgi
+    ma'lum qiymati bilan davom ettiriladi (carry forward)."""
+    from datetime import datetime, timezone, timedelta
+    body, uid = await _body(request)
+    ex = body.get("ex") or None
+    import cex
+    if ex is not None and ex not in cex.EXCHANGES:
+        raise web.HTTPBadRequest()
+    try:
+        days = int(body.get("days") or 30)
+    except (TypeError, ValueError):
+        days = 30
+    days = days if days in (7, 30, 90, 365) else 30
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+    rows = await db.cex_hist_rows(uid, since, ex)
+    step = 3600 if days <= 7 else 86400
+    by = {}
+    for r in sorted(rows, key=lambda r: r["at"]):
+        by.setdefault(r["exchange"], []).append((r["at"].timestamp(), float(r["total"])))
+    pts = []
+    t = (since.timestamp() // step + 1) * step
+    end = now.timestamp()
+    idx = {e: 0 for e in by}
+    cur = {}
+    while True:
+        tt = min(t, end)
+        for e, lst in by.items():
+            i = idx[e]
+            while i < len(lst) and lst[i][0] <= tt:
+                cur[e] = lst[i][1]
+                i += 1
+            idx[e] = i
+        if cur:
+            pts.append([int(tt * 1000), round(sum(cur.values()), 2)])
+        if t >= end:
+            break
+        t += step
+    return web.json_response({"days": days, "p": pts}, headers=NO_CACHE)
 
 
 async def api_cexdel(request):
@@ -941,6 +1069,7 @@ async def api_cexdel(request):
         raise web.HTTPBadRequest()
     ok = await db.cex_del(uid, ex)
     _CEX_CACHE.pop((uid, ex), None)
+    _CEX_REC.pop((uid, ex), None)
     return web.json_response({"ok": ok}, headers=NO_CACHE)
 
 
@@ -980,6 +1109,7 @@ def routes() -> list:
         web.post("/api/app/cex", api_cex),
         web.post("/api/app/cexadd", api_cexadd),
         web.post("/api/app/cexdel", api_cexdel),
+        web.post("/api/app/cexhist", api_cexhist),
     ]
 
 
@@ -1169,6 +1299,7 @@ T = {
 
 # 324: Wallet — birja hisoblari
 T["uz"].update({
+    "cx_hist": "Balans tarixi", "cx_hist_empty": "Tarix to'planmoqda — balans har soat yozib boriladi", "cx_dn": "{n} kun",
     "loading": "Yuklanmoqda…", "cx_sub": "Birja hisoblaringiz bir joyda", "cx_total": "Umumiy balans",
     "cx_n": "ta birja", "cx_mine": "Ulangan birjalar", "cx_connect": "Birjani ulash", "cx_more": "Yana ulash",
     "cx_intro": "Birja hisobingizni ulang — balans, aktivlar va ochiq fyuchers pozitsiyalaringiz shu yerda ko'rinadi.",
@@ -1185,6 +1316,7 @@ T["uz"].update({
     "cx_e_rate": "Juda ko'p urinish — bir daqiqadan keyin", "cx_e_perm": "Kalitda o'qish ruxsati yo'q",
 })
 T["ru"].update({
+    "cx_hist": "История баланса", "cx_hist_empty": "История собирается — баланс записывается каждый час", "cx_dn": "{n} дн",
     "loading": "Загрузка…", "cx_sub": "Ваши биржевые счета в одном месте", "cx_total": "Общий баланс",
     "cx_n": "бирж", "cx_mine": "Подключённые биржи", "cx_connect": "Подключить биржу", "cx_more": "Подключить ещё",
     "cx_intro": "Подключите биржевой счёт — баланс, активы и открытые фьючерсные позиции будут видны здесь.",
@@ -1201,6 +1333,7 @@ T["ru"].update({
     "cx_e_rate": "Слишком много попыток — через минуту", "cx_e_perm": "У ключа нет права чтения",
 })
 T["en"].update({
+    "cx_hist": "Balance history", "cx_hist_empty": "Collecting history — the balance is recorded every hour", "cx_dn": "{n}d",
     "loading": "Loading…", "cx_sub": "All your exchange accounts in one place", "cx_total": "Total balance",
     "cx_n": "exchanges", "cx_mine": "Connected exchanges", "cx_connect": "Connect an exchange", "cx_more": "Connect more",
     "cx_intro": "Connect your exchange account — balance, assets and open futures positions will show up here.",

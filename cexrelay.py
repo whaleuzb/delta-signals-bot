@@ -79,6 +79,18 @@ async def snapshot(request):
         return web.json_response({"err": "api"})
 
 
+async def history(request):
+    ex, k = await _args(request)
+    try:
+        return web.json_response({"hist": await cex.history(ex, k)})
+    except cex.ApiErr as e:
+        log.info("history xato (%s): %s — %s", ex, e.code, e.text[:200])
+        return web.json_response({"err": e.code, "msg": e.text[:200]})
+    except Exception:
+        log.warning("history xato (%s)", ex, exc_info=True)
+        return web.json_response({"err": "api"})
+
+
 async def health(_request):
     return web.Response(text="ok")
 
@@ -116,6 +128,7 @@ def build() -> web.Application:
     app = web.Application(client_max_size=64 * 1024)
     app.on_startup.append(_start_check)
     app.add_routes([web.post("/verify", verify), web.post("/snapshot", snapshot),
+                    web.post("/history", history),
                     web.get("/healthz", health)])
     return app
 
