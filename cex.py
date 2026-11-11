@@ -33,7 +33,7 @@ import config
 
 log = logging.getLogger("cex")
 
-EXCHANGES = ("mexc", "bitget", "bingx", "binance")
+EXCHANGES = ("mexc", "bitget", "bingx", "binance", "bitunix")
 NAMES = {"mexc": "MEXC", "bitget": "Bitget", "bingx": "BingX", "binance": "Binance"}
 NEEDS_PASS = {"bitget"}
 STABLE = {"USDT", "USDC", "FDUSD", "BUSD", "TUSD", "USDE", "DAI", "USD"}
@@ -357,7 +357,7 @@ _IMPL = {
     "mexc": (mx_spot, mx_fut, mx_pos, mx_perms),
     "bitget": (bg_spot, bg_fut, bg_pos, bg_perms),
     "bingx": (bx_spot, bx_fut, bx_pos, bx_perms),
-}
+}       # 357: bitunix — pastda (funksiyalar fayl oxirida), `_IMPL["bitunix"]`
 
 
 # ─────────────────────────── yuqori daraja ───────────────────────────
@@ -616,7 +616,7 @@ async def trades(ex: str, k: dict) -> dict | None:
 # yaxlitlash (LOT_SIZE/PRICE_FILTER), xatoda birjaning o'z xabari qaytariladi.
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
-TRADE_EX = ("binance", "bitget", "bingx", "mexc")   # 355: hammasida savdo
+TRADE_EX = ("binance", "bitget", "bingx", "mexc", "bitunix")   # 355: hammasida savdo
 SAPI = "https://api.binance.com"
 FAPI = "https://fapi.binance.com"
 
@@ -1117,7 +1117,7 @@ async def bx_depth(k, a) -> dict:
                  _chg(tk.get("lastPrice"), tk.get("openPrice"), (_f(pc) / 100) if pc else None))
 
 
-DEPTH_EX = {"binance": None, "bitget": bg_depth, "mexc": mx_depth, "bingx": bx_depth}
+DEPTH_EX = {"binance": None, "bitget": bg_depth, "mexc": mx_depth, "bingx": bx_depth}   # + bitunix (357)
 
 
 # ═══════════════════ 355: Bitget, BingX, MEXC — ilova ichida savdo (Binance bilan teng) ═══════════════════
@@ -1842,6 +1842,367 @@ async def _no_open(k, a=None) -> list:
     return []
 
 
+# ═══════════════════ 357: Bitunix (futures: fapi.bitunix.com, spot: openapi.bitunix.com) ═══════════════════
+# Imzo: digest = sha256(nonce + timestamp + apiKey + queryParams + body), sign = sha256(digest + secret);
+# queryParams — kalitlar bo'yicha saralangan "kalitqiymat" ketma-ketligi, body — bo'shliqsiz JSON.
+BUF = "https://fapi.bitunix.com"
+BUS = "https://openapi.bitunix.com"
+
+
+def _bu_sign(k, ts: str, nonce: str, params: dict, body: str) -> str:
+    qp = "".join(f"{key}{params[key]}" for key in sorted(params))
+    digest = hashlib.sha256((nonce + ts + k["key"] + qp + body).encode()).hexdigest()
+    return hashlib.sha256((digest + k["secret"]).encode()).hexdigest()
+
+
+async def _bu(k, base, path, params: dict | None = None, body: dict | None = None, method=None):
+    params = {key: v for key, v in (params or {}).items() if v is not None}
+    raw = json.dumps(body, separators=(",", ":")) if body is not None else ""
+    method = method or ("POST" if body is not None else "GET")
+    ts, nonce = str(_ms()), os.urandom(16).hex()
+    h = {"api-key": k["key"], "nonce": nonce, "timestamp": ts, "sign": _bu_sign(k, ts, nonce, params, raw),
+         "language": "en-US", "Content-Type": "application/json"}
+    d = await _req(method, base + path, h, urlencode(params), raw or None)
+    if not isinstance(d, dict) or d.get("code") not in (0, "0"):
+        code = d.get("code") if isinstance(d, dict) else None
+        raise ApiErr("auth" if code in (10003, 10004, 10005, 10007, 403, "10003", "10004", "10005", "10007") else "api",
+                     json.dumps(d)[:200] if isinstance(d, dict) else str(d)[:200])
+    return d.get("data")
+
+
+async def bu_spot(k):
+    try:
+        d = await _bu(k, BUS, "/api/spot/v1/user/account") or []
+    except ApiErr as e:          # spot API ochilmasa — kalitni fyuchers orqali tekshiramiz
+        if e.code == "auth":
+            raise
+        log.info("Bitunix spot o'qilmadi: %s", e.text[:120])
+        await _bu_acc(k)
+        return {}
+    lst = d if isinstance(d, list) else (d.get("list") or d.get("assets") or []) if isinstance(d, dict) else []
+    return {str(b.get("coin") or b.get("asset") or "").upper(): _f(b.get("balance") or b.get("available"))
+            + _f(b.get("balanceLocked") or b.get("frozen")) for b in lst if (b.get("coin") or b.get("asset"))}
+
+
+async def _bu_acc(k) -> dict:
+    d = await _bu(k, BUF, "/api/v1/futures/account", {"marginCoin": "USDT"}) or {}
+    return d[0] if isinstance(d, list) and d else d if isinstance(d, dict) else {}
+
+
+async def bu_fut(k):
+    a = await _bu_acc(k)
+    up = _f(a.get("crossUnrealizedPNL")) + _f(a.get("isolationUnrealizedPNL"))
+    eq = _f(a.get("available")) + _f(a.get("frozen")) + _f(a.get("margin")) + up
+    return eq, up
+
+
+async def bu_pos(k):
+    d = await _bu(k, BUF, "/api/v1/futures/position/get_pending_positions") or []
+    out = []
+    for p in d if isinstance(d, list) else []:
+        qty = abs(_f(p.get("qty")))
+        if not qty:
+            continue
+        side = "long" if str(p.get("side")).upper() in ("LONG", "BUY") else "short"
+        entry = _f(p.get("avgOpenPrice")) or (_f(p.get("entryValue")) / qty if qty else 0)
+        out.append({"sym": str(p.get("symbol") or "").upper(), "side": side, "qty": qty, "entry": entry,
+                    "mark": _f(p.get("markPrice")) or None, "upnl": _f(p.get("unrealizedPNL")),
+                    "lev": _f(p.get("leverage")), "liq": _f(p.get("liqPrice")) or None,
+                    "ps": side.upper() if str(p.get("positionMode")).upper() == "HEDGE" else "BOTH",
+                    "pid": str(p.get("positionId") or "")})
+    if out:   # belgi narxi pozitsiyada bo'lmasa — tickerdan
+        try:
+            t = await _get(BUF + "/api/v1/futures/market/tickers", {},
+                           "symbols=" + ",".join(sorted({x["sym"] for x in out})))
+            mk = {x.get("symbol"): _f(x.get("markPrice") or x.get("lastPrice")) for x in (t.get("data") or [])}
+            for x in out:
+                x["mark"] = x["mark"] or mk.get(x["sym"]) or None
+        except ApiErr:
+            pass
+    return out
+
+
+async def bu_perms(k):
+    return None        # Bitunix kalit ruxsatlarini so'rash API'si yo'q
+
+
+async def bu_depth(k, a) -> dict:
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    if mkt == "fut":
+        d, t = await asyncio.gather(_get(BUF + "/api/v1/futures/market/depth", {}, f"symbol={sym}&limit=15"),
+                                    _get(BUF + "/api/v1/futures/market/tickers", {}, f"symbols={sym}"))
+        tk = _first(_data(t))
+        b = _data(d) or {}
+        return _book(sym, mkt, _lv(b.get("bids")), _lv(b.get("asks")), _f(tk.get("lastPrice") or tk.get("last")),
+                     _chg(tk.get("lastPrice") or tk.get("last"), tk.get("open")))
+    d, t = await asyncio.gather(_get(BUS + "/api/spot/v1/market/depth", {}, f"symbol={sym}&precision=0"),
+                                _get(BUS + "/api/spot/v1/market/last_price", {}, f"symbol={sym}"),
+                                return_exceptions=True)
+    b = (_data(d) or {}) if isinstance(d, dict) else {}
+    last = _f(_data(t)) if isinstance(t, dict) and not isinstance(_data(t), dict) else _f((_data(t) or {}).get("price")) if isinstance(t, dict) else 0
+    return _book(sym, mkt, _lv(b.get("bids") or b.get("bid")), _lv(b.get("asks") or b.get("ask")), last, 0)
+
+
+async def bu_trade_perms(k) -> dict:
+    await _bu_acc(k)             # kalit ishlaydimi (auth bo'lsa xato)
+    return {"spot": True, "fut": True}
+
+
+async def bu_filters(mkt: str, sym: str) -> dict:
+    hit = _FX.get(("bu" + mkt, sym))
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    if mkt == "fut":
+        d = await _get(BUF + "/api/v1/futures/market/trading_pairs", {}, "symbols=" + sym)
+        s = next((x for x in (d.get("data") or []) if x.get("symbol") == sym), None)
+        if not s:
+            raise ApiErr("api", f"{sym}: Bitunix Futures'da bunday juftlik yo'q")
+        fx = {"step": _prec_step(s.get("basePrecision")), "tick": _prec_step(s.get("quotePrecision")),
+              "min_qty": _f(s.get("minTradeVolume")), "min_notional": 0.0, "base": s.get("base"), "quote": "USDT"}
+    else:
+        d = await _get(BUS + "/api/spot/v1/common/coin_pair/list", {})
+        s = next((x for x in (d.get("data") or []) if str(x.get("symbol")).upper() == sym), None)
+        if not s:
+            raise ApiErr("api", f"{sym}: Bitunix Spot'da bunday juftlik yo'q")
+        fx = {"step": _prec_step(s.get("basePrecision")), "tick": _prec_step(s.get("quotePrecision")),
+              "min_qty": _f(s.get("minVolume")), "min_notional": 0.0, "base": s.get("base") or sym[:-4],
+              "quote": "USDT"}
+    fx["mstep"] = fx["step"]
+    _FX[("bu" + mkt, sym)] = (time.time(), fx)
+    return fx
+
+
+async def bu_info(k, a) -> dict:
+    mkt = "fut" if a.get("mkt") == "fut" else "spot"
+    sym = _sym(a)
+    fx, book = await asyncio.gather(bu_filters(mkt, sym), bu_depth(None, {"mkt": mkt, "sym": sym}))
+    out = {"mkt": mkt, "sym": sym, "price": book.get("last"), "fx": fx, "perm": {"spot": True, "fut": True}}
+    if mkt == "spot":
+        bal = await bu_spot(k)
+        out["avail"] = {"quote": bal.get("USDT", 0.0), "base": bal.get(fx["base"] or "", 0.0)}
+    else:
+        acc = await _bu_acc(k)
+        out["avail"] = {"quote": _f(acc.get("available"))}
+        out["dual"] = str(acc.get("positionMode")).upper() == "HEDGE"
+        lv = acc.get("leverage")
+        out["lev"] = int(_f(lv)) or None if lv is not None else None
+    return out
+
+
+async def _bu_position(k, sym, ps=None) -> dict | None:
+    for p in await bu_pos(k):
+        if p["sym"] == sym and (not ps or ps == "BOTH" or p["ps"] in ("BOTH", ps)):
+            return p
+    return None
+
+
+async def bu_fut_order(k, a) -> dict:
+    sym = _sym(a)
+    side = "long" if a.get("side") == "long" else "short"
+    typ = "LIMIT" if a.get("type") == "limit" else "MARKET"
+    margin, lev = _pos(a, "margin"), int(_pos(a, "lev", hi=200))
+    tp, sl = _pos(a, "tp", False), _pos(a, "sl", False)
+    fx = await bu_filters("fut", sym)
+    await _bu(k, BUF, "/api/v1/futures/account/change_leverage", body={"symbol": sym, "leverage": lev, "marginCoin": "USDT"})
+    price = _round(_pos(a, "price"), fx["tick"]) if typ == "LIMIT" else _dec((await bu_depth(None, {"mkt": "fut", "sym": sym}))["last"] or 0)
+    if price <= 0:
+        raise ApiErr("api", "price")
+    qty = _floor(_dec(margin) * lev / price, fx["step"])
+    if qty <= 0 or float(qty) < fx["min_qty"]:
+        raise ApiErr("small", f"min {fx['min_qty']}")
+    b = {"symbol": sym, "qty": _s(qty), "side": "BUY" if side == "long" else "SELL", "tradeSide": "OPEN",
+         "orderType": typ, "effect": "GTC"}
+    if typ == "LIMIT":
+        b["price"] = _s(price)
+    if tp:
+        b.update(tpPrice=_s(_round(tp, fx["tick"])), tpStopType="MARK_PRICE", tpOrderType="MARKET")
+    if sl:
+        b.update(slPrice=_s(_round(sl, fx["tick"])), slStopType="MARK_PRICE", slOrderType="MARKET")
+    d = await _bu(k, BUF, "/api/v1/futures/trade/place_order", body=b) or {}
+    return {"id": str(d.get("orderId") or ""), "status": "NEW", "qty": float(qty), "sym": sym, "side": side,
+            "type": typ.lower(), "lev": lev, "warn": []}
+
+
+async def bu_fut_close(k, a) -> dict:
+    sym = _sym(a)
+    frac = _pos(a, "frac", hi=1.0)
+    p = await _bu_position(k, sym, str(a.get("ps") or "BOTH").upper())
+    if p is None:
+        raise ApiErr("nopos", sym)
+    if frac >= 0.999 and p.get("pid"):
+        await _bu(k, BUF, "/api/v1/futures/trade/flash_close_position", body={"positionId": p["pid"]})
+        return {"id": "", "status": "FILLED", "qty": p["qty"], "sym": sym}
+    fx = await bu_filters("fut", sym)
+    qty = _floor(_dec(p["qty"]) * _dec(frac), fx["step"])
+    if qty <= 0:
+        raise ApiErr("small", "qty")
+    b = {"symbol": sym, "qty": _s(qty), "side": "SELL" if p["side"] == "long" else "BUY", "tradeSide": "CLOSE",
+         "positionId": p.get("pid"), "orderType": "MARKET", "reduceOnly": True}
+    d = await _bu(k, BUF, "/api/v1/futures/trade/place_order", body=b) or {}
+    return {"id": str(d.get("orderId") or ""), "status": "NEW", "qty": float(qty), "sym": sym}
+
+
+async def bu_fut_open(k, a=None) -> list:
+    reg, tps = await asyncio.gather(_bu(k, BUF, "/api/v1/futures/trade/get_pending_orders"),
+                                    _bu(k, BUF, "/api/v1/futures/tpsl/get_pending_orders"),
+                                    return_exceptions=True)
+    out = []
+    lst = (reg.get("orderList") or []) if isinstance(reg, dict) else reg if isinstance(reg, list) else []
+    for o in lst:
+        out.append({"sym": str(o.get("symbol") or "").upper(), "id": str(o.get("orderId")), "algo": False,
+                    "side": str(o.get("side") or "").lower(), "type": str(o.get("orderType") or "").lower(),
+                    "price": _f(o.get("price")), "trigger": None, "qty": _f(o.get("qty")),
+                    "filled": _f(o.get("tradeQty")), "close": str(o.get("tradeSide")).upper() == "CLOSE",
+                    "ps": "BOTH", "t": int(_f(o.get("ctime")))})
+    tl = tps if isinstance(tps, list) else (tps.get("orderList") or tps.get("list") or []) if isinstance(tps, dict) else []
+    for o in tl:
+        for kind, key in (("take_profit_market", "tpPrice"), ("stop_market", "slPrice")):
+            if _f(o.get(key)):
+                out.append({"sym": str(o.get("symbol") or "").upper(), "id": str(o.get("id") or o.get("orderId")),
+                            "algo": True, "side": str(o.get("side") or "").lower(), "type": kind, "price": 0.0,
+                            "trigger": _f(o.get(key)), "qty": _f(o.get("tpQty") or o.get("slQty")), "close": True,
+                            "ps": "BOTH", "pid": str(o.get("positionId") or ""), "t": int(_f(o.get("ctime")))})
+    out.sort(key=lambda x: -x["t"])
+    return out
+
+
+async def bu_fut_cancel(k, a) -> dict:
+    sym, oid = _sym(a), _oid(a)
+    if a.get("algo"):
+        await _bu(k, BUF, "/api/v1/futures/tpsl/cancel_order", body={"symbol": sym, "orderId": oid})
+    else:
+        await _bu(k, BUF, "/api/v1/futures/trade/cancel_orders", body={"symbol": sym, "orderList": [{"orderId": oid}]})
+    return {"id": oid, "status": "CANCELED"}
+
+
+async def bu_fut_tpsl(k, a) -> dict:
+    sym = _sym(a)
+    tp, sl = _pos(a, "tp", False), _pos(a, "sl", False)
+    p = await _bu_position(k, sym, str(a.get("ps") or "BOTH").upper())
+    if p is None:
+        raise ApiErr("nopos", sym)
+    seen = set()
+    for o in await bu_fut_open(k):
+        if o["sym"] == sym and o["algo"] and o["id"] not in seen and (not o.get("pid") or o["pid"] == p.get("pid")):
+            seen.add(o["id"])
+            try:
+                await bu_fut_cancel(k, {"sym": sym, "id": o["id"], "algo": True})
+            except ApiErr as e:
+                log.info("Bitunix eski TP/SL bekor qilinmadi (%s): %s", sym, e.text[:120])
+    warn = []
+    if tp or sl:
+        fx = await bu_filters("fut", sym)
+        b = {"symbol": sym, "positionId": p.get("pid")}
+        if tp:
+            b.update(tpPrice=_s(_round(tp, fx["tick"])), tpStopType="MARK_PRICE")
+        if sl:
+            b.update(slPrice=_s(_round(sl, fx["tick"])), slStopType="MARK_PRICE")
+        try:
+            await _bu(k, BUF, "/api/v1/futures/tpsl/position/place_order", body=b)
+        except ApiErr as e:
+            warn.append("TP/SL: " + e.text[:120])
+    return {"sym": sym, "tp": tp, "sl": sl, "warn": warn}
+
+
+async def bu_fut_modify(k, a) -> dict:
+    sym, oid = _sym(a), _oid(a)
+    o = next((x for x in await bu_fut_open(k) if x["id"] == oid and not x["algo"]), None)
+    if o is None or o["type"] != "limit":
+        raise ApiErr("bad", "faqat LIMIT orderni surish mumkin")
+    fx = await bu_filters("fut", sym)
+    price = _s(_round(_pos(a, "price"), fx["tick"]))
+    await _bu(k, BUF, "/api/v1/futures/trade/modify_order",
+              body={"orderId": oid, "qty": _s(_dec(o["qty"])), "price": price})
+    return {"id": oid, "price": _f(price), "status": "NEW"}
+
+
+async def bu_spot_order(k, a) -> dict:
+    sym = _sym(a)
+    side = "buy" if a.get("side") == "buy" else "sell"
+    typ = "limit" if a.get("type") == "limit" else "market"
+    fx = await bu_filters("spot", sym)
+    b = {"symbol": sym, "side": 2 if side == "buy" else 1, "type": 1 if typ == "limit" else 2}
+    if typ == "limit":
+        price = _round(_pos(a, "price"), fx["tick"])
+        qty = (_floor(_dec(_pos(a, "quote")) / price, fx["step"]) if side == "buy" and a.get("qty") in (None, "")
+               else _floor(_pos(a, "qty"), fx["step"]))
+        if qty <= 0:
+            raise ApiErr("small", "qty")
+        b.update(price=_s(price), volume=_s(qty))
+    elif side == "buy" and a.get("qty") in (None, ""):
+        b["volume"] = _s(_floor(_pos(a, "quote"), "0.01"))        # market buy — USDT summasi
+    else:
+        qty = _floor(_pos(a, "qty"), fx["step"])
+        if qty <= 0:
+            raise ApiErr("small", "qty")
+        b["volume"] = _s(qty)
+    d = await _bu(k, BUS, "/api/spot/v1/order/place_order", body=b) or {}
+    oid = d.get("orderId") if isinstance(d, dict) else d
+    return {"id": str(oid or ""), "status": "NEW", "sym": sym, "side": side, "type": typ}
+
+
+async def bu_spot_open(k, a=None) -> list:
+    d = await _bu(k, BUS, "/api/spot/v1/order/pending/list", body={}) or []
+    lst = d if isinstance(d, list) else (d.get("data") or d.get("list") or []) if isinstance(d, dict) else []
+    return [{"sym": str(o.get("symbol") or "").upper(), "id": str(o.get("orderId")),
+             "side": "buy" if str(o.get("side")) in ("2", "BUY", "buy") else "sell",
+             "type": "limit" if str(o.get("type")) in ("1", "LIMIT", "limit") else "market",
+             "price": _f(o.get("price")), "qty": _f(o.get("volume")), "filled": _f(o.get("dealVolume")),
+             "t": int(_f(o.get("ctime")))} for o in lst]
+
+
+async def bu_spot_cancel(k, a) -> dict:
+    sym, oid = _sym(a), _oid(a)
+    await _bu(k, BUS, "/api/spot/v1/order/cancel", body={"orderIdList": [{"orderId": oid, "symbol": sym}]})
+    return {"id": oid, "status": "CANCELED"}
+
+
+async def bu_spot_modify(k, a) -> dict:
+    sym, oid = _sym(a), _oid(a)
+    o = next((x for x in await bu_spot_open(k) if x["id"] == oid), None)
+    if o is None or o["type"] != "limit":
+        raise ApiErr("bad", "faqat LIMIT orderni surish mumkin")
+    fx = await bu_filters("spot", sym)
+    qty = _floor(o["qty"] - o["filled"], fx["step"])
+    if qty <= 0:
+        raise ApiErr("small", sym)
+    await bu_spot_cancel(k, {"sym": sym, "id": oid})
+    r = await bu_spot_order(k, {"sym": sym, "side": o["side"], "type": "limit", "price": _pos(a, "price"),
+                                "qty": float(qty)})
+    return {"id": r["id"], "price": _pos(a, "price"), "status": "NEW"}
+
+
+async def bu_hist(k, a) -> dict:
+    """Futures yopilgan pozitsiyalar tarixi (sahifalab) — statistika uchun."""
+    since, errs, inc = int(a.get("since") or 0), [], []
+    try:
+        skip = 0
+        for _ in range(60):
+            d = await _bu(k, BUF, "/api/v1/futures/position/get_history_positions",
+                          {"startTime": since or None, "endTime": _ms(), "skip": skip, "limit": 100}) or {}
+            lst = d.get("positionList") or [] if isinstance(d, dict) else []
+            for x in lst:
+                pid, t = str(x.get("positionId") or ""), int(_f(x.get("mtime") or x.get("ctime")))
+                sym = str(x.get("symbol") or "").upper()
+                inc.append({"key": "u" + pid, "type": "REALIZED_PNL", "sym": sym, "amt": _f(x.get("realizedPNL")),
+                            "asset": "USDT", "t": t, "trade": pid})
+                if _f(x.get("fee")):
+                    inc.append({"key": "uf" + pid, "type": "COMMISSION", "sym": sym, "amt": -abs(_f(x.get("fee"))),
+                                "asset": "USDT", "t": t, "trade": pid})
+                if _f(x.get("funding")):
+                    inc.append({"key": "uu" + pid, "type": "FUNDING_FEE", "sym": sym, "amt": _f(x.get("funding")),
+                                "asset": "USDT", "t": t, "trade": ""})
+            skip += len(lst)
+            if len(lst) < 100:
+                break
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        errs.append("fut: " + e.text[:120])
+    return {"inc": inc, "spot": [], "spot_t": dict(a.get("spot_t") or {}), "errs": errs, "depth": "Bitunix"}
+
+
 # ─────────────── birja → amallar ───────────────
 
 TRADE_IMPL = {
@@ -1858,7 +2219,12 @@ TRADE_IMPL = {
              "fut_open": _no_open, "fut_cancel": _mx_fut_closed, "fut_tpsl": _mx_fut_closed,
              "fut_modify": _mx_fut_closed},
 }
-TRADE_PERMS = {"binance": None, "bitget": bg_trade_perms, "bingx": bx_trade_perms, "mexc": mx_trade_perms}
+TRADE_IMPL["bitunix"] = {"info": bu_info, "spot_order": bu_spot_order, "spot_open": bu_spot_open,
+                         "spot_cancel": bu_spot_cancel, "spot_modify": bu_spot_modify, "fut_order": bu_fut_order,
+                         "fut_close": bu_fut_close, "fut_open": bu_fut_open, "fut_cancel": bu_fut_cancel,
+                         "fut_tpsl": bu_fut_tpsl, "fut_modify": bu_fut_modify}
+TRADE_PERMS = {"binance": None, "bitget": bg_trade_perms, "bingx": bx_trade_perms, "mexc": mx_trade_perms,
+               "bitunix": bu_trade_perms}
 
 
 TRADE_OPS = {
@@ -2289,4 +2655,10 @@ async def bx_hist(k, a) -> dict:
     return {"inc": inc, "spot": spot, "spot_t": spot_t, "errs": errs, "depth": "BingX: spot ~30 kun"}
 
 
-HIST_EX = {"mexc": mx_hist, "bitget": bg_hist, "bingx": bx_hist}
+HIST_EX = {"mexc": mx_hist, "bitget": bg_hist, "bingx": bx_hist}   # + bitunix (357)
+
+
+# 357: Bitunix ro'yxatlarga (funksiyalar yuqorida, savdo blokida)
+_IMPL["bitunix"] = (bu_spot, bu_fut, bu_pos, bu_perms)
+DEPTH_EX["bitunix"] = bu_depth
+HIST_EX["bitunix"] = bu_hist

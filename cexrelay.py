@@ -133,6 +133,7 @@ _PING = {
     "mexc-fut": "https://contract.mexc.com/api/v1/contract/ping",
     "bitget": "https://api.bitget.com/api/v2/public/time",
     "bingx": "https://open-api.bingx.com/openApi/swap/v2/server/time",
+    "bitunix": "https://fapi.bitunix.com/api/v1/futures/market/tickers?symbols=BTCUSDT",
 }
 
 

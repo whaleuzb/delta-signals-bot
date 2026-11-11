@@ -8164,3 +8164,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Ma'lumot manbai: `https://mamurjon.com/api/config` (offline-group "Jamoaviy": 2–3 oy, $1299; `enrollEnd` 2026-11-15 23:59 +05; DIQQAT: o'sha paytda `available: false` edi). Narx postga qo'yilmadi.
 - `announce/promo-2026-11-mt/{1,2,3}.jpg, caption.txt`; `promo_job` (har 60 s): `PROMO_AT` 04:00 UTC dan keyin, 6 soatdan kech emas, `PROMO_KEY` bayrog'i avval qo'yiladi. Albomga Telegram tugma qo'ymaydi → albom (3 rasm, izohsiz) + ostida TO'LIQ MATNLI post "📖 Batafsil" tugmasi bilan (mamurjon.com/#plans) — foydalanuvchi: "tugmali post bo'lsin, tugmada batafsil"; ogohlantirish qatori olib tashlangan. Bot foydalanuvchilariga: admin nusxasi → `run_broadcast` (`msg_ids` albom + `after` tugmali xabar).
 - Sinov `test_356.py` 9/9. Broadcast paytida push qilinmasin (09:00 dan keyin ~2–3 daqiqa).
+
+## 357. Bitunix birjasi (to'liq teng imkoniyat)
+- `cex.py` (relay ham shu faylni ishlatadi): `_bu_sign`/`_bu` — imzo `sha256(sha256(nonce+ts+apiKey+saralangan "kalitqiymat"+bo'shliqsiz JSON body) + secret)`, sarlavhalar `api-key/nonce(32)/timestamp/sign`. Futures `fapi.bitunix.com`, spot `openapi.bitunix.com`.
+- O'qish: `bu_spot` (spot API ochilmasa — kalit fyuchers hisobi orqali tekshiriladi, spot = bo'sh), `bu_fut` (available+frozen+margin+uPnL), `bu_pos` (`pid` = positionId, belgi narxi tickerdan), `bu_perms` = None (ruxsat API'si yo'q).
+- `bu_depth`, `bu_hist` (yopilgan pozitsiyalar tarixi → REALIZED_PNL/COMMISSION/FUNDING_FEE), savdo: `bu_info`, `bu_fut_order` (leveraj + TP/SL bilan), `bu_fut_close` (to'liq — flash_close, qisman — CLOSE order), `bu_fut_open` (oddiy + TP/SL orderlar), `bu_fut_cancel`, `bu_fut_tpsl` (eski TP/SL bekor → pozitsiya TP/SL), `bu_fut_modify`, `bu_spot_*` (spot modify = bekor + qayta qo'yish).
+- Ro'yxatlar: `EXCHANGES`, `TRADE_EX`, `TRADE_IMPL`, `TRADE_PERMS`; `_IMPL/DEPTH_EX/HIST_EX` ga fayl oxirida qo'shiladi. Relay `_PING`, `notify.py` nomi, ilova `CEX` (harf belgisi `BU`, rasmiy logo berilsa `CXL.bitunix`).
+- Haqiqiy kalit bilan hali tekshirilmagan (sandbox birja hostlarini yopadi). Sinov `test_357.py` 31/31.

@@ -422,8 +422,8 @@ function render(){var ae=document.activeElement;if(ae&&ae.id&&ae.id.indexOf('tv_
  v.insertAdjacentHTML('beforeend','<div class="endsp"></div>');
  S.anim=false;S.dir='';bindSlider()}
 
-/* 324: Wallet — birja hisoblari (MEXC, Bitget, BingX, Binance), faqat o'qish */
-var CEX=[['mexc','MEXC','#0055ff','MX'],['bitget','Bitget','#00c2c2','BG'],['bingx','BingX','#3b5bff','BX'],['binance','Binance','#f0b90b','BN']];
+/* 324: Wallet — birja hisoblari (MEXC, Bitget, BingX, Binance, Bitunix), faqat o'qish */
+var CEX=[['mexc','MEXC','#0055ff','MX'],['bitget','Bitget','#00c2c2','BG'],['bingx','BingX','#3b5bff','BX'],['binance','Binance','#f0b90b','BN'],['bitunix','Bitunix','#1fd0a5','BU']];   /* 357: Bitunix (logo — harf belgisi) */
 function cexMeta(ex){if(ex=='dipfunded')return['dipfunded','Dip Funded','#c2f23a','DF'];for(var k=0;k<CEX.length;k++)if(CEX[k][0]==ex)return CEX[k];return[ex,ex,'#888','?']}
 /* 332: birja logolari (SVG, 24×24). Binance — simple-icons; qolganlari brend shakli/rangi bo'yicha. */
 var CXL={

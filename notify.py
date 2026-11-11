@@ -243,7 +243,7 @@ async def _cex_tick(row):
 
 
 def webapp_name(ex: str) -> str:
-    return {"binance": "Binance", "bitget": "Bitget", "mexc": "MEXC", "bingx": "BingX"}.get(ex, ex)
+    return {"binance": "Binance", "bitget": "Bitget", "mexc": "MEXC", "bingx": "BingX", "bitunix": "Bitunix"}.get(ex, ex)
 
 
 async def _df_tick(uid: int):
