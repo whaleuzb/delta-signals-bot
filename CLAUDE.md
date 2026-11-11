@@ -8189,3 +8189,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `bot.signal_copy_do()` — umumiy yadro (bot tugmasi ham, ilova `copy` amali ham). `/api/app/open` har signalga `cp: {ws, name, ch}` beradi (faqat egasiga, ikkinchi workspace bor va hali nusxalanmagan bo'lsa). Ilovada: signal kartasi va terminalda "📢 Kanalga ham qo'shish" / "👥 Guruhga ham qo'shish" (`cpAsk` → tasdiq → `act(id,'copy',…,{ws})`), PENDING signalda ham.
 - Tuzatildi: nusxaning o'zidan qayta nusxa (asl joyga ikkinchi marta qo'shib qo'yardi) — `copy_target` va `signal_copy_do` `copied_from` bo'lsa rad etadi.
 - Sinov `test_360.py` 12/12.
+
+## 361. Summa kiritilganda bo'sh summa (botdagidek) — ilovada
+- Foydalanuvchi: "summa kiritayotganda bo'sh summani ko'rsat avvalgidek". Botda `alloc_prompt`/`free_lines` bor edi, ilovada faqat depozitning o'zi (yangi signal) yoki hech narsa (Summa, Qo'shish) chiqardi.
+- `wsBusy(wid,fut)` — ochiq signallardagi `alloc` yig'indisi (spot/futures alohida; joriy workspace — `S.items`, boshqasi — `/api/app/open` bir marta, `S.busyC` keshi, `newSig()` da tozalanadi). `freeLine(w,fut)` → "Bo'sh: $X · Depozit $Y · Pozitsiyalarda $Z".
+- Qo'yilgan joylar: yangi signal (summa maydoni ostida; joy almashtirilsa `ns_ws` onchange qayta chizadi), `askSize`, `askAdd` ($ rejimida).
+- DIQQAT: `nsRender` HTML'i JS satri ichida — atribut ichidagi qo'shtirnoq `\'` bilan (birinchi urinishda butun skript yiqildi).
+- Brauzer sinovi `t_free.py`: spot 150,622 / 200,622 / 50,000; futures 4,500 / 5,000 / 500.

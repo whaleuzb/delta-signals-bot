@@ -1648,12 +1648,12 @@ function nsKeep(){var g=function(i){var e=document.getElementById(i);return e?e.
 function nsPick(){nsKeep();var kind=NS.kind=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(s){nsKeep();NS.sym=s;nsRender()}};pairPick(o);
  pairsGet(kind).then(function(p){o.list=p;o.loading=false;if(S.pp===o)ppList()}).catch(function(){o.loading=false;if(S.pp===o)ppList()})}
 function nsSet(k,v){nsKeep();NS[k]=v;tick();nsRender()}
-function newSig(){tick();if(!S.ws.length)return;NS.ws=NS.ws||S.cur;S.page={id:'ns'};nsRender();pageShow()}
+function newSig(){tick();if(!S.ws.length)return;S.busyC={};NS.ws=NS.ws||S.cur;S.page={id:'ns'};nsRender();pageShow()}
 function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(function(x){return x.id==NS.ws})[0]||cur();
  var lb=function(t_){return'<div class="rs" style="margin:10px 2px 6px">'+esc(t_)+'</div>'};
  var fi=function(id,ph,val,mode){return'<input id="ns_'+id+'" '+(mode?'inputmode="'+mode+'" ':'')+'placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;outline:none">'};
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('plus',22)+'</div><div><h2>'+esc(t('ns_title'))+'</h2><div class="rs">'+esc(wsName(w))+'</div></div></div>';
- if(S.ws.length>1)h+=lb(t('ns_where'))+'<select id="ns_ws" style="width:100%;font-size:15px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==w.id?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>';
+ if(S.ws.length>1)h+=lb(t('ns_where'))+'<select id="ns_ws" onchange="nsSet(\'ws\',+this.value)" style="width:100%;font-size:15px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==w.id?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>';
  h+=lb(t('ns_pair'))+'<input type="hidden" id="ns_sym" value="'+esc(NS.sym||'')+'"><div onclick="nsPick()" style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 14px">'
   +(NS.sym?coinIc(NS.sym,24)+'<span style="flex:1">'+esc(NS.sym)+'</span>':'<span style="flex:1;color:var(--mut);font-weight:600">'+esc(t('pp_choose'))+'</span>')+'<span style="opacity:.5">▾</span></div>';
  h+=lb(t('ns_kind'))+nsSeg('k',[['spot','Spot'],['fut','Futures']],NS.kind,'nsKind');
@@ -1663,7 +1663,7 @@ function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(func
  if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal');
  NS.tf=NS.tf||'1h';h+=lb(t('ns_tf'))+'<div class="chips" style="flex-wrap:wrap">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(NS.tf==x?' on':'')+'" onclick="nsSet(\'tf\',\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal')+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal');
- var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount')+' · '+f0(dep))+fi('amount','',NS.amount,'decimal');
+ var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount'))+fi('amount','',NS.amount,'decimal')+'<div style="height:6px"></div>'+freeLine(w,NS.kind=='fut');
  h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('ns_send'))+'</button>';
  p.innerHTML=h}
 function nsKind(k){nsSet('kind',k)}function nsSide(k){nsSet('side',k)}function nsMode(k){nsSet('mode',k)}
@@ -1845,13 +1845,20 @@ function sub(i){return esc(i.symbol)+' · '+esc(t('entry'))+' '+fp(i.entry)+' ·
 function askTps(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tps_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('tps_hint'),i.tps.join(' '))+'<button class="btn p full" onclick="var v=nums(document.getElementById(\'f1\').value);if(!v.length)return;sheetClose();act('+id+',\'tps\',null,true,v)">'+esc(t('save'))+'</button>')}
 function askEntry(id){var i=itm(id);sheetOpen('<h4>'+esc(t('entry_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('entry'),i.entry)+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'entry\',v,true)">'+esc(t('save'))+'</button>')}
 function askTpsl(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tpsl_btn'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('sl_l'),'')+inp('f2',t('tps_hint'),'')+'<button class="btn p full" onclick="var s=num(document.getElementById(\'f1\').value),v=nums(document.getElementById(\'f2\').value);if(!s||!v.length)return;sheetClose();act('+id+',\'tpsl\',null,true,{sl:s,tps:v})">'+esc(t('save'))+'</button>')}
-function askSize(id){var i=itm(id);sheetOpen('<h4>'+esc(t('size_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('size_usd'),'')+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'size\',v,true)">'+esc(t('save'))+'</button>')}
+/* 361: summa so'ralganda bo'sh summa (depozit − ochiq pozitsiyalarda band), botdagidek */
+function wsBusy(wid,fut){var w=cur(),L=(w&&w.id==wid&&w.type!='cex')?S.items:(S.busyC||{})[wid];
+ if(!L){S.busyC=S.busyC||{};if(!S.busyQ){S.busyQ=1;api('open',{ws:wid}).then(function(d){S.busyC[wid]=d.items||[];S.busyQ=0;if(S.page&&S.page.id=='ns'){nsKeep();nsRender()}}).catch(function(){S.busyQ=0})}return null}
+ var b=0;L.forEach(function(i){if(i.alloc&&((i.lev>1)==!!fut))b+=i.alloc});return b}
+function freeOf(w,fut){var dep=w?(fut?w.fut_deposit:w.deposit):null;if(dep==null)return null;var b=wsBusy(w.id,fut);return b==null?{dep:dep}:{dep:dep,busy:b,free:Math.max(0,dep-b)}}
+function freeLine(w,fut){var f=freeOf(w,fut);if(!f)return'';
+ return'<div class="rs" style="margin:-2px 2px 10px">'+esc(t('free_l'))+': <b style="color:var(--g)">'+(f.free!=null?f0(f.free):'…')+'</b> · '+esc(t('dep_l'))+' '+f0(f.dep)+(f.busy?' · '+esc(t('busy_l'))+' '+f0(f.busy):'')+'</div>'}
+function askSize(id){var i=itm(id);sheetOpen('<h4>'+esc(t('size_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('size_usd'),'')+freeLine(cur(),i.lev>1)+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'size\',v,true)">'+esc(t('save'))+'</button>')}
 var ADDM='now';
 function askAdd(id,m){var i=itm(id);ADDM=m||ADDM;var usd=i.usd;
  sheetOpen('<h4>'+esc(t('add_title'))+'</h4><p>'+sub(i)+'</p>'
  +'<div class="seg glass" style="margin-bottom:12px"><div class="si" style="width:calc((100% - 8px)/2);transform:translateX('+(ADDM=='lim'?100:0)+'%)"></div><a class="'+(ADDM=='now'?'on':'')+'" onclick="askAdd('+id+',\'now\')">'+esc(t('now'))+'</a><a class="'+(ADDM=='lim'?'on':'')+'" onclick="askAdd('+id+',\'lim\')">'+esc(t('lim'))+'</a></div>'
  +(ADDM=='lim'?inp('f2',t('prices'),'',i.side=='LONG'?'< '+fp(i.price):'> '+fp(i.price)):'')
- +inp('f1',usd?t('size_usd'):t('size_x'),usd?Math.round(i.alloc||0):1)
+ +inp('f1',usd?t('size_usd'):t('size_x'),usd?Math.round(i.alloc||0):1)+(usd?freeLine(cur(),i.lev>1):'')
  +'<button class="btn p full" onclick="saveAdd('+id+')">'+esc(t('save'))+'</button>')}
 function saveAdd(id){var v=num(document.getElementById('f1').value);if(!v)return;
  if(ADDM=='lim'){var p=nums(document.getElementById('f2').value);if(!p.length)return;sheetClose();act(id,'lim',v,true,p)}else{sheetClose();act(id,'add',v,true)}}
