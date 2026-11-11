@@ -38,7 +38,7 @@ WT = {
            "dl": "Kunlik limit", "mx": "Maks. zarar", "tg": "Maqsad", "days": "Kunlar", "left": "qoldi",
            "eq": "Hisob", "bal": "DIP balans", "tasks": "Vazifalar", "go": "Bajarish", "ck": "Tekshirish",
            "done": "Bajarildi", "ref": "Taklif havolasi", "copy": "Nusxa", "notask": "Hozircha yangi vazifa yo'q",
-           "upd": "yangilandi", "load": "Yuklanmoqda…"},
+           "upd": "yangilandi", "upnl": "ochiq · jami", "load": "Yuklanmoqda…"},
     "ru": {"pos": "Открытые позиции", "none": "Нет открытых позиций", "lim": "Лимит", "entry": "Вход",
            "px": "Цена", "close": "Закрыть", "cancel": "Отменить", "sure": "Нажмите ещё раз", "busy": "Подождите и нажмите снова",
            "err": "Ошибка — попробуйте ещё раз", "app": "Открыть в приложении", "trade": "Открыть на бирже",
@@ -46,7 +46,7 @@ WT = {
            "dl": "Дневной лимит", "mx": "Макс. просадка", "tg": "Цель", "days": "Дни", "left": "осталось",
            "eq": "Счёт", "bal": "Баланс DIP", "tasks": "Задания", "go": "Выполнить", "ck": "Проверить",
            "done": "Выполнено", "ref": "Ссылка-приглашение", "copy": "Копировать", "notask": "Новых заданий пока нет",
-           "upd": "обновлено", "load": "Загрузка…"},
+           "upd": "обновлено", "upnl": "открыто · итог", "load": "Загрузка…"},
     "en": {"pos": "Open positions", "none": "No open positions", "lim": "Limit", "entry": "Entry",
            "px": "Price", "close": "Close", "cancel": "Cancel", "sure": "Tap again", "busy": "Wait a moment and tap again",
            "err": "Error — try again", "app": "Open in the app", "trade": "Open on exchange",
@@ -54,7 +54,7 @@ WT = {
            "dl": "Daily limit", "mx": "Max loss", "tg": "Target", "days": "Days", "left": "left",
            "eq": "Account", "bal": "DIP balance", "tasks": "Tasks", "go": "Start", "ck": "Check",
            "done": "Done", "ref": "Invite link", "copy": "Copy", "notask": "No new tasks yet",
-           "upd": "updated", "load": "Loading…"},
+           "upd": "updated", "upnl": "open · total", "load": "Loading…"},
 }
 EXN = {"binance": "Binance", "bitget": "Bitget", "bingx": "BingX", "mexc": "MEXC", "bitunix": "Bitunix", "bybit": "Bybit"}
 
@@ -62,24 +62,42 @@ EXN = {"binance": "Binance", "bitget": "Bitget", "bingx": "BingX", "mexc": "MEXC
 # Umumiy: holat D (chatData'dan), so'rov Q() — bitta vaqtda bitta, javobdagi d/m qo'llanadi,
 # ko'rinib turganda har 20 s da 'r' (fon so'rovi; shaxsiy chatda ruxsat). Bosishlar —
 # delegatsiya (data-a / data-v), so'rov bosish ishlovchisi ichida sinxron chaqiriladi.
-_CSS = ("body{margin:0;padding:10px 12px;font:14px/1.3 system-ui,sans-serif}"
-        ".h{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--tg-theme-hint-color);margin-bottom:6px}"
-        ".h b{color:var(--tg-theme-text-color);font-size:14px}"
-        ".m{color:var(--tg-theme-hint-color);font-size:11.5px;margin-top:2px}"
-        ".g{color:#1fbf62}.e{color:#ef4444}.k{font-weight:700}"
-        ".r{padding:7px 0;border-top:1px solid var(--tg-theme-section-separator-color)}"
+# 364: Trade Controller uslubi — tungi fon (#070807), burchakda lime nur, Acid Lime (#c2f23a) urg'u,
+# qizil #ff5c5c, oynasimon qatorlar va pill tugmalar (ilovadagi `.glass`/`.chip`/`.btn.p` kabi).
+# Fon body'da — hujjatga ko'ra butun pufakni (bubble) bo'yaydi, yorug' mavzuda ham bir xil ko'rinadi.
+_CSS = ("body{margin:0;padding:12px 13px 13px;font:13.5px/1.35 system-ui,sans-serif;color:#f5f5f7;font-variant-numeric:tabular-nums;"
+        "background:radial-gradient(130% 80% at 0% 0%,rgba(194,242,58,.14),rgba(194,242,58,0) 55%),linear-gradient(165deg,#13150f,#070807)}"
+        ".h{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:rgba(200,205,194,.62);margin-bottom:6px}"
+        ".h b{color:#f5f5f7;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:7px}"
+        ".lg{width:20px;height:20px;border-radius:7px;background:#c2f23a;color:#0b0c0a;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center}"
+        ".m{color:rgba(200,205,194,.62);font-size:11.5px;margin-top:2px}"
+        ".g{color:#c2f23a}.e{color:#ff5c5c}.k{font-weight:800}"
+        ".r{padding:9px 10px;margin-top:6px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}"
+        ".r.on{border-color:rgba(194,242,58,.45)}"
         ".t{display:flex;justify-content:space-between;align-items:center;gap:8px}"
-        ".a{display:flex;gap:6px;margin-top:7px}.a button{flex:1;padding:7px 2px;font-size:12.5px}"
-        ".c{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}"
-        ".c button{padding:5px 9px;font-size:12px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color)}"
-        ".c .on{background:var(--tg-theme-button-color);color:var(--tg-theme-button-text-color)}"
-        ".n{font-size:12px;margin-top:7px;color:var(--tg-theme-hint-color)}"
-        ".bar{height:6px;border-radius:3px;background:var(--tg-theme-secondary-bg-color);overflow:hidden;margin:3px 0 7px}"
-        ".bar i{display:block;height:100%}")
+        ".a{display:flex;gap:6px;margin-top:8px}"
+        "button{flex:1;padding:9px 4px;font-size:12.5px;font-weight:700;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#f5f5f7}"
+        "button.p{background:rgba(194,242,58,.16);border-color:rgba(194,242,58,.42);color:#c2f23a}"
+        "button.d{background:rgba(255,92,92,.13);border-color:rgba(255,92,92,.38);color:#ff5c5c}"
+        "button[disabled]{color:rgba(200,205,194,.36)}"
+        ".c{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}"
+        ".c button{flex:none;padding:6px 12px;border-radius:999px;font-size:12px;color:rgba(200,205,194,.8)}"
+        ".c .on{border-color:rgba(194,242,58,.55);background:rgba(194,242,58,.1);color:#fff}"
+        ".n{font-size:12px;margin-top:9px;padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.05);color:#e8eae4}"
+        ".bar{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:4px 0 9px}.bar i{display:block;height:100%;border-radius:3px}"
+        ".tg{font-size:10px;font-weight:800;padding:2px 6px;border-radius:6px;margin-left:6px}"
+        ".L{background:rgba(194,242,58,.14);color:#c2f23a}.S{background:rgba(255,92,92,.14);color:#ff5c5c}"
+        ".av{width:30px;height:30px;border-radius:50%;background:rgba(194,242,58,.12);color:#c2f23a;font-weight:900;font-size:11px;display:inline-flex;align-items:center;justify-content:center;margin-right:9px;flex:none}"
+        ".rg{position:relative;height:4px;border-radius:2px;margin:9px 0 3px;background:linear-gradient(90deg,#ff5c5c,rgba(255,255,255,.18) 45%,#c2f23a)}"
+        ".rg i{position:absolute;top:-4px;width:12px;height:12px;border-radius:50%;background:#fff;margin-left:-6px;transition:left .6s}"
+        ".rg b{position:absolute;top:-3px;width:2px;height:10px;background:rgba(255,255,255,.55);margin-left:-1px}"
+        ".big{font-size:24px;font-weight:900;letter-spacing:-.02em}")
 
 _JS = ("var W=TelegramWidget,w=document.getElementById('w'),B=0,M='',S=0,C=0;"
        "function P(s){try{return JSON.parse(s)}catch(e){return null}}var D=P(W.chatData)||{};"
-       "function F(x,n){return x==null?'—':Number(x).toLocaleString(undefined,{maximumFractionDigits:n==null?2:n})}"
+       "function F(x,n){return x==null?'—':Number(x).toLocaleString('en-US',{maximumFractionDigits:n==null?2:n})}"
+       "function U(x){return(x>=0?'+$':'-$')+F(Math.abs(x))}"
+       "function H(t,i){return'<div class=h><b><span class=lg>'+(i||'TC')+'</span>'+t+'</b><span>'+(B?'⟳':(D.t||''))+'</span></div>'}"
        "function Q(x,f){if(B){M='{{busy}}';R();return}B=1;R();W.request(x).then(function(a){B=0;var r=P(a.result)||{};"
        "if(r.d)D=r.d;M=r.m||'';if(f)f(r);R()},function(e){B=0;M=e.code=='BUSY'||e.code=='RATE_LIMITED'?'{{busy}}':'{{err}}';R()})}"
        "W.onEvent('chatDataChanged',function(){D=P(W.chatData)||D;R()});"
@@ -91,56 +109,60 @@ _JS = ("var W=TelegramWidget,w=document.getElementById('w'),B=0,M='',S=0,C=0;"
 
 _TAIL = "R();Q(RQ());"
 
-# (1) Ochiq pozitsiyalar. Qator: [sid, sym, 'L'|'S', pnl%, narx, kirish, sl, lev, 'A'|'P', $pnl]
-_POS = ("function R(){var L=D.L||[],h='<div class=h><b>📊 {{pos}}</b><span>'+(B?'…':(D.t||''))+'</span></div>';"
-        "if(!L.length)h+='<div class=m>{{none}}</div>';"
-        "L.forEach(function(x){var p=x[8]=='P',o=S==x[0];"
-        "h+='<div class=r data-a=s data-v='+x[0]+'><div class=t><span><span class=k>'+x[1]+'</span> <span class='+(x[2]=='L'?'g':'e')+' style=font-size:11px>'+(x[2]=='L'?'LONG':'SHORT')+(x[7]>1?' '+x[7]+'x':'')+'</span></span>'"
-        "+'<span class=\"k '+(p||x[3]==null?'':x[3]>=0?'g':'e')+'\">'+(p?'{{lim}}':(x[3]>=0?'+':'')+F(x[3])+'%'+(x[9]!=null?' · '+(x[9]>=0?'+$':'-$')+F(Math.abs(x[9])):''))+'</span></div>'"
-        "+'<div class=m>{{entry}} '+x[5]+' · {{px}} '+x[4]+(x[6]?' · SL '+x[6]:'')+'</div>';"
-        "if(o)h+='<div class=a>'+(p?'':'<button data-a=be>BE</button><button data-a=pc>50%</button>')"
-        "+'<button data-a=cl style=color:#ef4444>'+(C==x[0]?'{{sure}}':(p?'{{cancel}}':'{{close}}'))+'</button></div>';h+='</div>'});"
+# (1) Ochiq pozitsiyalar. Qator: [sid, sym, 'L'|'S', pnl%, narx, kirish, sl, lev, 'A'|'P', $pnl, q, e, tp]
+# q / e — narx va kirishning SL→TP oralig'idagi o'rni (0..1): "qayerdamiz" chizig'i.
+_POS = ("function R(){var L=D.L||[],tot=0;L.forEach(function(x){if(x[9]!=null)tot+=x[9]});"
+        "var h=H('{{pos}}')+(L.length?'<div class=t><span class=m>'+L.length+' · {{upnl}}</span><span class=\"k '+(tot>=0?'g':'e')+'\" style=font-size:17px>'+U(tot)+'</span></div>':'<div class=m>{{none}}</div>');"
+        "L.forEach(function(x){var p=x[8]=='P',o=S==x[0],pc=p||x[3]==null?'':x[3]>=0?'g':'e';"
+        "h+='<div class=\"r'+(o?' on':'')+'\" data-a=s data-v='+x[0]+'><div class=t><span style=display:flex;align-items:center><span class=av>'+x[1].slice(0,3)+'</span><span><span class=k>'+x[1]+'</span>'"
+        "+'<span class=\"tg '+x[2]+'\">'+(x[2]=='L'?'LONG':'SHORT')+(x[7]>1?' '+x[7]+'x':'')+'</span><div class=m>{{entry}} '+x[5]+' · {{px}} '+x[4]+'</div></span></span>'"
+        "+'<span style=text-align:right><div class=\"k '+pc+'\" style=font-size:15px>'+(p?'{{lim}}':(x[3]>=0?'+':'')+F(x[3])+'%')+'</div>'+(x[9]!=null?'<div class=\"m '+pc+'\">'+U(x[9])+'</div>':'')+'</span></div>';"
+        "if(x[10]!=null)h+='<div class=rg><b style=left:'+x[11]*100+'%></b><i style=left:'+x[10]*100+'%></i></div><div class=\"t m\" style=font-size:10.5px><span>SL '+x[6]+'</span><span>TP '+x[12]+'</span></div>';"
+        "if(o)h+='<div class=a>'+(p?'':'<button data-a=be class=p>BE</button><button data-a=pc>50%</button>')"
+        "+'<button data-a=cl class=d>'+(C==x[0]?'{{sure}}':(p?'{{cancel}}':'{{close}}'))+'</button></div>';h+='</div>'});"
         "if(M)h+='<div class=n>'+M+'</div>';"
-        "h+='<div class=a><button data-a=app>{{app}}</button></div>';w.innerHTML=h}"
+        "h+='<div class=a><button data-a=app>{{app}} ›</button></div>';w.innerHTML=h}"
         "function A(a,v){if(a=='s'){S=S==v?0:+v;C=0;R()}else if(a=='be')Q('be:'+S);else if(a=='pc')Q('pc:'+S+':50');"
         "else if(a=='cl')T2(S,function(){Q('cl:'+S)});else if(a=='app')W.openTelegramLink('{{link}}')}")
 
-# (2) Tezkor savdo. D: {s,y,d,e,sl,tp,lv,f(utures signal),x:[[ex,nom]],i:{av,px,lev}}
+# (2) Tezkor savdo. D: {s,y,d,e,sl,tp,lv,f,x:[[ex,nom]],i:{av,px}}
 _TRADE = ("var X=0,K=D.f?'fut':'spot',G=25;function RQ(){return D.x&&D.x.length?'i:'+D.s+':'+D.x[X][0]+':'+K:'n'}"
-          "function R(){var h='<div class=h><b>⚡ '+(D.y||'')+' <span class='+(D.d=='L'?'g':'e')+'>'+(D.d=='L'?'LONG':'SHORT')+(D.f&&D.lv?' '+D.lv+'x':'')+'</span></b><span>'+(B?'…':'')+'</span></div>'"
-          "+'<div class=m>{{entry}} '+D.e+(D.sl?' · SL '+D.sl:'')+(D.tp?' · TP '+D.tp:'')+'</div>';var x=D.x||[];"
-          "if(!x.length){h+='<div class=n>{{nokey}}</div><div class=a><button data-a=app>{{app}}</button></div>';w.innerHTML=h;return}"
-          "h+='<div class=c>'+x.map(function(z,j){return'<button data-a=x data-v='+j+(j==X?' class=on':'')+'>'+z[1]+'</button>'}).join('')+'</div>';"
-          "if(D.f)h+='<div class=c><button data-a=k data-v=fut'+(K=='fut'?' class=on':'')+'>Futures</button>'+(D.d=='L'?'<button data-a=k data-v=spot'+(K=='spot'?' class=on':'')+'>Spot</button>':'')+'</div>';"
+          "function R(){var h=H((D.y||'')+'<span class=\"tg '+D.d+'\">'+(D.d=='L'?'LONG':'SHORT')+(D.f&&D.lv?' '+D.lv+'x':'')+'</span>','⚡')"
+          "+'<div class=r style=\"display:flex;justify-content:space-between;text-align:center\"><span><div class=m>{{entry}}</div><b>'+D.e+'</b></span><span><div class=m>SL</div><b class=e>'+(D.sl||'—')+'</b></span><span><div class=m>TP</div><b class=g>'+(D.tp||'—')+'</b></span></div>';var x=D.x||[];"
+          "if(!x.length){h+='<div class=n>{{nokey}}</div><div class=a><button data-a=app class=p>{{app}} ›</button></div>';w.innerHTML=h;return}"
+          "h+='<div class=c>'+x.map(function(z,j){return'<button data-a=x data-v='+j+(j==X?' class=on':'')+'>'+z[1]+'</button>'}).join('')"
+          "+(D.f?'<button data-a=k data-v=fut'+(K=='fut'?' class=on':'')+'>Futures</button>'+(D.d=='L'?'<button data-a=k data-v=spot'+(K=='spot'?' class=on':'')+'>Spot</button>':''):'')+'</div>';"
           "var i=D.i||{},av=i.av,amt=av!=null?Math.floor(av*G)/100:null;"
-          "h+='<div class=m>{{free}}: <b>'+(av==null?'…':'$'+F(av))+'</b>'+(i.px?' · {{px}} '+i.px:'')+'</div>';"
+          "h+='<div class=t><span class=m>{{free}}: '+(av==null?'…':'$'+F(av))+(i.px?' · {{px}} '+i.px:'')+'</span></div>'"
+          "+'<div class=t style=margin:6px 0 2px><span class=m>{{amt}}</span><span class=big>'+(amt==null?'—':'$'+F(amt))+'</span></div>';"
           "h+='<div class=c>'+[10,25,50,100].map(function(p){return'<button data-a=p data-v='+p+(p==G?' class=on':'')+'>'+p+'%</button>'}).join('')+'</div>';"
-          "h+='<div class=a><button data-a=go'+(amt?'':' disabled')+' style=\"background:'+(D.d=='L'?'#1fbf62':'#ef4444')+';color:#fff\">'"
-          "+(C=='go'?'{{sure}}':'{{buy}} '+(D.d=='L'?'LONG':'SHORT')+(amt?' · $'+F(amt):''))+'</button></div>';"
+          "h+='<div class=a><button data-a=go class='+(D.d=='L'?'p':'d')+(amt?'':' disabled')+' style=padding:12px;font-size:14px>'"
+          "+(C=='go'?'{{sure}}':'{{buy}} '+(D.d=='L'?'LONG':'SHORT'))+'</button></div>';"
           "if(M)h+='<div class=n>'+M+'</div>';w.innerHTML=h}"
           "function A(a,v){if(a=='x'){X=+v;D.i=null;C=0;Q(RQ())}else if(a=='k'){K=v;D.i=null;C=0;Q(RQ())}else if(a=='p'){G=+v;C=0;R()}"
           "else if(a=='go')T2('go',function(){Q('o:'+D.s+':'+D.x[X][0]+':'+K+':'+G)});else if(a=='app')W.openTelegramLink('{{link}}')}")
 
 # (4) Dip Funded. D: {c,n,s,eq,pn,dl:[%,left],mx:[%,left],tg:%,dy,p:[[sym,upnl,%]],a:[[id,nom]],t}
 _DF = ("function RQ(){return 'r:'+(D.c||0)}"
-       "function G(l,v,c,s){v=Math.max(0,Math.min(100,v||0));return'<div class=t style=font-size:12px><span>'+l+'</span><span class=m>'+s+'</span></div><div class=bar><i style=\"width:'+v+'%;background:'+c+'\"></i></div>'}"
-       "function R(){var h='<div class=h><b>Dip Funded</b><span>'+(B?'…':(D.t||''))+'</span></div>';if(!D.c){w.innerHTML=h+'<div class=m>'+(M||'{{load}}')+'</div>';return}"
+       "function K(v){return v>75?'#ff5c5c':v>50?'#f5b83d':'#c2f23a'}"
+       "function G(l,v,c,s){v=Math.max(0,Math.min(100,v||0));return'<div class=t style=font-size:12px;margin-top:4px><span>'+l+'</span><span class=m>'+s+'</span></div><div class=bar><i style=\"width:'+v+'%;background:'+c+'\"></i></div>'}"
+       "function R(){var h=H('Dip Funded','DF');if(!D.c){w.innerHTML=h+'<div class=m>'+(M||'{{load}}')+'</div>';return}"
        "if(D.a&&D.a.length>1)h+='<div class=c>'+D.a.map(function(z){return'<button data-a=a data-v='+z[0]+(z[0]==D.c?' class=on':'')+'>'+z[1]+'</button>'}).join('')+'</div>';"
-       "h+='<div class=m>'+D.n+' · '+D.s+'</div><div class=t style=margin:4px 0 8px><span class=k style=font-size:22px>$'+F(D.eq)+'</span><span class=\"k '+(D.pn>=0?'g':'e')+'\">'+(D.pn>=0?'+':'-')+'$'+F(Math.abs(D.pn))+'</span></div>';"
-       "var dl=D.dl||[0,0],mx=D.mx||[0,0];h+=G('{{dl}}',dl[0],dl[0]>75?'#ef4444':dl[0]>50?'#f59e0b':'#1fbf62',F(dl[0],0)+'% · $'+F(dl[1])+' {{left}}')"
-       "+G('{{mx}}',mx[0],mx[0]>75?'#ef4444':mx[0]>50?'#f59e0b':'#1fbf62',F(mx[0],0)+'% · $'+F(mx[1])+' {{left}}')"
-       "+(D.tg!=null?G('{{tg}}',D.tg,'var(--tg-theme-button-color)',F(D.tg,0)+'%'+(D.dy?' · {{days}} '+D.dy:'')):'');"
-       "(D.p||[]).forEach(function(x){h+='<div class=\"r t\"><span class=k>'+x[0]+'</span><span class=\"k '+(x[1]>=0?'g':'e')+'\">'+(x[1]>=0?'+':'-')+'$'+F(Math.abs(x[1]))+' · '+F(x[2])+'%</span></div>'});"
-       "if(M)h+='<div class=n>'+M+'</div>';h+='<div class=a><button data-a=app>{{app}}</button></div>';w.innerHTML=h}"
+       "h+='<div class=m>'+D.n+' · '+D.s+'</div><div class=t style=margin:3px 0 8px><span class=big>$'+F(D.eq)+'</span><span class=\"k '+(D.pn>=0?'g':'e')+'\" style=font-size:15px>'+U(D.pn)+'</span></div>';"
+       "var dl=D.dl||[0,0],mx=D.mx||[0,0];h+='<div class=r>'+G('{{dl}}',dl[0],K(dl[0]),F(dl[0],0)+'% · $'+F(dl[1])+' {{left}}')"
+       "+G('{{mx}}',mx[0],K(mx[0]),F(mx[0],0)+'% · $'+F(mx[1])+' {{left}}')"
+       "+(D.tg!=null?G('{{tg}}',D.tg,'#c2f23a',F(D.tg,0)+'%'+(D.dy?' · {{days}} '+D.dy:'')):'')+'</div>';"
+       "(D.p||[]).forEach(function(x){h+='<div class=\"r t\"><span style=display:flex;align-items:center><span class=av>'+x[0].slice(0,3)+'</span><b>'+x[0]+'</b></span><span class=\"k '+(x[1]>=0?'g':'e')+'\">'+U(x[1])+' · '+F(x[2])+'%</span></div>'});"
+       "if(M)h+='<div class=n>'+M+'</div>';h+='<div class=a><button data-a=app>{{app}} ›</button></div>';w.innerHTML=h}"
        "function A(a,v){if(a=='a'){D.c=+v;Q(RQ())}else if(a=='app')W.openTelegramLink('{{link}}')}")
 
 # (5) DIP. D: {b, u ($), T:[[id,nom,dip,url,done]], l: taklif havolasi}
-_DIP = ("function RQ(){return 'dr'}function R(){var h='<div class=h><b>💎 DIP</b><span>'+(B?'…':'')+'</span></div>'"
-        "+'<div class=t><span class=m>{{bal}}</span><span class=k style=font-size:20px>'+F(D.b)+' DIP</span></div><div class=m style=text-align:right>≈ $'+F(D.u)+'</div>';"
-        "var T=D.T||[];h+='<div class=m style=margin-top:8px>{{tasks}}</div>';if(!T.length)h+='<div class=m>{{notask}}</div>';"
-        "T.forEach(function(x){h+='<div class=r><div class=t><span>'+x[1]+'</span><span class=\"k g\">+'+F(x[2])+'</span></div>'"
-        "+(x[4]?'<div class=m>✓ {{done}}</div>':'<div class=a><button data-a=go data-v='+x[0]+'>{{go}}</button><button data-a=ck data-v='+x[0]+'>{{ck}}</button></div>')+'</div>'});"
-        "if(D.l)h+='<div class=r><div class=m>{{ref}}</div><div class=a><button data-a=cp>📋 {{copy}}</button></div></div>';"
+_DIP = ("function RQ(){return 'dr'}function R(){var h=H('DIP','💎')"
+        "+'<div class=r><div class=m>{{bal}}</div><div class=t><span class=\"big g\">'+F(D.b)+' DIP</span><span class=m>≈ $'+F(D.u)+'</span></div></div>';"
+        "var T=D.T||[];h+='<div class=m style=margin-top:10px>{{tasks}}</div>';if(!T.length)h+='<div class=m>{{notask}}</div>';"
+        "T.forEach(function(x){h+='<div class=r><div class=t><span class=k>'+x[1]+'</span><span class=\"tg L\">+'+F(x[2])+' DIP</span></div>'"
+        "+(x[4]?'<div class=\"m g\">✓ {{done}}</div>':'<div class=a><button data-a=go data-v='+x[0]+'>{{go}} ›</button><button data-a=ck data-v='+x[0]+' class=p>{{ck}}</button></div>')+'</div>'});"
+        "if(D.l)h+='<div class=a style=margin-top:10px><button data-a=cp class=p>🔗 {{ref}} · {{copy}}</button></div>';"
         "if(M)h+='<div class=n>'+M+'</div>';w.innerHTML=h}"
         "function A(a,v){if(a=='ck')Q('ck:'+v);else if(a=='cp')W.copyText(D.l);else if(a=='go'){var x=(D.T||[]).filter(function(z){return z[0]==v})[0];"
         "if(x&&x[3]){if(/^https:\\/\\/t\\.me\\//.test(x[3]))W.openTelegramLink(x[3]);else W.openLink(x[3])}}}")
@@ -225,6 +247,22 @@ def _hm() -> str:
     return time.strftime("%H:%M", time.gmtime(time.time() + 5 * 3600))     # Toshkent
 
 
+def _track(s, price, entry) -> list:
+    """364: narx va kirishning SL → keyingi TP oralig'idagi o'rni (0..1) + TP matni."""
+    B = _B()
+    tps = [float(x) for x in (s["tps"] or [])]
+    hit = int(s["tp_hit"] or 0)
+    tp = tps[min(hit, len(tps) - 1)] if tps else None
+    if s["sl"] is None or tp is None or not price:
+        return [None, None, ""]
+    sl = float(s["sl"])
+    span = (tp - sl) if s["side"] == "LONG" else (sl - tp)
+    if span <= 0:
+        return [None, None, ""]
+    f = (lambda x: max(0.0, min(1.0, ((x - sl) if s["side"] == "LONG" else (sl - x)) / span)))
+    return [round(f(float(price)), 3), round(f(entry), 3), B.fmt_price(tp)]
+
+
 async def pos_data(uid: int) -> dict:
     """(1) Egasining (ilovadagidek) ochiq signallari, jonli P&L bilan."""
     B = _B()
@@ -249,7 +287,7 @@ async def pos_data(uid: int) -> dict:
         L.append([s["id"], sym, "L" if s["side"] == "LONG" else "S", pnl,
                   B.fmt_price(float(price)) if price else "—", B.fmt_price(entry),
                   B.fmt_price(float(s["sl"])) if s["sl"] is not None else "", lv,
-                  "A" if s["status"] == "ACTIVE" else "P", usd])
+                  "A" if s["status"] == "ACTIVE" else "P", usd] + _track(s, price, entry))
     return {"L": L, "t": _hm()}
 
 

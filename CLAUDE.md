@@ -8210,3 +8210,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - DIQQAT: bot `python bot.py` (`__main__`) — `widgets._B()` ishlab turgan modulni oladi; `import bot` modulni ikkinchi marta yuklardi.
 - Web `api_wtrade`: info (bo'sh summa, narx), order: futures — marja = bo'sh × %, signal leveraji (yo'q bo'lsa birjadagi/10), SL + keyingi TP; spot — USDT summasi; 100% da 2% zaxira. `cex_orders` ga `via: widget`.
 - Sinovlar: `test_363.py` 23/23 (Postgres; bot + web), `t_wg.py` brauzerda soxta `TelegramWidget` bilan (4 widjet × qorong'i/yorug', bosishlar). Siqilgan hajm 1.5–1.9 KB. Haqiqiy Telegram (QuickJS) ichida hali sinalmagan.
+
+## 364. Widjetlar — Trade Controller uslubida
+- Foydalanuvchi: "ranglarini bizning stilga moslab". `widgets._CSS`: fon body'da (hujjat: butun pufakni bo'yaydi) — `#13150f→#070807` gradient + chap tepada lime nur; urg'u Acid Lime `#c2f23a`, qizil `#ff5c5c`, ikkinchi darajali matn `rgba(200,205,194,.62)`; oynasimon qatorlar `.r`, pill chiplar `.c`, tugmalar `.p` (lime) / `.d` (qizil); sarlavhada belgi `.lg` (TC/⚡/DF/💎). Yorug' mavzuda ham bir xil (brend kartasi).
+- Qo'shimcha: pozitsiyalar sarlavhasida jami $ P&L; har qatorda tanga belgisi va "SL → TP chizig'i" (`_track`: narx `q` va kirish `e` 0..1, TP matni — qator oxirida 3 maydon); savdo widjetida Kirish/SL/TP bloki va katta summa; DF shkalalari lime → sariq (50%) → qizil (75%).
+- Siqilgan hajm 2.2–2.5 KB (≤ 4096). `t_wg.py` 4 × 2 mavzu, xatosiz.
