@@ -1737,6 +1737,15 @@ async def _app_exec(ctx, a) -> tuple[bool, str]:
     act, arg = a["action"], (float(a["arg"]) if a["arg"] is not None else None)
     if act == "share":
         return await _app_sigshare(ctx, uid, lang, sig)
+    if act == "copy":                    # 360: guruh ↔ kanal — natijani ikkinchi joyda ham sanash
+        try:
+            target = int(json.loads(a["args"])["ws"])
+        except Exception:
+            return False, i18n.t("man.bad_format", lang)
+        err, _s, tgt, new_id, posted = await signal_copy_do(ctx.bot, uid, sig["id"], target, lang)
+        if err:
+            return False, err
+        return True, i18n.t("app.cp_done" if posted else "app.cp_fail", lang, name=tgt["name"], new=new_id)
     if act == "be":
         err = await act_be(ctx, ws, sig, lang)
         return (False, err) if err else (True, i18n.t("app.be_ok", lang))
@@ -2615,8 +2624,8 @@ async def copy_target(sig) -> "asyncpg.Record | None":
 
     `None` qaytadi: ikkinchi workspace yo'q, signal yopilgan, yoki
     allaqachon nusxalangan."""
-    if sig["status"] not in ("PENDING", "ACTIVE"):
-        return None
+    if sig["status"] not in ("PENDING", "ACTIVE") or sig["copied_from"] is not None:
+        return None     # 360: nusxaning o'zi yana nusxalanmaydi (aslini ikkinchi marta qo'shib qo'yardi)
     # Bu funksiya BOSHQARUV EKRANI chizilayotganda chaqiriladi. Uchta
     # so'rov qiladi va ularning biri yiqilsa butun ekran ochilmay
     # qolardi — holbuki bu ekranning ASOSIY vazifasi (stop ko'chirish,
@@ -7001,6 +7010,61 @@ async def on_alloc_again(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             i18n.t("al.btn_skip", lang), callback_data=f"allocskip:{sig['id']}")]]))
 
 
+async def signal_copy_do(bot, uid: int, sig_id: int, target_id: int, lang):
+    """Signalni egasining ikkinchi workspace'iga (guruh ↔ kanal) nusxalash — bot tugmasi
+    (`sigcopy:`) va ilova (`copy` amali, 360) uchun umumiy.
+    Natija: (xato_matni | None, sig, tgt, new_id, posted)."""
+    sig = await db.get_signal(sig_id)
+    src = await db.get_workspace(sig["workspace_id"]) if sig else None
+    tgt = await db.get_workspace(target_id)
+    # Huquq MANBA workspace bo'yicha tekshiriladi, ustiga manzil ham
+    # AYNI o'sha egaga tegishli bo'lishi shart — aks holda o'z signalini
+    # birovning kanaliga yozib qo'yish mumkin bo'lardi.
+    if not sig or not src or not tgt or not can_manage(uid, src) \
+            or tgt["owner_id"] != src["owner_id"]:
+        return i18n.t("man.no_right", lang), None, None, None, False
+    if sig["status"] not in ("PENDING", "ACTIVE"):
+        return i18n.t("cp.closed", lang), None, None, None, False
+    if sig["copied_from"] is not None:      # 360: nusxadan nusxa yo'q
+        return i18n.t("cp.already", lang, name=tgt["name"]), None, None, None, False
+
+    new_id = await db.copy_signal(sig_id, target_id)
+    if new_id is None:
+        return i18n.t("cp.already", lang, name=tgt["name"]), None, None, None, False
+    log.info("Signal nusxalandi: #%s -> ws#%s (#%s)", sig_id, target_id, new_id)
+
+    # Kartochka manzil chatiga — O'SHA workspace tilida.
+    posted = True
+    if tgt["group_chat_id"]:
+        d = {"symbol": sig["symbol"], "side": sig["side"],
+             "entry": float(sig["entry"]),
+             "sl": float(sig["sl"]) if sig["sl"] is not None else None,
+             "tps": [float(t) for t in sig["tps"]],
+             "market": sig["market"], "entry_mode": sig["entry_mode"]}
+        body = draft_text(d, new_id, ws_lang(tgt))
+        body = pub(tgt, body)
+        body += await promo_line(bot, tgt, body, 1024 if sig["chart_file_id"] else 4096)
+        try:
+            if sig["chart_file_id"]:
+                sent = await bot.send_photo(
+                    tgt["group_chat_id"], sig["chart_file_id"], caption=body,
+                    parse_mode=ParseMode.HTML,
+                    message_thread_id=tgt["group_topic_id"])
+            else:
+                sent = await bot.send_message(
+                    tgt["group_chat_id"], body, parse_mode=ParseMode.HTML,
+                    message_thread_id=tgt["group_topic_id"],
+                    disable_web_page_preview=True)
+            await db.set_group_msg(new_id, sent.message_id)
+        except Exception:
+            # Xabar ketmasa ham NUSXA QOLADI: foydalanuvchi savdoni
+            # o'sha kanalda ALLAQACHON qo'lda e'lon qilgan bo'lishi
+            # mumkin — asosiy maqsad natijani sanash edi.
+            log.exception("Nusxa kartochkasi yuborilmadi (ws#%s)", target_id)
+            posted = False
+    return None, sig, tgt, new_id, posted
+
+
 async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """"Kanalga ham qo'shish" — ochiq signalni ikkinchi workspace'ga
     nusxalaydi, kartochkasini o'sha chatga yuboradi va (depozit
@@ -7015,56 +7079,11 @@ async def on_signal_copy(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
     sig_id, target_id = int(sid_s), int(tid_s)
     lang = await user_lang(q.from_user.id)
 
-    sig = await db.get_signal(sig_id)
-    src = await db.get_workspace(sig["workspace_id"]) if sig else None
-    tgt = await db.get_workspace(target_id)
-    # Huquq MANBA workspace bo'yicha tekshiriladi, ustiga manzil ham
-    # AYNI o'sha egaga tegishli bo'lishi shart — aks holda o'z signalini
-    # birovning kanaliga yozib qo'yish mumkin bo'lardi.
-    if not sig or not src or not tgt or not can_manage(q.from_user.id, src) \
-            or tgt["owner_id"] != src["owner_id"]:
-        await q.answer(i18n.t("man.no_right", lang), show_alert=True)
+    err, sig, tgt, new_id, posted = await signal_copy_do(ctx.bot, q.from_user.id, sig_id, target_id, lang)
+    if err:
+        await q.answer(err, show_alert=True)
         return
-    if sig["status"] not in ("PENDING", "ACTIVE"):
-        await q.answer(i18n.t("cp.closed", lang), show_alert=True)
-        return
-
-    new_id = await db.copy_signal(sig_id, target_id)
-    if new_id is None:
-        await q.answer(i18n.t("cp.already", lang, name=tgt["name"]), show_alert=True)
-        return
-    log.info("Signal nusxalandi: #%s -> ws#%s (#%s)", sig_id, target_id, new_id)
-
-    # Kartochka manzil chatiga — O'SHA workspace tilida.
     name = html.escape(tgt["name"], quote=False)
-    posted = True
-    if tgt["group_chat_id"]:
-        d = {"symbol": sig["symbol"], "side": sig["side"],
-             "entry": float(sig["entry"]),
-             "sl": float(sig["sl"]) if sig["sl"] is not None else None,
-             "tps": [float(t) for t in sig["tps"]],
-             "market": sig["market"], "entry_mode": sig["entry_mode"]}
-        body = draft_text(d, new_id, ws_lang(tgt))
-        body = pub(tgt, body)
-        body += await promo_line(ctx.bot, tgt, body, 1024 if sig["chart_file_id"] else 4096)
-        try:
-            if sig["chart_file_id"]:
-                sent = await ctx.bot.send_photo(
-                    tgt["group_chat_id"], sig["chart_file_id"], caption=body,
-                    parse_mode=ParseMode.HTML,
-                    message_thread_id=tgt["group_topic_id"])
-            else:
-                sent = await ctx.bot.send_message(
-                    tgt["group_chat_id"], body, parse_mode=ParseMode.HTML,
-                    message_thread_id=tgt["group_topic_id"],
-                    disable_web_page_preview=True)
-            await db.set_group_msg(new_id, sent.message_id)
-        except Exception:
-            # Xabar ketmasa ham NUSXA QOLADI: foydalanuvchi savdoni
-            # o'sha kanalda ALLAQACHON qo'lda e'lon qilgan bo'lishi
-            # mumkin — asosiy maqsad natijani sanash edi.
-            log.exception("Nusxa kartochkasi yuborilmadi (ws#%s)", target_id)
-            posted = False
 
     await q.edit_message_text(
         i18n.t("cp.done", lang, sid=sig_id, name=name, new=new_id) if posted

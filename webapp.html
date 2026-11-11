@@ -980,6 +980,7 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  if(!pend&&i.sl==null)a+=B('p full',"askTpsl("+sid+")",esc(t('tpsl_btn')));
  if(pend)a+=B('',"askEntry("+sid+")",ic('pen',13)+' '+esc(t('entry_btn')));
  if(i.can_size)a+=B('',"askSize("+sid+")",'$ '+esc(t('size_btn')));
+ if(i.cp)a+=B('full',"cpAsk("+sid+")",esc(t(i.cp.ch?'cp_ch':'cp_gr')));
  a+=B('d full',"act("+sid+",'close')",esc(pend?t('cancel'):t('close')));
  var lims=i.adds&&i.adds.length?'<div class="tps" style="display:flex;justify-content:space-between;align-items:center"><span><b>'+esc(t('lims'))+'</b>'+i.adds.map(fp).join(' · ')+'</span><span class="r" style="cursor:pointer;font-weight:700" onclick="act('+sid+',\'limx\')">'+esc(t('cancel'))+'</span></div>':'';
  return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh" style="cursor:pointer" onclick="openTerm('+i.id+')"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
@@ -1171,12 +1172,16 @@ function termInfo(i){var g=S.page,L=i.lev||1,dir=i.side=='LONG'?1:-1,pend=i.stat
 /* 296: terminal tugmalari — BUY (qo'shimcha kirish) / SELL (qisman yoki to'liq yopish) va boshqaruv */
 function termActs(i){var sid=i.id,pend=i.status=='PENDING',B=function(cls,on,txt,dis,st){return'<button class="btn '+cls+'" style="'+(st||'')+'" '+(dis?'disabled ':'')+'onclick="'+on+'">'+txt+'</button>'};
  var big='padding:14px;font-size:15px;font-weight:800;letter-spacing:.02em',h='<div class="tile2 glass" style="margin-top:10px;padding:12px">';
- if(pend)return'';
+ var cpb=i.cp?'<div class="acts" style="margin-top:8px">'+B('full',"cpAsk("+sid+")",esc(t(i.cp.ch?'cp_ch':'cp_gr')))+'</div>':'';   /* 360 */
+ if(pend)return cpb?h+cpb+'</div>':'';
  else{var canAdd=i.filled==0&&i.sl!=null,canSell=true;
   h+='<div style="display:flex;gap:8px">'+B('p',"askAdd("+sid+")",'BUY · '+esc(t('add_btn')),!canAdd,big)+B('d',"sellSheet("+sid+")",'SELL · '+esc(t('close')),!canSell,big)+'</div>';
   if(i.can_size)h+='<div class="acts" style="margin-top:8px">'+B('',"askSize("+sid+")",'$ '+esc(t('size_btn')))+'</div>'}
  if(i.market=='crypto'||i.market=='futures'||!i.market)h+='<div class="acts" style="margin-top:8px">'+B('',"sgOpen("+sid+")",'🏦 '+esc(t('sg_btn')))+'</div>';
- return h+'</div>'}
+ return h+cpb+'</div>'}
+/* 360: signalni egasining ikkinchi joyiga (guruh ↔ kanal) ham qo'shish */
+function cpAsk(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i||!i.cp)return;
+ confirmBox(t('cp_q',{id:id,name:i.cp.name}),function(){act(id,'copy',null,true,{ws:i.cp.ws})})}
 function sellSheet(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;var B=function(cls,on,txt){return'<button class="btn '+cls+'" style="margin:0" onclick="sheetClose();'+on+'">'+txt+'</button>'};
  sheetOpen('<h4>SELL · '+esc(i.symbol)+'</h4><p>'+(i.live!=null?fpc(i.live):'')+'</p>'
   +(i.filled<0.999?'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'+B('',"act("+id+",'pc',25)",'25%')+B('',"act("+id+",'pc',50)",'50%')+B('',"act("+id+",'pc',75)",'75%')+'</div>':'')

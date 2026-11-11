@@ -29,7 +29,7 @@ import tracker
 log = logging.getLogger("webapp")
 
 NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
-ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share", "rcard")
+ACTIONS = ("be", "sl", "pc", "close", "tps", "entry", "tpsl", "add", "lim", "limx", "size", "tf", "limmv", "share", "rcard", "copy")
 WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "dfstats", "newsig", "ref", "refcode", "refshare", "dipout", "diplook", "diptask", "dipapply", "dftrade", "newsshare", "cxshare")       # 254: signalga emas, workspace/odamga
 
 
@@ -105,6 +105,13 @@ async def api_open(request):
         raise web.HTTPForbidden()
     rows = await db.live_signals(ws["id"])
     prices = await asyncio.gather(*(_price(r) for r in rows))
+    # 360: guruh ↔ kanal — egasining ikkinchi workspace'i (signalni u yerda ham sanash)
+    cp_ws = []
+    if ws["type"] == "group" and ws["owner_id"] == uid:
+        try:
+            cp_ws = [w for w in await db.get_owned_group_workspaces(uid) if w["id"] != ws["id"]]
+        except Exception:
+            log.warning("Nusxa manzillari olinmadi (ws#%s)", ws["id"], exc_info=True)
     out = []
     for r, price in zip(rows, prices):
         L = r["leverage"] or 1
@@ -118,7 +125,13 @@ async def api_open(request):
         alloc = _f(r["alloc_amount"])
         adds = await db.signal_adds(r["id"], "PENDING")
         dep_k = ws["fut_deposit"] if (r["leverage"] or 1) > 1 else ws["deposit"]
+        cp = None
+        if cp_ws and r["copied_from"] is None:
+            done = await db.signal_copies(r["id"])
+            w = next((w for w in cp_ws if w["id"] not in done), None)
+            cp = {"ws": w["id"], "name": w["name"], "ch": bool(w["is_channel"])} if w else None
         out.append({
+            "cp": cp,
             "adds": [float(a["price"]) for a in adds],
             "usd": alloc is not None, "can_size": alloc is None and dep_k is not None,
             "id": r["id"], "symbol": r["symbol"], "side": r["side"], "lev": L,
@@ -1655,7 +1668,7 @@ T = {
         "entry_btn": "Kirish", "entry_title": "Yangi kirish narxi", "tpsl_btn": "TP/SL qo'yish",
         "sl_l": "Stop (SL)", "add_btn": "Qo'shish", "add_title": "Pozitsiyaga qo'shish",
         "now": "Hozirgi narx", "lim": "Limit", "size_usd": "Summa, $", "size_x": "Hajm (1 = boshlang'ich)",
-        "prices": "Limit narxlari (5 tagacha)", "lims": "Limitlar", "size_btn": "Summa",
+        "prices": "Limit narxlari (5 tagacha)", "lims": "Limitlar", "size_btn": "Summa", "cp_ch": "📢 Kanalga ham qo'shish", "cp_gr": "👥 Guruhga ham qo'shish", "cp_q": "#{id} «{name}» natijasiga ham qo'shilsinmi? U yerga ham post chiqadi.",
         "size_title": "Pozitsiya summasi",
         "join_setup": "Qo'shilish havolasi ulanmagan — botda ulash",
         "p_d": "Bugun", "p_w": "Hafta", "p_m": "Oy", "p_y": "Yil", "p_all": "Hammasi",
@@ -1715,7 +1728,7 @@ T = {
         "entry_btn": "Вход", "entry_title": "Новая цена входа", "tpsl_btn": "Поставить TP/SL",
         "sl_l": "Стоп (SL)", "add_btn": "Добавить", "add_title": "Добавить к позиции",
         "now": "По рынку", "lim": "Лимит", "size_usd": "Сумма, $", "size_x": "Объём (1 = исходный)",
-        "prices": "Цены лимитов (до 5)", "lims": "Лимиты", "size_btn": "Сумма",
+        "prices": "Цены лимитов (до 5)", "lims": "Лимиты", "size_btn": "Сумма", "cp_ch": "📢 Добавить и в канал", "cp_gr": "👥 Добавить и в группу", "cp_q": "Добавить #{id} и в результаты «{name}»? Туда тоже уйдёт пост.",
         "size_title": "Сумма позиции",
         "join_setup": "Ссылка для вступления не подключена — подключить в боте",
         "p_d": "Сегодня", "p_w": "Неделя", "p_m": "Месяц", "p_y": "Год", "p_all": "Всё",
@@ -1775,7 +1788,7 @@ T = {
         "entry_btn": "Entry", "entry_title": "New entry price", "tpsl_btn": "Set TP/SL",
         "sl_l": "Stop (SL)", "add_btn": "Add", "add_title": "Add to position",
         "now": "Market", "lim": "Limit", "size_usd": "Size, $", "size_x": "Size (1 = initial)",
-        "prices": "Limit prices (up to 5)", "lims": "Limits", "size_btn": "Size",
+        "prices": "Limit prices (up to 5)", "lims": "Limits", "size_btn": "Size", "cp_ch": "📢 Add to the channel too", "cp_gr": "👥 Add to the group too", "cp_q": "Add #{id} to “{name}” results too? A post goes there as well.",
         "size_title": "Position size",
         "join_setup": "Join link not connected — set it in the bot",
         "p_d": "Today", "p_w": "Week", "p_m": "Month", "p_y": "Year", "p_all": "All",

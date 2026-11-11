@@ -2488,6 +2488,16 @@ STRINGS: dict[str, dict[str, str]] = {
                "(<code>#{new}</code> there).\n\n"
                "Both close at the same time with the same result."),
     },
+    "app.cp_done": {
+        "uz": "✅ «{name}» natijasiga ham qo'shildi (#{new}). Ikkovi bir xil natija bilan yopiladi.",
+        "ru": "✅ Добавлено и в «{name}» (#{new}). Оба закроются с одинаковым результатом.",
+        "en": "✅ Added to “{name}” too (#{new}). Both close with the same result.",
+    },
+    "app.cp_fail": {
+        "uz": "✅ «{name}» natijasiga qo'shildi (#{new}), lekin u yerga post yuborilmadi — bot yoza olmadi.",
+        "ru": "✅ Добавлено в «{name}» (#{new}), но пост туда не ушёл — бот не смог написать.",
+        "en": "✅ Added to “{name}” (#{new}), but the post failed — the bot could not write there.",
+    },
     "cp.already": {
         "uz": "Bu signal «{name}» ga allaqachon qo'shilgan.",
         "ru": "Этот сигнал уже добавлен в «{name}».",

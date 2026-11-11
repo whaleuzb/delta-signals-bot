@@ -8183,3 +8183,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 359. Birja logolari: Bybit
 - `CXL.bybit` — rasmiy so'z-belgi (`@web3icons/core` paketidagi branded SVG), yangi `<full>FON|svg` formati: belgi butun doirani egallaydi (qora fon). Bitunix — foydalanuvchi bergan rasmiy logo (`CXL.bitunix`, `<png>` 112 px base64), rang #b9f641.
+
+## 360. Guruh ↔ kanal: signalni ikkinchi joyga ham qo'shish — ilovaga qaytdi
+- Foydalanuvchi: "kanalga ham signalni biriktirish, kanaldagi signalni guruhga biriktirish yo'qolib qolibdi". Bot tugmasi (`sigcopy:`, 173-band) joyida edi, lekin boshqaruv Mini App'ga ko'chgach ilovada bu amal YO'Q edi.
+- `bot.signal_copy_do()` — umumiy yadro (bot tugmasi ham, ilova `copy` amali ham). `/api/app/open` har signalga `cp: {ws, name, ch}` beradi (faqat egasiga, ikkinchi workspace bor va hali nusxalanmagan bo'lsa). Ilovada: signal kartasi va terminalda "📢 Kanalga ham qo'shish" / "👥 Guruhga ham qo'shish" (`cpAsk` → tasdiq → `act(id,'copy',…,{ws})`), PENDING signalda ham.
+- Tuzatildi: nusxaning o'zidan qayta nusxa (asl joyga ikkinchi marta qo'shib qo'yardi) — `copy_target` va `signal_copy_do` `copied_from` bo'lsa rad etadi.
+- Sinov `test_360.py` 12/12.
