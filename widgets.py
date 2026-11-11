@@ -95,7 +95,9 @@ _CSS = ("body{margin:0;padding:12px 13px 13px;font:13.5px/1.35 system-ui,sans-se
         ".sl{position:relative;height:30px;margin:6px 4px 0;touch-action:pan-y}"
         ".sl:before{content:'';position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:rgba(255,255,255,.12)}"
         ".sl i{position:absolute;top:5px;width:20px;height:20px;border-radius:50%;margin-left:-10px;background:#c2f23a}"
-        ".md{display:inline-block;width:22px}")
+        ".md{display:inline-block;width:22px}"
+        ".lv{display:inline-block;width:7px;height:7px;border-radius:50%;background:#c2f23a;margin-right:6px;animation:pl 1.6s infinite}"
+        "@keyframes pl{50%{box-shadow:0 0 0 4px rgba(194,242,58,.25)}}")
 
 _JS = ("var W=TelegramWidget,w=document.getElementById('w'),B=0,M='',S=0,C=0,G=null;"
        "function P(s){try{return JSON.parse(s)}catch(e){return null}}var D=P(W.chatData)||{};"
@@ -215,11 +217,11 @@ _REF = ("function RQ(){return 'rf'}function R(){var h=H('{{refs}}','🎁')"
 _SIG = ("function RQ(){return ''}function Q(){}"
         "function R(){var c=D.st=='C',p=D.st=='P',pc=D.pn==null?'':D.pn>=0?'g':'e';"
         "var h=H((D.y||'')+'<span class=\"tg '+D.d+'\">'+(D.d=='L'?'LONG':'SHORT')+(D.lv>1?' '+D.lv+'x':'')+'</span>','TC')"
-        "+'<div class=t style=margin:2px 0 6px><span class=m>'+(c?'{{closed}}':p?'{{lim}}':'● {{live}}')+(D.t?' · '+D.t:'')+'</span>"
+        "+'<div class=t style=margin:2px 0 6px><span class=m>'+(c?'<b class='+(D.pn>=0?'g':'e')+'>✓ {{closed}}</b>':p?'{{lim}}':'<i class=lv></i>{{live}}')+(D.t?' · '+D.t:'')+'</span>"
         "<span class=\"big '+pc+'\">'+(D.pn==null?'—':(D.pn>=0?'+':'')+F(D.pn)+'%')+'</span></div>';"
         "if(D.q!=null)h+='<div class=rg><b style=left:'+D.ee*100+'%></b><i style=left:'+D.q*100+'%></i></div>';"
         "h+='<div class=r style=\"display:flex;justify-content:space-between;text-align:center\"><span><div class=m>{{entry}}</div><b>'+D.e+'</b></span>"
-        "<span><div class=m>SL</div><b class=e>'+(D.sl||'—')+'</b></span><span><div class=m>TP</div><b class=g>'+(D.tp||'—')+'</b></span><span><div class=m>{{px}}</div><b>'+(D.px||'—')+'</b></span></div>';"
+        "<span><div class=m>SL</div><b class=e>'+(D.sl||'—')+'</b></span><span><div class=m>TP</div><b class=g>'+(D.tp||'—')+'</b></span>'+(c?'':'<span><div class=m>{{px}}</div><b>'+(D.px||'—')+'</b></span>')+'</div>';"
         "if(!c)h+='<div class=a><button data-a=go class=p>⚡ {{trade}}</button></div>';w.innerHTML=h}"
         "function A(a){if(a=='go')W.openTelegramLink('{{link}}')}")
 
