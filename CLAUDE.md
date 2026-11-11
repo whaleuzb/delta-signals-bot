@@ -39,7 +39,7 @@ Signal hayot sikli:
 
 ## BUZILMASIN — qiyin yo'l bilan topilgan qarorlar
 
-- **Birjalar tengligi (foydalanuvchi talabi, doimiy):** Binance'ga qo'shilgan HAR bir imkoniyat (savdo, order book, grafikda boshqaruv, tarix, statistika va h.k.) avtomatik ravishda MEXC, Bitget va BingX'ga ham qo'shiladi — alohida so'ralmasa ham, kelajakda ham. Birja API ruxsat bermasa (masalan, ochiq API yo'q) — buni foydalanuvchiga aniq aytish va ilovada izoh bilan ko'rsatish.
+- **Birjalar tengligi (foydalanuvchi talabi, doimiy):** Binance'ga qo'shilgan HAR bir imkoniyat (savdo, order book, grafikda boshqaruv, tarix, statistika va h.k.) avtomatik ravishda MEXC, Bitget, BingX, Bitunix, Bybit (va keyin qo'shiladigan har bir birja)ga ham qo'shiladi — alohida so'ralmasa ham, kelajakda ham. Birja API ruxsat bermasa (masalan, ochiq API yo'q) — buni foydalanuvchiga aniq aytish va ilovada izoh bilan ko'rsatish.
 - **Yangi birja = logosi bilan (foydalanuvchi talabi, doimiy):** har qanday yangi birja qo'shilganda uning RASMIY logosi ham shu ishning o'zida qo'shiladi (`CXL.<ex>`), alohida so'ratmasdan. Manba: `npm pack @web3icons/core` (`dist/svgs/exchanges/branded/<ex>.svg.js`), `simple-icons`, yoki boshqa npm paketlari (sandbox birja saytlarini yopadi, npm ochiq). Hech qayerda topilmasa — vaqtincha harf belgisi va DARHOL foydalanuvchidan rasmini so'rash. Rasm tekshiruvi: Playwright skrinshot (38 va 24 px).
 
 Bular allaqachon sinovdan o'tgan. O'zgartirishdan oldin `test_tracker.py` ni ishlating.
