@@ -8179,3 +8179,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Savdo: `bb_fut_order` (set-leverage 110043 = o'zgarmagan, e'tiborsiz; "position idx" xatosida hedge `positionIdx` 1/2 bilan qayta), TP/SL — `/v5/position/trading-stop` (`"0"` = olib tashlash; 34040 = o'zgarish yo'q), pozitsiya TP/SL orderini bekor qilish ham trading-stop orqali; modify — `/v5/order/amend` (spot ham); spot market buy — `marketUnit=quoteCoin`.
 - Tarix: `closed-pnl` (REALIZED_PNL = closedPnl + fee, COMMISSION = −fee; funding alohida yo'q) va spot `execution/list`; bir so'rov ≤ 7 kun → `_bb_windows` bo'laklab, 6 tadan parallel (relay 90 s chegarasi). Spot kursori `spot_t["_all"]`.
 - Ro'yxatlar, relay `_PING`, `notify.py` nomi, ilova `CEX` (`BY`, #f7a600). Haqiqiy kalit bilan tekshirilmagan. Sinov `test_358.py` 33/33.
+
+## 359. Birja logolari: Bybit
+- `CXL.bybit` — rasmiy so'z-belgi (`@web3icons/core` paketidagi branded SVG), yangi `<full>FON|svg` formati: belgi butun doirani egallaydi (qora fon). Bitunix — hali harf belgisi (`BU`); rasmiy logo berilsa `CXL.bitunix` (`<png>` base64, MEXC kabi).
