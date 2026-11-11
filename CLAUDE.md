@@ -8182,4 +8182,4 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Ro'yxatlar, relay `_PING`, `notify.py` nomi, ilova `CEX` (`BY`, #f7a600). Haqiqiy kalit bilan tekshirilmagan. Sinov `test_358.py` 33/33.
 
 ## 359. Birja logolari: Bybit
-- `CXL.bybit` — rasmiy so'z-belgi (`@web3icons/core` paketidagi branded SVG), yangi `<full>FON|svg` formati: belgi butun doirani egallaydi (qora fon). Bitunix — hali harf belgisi (`BU`); rasmiy logo berilsa `CXL.bitunix` (`<png>` base64, MEXC kabi).
+- `CXL.bybit` — rasmiy so'z-belgi (`@web3icons/core` paketidagi branded SVG), yangi `<full>FON|svg` formati: belgi butun doirani egallaydi (qora fon). Bitunix — foydalanuvchi bergan rasmiy logo (`CXL.bitunix`, `<png>` 112 px base64), rang #b9f641.
