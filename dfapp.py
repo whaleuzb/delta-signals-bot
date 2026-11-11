@@ -76,7 +76,9 @@ def state_json(data: dict, lang) -> dict:
             "trades": [{"time": t_.get("time"), "ts": t_.get("ts"), "symbol": t_.get("symbol"), "side": t_.get("side"),
                         "price": t_.get("price"), "pnl": t_.get("pnl"), "kind": t_.get("kind")}
                        for t_ in (st.get("trades") or [])][:10],
-            "prices": {k: float(v) for k, v in px.items()}}
+            "prices": {k: float(v) for k, v in px.items()},
+            # 362: har tangaga ulush chegarasi (Dip Funded: BTC/ETH 100%, boshqalari 50%)
+            "alloc": st.get("alloc") or {"full": ["BTC", "ETH"], "default": 0.5}}
 
 
 async def trade(uid: int, lang, f: dict) -> tuple[bool, str]:

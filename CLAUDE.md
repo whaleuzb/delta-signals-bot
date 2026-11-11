@@ -8196,3 +8196,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Qo'yilgan joylar: yangi signal (summa maydoni ostida; joy almashtirilsa `ns_ws` onchange qayta chizadi), `askSize`, `askAdd` ($ rejimida).
 - DIQQAT: `nsRender` HTML'i JS satri ichida — atribut ichidagi qo'shtirnoq `\'` bilan (birinchi urinishda butun skript yiqildi).
 - Brauzer sinovi `t_free.py`: spot 150,622 / 200,622 / 50,000; futures 4,500 / 5,000 / 500.
+
+## 362. Dip Funded: har bir tangaga ulush chegarasi, 100% = chegaragacha
+- Dip Funded qoidasi (`delta-prop/trading.py`: `FULL_ALLOCATION={"BTC","ETH"}` → equity'ning 100%, boshqalari `DEFAULT_ALLOCATION=0.5`; pozitsiya + shu tangadagi ochiq limitlar + yangi xarid). Holat javobida `alloc` bor — `dfapp.state_json` uni o'tkazadi (yo'q bo'lsa shu standart).
+- Ilova: `dfLim(ds,b)`, `dfMaxBuy(ds,b)` = min(bo'sh/1.004 (komissiya 0.4%), equity×chegara − pozitsiya×narx − limitlar), sentgacha pastga. Savdo ekrani (DF): `info.maxq`, "Maks." qatori USDT'da + qoida izohi; `tvPct(100)` aynan maks.ni qo'yadi (boshqa foizlar maks.dan). Terminal BUY oynasi (`dfBuySheet`): "Maks.: $X", 10/25/50/100% maks.dan.
+- Brauzer sinovi `t_dflim.py`: BTC 6,175.79 (bo'sh pul cheklaydi), SOL 4,335.10 (50% − pozitsiya), ETH 6,175.79.

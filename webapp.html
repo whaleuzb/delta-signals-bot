@@ -588,9 +588,15 @@ function cxOrdRow(ex,o,tr){return'<div class="sig glass rise" style="padding:12p
    +(tr.fut?'<button class="btn" style="margin:0;color:var(--r)" onclick="cxCancel(\''+ex+'\',\''+esc(o.sym)+'\',\''+o.id+'\')">✕</button>':'')+'</div></div>'}
 /* 339: Savdo ekrani (birja kontekstida "Signallar" o'rnida) — Binance uslubi: chapda forma, o'ngda order book, pastda orderlar/pozitsiyalar/aktivlar */
 function tvS(){var w=cur();S.tv=S.tv||{};var T=S.tv;if(T.ex!=w.ex){S.tv=T={ex:w.ex,mkt:'spot',sym:'BTCUSDT',side:'buy',type:'limit',price:'',amt:'',total:'',tpsl:false,tp:'',sl:'',lev:null,info:null,book:null,open:null,tab:'orders'}}return T}
+/* 362: Dip Funded — har bir tangaga ulush chegarasi (BTC/ETH equity'ning 100%, boshqalari 50%; pozitsiya + ochiq limitlar bilan).
+   Maks. xarid = min(bo'sh pul / (1+komissiya), equity×chegara − pozitsiya qiymati − shu tangadagi limitlar). */
+function dfLim(ds,b){var A=(ds&&ds.alloc)||{full:['BTC','ETH'],default:.5};return(A.full||[]).indexOf(b)>=0?1:+A['default']||.5}
+function dfMaxBuy(ds,b){if(!ds)return null;var eq=+ds.equity||0,px=+((ds.prices||{})[b]||0),pos=(ds.positions||[]).filter(function(x){return x.symbol==b})[0];
+ var held=pos?(+pos.qty||0)*(px||+pos.price||0):0,pend=0;(ds.orders||[]).forEach(function(o){if(o.symbol==b)pend+=+o.amount||0});
+ var room=eq*dfLim(ds,b)-held-pend,cash=(+ds.available||0)/1.004;return Math.max(0,Math.floor(Math.min(room,cash)*100)/100)}
 function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLoad();v.innerHTML='<div class="spk"><div class="sk"></div></div>';return}T=tvS();
  if(DF){T.mkt='spot';var ds=S.dfs,b0=T.sym.replace(/USDT$/,''),pp=ds&&(ds.positions||[]).filter(function(x){return x.symbol==b0})[0];if(!ds)dfOneLoad();
-  T.info=ds?{sym:T.sym,mkt:'spot',price:+((ds.prices||{})[b0]||0),avail:{quote:+ds.available||0,base:pp?+pp.qty||0:0},perm:{spot:ds.tradable}}:null;if(T.side=='sell')T.type='market';if(!T.price&&T.info&&T.info.price)T.price=String(+T.info.price.toPrecision(10))}
+  T.info=ds?{sym:T.sym,mkt:'spot',price:+((ds.prices||{})[b0]||0),avail:{quote:+ds.available||0,base:pp?+pp.qty||0:0},maxq:dfMaxBuy(ds,b0),lim:dfLim(ds,b0),perm:{spot:ds.tradable}}:null;if(T.side=='sell')T.type='market';if(!T.price&&T.info&&T.info.price)T.price=String(+T.info.price.toPrecision(10))}
  var tr=a.trade||{},can=DF?!!(S.dfs&&S.dfs.tradable):!!tr[T.mkt],fut=T.mkt=='fut',i=T.info,b=T.book,base=T.sym.replace(/(USDT|USDC|FDUSD)$/,'');
  if(!DF&&(!T.info||T.info.sym!=T.sym||T.info.mkt!=T.mkt))tvLoad();else if(DF&&!T.book)tvBookLoad();
  var h='<div class="rise" style="display:flex;align-items:center;gap:8px;margin:2px 0 10px"><div onclick="tvPick()" style="display:flex;align-items:center;gap:7px;cursor:pointer">'+coinIc(T.sym,26)
@@ -618,7 +624,9 @@ function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLo
    F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div>'+inp('tv_tp','TP',T.tp)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[2,5,10].map(function(x){return qb('tp',x)}).join('')+'</div></div><div>'+inp('tv_sl','SL',T.sl)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[1,2,5].map(function(x){return qb('sl',x)}).join('')+'</div></div></div>'}}
  var av=i?(fut?i.avail.quote:(buy?i.avail.quote:i.avail.base)):null,lv=T.lev||(i&&i.lev)||10,px=tvPx();
  F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px"><span class="rs" style="margin:0">'+esc(t('tv_avbl'))+'</span><b>'+(av==null?'—':(!fut&&!buy?(+av.toPrecision(8))+' '+esc(base):n2(av)+' USDT'))+'</b></div>';
- F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px 10px"><span class="rs" style="margin:0">'+esc(t('tv_max'))+'</span><b id="tv_max">'+(av!=null&&px?(+(fut?av*lv/px:(buy?av/px:av)).toPrecision(6))+' '+esc(base):'—')+'</b></div>';
+ var mq=DF&&buy&&i&&i.maxq!=null;
+ F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px '+(mq?'2px':'10px')+'"><span class="rs" style="margin:0">'+esc(t('tv_max'))+'</span><b id="tv_max">'+(mq?n2(i.maxq)+' USDT':av!=null&&px?(+(fut?av*lv/px:(buy?av/px:av)).toPrecision(6))+' '+esc(base):'—')+'</b></div>';
+ if(mq)F+='<div class="rs" style="font-size:11px;margin:0 2px 10px">'+esc(t('df_lim_note',{s:base,p:Math.round(i.lim*100)}))+'</div>';
  F+='<button class="btn full" id="tv_go"'+dis+' onclick="tvGo()" style="width:100%;margin:0;padding:12px;background:'+col+';color:#fff;border-color:transparent;font-weight:800;font-size:15px">'+(fut?(buy?'Long ':'Short '):(buy?'Buy ':'Sell '))+esc(base)+'</button>';
  h+='<div class="rise" style="display:grid;grid-template-columns:57% 43%;gap:10px;align-items:start"><div>'+F+'</div><div id="tv_book">'+tvBookHtml()+'</div></div>';
  /* pastki yorliqlar */
@@ -667,7 +675,7 @@ function tvCalc(from){var T=S.tv,px=tvPx();if(!px)return;
  else{var tt=parseFloat(T.total);T.amt=tt>0?String(+(tt/px).toPrecision(6)):'';var e2=document.getElementById('tv_a');if(e2)e2.value=T.amt}}
 function tvPct(p){var T=S.tv,i=T.info,px=tvPx();if(!i||!px)return;T.pct=p;var fut=T.mkt=='fut',lv=T.lev||i.lev||10;
  if(fut){T.total=String(Math.floor(i.avail.quote*lv*p)/100);tvCalc('total')}
- else if(T.side=='buy'){T.total=String(Math.floor(i.avail.quote*p)/100);tvCalc('total')}
+ else if(T.side=='buy'){var q=i.maxq!=null?i.maxq:i.avail.quote;T.total=String(p>=100?q:Math.floor(q*p)/100);tvCalc('total')}   /* 362: DF — 100% = tanga chegarasi */
  else{T.amt=String(+(i.avail.base*p/100).toPrecision(8));tvCalc('amt')}tick();tvRe()}
 function tvLev(){var T=S.tv;sheetOpen('<h4>'+esc(t('tr_lev'))+'</h4><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+[1,2,3,5,10,20,25,50].map(function(x){return'<button class="btn" style="margin:0'+((T.lev||10)==x?';border-color:#c2f23a;color:#c2f23a':'')+'" onclick="S.tv.lev='+x+';sheetClose();tvRe()">'+x+'x</button>'}).join('')+'</div>')}
 function tvPick(){var T=S.tv;if(T.ex=='dipfunded'){var s=S.dfs;if(!s)return;var held={};(s.positions||[]).forEach(function(x){held[x.symbol]=1});
@@ -1563,13 +1571,14 @@ function dfSave(){var g=S.page,pd=g.pend;if(!pd)return;var k=pd.k,a={};
  if(k=='sl'||k=='tp'){a.op='protect';a[k]=pd.to}else if(k.charAt(0)=='o'){a.op='modify';a.order_id=+k.slice(1);a.limit=pd.to}else{g.pend=null;termRender();return}dfDo(a)}
 function dfIn(id,ph,val){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px">'}
 function dfV(id){var e=document.getElementById(id);return e?num(e.value):null}
-function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mode||g.bm||'market';g.bm=mode;var av=+s.available||0;
+function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mode||g.bm||'market';g.bm=mode;var av=+s.available||0,b0=String(i.symbol).replace(/USDT$/,''),mx=dfMaxBuy(s,b0);
  var ch=function(m,l){return'<span class="chip glass'+(mode==m?' on':'')+'" onclick="dfBuySheet(\''+m+'\')">'+esc(l)+'</span>'};
  sheetOpen('<h4>'+coinIc(i.symbol,20)+' BUY · '+esc(i.symbol)+'</h4><p>'+esc(t('df_free'))+': <b>'+f0(av)+'</b>'+(i.price!=null?' · '+fp(i.price):'')+'</p>'
   +'<div class="chips" style="margin-bottom:10px">'+ch('market',t('df_market'))+ch('limit',t('limit'))+'</div>'
   +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),g.nlp?g.nlp:i.price!=null?termRound(i.price*.99):''):'')
-  +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+'</div>'+dfIn('dfb_a','0','')
-  +'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+Math.floor(av*x/100)+'">'+x+'%</span>'}).join('')+'</div>'
+  +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+' · '+esc(t('tv_max'))+': <b style="color:var(--ink)">$'+n2(mx)+'</b></div>'+dfIn('dfb_a','0','')
+  +'<div class="chips" style="margin:-2px 0 6px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+(x==100?mx:Math.floor(mx*x)/100)+'">'+x+'%</span>'}).join('')+'</div>'
+  +'<div class="rs" style="font-size:11px;margin:0 2px 10px">'+esc(t('df_lim_note',{s:b0,p:Math.round(dfLim(s,b0)*100)}))+'</div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'')+dfIn('dfb_tp',t('df_tp_opt'),'')+'</div>'
   +'<button class="btn p full" style="width:100%;margin-top:4px" onclick="dfBuy()">BUY '+esc(i.symbol)+'</button>')}
 function dfBuy(){var g=S.page,a={op:'buy',amount:dfV('dfb_a')};if(!a.amount){toast(esc(t('df_amount')));return}
