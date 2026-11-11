@@ -12154,7 +12154,7 @@ def main() -> None:
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
     if widgets.GROUPS:
-        app.job_queue.run_repeating(widgets.group_sig_job, interval=60, first=45)   # 364-2
+        app.job_queue.run_repeating(widgets.group_sig_job, interval=widgets.GW_EVERY, first=45)   # 364-2/366
     app.job_queue.run_repeating(milestone_job, interval=config.POLL_SECONDS, first=25)
     # Kunlik hisobot: soatni o'tkazib yubormaslik uchun 15 daqiqada bir
     # aylanadi, lekin har guruhga kuniga faqat BIR marta yuboriladi.

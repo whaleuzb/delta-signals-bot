@@ -8230,3 +8230,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Har yangi signalda `send_group_sig` yuborib ko'radi. Telegram rad etsa (`_gw_result(False)`), `gw_retry_at` = hozir + 12 soat — shu orada urinmaydi (har signalda xato spami yo'q). Guruhning o'z xatolari (`_GW_LOCAL`: bot chiqarilgan, huquq yo'q, chat topilmadi, mavzu) kutish qo'ymaydi.
 - Birinchi muvaffaqiyatda `gw_live` yoziladi va adminlarga bir marta xabar boradi; keyin kartalar `group_sig_job` (60 s) bilan yangilanadi. Kanalga hech qachon urinmaydi.
 - Sinov `test_365.py` 11/11.
+
+## 366. Guruh kartalari har 30 soniyada
+- `GW_EVERY = 30` (job oralig'i). Telegram guruhga ~20 xabar/daqiqa; har `editMessageWidgetData` = 1 xabar → guruh boshiga siklda ≤ `GW_PER_CHAT = 10` (≈ 20/daqiqa), yopilganlar ham shu chegarada. Navbat `_GW_AT` bo'yicha (eng uzoq kutgan birinchi) — ortib qolgani keyingi siklda. Flood/RetryAfter → sikl darhol to'xtaydi. Faqat ma'lumot o'zgarganda tahrir.
+- Sinov `test_366.py` 8/8.

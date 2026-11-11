@@ -764,13 +764,21 @@ async def send_group_sig(bot, ws, sig, lang) -> None:
         await _gw_result(bot, False, str(e))
 
 
+GW_EVERY = 30            # 366: soniya (job oralig'i)
+GW_PER_CHAT = 10         # bitta guruhga bir siklda ko'pi bilan (Telegram: guruhga ~20 xabar/daqiqa)
+_GW_AT: dict[int, float] = {}      # sid -> oxirgi tahrir vaqti (navbat: eng uzoq kutgan birinchi)
+
+
 async def group_sig_job(ctx) -> None:
-    """Har daqiqa: guruh widjetlari holatini yangilash (o'zgargan bo'lsa); yopilgan signal — oxirgi
-    marta yangilanib, ro'yxatdan chiqariladi. editMessageWidgetData = 1 xabar (limit) — faqat o'zgarganda."""
+    """Har 30 s: guruh widjetlari holatini yangilash (o'zgargan bo'lsa); yopilgan signal — oxirgi
+    marta yangilanib, ro'yxatdan chiqariladi. editMessageWidgetData = 1 xabar (limit) — faqat o'zgarganda,
+    guruh boshiga siklda ≤ GW_PER_CHAT; flood (RetryAfter) bo'lsa sikl to'xtaydi."""
     if not GROUPS:
         return
     B = _B()
-    for sid in (await db.setting_users("gw:"))[:40]:
+    sids = sorted((await db.setting_users("gw:"))[:80], key=lambda x: _GW_AT.get(x, 0))
+    per: dict[str, int] = {}
+    for sid in sids:
         try:
             raw = await db.get_setting(f"gw:{sid}")
             sig = await db.get_signal(sid)
@@ -778,6 +786,9 @@ async def group_sig_job(ctx) -> None:
                 await db.set_setting(f"gw:{sid}", None)
                 continue
             chat, mid = raw.split(":")
+            closed = sig["status"] not in ("PENDING", "ACTIVE")
+            if per.get(chat, 0) >= GW_PER_CHAT:
+                continue                        # keyingi siklda (navbatda oldinda bo'ladi; yopilgani ham)
             price = await B.safe_last_price(sig["market"], sig["symbol"]) if sig["status"] == "ACTIVE" else None
             data = json.dumps(sig_card(sig, price), ensure_ascii=False, separators=(",", ":"))
             cmp = json.loads(data)
@@ -786,11 +797,18 @@ async def group_sig_job(ctx) -> None:
             if _GW_LAST.get(sid) != key:
                 await _api(ctx.bot, "editMessageWidgetData", chat_id=int(chat), message_id=int(mid), chat_data=data)
                 _GW_LAST[sid] = key
-            if sig["status"] not in ("PENDING", "ACTIVE"):
+                _GW_AT[sid] = time.time()
+                per[chat] = per.get(chat, 0) + 1
+            if closed:
                 await db.set_setting(f"gw:{sid}", None)
                 _GW_LAST.pop(sid, None)
+                _GW_AT.pop(sid, None)
         except Exception as e:
-            if "not modified" not in str(e):
+            t = str(e).lower()
+            if "retry after" in t or "flood" in t or type(e).__name__ == "RetryAfter":
+                log.warning("Guruh widjetlari: flood — sikl to'xtatildi (%s)", e)
+                return
+            if "not modified" not in t:
                 log.warning("Guruh widjeti yangilanmadi (#%s): %s", sid, e)
 
 
