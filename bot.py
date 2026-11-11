@@ -51,6 +51,7 @@ import paymembers
 import resultlink
 import dipfunded
 import dfapp
+import widgets
 import deltawear
 import tournament
 import stats
@@ -2127,6 +2128,8 @@ def main_menu_kb(uid: int, ws, private: bool = True,
                 i18n.t("menu.dipfunded", lang), web_app=WebAppInfo(url=f"{config.WEB_URL}/app?df=1")))
         else:
             extra.append(InlineKeyboardButton(i18n.t("menu.dipfunded", lang), callback_data="df:home"))
+    if private:                       # 363: chat ichidagi widjetlar
+        rows.append([InlineKeyboardButton(i18n.t("wg.btn", lang), callback_data="wg:menu")])
     if config.NEWS_CHANNEL_ID:
         extra.append(InlineKeyboardButton(i18n.t("menu.news", lang),
                                           url=f"https://t.me/{NEWS_CHANNEL_USERNAME}"))
@@ -5656,7 +5659,9 @@ def _open_on_cex_kb(sig_id: int, d: dict, lang):
         return None
     return InlineKeyboardMarkup([[InlineKeyboardButton(
         i18n.t("sig.open_cex", lang), url=f"https://t.me/{BOT_USERNAME}?startapp=sg_{sig_id}",
-        api_kwargs={"style": "success"})]])
+        api_kwargs={"style": "success"}),
+        # 363: shu signal uchun bot chatida tezkor savdo widjeti
+        InlineKeyboardButton(i18n.t("sig.chat_trade", lang), url=f"https://t.me/{BOT_USERNAME}?start=tw_{sig_id}")]])
 
 
 async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
@@ -7571,8 +7576,62 @@ async def _news_share(update: Update, ctx: ContextTypes.DEFAULT_TYPE, raw: str) 
         i18n.t("nws.share_hint", lang, n=f"{config.DIP_PER_REF:g}"), parse_mode=ParseMode.HTML)
 
 
+async def on_widget_update(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """363: `widget_query` (Bot API 10.4) — PTB 21 bu maydonni `api_kwargs`ga qo'yadi."""
+    ak = update.api_kwargs or {}
+    if "widget_query" in ak or "shared_widget_query" in ak:
+        await widgets.handle(update, ctx)
+        raise ApplicationHandlerStop
+
+
+def widgets_kb(lang) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(i18n.t("wg.pos", lang), callback_data="wg:pos")]]
+    if dipfunded.enabled():
+        rows.append([InlineKeyboardButton(i18n.t("wg.df", lang), callback_data="wg:df")])
+    rows.append([InlineKeyboardButton(i18n.t("wg.dip", lang), callback_data="wg:dip")])
+    return InlineKeyboardMarkup(rows)
+
+
+async def cmd_widgets(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_chat.type != "private":
+        return
+    lang = await user_lang(update.effective_user.id)
+    await update.effective_message.reply_text(i18n.t("wg.menu", lang), parse_mode=ParseMode.HTML,
+                                              reply_markup=widgets_kb(lang))
+
+
+async def on_widgets_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    lang = await user_lang(uid)
+    kind = q.data.split(":", 1)[1]
+    if kind == "menu":
+        await q.message.reply_text(i18n.t("wg.menu", lang), parse_mode=ParseMode.HTML,
+                                   reply_markup=widgets_kb(lang))
+        return
+    f = {"pos": widgets.send_pos, "df": widgets.send_df, "dip": widgets.send_dip}.get(kind)
+    if not f:
+        return
+    try:
+        await f(ctx.bot, uid, lang)
+    except Exception:
+        log.exception("Widjet yuborilmadi (%s)", kind)
+        await q.message.reply_text(i18n.t("wg.fail", lang))
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id
+    if ctx.args and ctx.args[0].startswith("tw_") and ctx.args[0][3:].isdigit() \
+            and update.effective_chat.type == "private":     # 363: "⚡ Chatda savdo" widjeti
+        lang = await user_lang(uid)
+        try:
+            if await widgets.send_trade(ctx.bot, uid, int(ctx.args[0][3:]), lang):
+                return
+        except Exception:
+            log.exception("Savdo widjeti yuborilmadi")
+            await update.effective_message.reply_text(i18n.t("wg.fail", lang))
+            return
     if ctx.args and ctx.args[0].startswith("nws_"):
         await _news_share(update, ctx, ctx.args[0][4:])
         return
@@ -11927,6 +11986,7 @@ def main() -> None:
     # ham oldin; faqat admin "xabar kutilmoqda" holatida bo'lsa ishlaydi.
     app.add_handler(MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND,
                                    bc_capture), group=-2)
+    app.add_handler(TypeHandler(Update, on_widget_update), group=-2)     # 363: widjet so'rovlari
     app.add_handler(TypeHandler(Update, gate), group=-1)
     app.add_handler(CallbackQueryHandler(on_subcheck, pattern=r"^subcheck$"))
     # Kanal ulash: bot kanalga admin qilinganda Telegram shu yangilanishni
@@ -11940,6 +12000,8 @@ def main() -> None:
     app.add_handler(CommandHandler("earn", cmd_dip_tasks))
     app.add_handler(CallbackQueryHandler(on_admin, pattern=r"^adm:"))
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler(["widgets", "vidjet"], cmd_widgets))
+    app.add_handler(CallbackQueryHandler(on_widgets_cb, pattern=r"^wg:"))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("menu", cmd_start))
     app.add_handler(CommandHandler("setup", cmd_setup))
@@ -12139,7 +12201,8 @@ def main() -> None:
     app.job_queue.run_repeating(liquidation_scan_job, interval=300, first=150)
 
     # MUHIM: drop_pending_updates=False — restart paytida kelgan xabarlar yo'qolmasin
-    app.run_polling(drop_pending_updates=False, allowed_updates=Update.ALL_TYPES)
+    app.run_polling(drop_pending_updates=False,
+                    allowed_updates=list(Update.ALL_TYPES) + ["widget_query", "shared_widget_query"])
 
 
 if __name__ == "__main__":

@@ -1589,6 +1589,90 @@ async def api_cextrade(request):
     return web.json_response(res, headers=NO_CACHE)
 
 
+async def api_wtrade(request):
+    """363: chat widjeti (bot → web, ichki): signalni ulangan birjada ochish. Kalitlar va relay shu
+    servisda. `op=i` — bo'sh summa va narx; `op=o` — market order: bo'sh summaning pct%i
+    (futures — marja, signal leveraji, SL va keyingi TP bilan; spot — USDT summasi)."""
+    import hmac
+    import cex
+    import widgets
+    if not hmac.compare_digest(request.headers.get("X-Internal", ""), widgets.internal_token()):
+        raise web.HTTPForbidden()
+    try:
+        b = await request.json()
+        uid, sid, ex, op = int(b["uid"]), int(b["sid"]), str(b["ex"]), str(b["op"])
+        pct = int(b.get("pct") or 0)
+    except Exception:
+        raise web.HTTPBadRequest()
+    mkt = "fut" if b.get("m") == "fut" else "spot"
+    L = T.get(i18n.normalize(b.get("lang")), T["uz"])
+    sig = await db.get_signal(sid)
+    if not sig or sig["market"] not in ("crypto", "futures") or ex not in cex.TRADE_EX or op not in ("i", "o"):
+        return web.json_response({"ok": False, "m": L.get("cx_e_api")})
+    if mkt == "spot" and sig["side"] == "SHORT":
+        mkt = "fut"
+    row = next((r for r in await db.cex_list(uid) if r["exchange"] == ex), None)
+    if row is None:
+        return web.json_response({"ok": False, "m": L.get("cx_e_reconnect")})
+    k = _cex_keys(row)
+    sym = sig["symbol"]
+
+    def _err(e):
+        msg = L.get("cx_e_" + e.code) or L.get("cx_e_api")
+        extra = _cx_msg(e.text)
+        return web.json_response({"ok": False, "m": (msg + (": " + extra if extra else ""))[:250]})
+    try:
+        info = await _cx_call("trade", ex, k, {"op": "info", "a": {"mkt": mkt, "sym": sym}})
+    except cex.ApiErr as e:
+        return _err(e)
+    av = float(((info or {}).get("avail") or {}).get("quote") or 0)
+    px = (info or {}).get("price")
+    base = {"ok": True, "av": round(av, 2), "px": px}
+    if op == "i":
+        return web.json_response(base)
+    if pct not in (10, 25, 50, 100):
+        raise web.HTTPBadRequest()
+    if not ((info or {}).get("perm") or {}).get(mkt):
+        return web.json_response({**base, "ok": False, "m": L.get("tr_noperm_fut" if mkt == "fut" else "tr_noperm_spot")})
+    if not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
+    # 100% da komissiya/sirpanish uchun 2% zaxira — aks holda birja "mablag' yetmaydi" deydi
+    amt = int(av * pct * (0.98 if pct == 100 else 1)) / 100
+    if amt <= 0:
+        return web.json_response({**base, "ok": False, "m": L.get("tr_need_amt")})
+    tps = [float(x) for x in (sig["tps"] or [])]
+    hit = int(sig["tp_hit"] or 0)
+    tp = tps[min(hit, len(tps) - 1)] if tps and hit < len(tps) else None
+    if mkt == "fut":
+        a = {"sym": sym, "type": "market", "side": "long" if sig["side"] == "LONG" else "short",
+             "lev": int(sig["leverage"] or (info or {}).get("lev") or 10), "margin": amt}
+        if sig["sl"] is not None:
+            a["sl"] = float(sig["sl"])
+        if tp:
+            a["tp"] = tp
+        top = "fut_order"
+    else:
+        a, top = {"sym": sym, "type": "market", "side": "buy", "quote": amt}, "spot_order"
+    try:
+        r = await _cx_call("trade", ex, k, {"op": top, "a": a})
+        res = {"ok": True, "r": r}
+    except cex.ApiErr as e:
+        res = {"ok": False, "err": e.code, "msg": _cx_msg(e.text)}
+    log.info("Widjet savdosi: %s %s uid=%s sig=%s %s → %s", ex, top, uid, sid, json.dumps(a)[:200],
+             "ok" if res["ok"] else f"{res.get('err')} {res.get('msg', '')}")
+    try:
+        await db.cex_order_log(uid, ex, top, {**a, "via": "widget", "sig": sid}, res["ok"], res.get("r") if res["ok"] else res)
+    except Exception:
+        log.warning("Savdo jurnali yozilmadi", exc_info=True)
+    _CEX_CACHE.pop((uid, ex), None)
+    _CEX_TR.pop((uid, ex), None)
+    if not res["ok"]:
+        return web.json_response({**base, "ok": False,
+                                  "m": ((L.get("cx_e_" + res["err"]) or L.get("cx_e_api")) + (": " + res["msg"] if res.get("msg") else ""))[:250]})
+    warn = "; ".join((r or {}).get("warn") or [])
+    return web.json_response({**base, "m": "✅ " + L.get("tr_sent", "OK") + f" · ${amt:,.2f}" + (" · " + warn if warn else "")})
+
+
 async def api_cexdel(request):
     import cex
     body, uid = await _body(request)
@@ -1641,6 +1725,7 @@ def routes() -> list:
         web.post("/api/app/cexhist", api_cexhist),
         web.post("/api/app/cextrades", api_cextrades),
         web.post("/api/app/cextrade", api_cextrade),
+        web.post("/api/internal/wtrade", api_wtrade),
         web.post("/api/app/cexstats", api_cexstats),
         web.post("/api/app/dfoff", api_dfoff),
         web.post("/api/app/ntf", api_ntf),
