@@ -8224,3 +8224,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `answer()`: `g=` (grafik) va xabar uchun bayt byudjeti (`_fit(…, 1010 - len(m))`).
 - DIQQAT hajm: pos widjeti siqilganda ~3.7 KB (chegara 4096) — unga yangi narsa qo'shishdan oldin `packed_size` ni tekshiring (`test_364.py` 7 tur × 3 til tekshiradi).
 - Sinov: `test_364.py` 14/14, `test_363.py` 23/23, brauzer `t_wg2.py` (grafik 40 sham, surgich → `sl:101:99500`, ulashish/nusxa, guruh kartasi).
+
+## 365. Guruhdagi jonli signal kartasi — standart YOQILGAN, o'zini o'zi tekshiradi
+- Prod'da widjet guruhga hali qabul qilinmaydi (test server). Bayroqni qo'lda yoqishni kutmaslik uchun: `widgets.GROUPS` endi standart `True` (`WIDGET_GROUPS=0` — butunlay o'chirish).
+- Har yangi signalda `send_group_sig` yuborib ko'radi. Telegram rad etsa (`_gw_result(False)`), `gw_retry_at` = hozir + 12 soat — shu orada urinmaydi (har signalda xato spami yo'q). Guruhning o'z xatolari (`_GW_LOCAL`: bot chiqarilgan, huquq yo'q, chat topilmadi, mavzu) kutish qo'ymaydi.
+- Birinchi muvaffaqiyatda `gw_live` yoziladi va adminlarga bir marta xabar boradi; keyin kartalar `group_sig_job` (60 s) bilan yangilanadi. Kanalga hech qachon urinmaydi.
+- Sinov `test_365.py` 11/11.

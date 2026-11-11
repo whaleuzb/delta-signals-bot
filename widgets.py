@@ -696,14 +696,52 @@ async def send_ref(bot, uid: int, lang) -> None:
 
 
 # ── 364-2 (11): guruhdagi jonli signal kartasi ──
-# Telegram hozircha widjetni guruhga faqat TEST serverda qabul qiladi. Prod'da ruxsat berilganda
-# Railway'da `WIDGET_GROUPS=1` qo'yiladi — kod tayyor. Kanalga widjet yuborib bo'lmaydi.
-GROUPS = __import__("os").getenv("WIDGET_GROUPS", "") == "1"
+# Telegram hozircha widjetni guruhga faqat TEST serverda qabul qiladi. 365: o'zini o'zi tekshiradi —
+# yangi signalda yuborib ko'radi; Telegram rad etsa, 12 soat urinmaydi (`gw_retry_at`), keyin yana.
+# Birinchi muvaffaqiyatda adminlarga xabar (`gw_live`). `WIDGET_GROUPS=0` — butunlay o'chirish.
+# Kanalga widjet yuborib bo'lmaydi.
+GROUPS = __import__("os").getenv("WIDGET_GROUPS", "") != "0"
+GW_RETRY = 12 * 3600
 _GW_LAST: dict[int, str] = {}
+# Guruhning o'ziga tegishli xatolar (bot chiqarilgan, huquq yo'q) — "Telegram hali ruxsat bermagan" emas
+_GW_LOCAL = ("not enough rights", "chat not found", "kicked", "not a member", "have no rights",
+             "chat_write_forbidden", "topic", "thread")
+
+
+async def _gw_open() -> bool:
+    try:
+        v = await db.get_setting("gw_retry_at")
+        return not v or time.time() >= float(v)
+    except Exception:
+        return True
+
+
+async def _gw_result(bot, ok: bool, err: str = "") -> None:
+    if ok:
+        if not await db.get_setting("gw_live"):
+            await db.set_setting("gw_live", str(int(time.time())))
+            log.info("Guruh widjetlari ISHLAY BOSHLADI — Telegram ruxsat berdi")
+            for a in config.ADMIN_IDS:
+                try:
+                    await bot.send_message(a, "🧩 Guruhdagi jonli signal kartalari ishlay boshladi — Telegram widjetlarni "
+                                              "guruhlarda ruxsat berdi. Endi har yangi signal postiga jonli karta qo'shiladi.")
+                except Exception:
+                    pass
+        await db.set_setting("gw_retry_at", None)
+        return
+    low = err.lower()
+    if any(x in low for x in _GW_LOCAL):
+        return
+    await db.set_setting("gw_retry_at", str(time.time() + GW_RETRY))
+    if await db.get_setting("gw_live"):
+        await db.set_setting("gw_live", None)
+    log.info("Guruh widjeti hali qabul qilinmaydi (%s) — %d soatdan keyin yana urinadi", err[:120], GW_RETRY // 3600)
 
 
 async def send_group_sig(bot, ws, sig, lang) -> None:
     if not GROUPS or ws["type"] != "group" or ws["is_channel"] or not ws["group_chat_id"]:
+        return
+    if not await _gw_open():
         return
     B = _B()
     price = await B.safe_last_price(sig["market"], sig["symbol"])
@@ -719,8 +757,9 @@ async def send_group_sig(bot, ws, sig, lang) -> None:
         if mid:
             await db.set_setting(f"gw:{sig['id']}", f"{ws['group_chat_id']}:{mid}")
             _GW_LAST[sig["id"]] = raw
+            await _gw_result(bot, True)
     except Exception as e:
-        log.warning("Guruh widjeti yuborilmadi (#%s): %s", sig["id"], e)
+        await _gw_result(bot, False, str(e))
 
 
 async def group_sig_job(ctx) -> None:

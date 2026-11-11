@@ -5700,7 +5700,7 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
             _promo_emoji_seen(sent, ws)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
-        if widgets.GROUPS and group_msg_id:          # 364-2: jonli signal kartasi (WIDGET_GROUPS=1)
+        if widgets.GROUPS and group_msg_id:          # 364-2/365: jonli signal kartasi (o'zi tekshiradi)
             try:
                 await widgets.send_group_sig(ctx.bot, ws, await db.get_signal(sig_id), ws_lang(ws))
             except Exception:
