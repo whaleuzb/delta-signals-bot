@@ -5700,6 +5700,11 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
             _promo_emoji_seen(sent, ws)
         except Exception:
             log.exception("Guruhga yuborib bo'lmadi")
+        if widgets.GROUPS and group_msg_id:          # 364-2: jonli signal kartasi (WIDGET_GROUPS=1)
+            try:
+                await widgets.send_group_sig(ctx.bot, ws, await db.get_signal(sig_id), ws_lang(ws))
+            except Exception:
+                log.warning("Guruh widjeti xato", exc_info=True)
 
     elif ws["type"] == "personal":
         # Shaxsiy jurnalda signal kartasi AVVAL umuman yuborilmasdi — faqat
@@ -7589,6 +7594,8 @@ def widgets_kb(lang) -> InlineKeyboardMarkup:
     if dipfunded.enabled():
         rows.append([InlineKeyboardButton(i18n.t("wg.df", lang), callback_data="wg:df")])
     rows.append([InlineKeyboardButton(i18n.t("wg.dip", lang), callback_data="wg:dip")])
+    rows.append([InlineKeyboardButton(i18n.t("wg.tour", lang), callback_data="wg:tour"),
+                 InlineKeyboardButton(i18n.t("wg.ref", lang), callback_data="wg:ref")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -7610,7 +7617,8 @@ async def on_widgets_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.message.reply_text(i18n.t("wg.menu", lang), parse_mode=ParseMode.HTML,
                                    reply_markup=widgets_kb(lang))
         return
-    f = {"pos": widgets.send_pos, "df": widgets.send_df, "dip": widgets.send_dip}.get(kind)
+    f = {"pos": widgets.send_pos, "df": widgets.send_df, "dip": widgets.send_dip,
+         "tour": widgets.send_tour, "ref": widgets.send_ref}.get(kind)
     if not f:
         return
     try:
@@ -12145,6 +12153,8 @@ def main() -> None:
     app.add_error_handler(on_error)
 
     app.job_queue.run_repeating(poll_job, interval=config.POLL_SECONDS, first=10)
+    if widgets.GROUPS:
+        app.job_queue.run_repeating(widgets.group_sig_job, interval=60, first=45)   # 364-2
     app.job_queue.run_repeating(milestone_job, interval=config.POLL_SECONDS, first=25)
     # Kunlik hisobot: soatni o'tkazib yubormaslik uchun 15 daqiqada bir
     # aylanadi, lekin har guruhga kuniga faqat BIR marta yuboriladi.
