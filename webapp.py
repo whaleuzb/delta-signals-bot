@@ -886,6 +886,16 @@ _COIN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "
 COINS = sorted(f[:-4] for f in os.listdir(_COIN_DIR) if f.endswith(".svg")) if os.path.isdir(_COIN_DIR) else []
 
 
+_LWC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "vendor", "lightweight-charts", "lightweight-charts-4.2.3.js")
+
+
+async def lwc_js(request):
+    """367: TradingView Lightweight Charts 4.2.3 (Apache-2.0, LICENSE yonida) — terminal grafigi."""
+    with open(_LWC, "rb") as fh:
+        return web.Response(body=fh.read(), content_type="application/javascript",
+                            headers={"Cache-Control": "public, max-age=2592000"})
+
+
 async def coin_svg(request):
     name = request.match_info["c"].lower()
     if name not in COINS:
@@ -1702,6 +1712,7 @@ def routes() -> list:
         web.get("/app", app_page),
         web.get("/api/app/ver", api_ver),
         web.get("/invite.jpg", invite_jpg),
+        web.get("/lwc.js", lwc_js),
         web.get(r"/coins/{c:[a-z0-9]{1,12}}.svg", coin_svg),
         web.post("/api/app/me", api_me),
         web.post("/api/app/open", api_open),
@@ -1770,7 +1781,7 @@ T = {
         "df_term": "Savdo terminali", "df_avg": "O'rtacha narx", "df_market": "Market", "df_limit_p": "Limit narx", "df_amount": "Summa, USDT", "df_sl_opt": "SL (ixtiyoriy)", "df_tp_opt": "TP (ixtiyoriy)", "df_qty": "Miqdor", "df_tpsl_hint": "Bo'sh qoldirilsa — olib tashlanadi", "df_pick": "Juftlikni tanlang", "df_pos1": "Pozitsiya", "df_mark": "Joriy narx", "df_value": "Qiymat", "df_no_pos": "Bu juftlikda pozitsiya yo'q — BUY bilan oching", "df_trades": "So'nggi savdolar", "pp_typed": "shu nom bilan", "pp_choose": "Juftlikni tanlang", "df_share": "Hisobdagi ulush", "df_equity2": "Equity", "nws_prep": "Ulashish tayyorlanmoqda…", "wallet": "Birja", "w_soon": "Tez orada", "w_sub": "Birja", "w_txt": "DIP, USDT va Dip Funded balanslaringiz bir joyda — bo'lim tayyorlanmoqda.", "df_inbot": "Botda boshqarish",
         "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
         "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
-        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Chiziqni (SL, TP, kirish, limit) barmoq bilan surib, saqlang", "ns_sl": "Stop (SL)",
+        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Grafikni barmoq bilan suring va kattalashtiring · chiziqni o'ngdagi ⇕ yoki yorlig'idan bosib, so'ng surib saqlang", "lw_armed": "Chiziq tanlandi — endi surib qo'ying", "ns_sl": "Stop (SL)",
         "ns_tps": "Maqsadlar (TP) — bo'sh joy bilan", "ns_amount": "Summa, $ (ixtiyoriy)",
         "ns_send": "Signal berish", "ns_where": "Qayerga",
         "ref_title": "Taklif qilish", "ref_sub": "Do'stlaringizni taklif qiling — DIP yig'ing", "ref_code": "Taklif kodingiz",
@@ -1830,7 +1841,7 @@ T = {
         "df_term": "Терминал", "df_avg": "Средняя цена", "df_market": "Рынок", "df_limit_p": "Лимит-цена", "df_amount": "Сумма, USDT", "df_sl_opt": "SL (необяз.)", "df_tp_opt": "TP (необяз.)", "df_qty": "Количество", "df_tpsl_hint": "Пустое поле — удалить", "df_pick": "Выберите пару", "df_pos1": "Позиция", "df_mark": "Текущая цена", "df_value": "Стоимость", "df_no_pos": "По этой паре позиции нет — откройте через BUY", "df_trades": "Последние сделки", "pp_typed": "как введено", "pp_choose": "Выберите пару", "df_share": "Доля счёта", "df_equity2": "Equity", "nws_prep": "Готовим к отправке…", "wallet": "Биржа", "w_soon": "Скоро", "w_sub": "Биржа", "w_txt": "DIP, USDT и балансы Dip Funded в одном месте — раздел готовится.", "df_inbot": "Управлять в боте",
         "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
         "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
-        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Перетащите линию (SL, TP, вход, лимит) пальцем и сохраните", "ns_sl": "Стоп (SL)",
+        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Двигайте и масштабируйте график пальцами · линию — нажмите ⇕ справа или её ярлык, затем перетащите и сохраните", "lw_armed": "Линия выбрана — теперь перетащите", "ns_sl": "Стоп (SL)",
         "ns_tps": "Цели (TP) — через пробел", "ns_amount": "Сумма, $ (необязательно)",
         "ns_send": "Отправить сигнал", "ns_where": "Куда",
         "ref_title": "Пригласить", "ref_sub": "Приглашайте друзей — копите DIP", "ref_code": "Ваш код",
@@ -1890,7 +1901,7 @@ T = {
         "df_term": "Trading terminal", "df_avg": "Avg price", "df_market": "Market", "df_limit_p": "Limit price", "df_amount": "Amount, USDT", "df_sl_opt": "SL (optional)", "df_tp_opt": "TP (optional)", "df_qty": "Quantity", "df_tpsl_hint": "Leave empty to remove", "df_pick": "Choose a pair", "df_pos1": "Position", "df_mark": "Mark price", "df_value": "Value", "df_no_pos": "No position in this pair — open one with BUY", "df_trades": "Recent trades", "pp_typed": "as typed", "pp_choose": "Choose a pair", "df_share": "Share of account", "df_equity2": "Equity", "nws_prep": "Preparing to share…", "wallet": "Exchange", "w_soon": "Coming soon", "w_sub": "Exchange", "w_txt": "Your DIP, USDT and Dip Funded balances in one place — this section is on its way.", "df_inbot": "Manage in bot",
         "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
         "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
-        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Drag a line (SL, TP, entry, limit) and save", "ns_sl": "Stop (SL)",
+        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Pan and zoom the chart with your fingers · tap ⇕ on the right or a line label, then drag and save", "lw_armed": "Line selected — now drag it", "ns_sl": "Stop (SL)",
         "ns_tps": "Targets (TP) — space-separated", "ns_amount": "Size, $ (optional)",
         "ns_send": "Send signal", "ns_where": "Where",
         "ref_title": "Invite", "ref_sub": "Invite friends — earn DIP", "ref_code": "Your code",
