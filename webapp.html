@@ -1079,7 +1079,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;
    rightPriceScale:{borderColor:'rgba(255,255,255,.08)',scaleMargins:{top:.1,bottom:.08}},
    timeScale:{borderColor:'rgba(255,255,255,.08)',timeVisible:true,rightOffset:6,barSpacing:7,minBarSpacing:1.5},
    crosshair:{mode:0,vertLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'},horzLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'}},
-   handleScroll:{vertTouchDrag:false},localization:{locale:'en-US'}});
+   localization:{locale:'en-US'}});   /* 368: vertTouchDrag yoqiq — o'chirilsa narx o'qini barmoq bilan cho'zish ham ishlamaydi */
   var se=ch.addCandlestickSeries({upColor:'#c2f23a',downColor:'#ff5c5c',borderVisible:false,wickUpColor:'#c2f23a',wickDownColor:'#ff5c5c',
    autoscaleInfoProvider:function(orig){var r=orig();if(!r||!r.priceRange||LW.drag)return r;var lo=r.priceRange.minValue,hi=r.priceRange.maxValue,pad=(hi-lo)*1.2;
     (LW.L||[]).forEach(function(l){if(l.ns)return;if(l.p<lo&&l.p>=lo-pad)r.priceRange.minValue=Math.min(r.priceRange.minValue,l.p);if(l.p>hi&&l.p<=hi+pad)r.priceRange.maxValue=Math.max(r.priceRange.maxValue,l.p)});return r}});
@@ -1139,7 +1139,7 @@ function lwDown(e){var t_=e.target.closest&&e.target.closest('.lwl.dr,.lwh');if(
   var p=LW.se.coordinateToPrice(ev.clientY-LW.el.getBoundingClientRect().top-d.off);if(p===null||p<=0)return;d.p=termRound(p);g.drag={k:k,p:d.p};
   LW.pl[k].pl.applyOptions({price:d.p});lwPos()};
  var up=function(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up);
-  var d=LW.drag;LW.drag=null;g.drag=null;LW.arm=null;LW.ch.applyOptions({handleScroll:{vertTouchDrag:false},handleScale:true});
+  var d=LW.drag;LW.drag=null;g.drag=null;LW.arm=null;LW.ch.applyOptions({handleScroll:true,handleScale:true});
   if(!d||!d.mv||Math.abs(d.p-d.from)<=d.from*1e-7){lwLines(true);return}
   g.pend={k:d.k,lb:d.lb,from:g.pend&&g.pend.k==d.k?g.pend.from:d.from,to:d.p};haptic('success');termRender()};
  document.addEventListener('pointermove',mv,{passive:false});document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up)}

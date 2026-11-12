@@ -8246,3 +8246,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Belgilar (`termMarks`) → `series.setMarkers` (xarid ▲ oq, sotuv ▼ sariq); oxirgi sham `i.price` bilan yangilanadi.
 - Yo'l-yo'lakay: `tvLoad` — birja `info` javobidagi `sym` boshqacha bo'lsa Savdo ekrani cheksiz qayta so'rardi (`tvView` → `tvLoad` → `tvRe`); endi so'ralgan `sym/mkt` saqlanadi.
 - Sinov: `t_lw.py` (APTUSDT: shamlar to'liq balandlikda, TP chetda ▲, sichqoncha bilan SL surish → pend, teginish → tanlash, TF, qayta chizishda grafik o'sha obyekt), `t_cxc.py` (✕, limit surish, + Limit, spot), `t_dfx.py`, `t_cxw.py`.
+
+
+## 368. Narx o'qida vertikal masshtab (telefonda) ishlamasdi
+- Foydalanuvchi: "pastga-yuqoriga qisqartirish ishlamayapti, narxlar ustida suring — qisqarmayapti". Sabab: 367 da sahifa aylanishi uchun `handleScroll.vertTouchDrag:false` qo'yilgan edi — Lightweight Charts'da bu NARX O'QIDAGI teginish bilan cho'zishni ham o'chiradi (CDP touch sinovida tasdiqlandi: oraliq o'zgarmadi; yoqilganda 0.52–0.62 → 0.47–0.67).
+- Endi `handleScroll` standart (Dip Funded va TradingView kabi): grafik ustida vertikal surish grafikni suradi, sahifa grafikdan tashqarida aylanadi. Narx o'qida 2 marta bosish — avtomasshtabga qaytish (kutubxona). `t_lw2.py` — CDP touch bilan narx o'qini tortish sinovi.
