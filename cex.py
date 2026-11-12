@@ -2641,14 +2641,243 @@ TRADE_PERMS = {"binance": None, "bitget": bg_trade_perms, "bingx": bx_trade_perm
                "bitunix": bu_trade_perms, "bybit": bb_trade_perms}
 
 
+# ═══════════════════ 370: Binance Stocks — haqiqiy AQSh aksiyalari / ETF (+ bStocks token) ═══════════════════
+# Rasmiy SDK (`binance-sdk-stocks` 1.8.1 / `@binance/stocks`) bo'yicha: `/sapi/v1/equity/*`, oddiy Binance
+# kaliti va HMAC imzosi, parametrlar camelCase, POST ham query bilan. Narx AQSh dollarida, kotirovka USDC
+# (standart). BUY MARKET — `notional`; LIMIT — price (2 xona) + quantity + tradingSession (RTH/EXTENDED/24H);
+# SELL MARKET — quantity. Ulushli aksiya: quantity kasr yoki notional; GTC kasr bo'lsa — EXTENDED/24H.
+# `tokenize` (standart true) — tokenlash yoqilgan aksiya sotib olinganda bStock tokeniga aylanadi.
+# Qoldiqlar uchun alohida endpoint YO'Q — portfel savdo tarixidan (xarid − sotuv) yig'iladi.
+_STK: dict = {}          # kesh: "list", "tok" -> (ts, data)
+
+
+async def _stk_pub(k, path, params=None):
+    """MARKET_DATA — faqat API kaliti sarlavhada (imzosiz)."""
+    d = await _req("GET", SAPI + path, {"X-MBX-APIKEY": k["key"]}, urlencode(params or {}))
+    if isinstance(d, dict) and isinstance(d.get("code"), int) and d["code"] < 0:
+        raise ApiErr("auth" if d["code"] in (-2014, -2015, -1022, -2008) else "api", json.dumps(d)[:200])
+    return d
+
+
+def _stk_sym(a) -> str:
+    s = str(a.get("sym") or "").upper().strip()
+    if not s or len(s) > 12 or not all(ch.isalnum() or ch in ".-" for ch in s) or not s.isascii():
+        raise ApiErr("bad", "symbol")
+    return s
+
+
+async def _stk_rules(k) -> dict:
+    hit = _STK.get("list")
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    d = await _stk_pub(k, "/sapi/v1/equity/market/exchangeInfo") or {}
+    rules = {}
+    for x in d.get("symbols") or []:
+        if not x.get("symbol"):
+            continue
+        rules[str(x["symbol"]).upper()] = {
+            "tr": str(x.get("tradability") or ""), "fr": bool(x.get("fractionable")),
+            "ext": bool(x.get("extendedSession")), "on": bool(x.get("overnightSupported")),
+            "step": _f(x.get("stepSize")) or 1e-9, "min_qty": _f(x.get("minQty")),
+            "max_qty": _f(x.get("maxQty")), "min_notional": _f(x.get("minNotional")),
+            "max_notional": _f(x.get("maxNotional"))}
+    _STK["list"] = (time.time(), rules)
+    return rules
+
+
+async def _stk_tokens(k) -> dict:
+    """aksiya -> bStock token kodi (tokenlash yoqilganlari)."""
+    hit = _STK.get("tok")
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    d = await _stk_pub(k, "/sapi/v1/equity/market/tokenized-assets") or []
+    rows = d if isinstance(d, list) else (d.get("rows") or d.get("data") or [])
+    tok = {str(x.get("underlyingEquitySymbol") or "").upper(): {"code": x.get("assetCode"), "name": x.get("assetName"),
+                                                                 "mul": _f(x.get("multiplier")) or 1.0}
+           for x in rows if x.get("underlyingEquitySymbol") and x.get("assetCode")}
+    _STK["tok"] = (time.time(), tok)
+    return tok
+
+
+def _stk_ok(tr: str) -> bool:
+    return tr.upper() in ("", "TRADABLE", "TRADING", "ACTIVE", "ENABLED", "NORMAL")
+
+
+async def stk_list(k, a=None) -> dict:
+    """Savdo qilinadigan aksiyalar (ixcham): [ticker, fractionable, tokenlanadimi]."""
+    rules, tok = await asyncio.gather(_stk_rules(k), _stk_tokens(k), return_exceptions=True)
+    if isinstance(rules, BaseException):
+        raise rules
+    tok = tok if isinstance(tok, dict) else {}
+    out = [[s, 1 if r["fr"] else 0, 1 if s in tok else 0] for s, r in rules.items() if _stk_ok(r["tr"])]
+    out.sort(key=lambda x: (-x[2], x[0]))
+    return {"s": out, "n": len(out)}
+
+
+async def stk_quote(k, a) -> dict:
+    sym = _stk_sym(a)
+    d = await _stk_pub(k, "/sapi/v1/equity/market/quote", {"symbol": sym}) or {}
+    bid, ask = _f(d.get("bidPrice")), _f(d.get("askPrice"))
+    last = (bid + ask) / 2 if bid and ask else (bid or ask)
+    return {"sym": sym, "bid": bid, "ask": ask, "last": last}
+
+
+async def _stk_quote_bal(k) -> dict:
+    d = await _bn(k, SAPI, "/api/v3/account", {"omitZeroBalances": "true"})
+    return {b["asset"]: _f(b["free"]) for b in d.get("balances", [])}
+
+
+async def stk_hold(k, a=None) -> dict:
+    """Portfel: savdo tarixidan (xarid − sotuv, o'rtacha narx) + spotdagi bStock tokenlar; joriy narx kotirovkadan."""
+    pos: dict = {}
+    page = 1
+    for _ in range(20):
+        d = await _bn_send(k, SAPI, "/sapi/v1/equity/trade/history", "GET", {"current": page, "size": 100}) or {}
+        rows = d.get("rows") or d.get("data") or (d if isinstance(d, list) else [])
+        for r in rows:
+            s = str(r.get("symbol") or "").upper()
+            q, tot = _f(r.get("qty")), _f(r.get("total")) or _f(r.get("qty")) * _f(r.get("price"))
+            p = pos.setdefault(s, {"qty": 0.0, "cost": 0.0, "real": 0.0})
+            if str(r.get("side")).upper() == "BUY":
+                p["qty"] += q
+                p["cost"] += tot
+            elif p["qty"] > 0:
+                avg = p["cost"] / p["qty"]
+                sold = min(q, p["qty"])
+                p["real"] += tot - avg * sold
+                p["cost"] -= avg * sold
+                p["qty"] -= sold
+        total = int(_f(d.get("total"))) if isinstance(d, dict) else 0
+        if len(rows) < 100 or (total and page * 100 >= total):
+            break
+        page += 1
+    tok = {}
+    try:
+        tok = await _stk_tokens(k)
+    except ApiErr:
+        pass
+    bal = await _stk_quote_bal(k)
+    held = [s for s, p in pos.items() if p["qty"] > 1e-9]
+    out = []
+    quotes = await asyncio.gather(*(stk_quote(k, {"sym": s}) for s in held[:25]), return_exceptions=True)
+    qm = {q["sym"]: q["last"] for q in quotes if isinstance(q, dict)}
+    for s in held:
+        p = pos[s]
+        avg = p["cost"] / p["qty"] if p["qty"] else 0
+        px = qm.get(s)
+        t = tok.get(s)
+        out.append({"sym": s, "qty": round(p["qty"], 9), "avg": avg, "price": px,
+                    "val": px * p["qty"] if px else None, "upnl": (px - avg) * p["qty"] if px else None,
+                    "real": p["real"], "tok": (t or {}).get("code"), "tok_qty": bal.get((t or {}).get("code") or "", 0.0)})
+    out.sort(key=lambda x: -(x["val"] or 0))
+    return {"pos": out, "cash": {"USDC": bal.get("USDC", 0.0), "USDT": bal.get("USDT", 0.0)}}
+
+
+async def stk_info(k, a) -> dict:
+    sym = _stk_sym(a)
+    rules, q, bal = await asyncio.gather(_stk_rules(k), stk_quote(k, {"sym": sym}), _stk_quote_bal(k))
+    r = rules.get(sym)
+    if not r:
+        raise ApiErr("api", f"{sym}: Binance Stocks'da bunday aksiya yo'q")
+    tok = {}
+    try:
+        tok = await _stk_tokens(k)
+    except ApiErr:
+        pass
+    return {"sym": sym, "price": q["last"], "bid": q["bid"], "ask": q["ask"], "fx": r,
+            "avail": {"quote": bal.get("USDC", 0.0), "usdt": bal.get("USDT", 0.0)},
+            "tok": (tok.get(sym) or {}).get("code"), "mkt": "stk", "perm": {"stk": True}}
+
+
+async def stk_order(k, a) -> dict:
+    sym = _stk_sym(a)
+    side = "BUY" if a.get("side") == "buy" else "SELL"
+    typ = "LIMIT" if a.get("type") == "limit" else "MARKET"
+    r = (await _stk_rules(k)).get(sym)
+    if not r:
+        raise ApiErr("api", f"{sym}: Binance Stocks'da bunday aksiya yo'q")
+    p = {"symbol": sym, "side": side, "orderType": typ, "walletType": "MAIN"}
+    if typ == "MARKET" and side == "BUY":
+        notional = _floor(_pos(a, "quote"), "0.01")
+        if r["min_notional"] and float(notional) < r["min_notional"]:
+            raise ApiErr("small", f"min ${r['min_notional']}")
+        p["notional"] = _s(notional)
+    else:
+        q0 = _pos(a, "qty")
+        if not r["fr"] and q0 != int(q0):
+            raise ApiErr("bad", f"{sym}: ulushli (kasr) miqdor ruxsat etilmagan")
+        qty = _floor(q0, r["step"])
+        if qty <= 0 or (r["min_qty"] and float(qty) < r["min_qty"]):
+            raise ApiErr("small", f"min {r['min_qty']}")
+        p["quantity"] = _s(qty)
+    if typ == "LIMIT":
+        p["price"] = _s(_round(_pos(a, "price"), "0.01"))
+        ses = str(a.get("session") or "RTH").upper()
+        p["tradingSession"] = ses if ses in ("RTH", "EXTENDED", "24H") else "RTH"
+        tif = str(a.get("tif") or "DAY").upper()
+        p["timeInForce"] = tif if tif in ("DAY", "GTC") else "DAY"
+        if p["timeInForce"] == "GTC" and "." in p["quantity"] and p["tradingSession"] == "RTH":
+            p["tradingSession"] = "EXTENDED"         # kasr GTC — faqat EXTENDED/24H
+    if a.get("tok") is not None:
+        p["tokenize"] = "true" if a.get("tok") in (True, 1, "1", "true") else "false"
+    d = await _bn_send(k, SAPI, "/sapi/v1/equity/order/place", "POST", p) or {}
+    return {"id": str(d.get("orderId") or ""), "status": d.get("status") or "NEW", "sym": sym,
+            "side": side.lower(), "type": typ.lower()}
+
+
+async def stk_open(k, a=None) -> list:
+    d = await _bn_send(k, SAPI, "/sapi/v1/equity/order/open-orders", "GET", {}) or []
+    rows = d if isinstance(d, list) else (d.get("rows") or d.get("data") or [])
+    return [{"id": str(o.get("orderId")), "sym": str(o.get("symbol") or "").upper(), "side": str(o.get("side")).lower(),
+             "type": str(o.get("orderType")).lower(), "price": _f(o.get("limitPrice")), "qty": _f(o.get("qty")),
+             "notional": _f(o.get("notional")), "filled": _f(o.get("filledQty")), "session": o.get("session"),
+             "status": o.get("status"), "t": int(_f(o.get("createdAt")))} for o in rows]
+
+
+async def stk_cancel(k, a) -> dict:
+    oid = _oid(a)
+    await _bn_send(k, SAPI, "/sapi/v1/equity/order/cancel", "POST", {"orderId": oid})
+    return {"id": oid, "status": "CANCELED"}
+
+
+async def stk_disc(k, a=None) -> dict:
+    """AQSh aksiyalari shartlarini qabul qilish (bir marta, kalit egasining hisobi uchun)."""
+    d = await _bn_send(k, SAPI, "/sapi/v1/equity/account/disclaimer", "POST", {}) or {}
+    return {"ok": True, "r": d}
+
+
+async def stk_mint(k, a) -> dict:
+    """Aksiya → bStock token (1:1)."""
+    sym = _stk_sym(a)
+    qty = _floor(_pos(a, "qty"), "0.00000001")
+    d = await _bn_send(k, SAPI, "/sapi/v1/equity/tokenized/mint", "POST",
+                       {"underlyingAsset": sym, "underlyingAssetAmount": _s(qty)}) or {}
+    return {"id": str(d.get("issuerRequestId") or d.get("requestId") or ""), "status": d.get("status") or "PENDING"}
+
+
+async def stk_redeem(k, a) -> dict:
+    """bStock token → aksiya."""
+    asset = _stk_sym({"sym": a.get("asset") or a.get("sym")})
+    qty = _floor(_pos(a, "qty"), "0.00000001")
+    d = await _bn_send(k, SAPI, "/sapi/v1/equity/tokenized/redeem", "POST",
+                       {"tokenizedAsset": asset, "tokenizedAssetAmount": _s(qty)}) or {}
+    return {"id": str(d.get("issuerRequestId") or d.get("requestId") or ""), "status": d.get("status") or "PENDING"}
+
+
+STK_OPS = {"stk_list": stk_list, "stk_quote": stk_quote, "stk_info": stk_info, "stk_hold": stk_hold,
+           "stk_order": stk_order, "stk_open": stk_open, "stk_cancel": stk_cancel, "stk_disc": stk_disc,
+           "stk_mint": stk_mint, "stk_redeem": stk_redeem}
+
+
 TRADE_OPS = {
     "depth": bn_depth,
     "info": bn_info, "spot_order": bn_spot_order, "spot_open": bn_spot_open,
     "spot_cancel": bn_spot_cancel, "fut_order": bn_fut_order, "fut_close": bn_fut_close,
     "fut_open": bn_fut_open, "fut_cancel": bn_fut_cancel, "fut_tpsl": bn_fut_tpsl,
     "fut_modify": bn_fut_modify, "spot_modify": bn_spot_modify,
+    **STK_OPS,                       # 370: Binance Stocks (faqat Binance)
 }
-TRADE_READ = ("info", "spot_open", "fut_open", "depth")
+TRADE_READ = ("info", "spot_open", "fut_open", "depth", "stk_list", "stk_quote", "stk_info", "stk_hold", "stk_open")
 
 
 async def trade(ex: str, k: dict, op: str, a: dict):
@@ -2658,6 +2887,8 @@ async def trade(ex: str, k: dict, op: str, a: dict):
         return await HIST_EX[ex](k, a or {})
     if op == "depth" and ex != "binance" and DEPTH_EX.get(ex):   # 343: ochiq order book
         return await DEPTH_EX[ex](k, a or {})
+    if op in STK_OPS and ex != "binance":                     # 370: aksiyalar — faqat Binance
+        raise ApiErr("bad", "stocks: faqat Binance")
     if ex != "binance" and op in TRADE_IMPL.get(ex, {}):      # 355: boshqa birjalar savdosi
         return await TRADE_IMPL[ex][op](k, a or {})
     if ex not in TRADE_EX:
