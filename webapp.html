@@ -319,6 +319,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .dippill{position:absolute;right:14px;bottom:14px;border-radius:999px;padding:5px 10px;font-size:10px;font-weight:700;color:#fff;
  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.ph{font-size:11.5px;margin:-4px 3px 9px;min-height:14px;color:var(--mut);font-variant-numeric:tabular-nums}
 .lwo{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
 .lwl{position:absolute;left:4px;top:0;display:flex;align-items:center;gap:5px;height:18px;padding:0 3px 0 7px;border-radius:7px;background:rgba(10,11,9,.82);border:1px solid rgba(255,255,255,.16);color:var(--lt);font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:auto;font-variant-numeric:tabular-nums}
 .lwl{border-color:rgba(255,255,255,.16)}@supports (color:color-mix(in srgb,red 50%,blue)){.lwl{border-color:color-mix(in srgb,var(--lc) 55%,transparent)}}
@@ -623,15 +624,16 @@ function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLo
   +'<a onclick="tvSet(\'side\',\'sell\')" style="text-align:center;padding:9px 0;font-weight:800;'+(!buy?'background:#f6465d;color:#fff':'color:var(--mut)')+'">'+(fut?'Short':'Sell')+'</a></div>';
  if(fut)F+='<div onclick="tvLev()" class="glass" style="border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;cursor:pointer"><span class="rs" style="margin:0">'+esc(t('tr_lev'))+'</span><b>'+(T.lev||(i&&i.lev)||10)+'x ▾</b></div>';
  if(DF&&!buy)F+='<div class="rs" style="margin:0 2px 8px;line-height:1.4">'+esc(t('dfx_sell_note'))+'</div>';else F+='<div style="display:flex;gap:6px;margin-bottom:8px">'+['limit','market'].map(function(x){return'<span class="chip glass'+(T.type==x?' on':'')+'" style="flex:1;text-align:center" onclick="tvSet(\'type\',\''+x+'\')">'+(x=='limit'?'Limit':'Market')+'</span>'}).join('')+'</div>';
- var inp=function(id,ph,val,dis2){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val)+'"'+(dis2?' disabled':'')+' oninput="tvIn(\''+id+'\')" style="width:100%;font-size:15px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 11px;outline:none;margin-bottom:8px">'};
- if(T.type=='limit')F+='<div style="display:flex;gap:6px">'+'<div style="flex:1">'+inp('tv_p',t('tv_price'),T.price)+'</div><button class="btn" style="margin:0 0 8px;padding:0 10px" onclick="tvBbo()">BBO</button></div>';
+ var inp=function(id,ph,val,dis2,at){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val)+'"'+(dis2?' disabled':'')+(at||'')+' oninput="tvIn(\''+id+'\')" style="width:100%;font-size:15px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 11px;outline:none;margin-bottom:8px">'+(at?PH:'')};
+ var tdir=(T.side=='buy'||T.side=='long')?1:-1,tlev=T.mkt=='fut'?(T.lev||(T.info&&T.info.lev)||10):1;
+ if(T.type=='limit')F+='<div style="display:flex;gap:6px">'+'<div style="flex:1">'+inp('tv_p',t('tv_price'),T.price,0,' data-ref="0" data-rk="tvm"')+'</div><button class="btn" style="margin:0 0 8px;padding:0 10px" onclick="tvBbo()">BBO</button></div>';
  else F+='<div class="glass" style="border-radius:10px;padding:10px 11px;margin-bottom:8px;color:var(--mut);font-weight:700;font-size:14px">'+esc(t('tv_mkt_price'))+'</div>';
  F+=inp('tv_a',t('tv_amount',{b:base}),T.amt);
  F+='<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px">'+[0,25,50,75,100].map(function(x){return'<span onclick="tvPct('+x+')" style="cursor:pointer;width:14px;height:14px;transform:rotate(45deg);border:2px solid '+((T.pct||0)>=x&&x>0?col:'rgba(255,255,255,.35)')+';background:'+((T.pct||0)>=x&&x>0?col:'transparent')+';border-radius:3px;display:inline-block"></span>'}).join('<span style="flex:1;height:2px;background:rgba(255,255,255,.12);margin:0 3px"></span>')+'</div>';
  F+=inp('tv_t',t('tv_total'),T.total);
  if(fut||(DF&&buy)){F+='<label style="display:flex;align-items:center;gap:8px;margin:0 2px 8px;font-size:13px;font-weight:700"><input type="checkbox" '+(T.tpsl?'checked':'')+' onchange="tvSet(\'tpsl\',this.checked)" style="width:18px;height:18px;accent-color:#c2f23a"> TP/SL</label>';
   if(T.tpsl){var qb=function(k,x){return'<button onclick="tvQ(\''+k+'\','+x+')" style="flex:1;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--mut);font-weight:700;font-size:11px;padding:6px 0;border-radius:6px;cursor:pointer">'+(k=='tp'?'+':'−')+x+'%</button>'};
-   F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div>'+inp('tv_tp','TP',T.tp)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[2,5,10].map(function(x){return qb('tp',x)}).join('')+'</div></div><div>'+inp('tv_sl','SL',T.sl)+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[1,2,5].map(function(x){return qb('sl',x)}).join('')+'</div></div></div>'}}
+   F+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div>'+inp('tv_tp','TP',T.tp,0,' data-ref="0" data-rk="tv" data-dir="'+tdir+'" data-lev="'+tlev+'"')+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[2,5,10].map(function(x){return qb('tp',x)}).join('')+'</div></div><div>'+inp('tv_sl','SL',T.sl,0,' data-ref="0" data-rk="tv" data-dir="'+tdir+'" data-lev="'+tlev+'"')+'<div style="display:flex;gap:4px;margin:-4px 0 8px">'+[1,2,5].map(function(x){return qb('sl',x)}).join('')+'</div></div></div>'}}
  var av=i?(fut?i.avail.quote:(buy?i.avail.quote:i.avail.base)):null,lv=T.lev||(i&&i.lev)||10,px=tvPx();
  F+='<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 2px"><span class="rs" style="margin:0">'+esc(t('tv_avbl'))+'</span><b>'+(av==null?'—':(!fut&&!buy?(+av.toPrecision(8))+' '+esc(base):n2(av)+' USDT'))+'</b></div>';
  var mq=DF&&buy&&i&&i.maxq!=null;
@@ -648,7 +650,7 @@ function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLo
  else h+=O.length?O.map(function(o){return'<div class="sig glass rise" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:9px">'+coinIc(o.sym,26)
    +'<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(o.sym)+' <span class="b '+(o.side=='buy'?'bl':'bs')+'">'+o.side.toUpperCase()+'</span> <span class="rs" style="display:inline">'+esc(String(o.type).replace(/_/g,' ').toUpperCase())+'</span></div><div class="rs">'+(o.trigger?'⚡ '+fp(o.trigger):fp(o.price))+(o.qty?' · '+(+o.qty):'')+(o.filled?' · '+esc(t('tv_filled'))+' '+(+o.filled):'')+'</div></div>'
    +(can?'<button class="btn" style="margin:0;color:var(--r);flex:none;width:42px;padding:8px 0" onclick="tvCancel(\''+esc(o.sym)+'\',\''+o.id+'\','+(o.algo?1:0)+')">✕</button>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('tv_no_orders'))+'</div></div>';
- v.innerHTML=h;tvPoll()}
+ v.innerHTML=h;phAll(v);tvPoll()}
 function tvOrders(){var T=S.tv,ex=T.ex;if(ex=='dipfunded')return((S.dfs||{}).orders||[]).map(function(o){return{sym:o.symbol+'USDT',id:o.id,side:'buy',type:'limit',price:+o.limit,qty:o.limit?+(+o.amount/+o.limit).toPrecision(6):0,df:1}});if(T.mkt=='fut')return((S.cxo||{})[ex]||[]);return T.sopen||[]}
 function tvPx(){var T=S.tv;if(T.type=='limit'){var p=parseFloat(T.price);if(p>0)return p}var b=T.book;return b&&b.last?b.last:(T.info?T.info.price:0)}
 function tvBookHtml(){var T=S.tv,b=T.book;if(!b)return T.bkerr?'<div class="rs" style="text-align:center;padding:40px 6px;line-height:1.5">'+esc(t('tv_book_err'))+'</div>':'<div class="spk" style="height:300px;margin:0"><div class="sk"></div></div>';
@@ -675,11 +677,11 @@ var TVP=0;function tvPoll(){clearInterval(TVP);TVP=setInterval(function(){var w=
 function tvRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!S.page&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
 function tvSet(k,v){var T=S.tv;T[k]=v;if(k=='mkt'||k=='sym'){T.info=null;T.book=null;T.tick0=0;T.bkerr=0;T.price='';T.amt='';T.total='';T.pct=0;T.lev=null;if(k=='mkt')T.tab=v=='fut'?'pos':'orders'}
  if(k=='side'||k=='type'){T.pct=0}tick();tvRe()}
-function tvQ(k,x){var T=S.tv,px=tvPx();if(!px)return;var up=(T.side=='buy')==(k=='tp'),v=+(px*(1+(up?x:-x)/100)).toPrecision(6);T[k]=String(v);var e=document.getElementById('tv_'+k);if(e)e.value=T[k]}
+function tvQ(k,x){var T=S.tv,px=tvPx();if(!px)return;var up=(T.side=='buy')==(k=='tp'),v=+(px*(1+(up?x:-x)/100)).toPrecision(6);T[k]=String(v);var e=document.getElementById('tv_'+k);if(e){e.value=T[k];ph(e)}}
 function tvSetP(p){var T=S.tv;if(T.type!='limit')return;T.price=String(p);var e=document.getElementById('tv_p');if(e)e.value=T.price;tvCalc('amt')}
 function tvBbo(){var T=S.tv,b=T.book;if(!b)return;tvSetP(T.side=='buy'?(b.bids[0]||[0])[0]:(b.asks[0]||[0])[0])}
 function tvIn(id){var T=S.tv,e=document.getElementById(id);if(!e)return;var v=e.value.replace(',','.');
- if(id=='tv_p'){T.price=v;tvCalc('amt')}else if(id=='tv_a'){T.amt=v;T.pct=0;tvCalc('amt')}else if(id=='tv_t'){T.total=v;T.pct=0;tvCalc('total')}else if(id=='tv_tp')T.tp=v;else if(id=='tv_sl')T.sl=v}
+ if(id=='tv_p'){T.price=v;tvCalc('amt')}else if(id=='tv_a'){T.amt=v;T.pct=0;tvCalc('amt')}else if(id=='tv_t'){T.total=v;T.pct=0;tvCalc('total')}else if(id=='tv_tp')T.tp=v;else if(id=='tv_sl')T.sl=v;ph(e);if(id=='tv_p'){ph(document.getElementById('tv_tp'));ph(document.getElementById('tv_sl'))}}
 function tvCalc(from){var T=S.tv,px=tvPx();if(!px)return;
  if(from=='amt'){var a=parseFloat(T.amt);T.total=a>0?String(Math.round(a*px*100)/100):'';var e=document.getElementById('tv_t');if(e)e.value=T.total}
  else{var tt=parseFloat(T.total);T.amt=tt>0?String(+(tt/px).toPrecision(6)):'';var e2=document.getElementById('tv_a');if(e2)e2.value=T.amt}}
@@ -743,7 +745,7 @@ function cxTermRender(g){var i=termItem(),ex=g.cx.ex,a=cexAcc(ex)||{},p=document
  if(P.length>1)h+='<div class="chips" style="margin-bottom:8px">'+P.map(function(x){return'<span class="chip glass'+(x.sym==i.symbol?' on':'')+'" onclick="cxSym(\''+esc(x.sym)+'\')">'+esc(x.sym)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span></div>'
+ if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
  else if(can&&i.price){var ab=function(k,l,c){return'<button class="btn" style="margin:0;color:'+c+'" onclick="cxAdd(\''+k+'\')">+ '+l+'</button>'};
   h+='<div class="mcb" style="margin-top:10px">'+(i.pos&&i.pos.tp==null?ab('tp','TP','#c2f23a'):'')+(i.pos&&i.pos.sl==null?ab('sl','SL','#ff5c5c'):'')+ab('nl','Limit','#4ea1ff')+'</div>'}
@@ -1053,7 +1055,7 @@ function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.cx){cxTermRen
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span></div>'
+ if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
  else h+='<div class="rs" style="text-align:center;margin:10px 4px">'+esc(t('term_hint'))+'</div>';
  h+=termInfo(i)+termActs(i);
@@ -1105,6 +1107,10 @@ function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
   M.push({time:rows[k].time,position:m.buy?'belowBar':'aboveBar',color:m.buy?'#ffffff':'#ffc83d',shape:m.buy?'arrowUp':'arrowDown',size:.8})});
  M.sort(function(a,b){return a.time-b.time});try{se.setMarkers(M)}catch(e){}}
 function lwView(g){if(!LW.ch||!LW.n||!g.vr)return;LW.busy=1;var to=LW.n-1-g.vr.right;LW.ch.timeScale().setVisibleLogicalRange({from:to-g.vr.span,to:to});LW.busy=0}
+/* 369: chiziq surilganda/saqlashda foiz: SL/TP — kirishdan (natija, leverajli), qolganlari — joriy narxdan */
+function lwRef(k){var i=termItem();if(!i)return null;var ent=i.pos?+(i.pos.avg||i.pos.entry):+i.entry,sd=i.pos?(i.pos.side=='short'?-1:1):(i.side=='SHORT'?-1:1);
+ if(k=='sl'||/^tp/.test(k))return{ref:ent,dir:sd,lev:i.pos?(+i.pos.lev||1):(i.lev||1)};return{ref:+i.price,dir:0,lev:1}}
+function pendPc(pd){var r=lwRef(pd.k);return r&&r.ref>0?' <span style="font-size:13px;font-weight:600">'+pcH(pd.to,r.ref,r.dir,r.lev)+'</span>':''}
 function lwArmed(k){return LW.arm&&LW.arm.k==k&&Date.now()<LW.arm.u}
 function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;var i=termItem();if(!i)return;var L=termLines(i,g);LW.L=L;
  var sig=JSON.stringify(L.map(function(l){return[l.k,l.p,l.lb,l.c,l.hit,l.dr]}))+(g.xarm?g.xarm.k:'')+(LW.arm?LW.arm.k:'');
@@ -1123,7 +1129,8 @@ function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;v
 function lwPos(){var se=LW.se,ov=LW.ov;if(!se||!ov)return;var h=ov.clientHeight-26,sw=0;try{sw=LW.ch.priceScale('right').width()}catch(e){}
  var top=0,bot=0,R=[];Object.keys(LW.pl).forEach(function(k){var o=LW.pl[k],l=o.l;if(!l)return;var p=LW.drag&&LW.drag.k==k?LW.drag.p:l.p,y=se.priceToCoordinate(p),out=0;
   if(y===null||y<8){out=-1}else if(y>h-6){out=1}
-  var txt=(out<0?'▲ ':out>0?'▼ ':'')+l.lb+(l.hit?' ✓':'')+(l.np&&!out?'':' '+fp(p))+(l.f&&!l.hit?' · '+l.f(p):'');var t_=o.el.firstChild;if(t_.textContent!==txt)t_.textContent=txt;
+  var txt=(out<0?'▲ ':out>0?'▼ ':'')+l.lb+(l.hit?' ✓':'')+(l.np&&!out?'':' '+fp(p))+(l.f&&!l.hit?' · '+l.f(p):'');
+  if(LW.drag&&LW.drag.k==k){var rf=lwRef(k);if(rf&&rf.ref>0)txt+=' · '+pcT(p,rf.ref,rf.dir,rf.lev)}var t_=o.el.firstChild;if(t_.textContent!==txt)t_.textContent=txt;
   R.push({o:o,y:out<0?9+18*(top++):out>0?h-9-18*(bot++):y,out:out})});
  R.sort(function(a,b){return a.y-b.y});for(var q=1;q<R.length;q++)if(R[q].y<R[q-1].y+18&&!R[q].out)R[q].y=R[q-1].y+18;
  R.forEach(function(r){r.o.el.style.transform='translateY('+Math.round(r.y-9)+'px)';r.o.hd.style.transform='translateY('+Math.round(r.y-9)+'px)';r.o.hd.style.right=(sw+6)+'px';
@@ -1550,7 +1557,9 @@ function sgRender(){var g=S.sg,b=document.getElementById('sgbox');if(!g||!g.s||!
  var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0">'+esc(l)+'</span><b class="'+(c||'')+'">'+v+'</b></div>'};
  var h='<h4 style="display:flex;align-items:center;gap:9px">'+coinIc(x.sym,24)+esc(x.sym)+' <span class="b '+(lg?'bl':'bs')+'">'+x.side+'</span>'+(x.lev&&x.market=='futures'?'<span class="b bx">'+x.lev+'x</span>':'')+'</h4>'
   +'<div class="rs" style="margin:-4px 2px 8px">'+esc(x.ws)+' · #'+x.id+(x.price?' · '+esc(t('t_now'))+' <b>'+fp(x.price)+'</b>':'')+'</div>'
-  +row(t('t_entry_px'),fp(x.entry))+row('SL',x.sl!=null?fp(x.sl):'—','r')+row('TP',x.tp_next!=null?fp(x.tp_next):'—','g');
+  +row(t('t_entry_px'),fp(x.entry)+(x.price?' <span style="font-weight:500;font-size:12px">'+pcH(x.entry,x.price,0)+'</span>':''))
+  +row('SL',x.sl!=null?fp(x.sl)+' <span style="font-weight:500;font-size:12px">'+pcH(x.sl,x.entry,lg?1:-1,x.market=='futures'?x.lev:1)+'</span>':'—','r')
+  +row('TP',x.tp_next!=null?fp(x.tp_next)+' <span style="font-weight:500;font-size:12px">'+pcH(x.tp_next,x.entry,lg?1:-1,x.market=='futures'?x.lev:1)+'</span>':'—','g');
  if(x.status!='PENDING'&&x.status!='ACTIVE'){b.innerHTML=h+'<p style="margin-top:10px">'+esc(t('sg_closed'))+'</p>';return}
  if(!D.length){b.innerHTML=h+'<p style="margin-top:12px;line-height:1.5">'+esc(t(lg?'sg_nodest':'sg_nodest_s'))+'</p><button class="btn p full" style="width:100%" onclick="sheetClose();go(\'wallet\')">'+esc(t('cx_connect'))+'</button>';return}
  h+='<div class="rs" style="margin:12px 2px 6px;font-weight:700">'+esc(t('sg_where'))+'</div><div class="chips" style="margin-bottom:8px">'+D.map(function(z){return'<span class="chip glass'+(z.k==g.dest?' on':'')+'" onclick="S.sg.dest=\''+z.k+'\';S.sg.av=null;sgAvail();sgRender()">'+esc(z.lb)+'</span>'}).join('')+'</div>';
@@ -1604,17 +1613,17 @@ function dfLineX(k){var g=S.page,i=termItem();if(!g||!i)return;
 function dfSave(){var g=S.page,pd=g.pend;if(!pd)return;var k=pd.k,a={};
  if(k=='nl'){g.nlp=termRound(+pd.to);g.pend=null;termRender();dfBuySheet('limit');return}
  if(k=='sl'||k=='tp'){a.op='protect';a[k]=pd.to}else if(k.charAt(0)=='o'){a.op='modify';a.order_id=+k.slice(1);a.limit=pd.to}else{g.pend=null;termRender();return}dfDo(a)}
-function dfIn(id,ph,val){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px">'}
+function dfIn(id,ph,val,at){return'<input id="'+id+'" inputmode="decimal" placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'"'+(at||'')+' style="width:100%;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 13px;outline:none;margin-bottom:8px">'+(at?PH:'')}
 function dfV(id){var e=document.getElementById(id);return e?num(e.value):null}
 function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mode||g.bm||'market';g.bm=mode;var av=+s.available||0,b0=String(i.symbol).replace(/USDT$/,''),mx=dfMaxBuy(s,b0);
  var ch=function(m,l){return'<span class="chip glass'+(mode==m?' on':'')+'" onclick="dfBuySheet(\''+m+'\')">'+esc(l)+'</span>'};
  sheetOpen('<h4>'+coinIc(i.symbol,20)+' BUY · '+esc(i.symbol)+'</h4><p>'+esc(t('df_free'))+': <b>'+f0(av)+'</b>'+(i.price!=null?' · '+fp(i.price):'')+'</p>'
   +'<div class="chips" style="margin-bottom:10px">'+ch('market',t('df_market'))+ch('limit',t('limit'))+'</div>'
-  +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),g.nlp?g.nlp:i.price!=null?termRound(i.price*.99):''):'')
+  +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),g.nlp?g.nlp:i.price!=null?termRound(i.price*.99):'',phA(i.price,0)):'')
   +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+' · '+esc(t('tv_max'))+': <b style="color:var(--ink)">$'+n2(mx)+'</b></div>'+dfIn('dfb_a','0','')
   +'<div class="chips" style="margin:-2px 0 6px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+(x==100?mx:Math.floor(mx*x)/100)+'">'+x+'%</span>'}).join('')+'</div>'
   +'<div class="rs" style="font-size:11px;margin:0 2px 10px">'+esc(t('df_lim_note',{s:b0,p:Math.round(dfLim(s,b0)*100)}))+'</div>'
-  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'')+dfIn('dfb_tp',t('df_tp_opt'),'')+'</div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'',phA(i.price,1,1,0,mode=='limit'?'dfb_l':''))+dfIn('dfb_tp',t('df_tp_opt'),'',phA(i.price,1,1,0,mode=='limit'?'dfb_l':''))+'</div>'
   +'<button class="btn p full" style="width:100%;margin-top:4px" onclick="dfBuy()">BUY '+esc(i.symbol)+'</button>')}
 function dfBuy(){var g=S.page,a={op:'buy',amount:dfV('dfb_a')};if(!a.amount){toast(esc(t('df_amount')));return}
  if(g.bm=='limit'){a.limit=dfV('dfb_l');if(!a.limit){toast(esc(t('df_limit_p')));return}}var sl=dfV('dfb_sl'),tp=dfV('dfb_tp');if(sl)a.sl=sl;if(tp)a.tp=tp;dfDo(a,sheetClose)}
@@ -1671,7 +1680,7 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span></div>'
+ if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
  else if(s&&s.id==g.df.acc&&s.tradable&&i.price){var ab=function(k,l,c){return'<button class="btn" style="margin:0;color:'+c+'" onclick="cxAdd(\''+k+'\')">+ '+l+'</button>'};
   h+='<div class="mcb" style="margin-top:10px">'+(i.pos&&i.pos.tp==null?ab('tp','TP','#c2f23a'):'')+(i.pos&&i.pos.sl==null?ab('sl','SL','#ff5c5c'):'')+ab('nl','Limit','#4ea1ff')+'</div>'}
@@ -1691,11 +1700,14 @@ function nsSeg(id,opts,cur,fn){var k=Math.max(0,opts.map(function(o){return o[0]
 function nsKeep(){var g=function(i){var e=document.getElementById(i);return e?e.value:undefined};['sym','entry','sl','tps','amount'].forEach(function(k){var v=g('ns_'+k);if(v!==undefined)NS[k]=v});var w=document.getElementById('ns_ws');if(w)NS.ws=+w.value}
 function nsPick(){nsKeep();var kind=NS.kind=='fut'?'fut':'spot',o={title:t('pp_choose'),list:(S.pairs[kind]||{}).p||[],loading:true,typed:true,pick:function(s){nsKeep();NS.sym=s;nsRender()}};pairPick(o);
  pairsGet(kind).then(function(p){o.list=p;o.loading=false;if(S.pp===o)ppList()}).catch(function(){o.loading=false;if(S.pp===o)ppList()})}
+document.addEventListener('input',function(e){if(e.target&&e.target.id=='ns_entry')phAll(document.getElementById('page'))});
 function nsSet(k,v){nsKeep();NS[k]=v;tick();nsRender()}
+function nsPx(){var k=NS.kind=='fut'?'fut':'spot',L=(S.pairs[k]||{}).p||[],b=String(NS.sym||'').replace(/USDT$/,'');for(var j=0;j<L.length;j++)if(L[j][0]==b)return+L[j][1];return 0}
 function newSig(){tick();if(!S.ws.length)return;S.busyC={};NS.ws=NS.ws||S.cur;S.page={id:'ns'};nsRender();pageShow()}
 function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(function(x){return x.id==NS.ws})[0]||cur();
  var lb=function(t_){return'<div class="rs" style="margin:10px 2px 6px">'+esc(t_)+'</div>'};
- var fi=function(id,ph,val,mode){return'<input id="ns_'+id+'" '+(mode?'inputmode="'+mode+'" ':'')+'placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'" style="width:100%;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;outline:none">'};
+ var fi=function(id,ph,val,mode,at){return'<input id="ns_'+id+'" '+(mode?'inputmode="'+mode+'" ':'')+'placeholder="'+esc(ph)+'" value="'+esc(val==null?'':val)+'"'+(at||'')+' style="width:100%;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 14px;outline:none">'+(at?'<div class="ph" style="margin:5px 3px 0"></div>':'')};
+ var ndir=NS.kind=='fut'&&NS.side=='SHORT'?-1:1,nlev=NS.kind=='fut'?NS.lev:1,nref=NS.mode=='limit'?'ns_entry':'';
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av" style="color:var(--g)">'+ic('plus',22)+'</div><div><h2>'+esc(t('ns_title'))+'</h2><div class="rs">'+esc(wsName(w))+'</div></div></div>';
  if(S.ws.length>1)h+=lb(t('ns_where'))+'<select id="ns_ws" onchange="nsSet(\'ws\',+this.value)" style="width:100%;font-size:15px;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px">'+S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==w.id?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('')+'</select>';
  h+=lb(t('ns_pair'))+'<input type="hidden" id="ns_sym" value="'+esc(NS.sym||'')+'"><div onclick="nsPick()" style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:17px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px 14px">'
@@ -1704,19 +1716,51 @@ function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(func
  if(NS.kind=='fut'){h+=lb(t('ns_lev'))+'<div class="chips" style="flex-wrap:wrap">'+[5,10,20,25,30,40,50,90,100].map(function(l){return'<span class="chip glass'+(NS.lev==l?' on':'')+'" onclick="nsSet(\'lev\','+l+')">'+l+'x</span>'}).join('')+'</div>';
   h+=lb(t('ns_side'))+nsSeg('sd',[['LONG','LONG'],['SHORT','SHORT']],NS.side,'nsSide')}
  h+=lb(t('ns_entry_mode'))+nsSeg('m',[['market',t('ns_market')],['limit',t('ns_limit')]],NS.mode,'nsMode');
- if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal');
+ if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal',phA(0,0,1,0,'','ns'));
  NS.tf=NS.tf||'1h';h+=lb(t('ns_tf'))+'<div class="chips" style="flex-wrap:wrap">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(NS.tf==x?' on':'')+'" onclick="nsSet(\'tf\',\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
- h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal')+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal');
+ h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal',phA(0,ndir,nlev,0,nref,'ns'))+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal',phA(0,ndir,nlev,1,nref,'ns'));
  var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount'))+fi('amount','',NS.amount,'decimal')+'<div style="height:6px"></div>'+freeLine(w,NS.kind=='fut');
- h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('ns_send'))+'</button>';
- p.innerHTML=h}
+ h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('nsp_check'))+' ›</button>';
+ p.innerHTML=h;phAll(p);if(NS.sym&&!nsPx())pairsGet(NS.kind=='fut'?'fut':'spot').then(function(){if(S.page&&S.page.id=='ns')phAll(document.getElementById('page'))}).catch(function(){})}
 function nsKind(k){nsSet('kind',k)}function nsSide(k){nsSet('side',k)}function nsMode(k){nsSet('mode',k)}
-function nsSend(){nsKeep();var b=document.getElementById('ns_go');
- var sl=num(NS.sl),tps=nums(NS.tps);if(!NS.sym||!sl||!tps.length||(NS.mode=='limit'&&!num(NS.entry))){haptic('error');toast(esc(t('man_fill')));return}
- b.disabled=true;toast(esc(t('wait')));
- api('act',{action:'newsig',args:{ws:NS.ws||S.cur,sym:NS.sym,kind:NS.kind,lev:NS.lev,side:NS.kind=='fut'?NS.side:'LONG',mode:NS.mode,tf:NS.tf||'1h',entry:num(NS.entry),sl:sl,tps:tps,amount:num(NS.amount)}})
- .then(function(r){b.disabled=false;if(r.pending){toast(esc(t('slow')));return}toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
-  if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';S.cur=NS.ws||S.cur;closeGroup();S.tab='home';go('signals');load()}}).catch(function(){b.disabled=false;toast('Error')})}
+function nsArgs(){var sl=num(NS.sl),tps=nums(NS.tps);return{ws:NS.ws||S.cur,sym:NS.sym,kind:NS.kind,lev:NS.lev,side:NS.kind=='fut'?NS.side:'LONG',mode:NS.mode,tf:NS.tf||'1h',entry:num(NS.entry),sl:sl,tps:tps,amount:num(NS.amount)}}
+/* 369: botdagidek — avval TEKSHIRISH (bot bir xil tekshiruvdan o'tkazadi, post qilmaydi), keyin "Yuborish" */
+function nsSend(){nsKeep();var b=document.getElementById('ns_go'),A=nsArgs();
+ if(!NS.sym||!A.sl||!A.tps.length||(NS.mode=='limit'&&!A.entry)){haptic('error');toast(esc(t('man_fill')));return}
+ b.disabled=true;toast(esc(t('wait')));A.dry=1;
+ api('act',{action:'newsig',args:A}).then(function(r){b.disabled=false;if(r.pending){toast(esc(t('slow')));return}
+  var d=null;try{d=JSON.parse(r.msg)}catch(e){}if(!r.ok||!d){haptic('error');toast(esc(noEmoji(String(r.msg||'Error').replace(/<[^>]+>/g,''))));return}
+  delete A.dry;NS.args=A;NS.prev=d;nsPrev()}).catch(function(){b.disabled=false;toast('Error')})}
+function nsPrev(){var d=NS.prev,p=document.getElementById('page');if(!d||!p)return;var lg=d.side=='LONG',dir=lg?1:-1,lev=d.lev||1,e=+d.entry,risk=Math.abs(e-d.sl);
+ var row=function(l,v,c){return'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06)"><span class="rs" style="margin:0">'+l+'</span><span style="text-align:right"><b class="'+(c||'')+'">'+v+'</b></span></div>'};
+ var sm=function(x){return' <span style="font-weight:500;font-size:12px">'+x+'</span>'};
+ var h='<div class="ghd"><div class="bk glass" onclick="nsRender()">'+ic('back',18)+'</div><div class="av">'+coinIc(d.sym,30)+'</div><div><h2>'+esc(t('nsp_title'))+'</h2><div class="rs">'+esc(d.ws)+'</div></div></div>';
+ h+='<div class="eq glass" style="padding:8px 6px"><div style="display:flex;align-items:center;gap:8px;margin:2px 6px 8px"><b style="font-size:17px">'+esc(d.sym)+'</b><span class="b '+(lg?'bl':'bs')+'">'+d.side+'</span>'+(lev>1?'<span class="b bx">'+lev+'x</span>':'<span class="b bx">Spot</span>')+'<span class="rs" style="margin:0 0 0 auto">'+esc(d.tf)+'</span></div>'
+  +'<div id="nspc" style="height:250px;position:relative"></div></div>';
+ h+='<div class="eq glass" style="margin-top:10px;padding:6px 14px">'
+  +row(esc(t('ns_entry')),(d.mode=='market'?'Market ≈ ':'Limit ')+fp(e)+(d.mode=='limit'&&d.price?sm(pcH(e,d.price,0)):''))
+  +row('SL',fp(d.sl)+sm(pcH(d.sl,e,dir,lev)),'r');
+ d.tps.forEach(function(x,k){h+=row('TP'+(k+1),fp(x)+sm(pcH(x,e,dir,lev)+(risk?' · R:R '+(Math.abs(x-e)/risk).toFixed(2):'')),'g')});
+ var am=NS.args&&NS.args.amount;if(am){var rk=am*Math.abs(d.sl/e-1)*lev;h+=row(esc(t('ns_amount')),'$'+n2(am)+sm('<span class="r">'+esc(t('nsp_risk'))+' −$'+n2(rk)+'</span>'))}
+ h+='</div><div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:12px"><button class="btn" style="margin:0;padding:14px" onclick="nsRender()">✏️ '+esc(t('nsp_edit'))+'</button>'
+  +'<button class="btn p" id="nsp_go" style="margin:0;padding:14px;font-size:15px" onclick="nsPost()">✅ '+esc(t('ns_send'))+'</button></div><div class="endsp"></div>';
+ p.innerHTML=h;window.scrollTo(0,0);nspChart(d)}
+function nspChart(d){lwLoad(function(){var el=document.getElementById('nspc');if(!el||NS.prev!==d)return;try{if(NS.ch)NS.ch.remove()}catch(e){}
+ var ch=LightweightCharts.createChart(el,{autoSize:true,layout:{background:{type:'solid',color:'rgba(0,0,0,0)'},textColor:'rgba(200,205,194,.62)',fontSize:10},
+  grid:{vertLines:{color:'rgba(255,255,255,.035)'},horzLines:{color:'rgba(255,255,255,.035)'}},rightPriceScale:{borderColor:'rgba(255,255,255,.08)',scaleMargins:{top:.08,bottom:.06}},
+  timeScale:{borderColor:'rgba(255,255,255,.08)',timeVisible:true,rightOffset:4},crosshair:{mode:0},localization:{locale:'en-US'}});NS.ch=ch;
+ var L=[d.entry,d.sl].concat(d.tps);
+ var se=ch.addCandlestickSeries({upColor:'#c2f23a',downColor:'#ff5c5c',borderVisible:false,wickUpColor:'#c2f23a',wickDownColor:'#ff5c5c',
+  priceFormat:{type:'price',precision:lwPrec(d.entry),minMove:Math.pow(10,-lwPrec(d.entry))},
+  autoscaleInfoProvider:function(o){var r=o();if(!r||!r.priceRange)return{priceRange:{minValue:Math.min.apply(null,L),maxValue:Math.max.apply(null,L)}};
+   r.priceRange.minValue=Math.min(r.priceRange.minValue,Math.min.apply(null,L));r.priceRange.maxValue=Math.max(r.priceRange.maxValue,Math.max.apply(null,L));return r}});
+ var e=+d.entry,dir=d.side=='LONG'?1:-1,lev=d.lev||1,add=function(p,c,tl,st){se.createPriceLine({price:p,color:c,lineWidth:1,lineStyle:st||0,axisLabelVisible:true,title:tl})};
+ add(e,'rgba(255,255,255,.85)',t('ns_entry'),2);add(d.sl,'#ff5c5c','SL '+pcT(d.sl,e,dir,1));d.tps.forEach(function(x,k){add(x,'#c2f23a','TP'+(k+1)+' '+pcT(x,e,dir,1))});
+ api('dfcandles',{sym:d.sym.replace(/USDT$/,''),tf:d.tf}).then(function(r){if(NS.ch!==ch)return;var c=(r.c||[]).map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}});
+  if(!c.length){var now=Math.floor(Date.now()/1000);c=[{time:now,open:e,high:e,low:e,close:e}]}se.setData(c);var n=c.length;ch.timeScale().setVisibleLogicalRange({from:Math.max(0,n-60),to:n+4})}).catch(function(){})})}
+function nsPost(){var b=document.getElementById('nsp_go');if(!NS.args)return;if(b)b.disabled=true;toast(esc(t('wait')));
+ api('act',{action:'newsig',args:NS.args}).then(function(r){if(b)b.disabled=false;if(r.pending){toast(esc(t('slow')));return}toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
+  if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';NS.prev=NS.args=null;try{if(NS.ch)NS.ch.remove()}catch(e){}NS.ch=null;S.cur=NS.ws||S.cur;closeGroup();S.tab='home';go('signals');load()}}).catch(function(){if(b)b.disabled=false;toast('Error')})}
 
 /* ===== 258: taklif (referal) ===== */
 function openRef(){tick();S.page={id:'ref'};var p=document.getElementById('page');
@@ -1869,7 +1913,7 @@ function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
   var main=TABS;var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
 
 /* ---- pastdan chiqadigan oyna (yangi stop) ---- */
-function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show')}
+function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show');phAll(s)}
 function sheetClose(){document.getElementById('sheet').classList.remove('show');document.getElementById('shade').classList.remove('show')}
 (function(){var y0=null;var s=document.getElementById('sheet');
  s.addEventListener('touchstart',function(e){y0=e.touches[0].clientY},{passive:true});
@@ -1877,18 +1921,32 @@ function sheetClose(){document.getElementById('sheet').classList.remove('show');
  s.addEventListener('touchend',function(e){var d=e.changedTouches[0].clientY-(y0||0);s.style.transition='';s.style.transform='';y0=null;if(d>80)sheetClose()},{passive:true})})();
 function askStop(id){var i=S.items.filter(function(x){return x.id==id})[0];
  sheetOpen('<h4>'+esc(t('newstop'))+'</h4><p>'+esc(i.symbol)+' · '+esc(t('entry'))+' '+fp(i.entry)+' · '+esc(t('price'))+' '+fp(i.price)+'</p>'
- +'<input id="stopIn" inputmode="decimal" value="'+(i.sl!=null?i.sl:'')+'"><button class="btn p full" onclick="saveStop('+id+')">'+esc(t('save'))+'</button>');
+ +'<input id="stopIn" inputmode="decimal" value="'+(i.sl!=null?i.sl:'')+'"'+phA(i.entry,i.side=='LONG'?1:-1,i.lev)+'>'+PH+'<button class="btn p full" onclick="saveStop('+id+')">'+esc(t('save'))+'</button>');
  setTimeout(function(){var e=document.getElementById('stopIn');if(e){e.focus();e.select()}},350)}
 function saveStop(id){var p=parseFloat(String(document.getElementById('stopIn').value).replace(',','.'));if(!(p>0))return;sheetClose();act(id,'sl',p,true)}
 /* ---- 248: qolgan boshqaruv amallari (pastdan chiqadigan oyna) ---- */
+/* 369: TP/SL/limit kiritilganda foiz — pozitsiya ochiladigan hamma joyda. dir: 1 LONG, −1 SHORT (natija %), 0 — oddiy narx farqi */
+function pcF(v){return(v>=0?'+':'')+(Math.abs(v)<10?v.toFixed(2):v.toFixed(1))+'%'}
+function pcT(p,ref,dir,lev){if(!(p>0)||!(ref>0))return'';var r=(p/ref-1)*100;if(!dir)return pcF(r);r*=dir;return pcF(r)+(lev>1?' ('+lev+'x '+pcF(r*lev)+')':'')}
+function pcH(p,ref,dir,lev){if(!(p>0)||!(ref>0))return'';var r=(p/ref-1)*100;if(!dir)return'<b>'+pcF(r)+'</b> <span style="opacity:.6">'+esc(t('ph_px'))+'</span>';r*=dir;
+ return'<b class="'+(r>=0?'g':'r')+'">'+pcF(r)+'</b>'+(lev>1?' <span style="opacity:.65">· '+lev+'x '+pcF(r*lev)+'</span>':'')}
+var PHR={ns:function(){return nsPx()},tv:function(){return tvPx()},tvm:function(){var T=S.tv,b=T&&T.book;return b&&b.last?b.last:(T&&T.info?T.info.price:0)}};
+function ph(el){var o=el&&el.nextElementSibling;if(!o||!o.classList||!o.classList.contains('ph'))return;var d=el.dataset,ref=+(d.ref||0);
+ if(d.rk&&PHR[d.rk])ref=+PHR[d.rk]()||ref;if(d.refid){var e2=document.getElementById(d.refid),v2=e2&&num(e2.value);if(v2)ref=v2}
+ var ps=d.multi?nums(el.value):[num(el.value)].filter(function(x){return x});
+ o.innerHTML=ref>0&&ps.length?ps.map(function(p,k){return(ps.length>1?'<span style="opacity:.6">TP'+(k+1)+'</span> ':'')+pcH(p,ref,+d.dir||0,+d.lev||1)}).join(' · '):''}
+function phAll(r){(r||document).querySelectorAll('input[data-ref]').forEach(ph)}
+function phA(ref,dir,lev,multi,refid,rk){return' data-ref="'+(+ref||0)+'" data-dir="'+(dir||0)+'" data-lev="'+(lev||1)+'"'+(multi?' data-multi="1"':'')+(refid?' data-refid="'+refid+'"':'')+(rk?' data-rk="'+rk+'"':'')+' oninput="ph(this)"'}
+var PH='<div class="ph"></div>';
 function itm(id){return S.items.filter(function(x){return x.id==id})[0]}
 function num(v){v=parseFloat(String(v||'').replace(',','.'));return v>0?v:null}
 function nums(v){return String(v||'').replace(/,/g,' ').split(/[\s;]+/).map(num).filter(function(x){return x})}
-function inp(id,lbl,val,ph){return'<div class="rs" style="margin:2px 2px 6px">'+esc(lbl)+'</div><input id="'+id+'" inputmode="decimal" value="'+(val==null?'':esc(val))+'" placeholder="'+esc(ph||'')+'">'}
+function inp(id,lbl,val,ph,at){return'<div class="rs" style="margin:2px 2px 6px">'+esc(lbl)+'</div><input id="'+id+'" inputmode="decimal" value="'+(val==null?'':esc(val))+'" placeholder="'+esc(ph||'')+'"'+(at||'')+'>'+(at?PH:'')}
+function idr(i){return i.side=='LONG'?1:-1}
 function sub(i){return esc(i.symbol)+' · '+esc(t('entry'))+' '+fp(i.entry)+' · '+esc(t('price'))+' '+fp(i.price)}
-function askTps(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tps_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('tps_hint'),i.tps.join(' '))+'<button class="btn p full" onclick="var v=nums(document.getElementById(\'f1\').value);if(!v.length)return;sheetClose();act('+id+',\'tps\',null,true,v)">'+esc(t('save'))+'</button>')}
-function askEntry(id){var i=itm(id);sheetOpen('<h4>'+esc(t('entry_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('entry'),i.entry)+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'entry\',v,true)">'+esc(t('save'))+'</button>')}
-function askTpsl(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tpsl_btn'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('sl_l'),'')+inp('f2',t('tps_hint'),'')+'<button class="btn p full" onclick="var s=num(document.getElementById(\'f1\').value),v=nums(document.getElementById(\'f2\').value);if(!s||!v.length)return;sheetClose();act('+id+',\'tpsl\',null,true,{sl:s,tps:v})">'+esc(t('save'))+'</button>')}
+function askTps(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tps_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('tps_hint'),i.tps.join(' '),'',phA(i.entry,idr(i),i.lev,1))+'<button class="btn p full" onclick="var v=nums(document.getElementById(\'f1\').value);if(!v.length)return;sheetClose();act('+id+',\'tps\',null,true,v)">'+esc(t('save'))+'</button>')}
+function askEntry(id){var i=itm(id);sheetOpen('<h4>'+esc(t('entry_title'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('entry'),i.entry,'',phA(i.price,0))+'<button class="btn p full" onclick="var v=num(document.getElementById(\'f1\').value);if(!v)return;sheetClose();act('+id+',\'entry\',v,true)">'+esc(t('save'))+'</button>')}
+function askTpsl(id){var i=itm(id);sheetOpen('<h4>'+esc(t('tpsl_btn'))+'</h4><p>'+sub(i)+'</p>'+inp('f1',t('sl_l'),'','',phA(i.entry,idr(i),i.lev))+inp('f2',t('tps_hint'),'','',phA(i.entry,idr(i),i.lev,1))+'<button class="btn p full" onclick="var s=num(document.getElementById(\'f1\').value),v=nums(document.getElementById(\'f2\').value);if(!s||!v.length)return;sheetClose();act('+id+',\'tpsl\',null,true,{sl:s,tps:v})">'+esc(t('save'))+'</button>')}
 /* 361: summa so'ralganda bo'sh summa (depozit − ochiq pozitsiyalarda band), botdagidek */
 function wsBusy(wid,fut){var w=cur(),L=(w&&w.id==wid&&w.type!='cex')?S.items:(S.busyC||{})[wid];
  if(!L){S.busyC=S.busyC||{};if(!S.busyQ){S.busyQ=1;api('open',{ws:wid}).then(function(d){S.busyC[wid]=d.items||[];S.busyQ=0;if(S.page&&S.page.id=='ns'){nsKeep();nsRender()}}).catch(function(){S.busyQ=0})}return null}
@@ -1901,7 +1959,7 @@ var ADDM='now';
 function askAdd(id,m){var i=itm(id);ADDM=m||ADDM;var usd=i.usd;
  sheetOpen('<h4>'+esc(t('add_title'))+'</h4><p>'+sub(i)+'</p>'
  +'<div class="seg glass" style="margin-bottom:12px"><div class="si" style="width:calc((100% - 8px)/2);transform:translateX('+(ADDM=='lim'?100:0)+'%)"></div><a class="'+(ADDM=='now'?'on':'')+'" onclick="askAdd('+id+',\'now\')">'+esc(t('now'))+'</a><a class="'+(ADDM=='lim'?'on':'')+'" onclick="askAdd('+id+',\'lim\')">'+esc(t('lim'))+'</a></div>'
- +(ADDM=='lim'?inp('f2',t('prices'),'',i.side=='LONG'?'< '+fp(i.price):'> '+fp(i.price)):'')
+ +(ADDM=='lim'?inp('f2',t('prices'),'',i.side=='LONG'?'< '+fp(i.price):'> '+fp(i.price),phA(i.price,0,1,1)):'')
  +inp('f1',usd?t('size_usd'):t('size_x'),usd?Math.round(i.alloc||0):1)+(usd?freeLine(cur(),i.lev>1):'')
  +'<button class="btn p full" onclick="saveAdd('+id+')">'+esc(t('save'))+'</button>')}
 function saveAdd(id){var v=num(document.getElementById('f1').value);if(!v)return;

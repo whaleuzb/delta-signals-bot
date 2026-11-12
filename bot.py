@@ -911,6 +911,13 @@ async def _app_newsig(ctx, uid: int, lang, a) -> tuple[bool, str]:
         return False, err
     # 281: taymfreym ilovada tanlanadi (sehrgardagi kabi), standart 1h.
     tf = f.get("tf") if f.get("tf") in TF_CHOICES else "1h"
+    # 369: "Tekshirish" — botdagi kabi: avval qoralama ko'rsatiladi, keyin "Yuborish" bilan e'lon.
+    # Bu yerda faqat tekshiruvdan o'tgan, normallangan qiymatlar qaytadi — hech narsa post qilinmaydi.
+    if f.get("dry"):
+        price = await safe_last_price(market, sym)
+        return True, json.dumps({"sym": sym, "side": side, "entry": entry, "sl": sl, "tps": tps, "lev": lev,
+                                 "mode": mode, "market": market, "tf": tf, "ws": ws["name"],
+                                 "price": float(price) if price else None})
     # Guruh posti uchun bot grafigi (sehrgardagi "📈 Bot grafikni aniqlasin").
     photo = None
     try:
