@@ -8269,3 +8269,11 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Paritet istisnosi: aksiyalar faqat Binance'da bor (boshqa birjalarda bunday API yo'q) — parity qoidasi bu bo'limga taalluqli emas. Bybit/Bitget'dagi aksiya perp'lari oddiy futures juftligi sifatida mavjud oqim orqali ishlaydi.
 - Real kalit bilan tekshirilmagan; Binance Stocks faqat ruxsat etilgan mamlakatlar foydalanuvchilari uchun (AQSh rezidentlari emas).
 - Sinov: `test_370.py` 20/20 (so'rov shakllari, kasr/min, portfel hisobi, disclaimer, mint/redeem, boshqa birja rad), brauzer `t_stk.py` (seg, buy market/limit, kotirovka yangilanishi, tanlash, mint, Spot'ga qaytish).
+
+## 371. Ilova navigatsiyasi — tartibli tarix (stack), «Orqaga» bitta oldingi sahifaga qaytaradi
+- Foydalanuvchi: "harqanday sahifadan ortga tugmasini bosganimda dip bo'limiga o'tib qolyabti. Sahifalar ketma-ketligini tartibli saqlaydigan qil, ortga qaytganda bitta avvalgi sahifaga qaytsin."
+- Avval: Telegram BackButton faqat ochiq sahifani (`#page`) yopardi, bo'limlar orasidagi o'tish tarixi yo'q edi.
+- Endi (`webapp.html`): `S.nh` — holatlar stack'i `{tab, cur, re, key, y}` (40 tagacha). `navPush()` har bir o'tishdan oldin chaqiriladi: `go(tab)` (`go(tab,1)` — yozmasdan), workspace/birja tanlovi (`wsSel`), `pickWs`/`cexGoWs`/`dfGo` va barcha sahifa ochuvchilar (`openGroup, cxTerm, cxStats, openTerm, dfTrades, dfTerm, newSig, openRef`) — `navWrap` ularni o'raydi va qayta ochish funksiyasini (`S.pageRe`) eslab qoladi; bir tick ichidagi ikkinchi push e'tiborsiz (`NAVT`).
+- `navBack()` (BackButton'ga init'da BIR marta ulanadi): ochiq sheet bo'lsa — avval uni yopadi; aks holda stack'dan bittasini olib bo'lim/workspace/sahifani (oldingi sahifa bo'lsa — qayta ochib) tiklaydi, scroll joyi ham qaytadi. `backSync()` tugmani ko'rsatadi/yashiradi (tarix, sahifa yoki sheet bo'lsa — ko'rinadi; aks holda Telegram X).
+- `closeGroup()` = sahifadagi ‹ tugmasi → `navBack`. Faqat yashirish kerak bo'lsa — `pageHide()` (signal yuborilgandan keyin, terminal → Savdo limit, `dfGo`).
+- Sinov: brauzer `t_nav.py` (signals → top → dip → referal → orqaga ×3; home → statistika → terminal → sheet → ‹ → orqaga ×3), `t_cxc.py`, `t_369.py`, `t_stk.py`.

@@ -408,7 +408,7 @@ function nav(){var tabs=[['home','home'],['wallet','xchg'],['signals','trend'],[
  var ind=document.getElementById('ind');if(!on||on.dataset.t=='dip'){ind.style.opacity=0;return}
  ind.style.opacity=1;ind.style.width=on.offsetWidth+'px';ind.style.transform='translateX('+(on.offsetLeft-5)+'px)'}
 function dipCoinFace(){return'<svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="display:block"><g transform="translate(20 20) scale(.058) translate(-553 -552)"><path fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-width="10" stroke-linejoin="round" d="M553 244 803 733H304ZM521 397Q538 368 555 397L689 662Q703 693 672 693H399Q368 693 382 662Z"/></g></svg>'}
-function go(tab){if(tab==S.tab)return;
+function go(tab,nb){if(tab==S.tab)return;if(!nb)navPush();
   if(tab=='dip'){S.dtop=null;S.etask=null}
   var nv=document.getElementById('nav');if(nv)nv.classList.remove('hid');
   S.dir=TABS.indexOf(tab)>TABS.indexOf(S.tab)?'in-r':'in-l';S.tab=tab;S.anim=true;tick();render();window.scrollTo({top:0})}
@@ -419,7 +419,7 @@ function pill(){var w=cur();var el=document.getElementById('wsPill');
  var opts=S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('');
  if(CX.length)opts+='<optgroup label="'+esc(t('wallet'))+'">'+CX.map(function(a){return'<option value="cx:'+esc(a.ex)+'"'+(S.cur=='cx:'+a.ex?' selected':'')+'>'+esc(cexMeta(a.ex)[1])+(a.err?'':' · $'+n2(a.total||0))+'</option>'}).join('')+'</optgroup>';
  el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1||CX.length?ic('chev',14)+'<select id="wsSel">'+opts+'</select>':'');
- el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){var v=s.value;
+ el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){var v=s.value;navPush();
   /* 333: birja tanlansa — butun ilova (Bosh, Signallar/pozitsiyalar, terminal, statistika) shu birja konteksiga o'tadi */
   if(v.indexOf('cx:')==0){S.cur=v;S.anim=true;S.items=[];S.spark={};S.slide=0;try{localStorage.setItem('tc_ws',v)}catch(e){}if(S.tab=='wallet')S.tab='home';tick();render();load();return}
   S.cur=+v;S.anim=true;S.items=[];S.spark={};try{localStorage.setItem('tc_ws',S.cur)}catch(e){}load()}}
@@ -798,7 +798,7 @@ function cxLines(i,g){var can=cxCan(g),L=dfLines(i,g),om={};i.orders.forEach(fun
  if(g.pend&&!L.some(function(l){return l.k==g.pend.k})){var k=g.pend.k;L.push({k:k,p:g.pend.to,c:k=='sl'?'#ff5c5c':k=='tp'?'#c2f23a':'#4ea1ff',lb:g.pend.lb,dr:true,x:1})}
  if(i.pos&&i.pos.liq)L.push({k:'liq',p:+i.pos.liq,c:'#ff9f43',lb:'LIQ',dr:false,ns:true});return L}
 function cxSave(){var g=S.page,i=termItem(),pd=g.pend;if(!pd||!i)return;
- if(pd.k=='nl'){var px=termRound(+pd.to),mk=g.cx.mkt,sy=i.symbol,lp=i.price;closeGroup();var T=tvS();T.mkt=mk;T.sym=sy;T.type='limit';T.info=null;T.book=null;T.price=String(px);T.amt='';T.total='';T.pct=0;T.side=lp&&px<lp?'buy':'sell';T.tab=mk=='fut'?'pos':'orders';
+ if(pd.k=='nl'){var px=termRound(+pd.to),mk=g.cx.mkt,sy=i.symbol,lp=i.price;navPush();pageHide();var T=tvS();T.mkt=mk;T.sym=sy;T.type='limit';T.info=null;T.book=null;T.price=String(px);T.amt='';T.total='';T.pct=0;T.side=lp&&px<lp?'buy':'sell';T.tab=mk=='fut'?'pos':'orders';
   if(S.tab!='signals')go('signals');else render();toast(esc(t('cx_nl_go')));return}
  if(pd.k.charAt(0)=='o'){var oid=pd.k.slice(1);toast(esc(t('wait')));
   api('cextrade',{ex:g.cx.ex,op:g.cx.mkt=='spot'?'spot_modify':'fut_modify',a:{sym:i.symbol,id:oid,price:termRound(+pd.to)}}).then(function(d){
@@ -1401,9 +1401,31 @@ setInterval(function(){document.querySelectorAll('[data-cd]').forEach(function(e
 
 /* guruh sahifasi — o'ngdan chiqadigan oyna, Telegram "Orqaga" bilan yopiladi */
 function openGroup(id){tick();S.page={id:id,kind:'spot',mon:null,data:null};pageRender();var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');
- try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}
+ backSync();
  api('group',{id:id,lang:S.lang}).then(function(d){if(!S.page||S.page.id!=id)return;S.page.data=d;pageRender(true);loadPer()}).catch(function(){var p=document.getElementById('page');p.innerHTML=pageHead(null)+'<div class="empty glass">'+esc(t('not_public'))+'</div>'})}
-function closeGroup(){document.getElementById('page').classList.remove('show');S.page=null;saveNav();try{tg.BackButton.offClick(closeGroup);tg.BackButton.hide()}catch(e){}}
+function pageHide(){document.getElementById('page').classList.remove('show');S.page=null;S.pageRe=null;S.pageKey=null;saveNav();backSync()}
+function closeGroup(){if(S.page&&S.nh.length)navBack(1);else pageHide()}
+/* 371: ilova ichidagi navigatsiya tarixi (stack). Har bir o'tish (bo'lim, workspace/birja, sahifa) oldidan joriy holat
+   saqlanadi; Telegram «Orqaga» tugmasi (va sahifadagi ‹) faqat BITTA oldingi holatga qaytaradi — oldingi sahifa bo'lsa
+   o'sha sahifa qayta ochiladi. Ochiq oyna (sheet) bo'lsa — avval u yopiladi. Tarix bo'sh va sahifa yo'q — tugma yashirinadi (X). */
+S.nh=[];var NAVT=0;
+function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);
+ S.nh.push({tab:S.tab,cur:S.cur,re:S.page?S.pageRe:null,key:S.page?S.pageKey:null,y:S.page?0:window.scrollY});if(S.nh.length>40)S.nh.shift();backSync()}
+function backSync(){try{var on=S.nh.length||S.page||document.getElementById('sheet').classList.contains('show');if(on)tg.BackButton.show();else tg.BackButton.hide()}catch(e){}}
+function navBack(fromPage){if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
+ var e=S.nh.pop();if(!e){if(S.page)pageHide();backSync();return}
+ NAVT=1;setTimeout(function(){NAVT=0},0);tick();
+ if(S.page)pageHide();
+ var rr=false;if(e.cur!=null&&e.cur!=S.cur){S.cur=e.cur;S.items=[];S.spark={};S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(x){}rr=true}
+ if(e.tab!=S.tab){S.dir='in-l';S.tab=e.tab;S.anim=true;rr=true}
+ if(rr){var nv=document.getElementById('nav');if(nv)nv.classList.remove('hid');render();if(e.cur!=null)load()}
+ if(e.re){e.re();S.pageRe=e.re;S.pageKey=e.key}else setTimeout(function(){window.scrollTo({top:e.y||0})},rr?60:0);
+ backSync()}
+/* sahifa ochuvchilar: chaqirilganda tarixga yoziladi va qayta ochish uchun eslab qolinadi */
+function navWrap(names,page){names.forEach(function(n){var f=window[n];if(typeof f!='function')return;
+ window[n]=function(){var a=Array.prototype.slice.call(arguments),k=n+':'+JSON.stringify(a);
+  if(!(page&&S.page&&S.pageKey==k))navPush();var r=f.apply(this,a);
+  if(page&&S.page){S.pageRe=function(){f.apply(null,a)};S.pageKey=k}backSync();return r}})}
 function pageHead(d){return'<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div>'+(d?logoHtml(d.id,d.logo,d.name)+'<div style="min-width:0"><h2>'+esc(d.name)+'</h2><div class="rs">'+esc(d.channel?t('channel'):t('group'))+'</div></div>':'')+'</div>'}
 function curve(pts){if(!pts||pts.length<2)return'';var W=300,H=120,n=pts.length,a=[0].concat(pts);n=a.length;var mn=Math.min.apply(null,a),mx=Math.max.apply(null,a);if(mx==mn)mx=mn+1;
  var X=function(k){return k/(n-1)*W},Y=function(v){return H-(v-mn)/(mx-mn)*H};var up=a[n-1]>=0;var c=up?'#c2f23a':'#ff5c5c';
@@ -1481,7 +1503,7 @@ function dfCall(a,arg){return api('act',{action:a,arg:arg}).then(function(r){var
 function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(back?'openDf(1)':'closeGroup()')+'">'+ic('back',18)+'</div><div class="av">'+dfLogo(24)+'</div><div><h2>Dip Funded</h2><div class="rs">'+esc(t('df_accs'))+'</div></div></div>'}
 function dfErr(d){var c=d&&d.code;if(c=='not_linked'||c=='profile')return'<div class="empty glass rise">'+ic('link',36)+'<div style="margin:8px 0 14px">'+esc(t('df_nolink'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button></div>';
  return'<div class="empty glass rise">'+esc(t('df_unav'))+'</div>'}
-function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');try{tg.BackButton.show();tg.BackButton.onClick(closeGroup)}catch(e){}}
+function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');backSync()}
 function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col=u>=80?'var(--r)':u>=50?'#e8e8ea':'var(--g)';
  return'<div style="margin:8px 0"><div class="rs" style="display:flex;justify-content:space-between"><span>'+esc(lbl)+'</span><span>'+txt+'</span></div><div class="bar" style="margin-top:6px"><i style="left:0;width:'+u+'%;background:'+col+'"></i></div></div>'}
 /* ===== 346: Dip Funded — birjalar qatorida (kontekst `cx:dipfunded`): ulash/uzish, hisob almashtirish,
@@ -1508,7 +1530,7 @@ function dfxAfter(){var w=cur(),g=S.page;if(typeof S.cur=='string'&&S.cur=='cx:d
 function dfSwitch(id){if(!S.dfx||id==S.dfx.cur)return;S.dfx.cur=id;S.dfs=null;try{localStorage.setItem('tc_dfacc',id)}catch(e){}
  if(S.cxst)S.cxst.dipfunded=null;if(S.tv&&S.tv.ex=='dipfunded')S.tv=null;haptic('success');tick();render();dfOneLoad()}
 /* Dip Funded'ga o'tish (eski openDf/dfAcc o'rnida — reklama kartasi, bot menyusi ?df=1) */
-function dfGo(acc){if(S.page)closeGroup();if(!S.dflink){openLink(S.df||'https://dipfunded.com');return}
+function dfGo(acc){if(S.page)pageHide();if(!S.dflink){openLink(S.df||'https://dipfunded.com');return}
  if(S.dfoff){dfConnect();return}var x=S.dfx;
  if(x&&(x.err=='not_linked'||x.err=='profile')){dfLinkSheet();return}
  if(acc&&x&&x.cur!=acc){x.cur=acc;S.dfs=null;try{localStorage.setItem('tc_dfacc',acc)}catch(e){}}
@@ -1830,7 +1852,7 @@ function nspChart(d){lwLoad(function(){var el=document.getElementById('nspc');if
   if(!c.length){var now=Math.floor(Date.now()/1000);c=[{time:now,open:e,high:e,low:e,close:e}]}se.setData(c);var n=c.length;ch.timeScale().setVisibleLogicalRange({from:Math.max(0,n-60),to:n+4})}).catch(function(){})})}
 function nsPost(){var b=document.getElementById('nsp_go');if(!NS.args)return;if(b)b.disabled=true;toast(esc(t('wait')));
  api('act',{action:'newsig',args:NS.args}).then(function(r){if(b)b.disabled=false;if(r.pending){toast(esc(t('slow')));return}toast(esc(noEmoji(String(r.msg||'').replace(/<[^>]+>/g,''))));haptic(r.ok?'success':'error');
-  if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';NS.prev=NS.args=null;try{if(NS.ch)NS.ch.remove()}catch(e){}NS.ch=null;S.cur=NS.ws||S.cur;closeGroup();S.tab='home';go('signals');load()}}).catch(function(){if(b)b.disabled=false;toast('Error')})}
+  if(r.ok){NS.sym=NS.sl=NS.tps=NS.entry=NS.amount='';NS.prev=NS.args=null;try{if(NS.ch)NS.ch.remove()}catch(e){}NS.ch=null;S.cur=NS.ws||S.cur;pageHide();S.tab='home';go('signals',1);load()}}).catch(function(){if(b)b.disabled=false;toast('Error')})}
 
 /* ===== 258: taklif (referal) ===== */
 function openRef(){tick();S.page={id:'ref'};var p=document.getElementById('page');
@@ -1983,8 +2005,8 @@ function setF(f){if(f==S.filter)return;S.filter=f;S.anim=true;tick();render()}
   var main=TABS;var k=main.indexOf(S.tab);if(k<0)return;var n=k+(dx<0?1:-1);if(n<0||n>=main.length)return;go(main[n])},{passive:true})})();
 
 /* ---- pastdan chiqadigan oyna (yangi stop) ---- */
-function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show');phAll(s)}
-function sheetClose(){document.getElementById('sheet').classList.remove('show');document.getElementById('shade').classList.remove('show')}
+function sheetOpen(h){var s=document.getElementById('sheet');s.innerHTML='<div class="grab"></div>'+h;s.classList.add('show');document.getElementById('shade').classList.add('show');phAll(s);backSync()}
+function sheetClose(){document.getElementById('sheet').classList.remove('show');document.getElementById('shade').classList.remove('show');backSync()}
 (function(){var y0=null;var s=document.getElementById('sheet');
  s.addEventListener('touchstart',function(e){y0=e.touches[0].clientY},{passive:true});
  s.addEventListener('touchmove',function(e){if(y0==null)return;var d=e.touches[0].clientY-y0;if(d>0){s.style.transition='none';s.style.transform='translateY('+d+'px)'}},{passive:true});
@@ -2061,7 +2083,7 @@ document.addEventListener('pointerdown',function(e){var g=e.target.closest&&e.ta
  fx.style.setProperty('--mx',(e.clientX-r.left)+'px');fx.style.setProperty('--my',(e.clientY-r.top)+'px');fx.style.setProperty('--ts',Math.ceil(Math.max(r.width,r.height)/7));
  var w=document.createElement('span');w.className='tapw';w.appendChild(fx);
  g.appendChild(w);g.classList.add('tap');setTimeout(function(){w.remove();g.classList.remove('tap')},620)},{passive:true});
-addEventListener('pageshow',function(){try{tg&&tg.BackButton&&tg.BackButton.hide()}catch(e){}});
+addEventListener('pageshow',function(){backSync()});
 /* 273: yangi versiya chiqqan bo'lsa — qaytib kelganda o'zini yangilaydi (joyi saqlanadi, 267) */
 var VER='__VER__',verAt=0;
 function checkVer(){var n=Date.now();if(n-verAt<15000)return;verAt=n;
@@ -2069,8 +2091,9 @@ function checkVer(){var n=Date.now();if(n-verAt<15000)return;verAt=n;
 document.addEventListener('visibilitychange',function(){if(!document.hidden)checkVer()});
 try{tg&&tg.onEvent&&tg.onEvent('activated',checkVer)}catch(e){}
 setInterval(function(){if(!document.hidden)checkVer()},300000);
+navWrap(['openGroup','cxTerm','cxStats','openTerm','dfTrades','dfTerm','newSig','openRef'],1);navWrap(['dfGo','cexGoWs','pickWs'],0);
 (function init(){if(tg){try{tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#050506');tg.setBackgroundColor&&tg.setBackgroundColor('#050506');
- tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide()}catch(e){}
+ tg.disableVerticalSwipes&&tg.disableVerticalSwipes();try{tg.BackButton.hide();tg.BackButton.onClick(function(){navBack()})}catch(e){}
  var ins=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0)+(tg.safeAreaInset&&tg.safeAreaInset.top||0);document.documentElement.style.setProperty('--top',ins+'px');var bi=(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)+(tg.safeAreaInset&&tg.safeAreaInset.bottom||0);document.documentElement.style.setProperty('--bot',bi+'px')}catch(e){}}
  /* 252: Telegram tashqarisida (brauzer, to'lov boti) — ochiq rejim:
     Top, Turnir va guruh sahifalari; boshqaruv faqat Telegram ichida. */
