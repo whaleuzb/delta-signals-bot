@@ -8300,3 +8300,4 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Sabab: (1) Signallar ro'yxatidagi kartalarda (`sigCard`) tanga belgisi umuman yo'q edi; (2) `coinIc` faqat `static/coins/*.svg` (115 ta) — qolganlarida harf.
 - Tuzatish: `sigCard` sarlavhasida `coinIc(i.symbol,30)`. `static/coins/w3i.json.gz` — "@web3icons/core" 4.0.59 tokens/branded (MIT, 1789 ta, {TICKER: svg}, 1.7 MB); `webapp.COINS` = mahalliy ∪ w3i, `/coins/{c}.svg` avval mahalliy faylni, keyin w3i'ni beradi. `coinIc`: ro'yxatda yo'q bo'lsa `1000PEPE`/`1MBABYDOGE` kabi prefiks olib tashlanadi. Topilmasa — avvalgidek harf.
 - Sinov: brauzer (guruh signallari: btc/eth/sol/epic rasmlari yuklandi), `test_app`, `t_cxc`.
+- Qo'shimcha (foydalanuvchi: "chiqmadi"): logotip guruh sahifasining ochiq/yopilgan savdolari, Turnir ochiqlari va birja pozitsiya kartalariga ham qo'shildi (avval faqat terminal/Savdo/orderlarda edi). Brauzerda tekshirildi.
