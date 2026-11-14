@@ -8277,3 +8277,13 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `navBack()` (BackButton'ga init'da BIR marta ulanadi): ochiq sheet bo'lsa — avval uni yopadi; aks holda stack'dan bittasini olib bo'lim/workspace/sahifani (oldingi sahifa bo'lsa — qayta ochib) tiklaydi, scroll joyi ham qaytadi. `backSync()` tugmani ko'rsatadi/yashiradi (tarix, sahifa yoki sheet bo'lsa — ko'rinadi; aks holda Telegram X).
 - `closeGroup()` = sahifadagi ‹ tugmasi → `navBack`. Faqat yashirish kerak bo'lsa — `pageHide()` (signal yuborilgandan keyin, terminal → Savdo limit, `dfGo`).
 - Sinov: brauzer `t_nav.py` (signals → top → dip → referal → orqaga ×3; home → statistika → terminal → sheet → ‹ → orqaga ×3), `t_cxc.py`, `t_369.py`, `t_stk.py`.
+
+## 372. Signal va natija postlari — rich xabar, «🤖 Trade Controller orqali» matn ichidagi tugma
+- Foydalanuvchi (OnePC kanalidagi rich postni ko'rsatib): "pnl natijasi va signal yuborganda pastdagi Trade Controller orqali ni shunga o'zgartiraylik… yonida premium emoji ham tursin va shunday link".
+- Matn ichidagi tugma (`<tg-button>`) faqat Rich Messages'da bor (Bot API 10.1+, `sendRichMessage`). Guruh/kanal signal posti (yangi + nusxa) va natija posti `rich_send` orqali: `<img src="tg://photo?id=p1"/>` (file_id yoki `attach://` yangi rasm) + paragraflar (`rich_html`: bo'sh qator → `<p>`, qator → `<br>`, blockquote/pre bo'lsa — eski format) + oxirida `promo_button` (`style="primary"`, ichida `PROMO_EMOJI` premium emoji yoki 🤖, egasining referal havolasi). Pastdagi inline tugmalar (`reply_markup`) saqlanadi.
+- PTB 21.9 metodni bilmaydi → `bot.do_api_request("sendRichMessage")`; javob `Message.de_json`.
+- Xavfsizlik: `RICH_POSTS=1` (Railway, bot servisi) bo'lmasa o'chiq. Rich yuborilmasa → post ESKI formatda (rasm+caption, `promo_line` havolasi) ketadi; 3 ta ketma-ket xatodan keyin jarayon oxirigacha o'chadi. Natija postiga eski formatda ham `promo_line` qo'shildi.
+- Bu postlar keyin tahrirlanmaydi (hodisalar — alohida javoblar), shuning uchun faqat yuborish o'zgardi. News Trade (jonli grafik tahriri) — o'zgarmagan.
+- `/richtest` (super-admin): namunaviy signal postini rich formatda O'ZIGA yuboradi, xato bo'lsa Telegram javobini ko'rsatadi.
+- Eslatma: eski Telegram ilovalari rich xabarni ko'rsatmasligi mumkin — foydalanuvchiga aytilgan.
+- Sinov: `test_372.py` 16/16 (HTML konvertatsiya, tugma+premium emoji, sukutda o'chiq, so'rov shakli, attach multipart, style serializatsiya, xato → zaxira, 3 xatodan keyin o'chish).

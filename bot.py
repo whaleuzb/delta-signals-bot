@@ -23,7 +23,7 @@ from PIL import Image
 
 from telegram import (
     InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    InputFile, WebAppInfo, MenuButtonWebApp,
+    InputFile, WebAppInfo, MenuButtonWebApp, Message,
 )
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter, TimedOut
@@ -1947,6 +1947,91 @@ async def promo_line(bot, ws, body: str, limit: int = 4096) -> str:
     return line if visible <= limit else ""
 
 
+# ═══════════ 372: Rich xabar (Bot API 10.1+) — signal va natija postlari ═══════════
+# Foydalanuvchi: "pnl natijasi va signal yuborganda pastdagi «Trade Controller orqali»
+# ni shunday (matn ichidagi rangli tugma) qilaylik, yonida premium emoji ham tursin".
+# Matn ichidagi tugma (`<tg-button>`) FAQAT rich xabarda bor — shuning uchun guruh/kanal
+# signal posti va natija posti `sendRichMessage` bilan yuboriladi: rasm — `<img>` bloki,
+# matn — paragraflar, oxirida «🤖 Trade Controller orqali» ko'k tugma (premium emoji
+# ichida). PTB 21.9 bu metodni bilmaydi — `do_api_request`; yangi rasm `attach://`.
+# Xavfsizlik: `RICH_POSTS=1` bo'lmasa o'chiq (avval `/richtest` bilan ko'rib olinadi);
+# rich yuborilmasa — post ESKI formatda ketadi (`rich_send` None qaytaradi), 3 marta
+# ketma-ket xato bo'lsa jarayon oxirigacha o'chadi. Post keyin tahrirlanmaydi (hodisalar
+# — alohida javob xabarlari), shuning uchun faqat yuborish yetarli.
+RICH_POSTS = os.getenv("RICH_POSTS", "0").strip() == "1"
+_RICH_FAILS = 0
+
+
+async def promo_button(bot, ws) -> str:
+    """«🤖 Trade Controller orqali» — rich xabar uchun matn ichidagi tugma (HTML)."""
+    if ws["type"] != "group":
+        return ""
+    try:
+        _, url = await referral_token(ws["owner_id"], bot.username)
+    except Exception:
+        log.warning("Promo havola yasalmadi (ws=%s)", ws["id"], exc_info=True)
+        return ""
+    if not url:
+        return ""
+    label = html.escape(i18n.t("sig.promo", ws_lang(ws)))
+    icon = (f'<tg-emoji emoji-id="{PROMO_EMOJI}">🤖</tg-emoji>' if PROMO_EMOJI else "🤖")
+    return (f'<tg-button type="url" style="primary" url="{html.escape(url)}">'
+            f'{icon} {label}</tg-button>')
+
+
+def rich_html(body: str, tail: str = "") -> str | None:
+    """Oddiy Telegram HTML matnini rich HTML'ga: bo'sh qator — yangi paragraf, qator — <br>.
+    Blok teglar (blockquote/pre) bo'lsa — None (eski formatda yuborilsin)."""
+    if re.search(r"<(blockquote|pre)\b", body):
+        return None
+    paras = [p.strip("\n") for p in re.split(r"\n\s*\n", body.strip())]
+    out = "".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paras if p.strip())
+    if tail:
+        out += f"<p>{tail}</p>"
+    return out
+
+
+async def rich_send(bot, chat_id, body: str, tail: str = "", photo=None, *,
+                    thread_id=None, reply_markup=None, reply_to=None, force=False):
+    """Rich xabar yuboradi; muvaffaqiyatli bo'lsa Message, aks holda None (chaqiruvchi
+    eski usulda yuboradi). photo — file_id (str) yoki BytesIO."""
+    global _RICH_FAILS
+    if not force and (not RICH_POSTS or _RICH_FAILS >= 3):
+        return None
+    h = rich_html(body, tail)
+    if h is None:
+        return None
+    rm: dict = {"html": h, "skip_entity_detection": True}
+    kw: dict = {"chat_id": chat_id}
+    if photo is not None:
+        if isinstance(photo, str):
+            media = photo
+        else:
+            photo.seek(0)
+            f = InputFile(photo, "rich.png", attach=True)
+            kw["rich_photo"] = f
+            media = f.attach_uri
+        rm["html"] = '<img src="tg://photo?id=p1"/>' + h
+        rm["media"] = [{"id": "p1", "media": {"type": "photo", "media": media}}]
+    kw["rich_message"] = rm
+    if thread_id:
+        kw["message_thread_id"] = thread_id
+    if reply_markup is not None:
+        kw["reply_markup"] = reply_markup
+    if reply_to:
+        kw["reply_parameters"] = {"message_id": reply_to, "allow_sending_without_reply": True}
+    try:
+        r = await bot.do_api_request("sendRichMessage", api_kwargs=kw)
+        _RICH_FAILS = 0
+        return Message.de_json(r, bot) if isinstance(r, dict) else r
+    except Exception as ex:
+        _RICH_FAILS += 1
+        log.warning("Rich xabar yuborilmadi (%s, %s/3): %s — eski formatda", chat_id, _RICH_FAILS, ex)
+        if force:
+            raise
+        return None
+
+
 async def build_pnl_card(sig, ws, bot_username: str | None, ref_uid: int | None = None,
                          show_id: bool = True, bot=None):
     """Yopilgan savdo uchun ULASHISH kartasi (1080x1080).
@@ -2051,8 +2136,15 @@ async def send_close_result(ctx, ws, sig, txt: str, ref_uid: int | None = None) 
         kw["message_thread_id"] = thread_id
 
     msg = None
+    if ws["type"] == "group" and RICH_POSTS:          # 372: natija — rich, «Trade Controller orqali» tugmasi
+        msg = await rich_send(ctx.bot, chat_id, txt, await promo_button(ctx.bot, ws), single,
+                              thread_id=thread_id, reply_to=sig["group_msg_id"])
+    if msg is None and ws["type"] == "group":         # 372: eski formatda ham havola
+        txt += await promo_line(ctx.bot, ws, txt, 1024 if single else 4096)
     try:
-        if single:
+        if msg is not None:
+            pass
+        elif single:
             single.seek(0)
             msg = await ctx.bot.send_photo(chat_id, InputFile(single, "natija.png"),
                                             caption=txt, parse_mode=ParseMode.HTML, **kw)
@@ -5690,10 +5782,15 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
         body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
             ws, uid, username, first_name, ws_lang(ws))
         body = pub(ws, body)
+        rich = await rich_send(ctx.bot, ws["group_chat_id"], body, await promo_button(ctx.bot, ws),
+                               post_file_id or photo, thread_id=ws["group_topic_id"],
+                               reply_markup=_open_on_cex_kb(sig_id, d, ws_lang(ws))) if RICH_POSTS else None
         body += await promo_line(ctx.bot, ws, body, 1024 if (post_file_id or photo) else 4096)
         try:
             kb = _open_on_cex_kb(sig_id, d, ws_lang(ws))
-            if post_file_id or photo:
+            if rich is not None:                      # 372: rich xabar ketdi
+                sent = rich
+            elif post_file_id or photo:
                 sent = await ctx.bot.send_photo(
                     ws["group_chat_id"], post_file_id or InputFile(photo, "signal.png"), caption=body,
                     parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"], reply_markup=kb)
@@ -7060,9 +7157,13 @@ async def signal_copy_do(bot, uid: int, sig_id: int, target_id: int, lang):
              "market": sig["market"], "entry_mode": sig["entry_mode"]}
         body = draft_text(d, new_id, ws_lang(tgt))
         body = pub(tgt, body)
+        rich = await rich_send(bot, tgt["group_chat_id"], body, await promo_button(bot, tgt),
+                               sig["chart_file_id"], thread_id=tgt["group_topic_id"]) if RICH_POSTS else None
         body += await promo_line(bot, tgt, body, 1024 if sig["chart_file_id"] else 4096)
         try:
-            if sig["chart_file_id"]:
+            if rich is not None:                      # 372
+                sent = rich
+            elif sig["chart_file_id"]:
                 sent = await bot.send_photo(
                     tgt["group_chat_id"], sig["chart_file_id"], caption=body,
                     parse_mode=ParseMode.HTML,
@@ -11452,6 +11553,30 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                        sym=html.escape(sig["symbol"])))
 
 
+async def cmd_richtest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """372: /richtest — FAQAT super-admin. Namunaviy signal postini rich xabar sifatida
+    (rasm + matn + «🤖 Trade Controller orqali» tugmasi) O'ZIGA yuboradi; xato bo'lsa
+    Telegram javobini ko'rsatadi. Guruhlarda yoqish — Railway'da `RICH_POSTS=1`."""
+    uid = update.effective_user.id
+    if not is_admin(uid):
+        return
+    d = {"symbol": "BTCUSDT", "side": "LONG", "entry": 104200.0, "sl": 101500.0,
+         "tps": [106800.0, 109500.0], "market": "crypto", "entry_mode": "market", "leverage": 10}
+    ws = {"type": "group", "owner_id": uid, "id": 0, "lang": "uz", "name": "Test"}
+    body = draft_text(d, None, "uz")
+    img = Image.new("RGB", (1200, 630), (11, 11, 12))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    try:
+        await rich_send(ctx.bot, uid, body, await promo_button(ctx.bot, ws), buf, force=True,
+                        reply_markup=_open_on_cex_kb(0, d, "uz"))
+        await update.message.reply_text(
+            f"✅ Rich xabar yuborildi (premium emoji: {'bor' if PROMO_EMOJI else 'yo‘q — oddiy 🤖'}). "
+            f"Guruhlarda hozir: {'YOQIQ' if RICH_POSTS else 'o‘chiq (RICH_POSTS=1 kerak)'}.")
+    except Exception as ex:
+        await update.message.reply_text(f"❌ Rich xabar rad etildi: {ex}")
+
+
 async def cmd_charttest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """/charttest TLM (yoki TSLA, EURUSD) — FAQAT super-admin. News Trade AI
     jonli grafik mexanizmini (post + har necha soniyada qayta chizish)
@@ -12036,6 +12161,7 @@ def main() -> None:
     app.add_handler(CommandHandler("eski", cmd_eski))
     app.add_handler(CommandHandler("karta", cmd_karta))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
+    app.add_handler(CommandHandler("richtest", cmd_richtest))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))
     app.add_handler(CommandHandler("tg_password", cmd_tg_password))
