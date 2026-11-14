@@ -900,23 +900,106 @@ COINS = sorted(_COINS_LOCAL | set(_W3I))
 # saqlanadi: deploy'dan keyin ham qayta so'ralmaydi. Topilmasa — "none:<ts>", 3 kundan keyin qayta urinadi.
 _CIMG: dict = {}
 _CIMG_LOCK = asyncio.Lock()
-_CIMG_SEM = asyncio.Semaphore(2)
+
+
+# 374-3: birdan ~50 token so'ralganda CoinGecko bepul limiti (429) ko'plarini rad etdi (TRUMP, ZRO, WIF...).
+# Endi: `/coins/markets` (250 tadan, 8 sahifa → eng yirik ~2000 tanga) bilan tiker → rasm URL xaritasi bir
+# marta tuziladi (bazada `cg_map`, 1 kun), rasmlar CDN'dan (assets.coingecko.com — API limiti yo'q).
+# Xaritada yo'qlari uchun `search` — navbat bilan (2.5 s oraliq), navbat 6 tadan oshsa darhol 404 (keshlanmaydi).
+_CG_MAP: dict = {}
+_CG_MAP_AT = 0.0
+_CG_MAP_LOCK = asyncio.Lock()
+_CG_Q = {"n": 0, "last": 0.0}
+_CG_SLOCK = asyncio.Lock()
+
+
+async def _cg_map(cs) -> dict:
+    global _CG_MAP, _CG_MAP_AT
+    if _CG_MAP and time.time() - _CG_MAP_AT < 86400:
+        return _CG_MAP
+    async with _CG_MAP_LOCK:
+        if _CG_MAP and time.time() - _CG_MAP_AT < 86400:
+            return _CG_MAP
+        try:
+            v = await db.get_setting("cg_map")
+            if v:
+                d = json.loads(v)
+                if time.time() - d.get("t", 0) < 86400:
+                    _CG_MAP, _CG_MAP_AT = d["m"], d["t"]
+                    return _CG_MAP
+        except Exception:
+            pass
+        m: dict = {}
+        for pg in range(1, 9):
+            try:
+                async with cs.get("https://api.coingecko.com/api/v3/coins/markets",
+                                  params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 250,
+                                          "page": pg}) as r:
+                    if r.status != 200:
+                        break
+                    rows = await r.json()
+            except Exception:
+                break
+            for x in rows or []:
+                sy = str(x.get("symbol") or "").lower()
+                if sy and x.get("image") and sy not in m:
+                    m[sy] = x["image"].replace("/small/", "/large/").replace("/thumb/", "/large/")
+            if len(rows or []) < 250:
+                break
+            await asyncio.sleep(2.5)
+        if m:
+            _CG_MAP, _CG_MAP_AT = m, time.time()
+            try:
+                await db.set_setting("cg_map", json.dumps({"t": _CG_MAP_AT, "m": m}))
+            except Exception:
+                pass
+        else:
+            _CG_MAP_AT = time.time() - 86400 + 600          # 10 daqiqadan keyin qayta urinadi
+        return _CG_MAP
+
+
+async def cg_map_warm(_app=None):
+    """374-3: ishga tushganda xaritani fonda tayyorlab qo'yadi (birinchi ochishda kutish bo'lmasin)."""
+    async def run():
+        import aiohttp
+        await asyncio.sleep(20)
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as cs:
+                m = await _cg_map(cs)
+            log.info("CoinGecko logotip xaritasi: %s ta", len(m))
+        except Exception:
+            log.warning("CoinGecko xaritasi tuzilmadi", exc_info=True)
+    asyncio.get_running_loop().create_task(run())
 
 
 async def _cimg_fetch(c: str):
     import aiohttp
     import base64
-    async with _CIMG_SEM, aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as cs:
-        async with cs.get("https://api.coingecko.com/api/v3/search", params={"query": c},
-                          headers={"accept": "application/json"}) as r:
-            if r.status != 200:
-                raise RuntimeError(f"cg {r.status}")
-            d = await r.json()
-        L = [x for x in d.get("coins") or [] if str(x.get("symbol") or "").lower() == c and x.get("large")]
-        if not L:
-            return None
-        L.sort(key=lambda x: x.get("market_cap_rank") or 10 ** 9)
-        async with cs.get(L[0]["large"]) as r:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as cs:
+        url = (await _cg_map(cs)).get(c)
+        if not url:
+            if _CG_Q["n"] >= 6:
+                raise RuntimeError("navbat to'la")
+            _CG_Q["n"] += 1
+            try:
+                async with _CG_SLOCK:
+                    w = _CG_Q["last"] + 2.5 - time.time()
+                    if w > 0:
+                        await asyncio.sleep(w)
+                    _CG_Q["last"] = time.time()
+                    async with cs.get("https://api.coingecko.com/api/v3/search", params={"query": c},
+                                      headers={"accept": "application/json"}) as r:
+                        if r.status != 200:
+                            raise RuntimeError(f"cg {r.status}")
+                        d = await r.json()
+            finally:
+                _CG_Q["n"] -= 1
+            L = [x for x in d.get("coins") or [] if str(x.get("symbol") or "").lower() == c and x.get("large")]
+            if not L:
+                return None
+            L.sort(key=lambda x: x.get("market_cap_rank") or 10 ** 9)
+            url = L[0]["large"]
+        async with cs.get(url) as r:
             if r.status != 200:
                 return None
             ct = r.headers.get("Content-Type", "image/png").split(";")[0]
