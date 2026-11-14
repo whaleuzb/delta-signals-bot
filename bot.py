@@ -1880,6 +1880,7 @@ async def promo_emoji_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     super-admin DM'ida JIM sinov xabari bilan tekshiradi: javobda
     `custom_emoji` entity qolgan bo'lsa — yoqiladi. Sinov darhol o'chiriladi."""
     global PROMO_EMOJI
+    await pemo_load()                                 # 373
     eid = config.PROMO_EMOJI_ID
     if not eid and config.PROMO_EMOJI_SET:
         try:
@@ -2409,7 +2410,82 @@ def pub(ws, text: str) -> str:
         return text
     for rx, rep in _ID_PATTERNS:
         text = rx.sub(rep, text)
-    return text
+    return premoji(text)
+
+
+# ═══════════ 373: guruh/kanal postlaridagi emojilar → premium (custom) emoji ═══════════
+# Foydalanuvchi: "postdagi hamma emojilarni premiumga o'tqiza olamizmi?" Xarita
+# (oddiy emoji → custom_emoji_id) super-admin `/emoji <premium emojilar>` bilan beradi:
+# xabardagi har bir custom_emoji entity'ning matni — uning oddiy (zaxira) emojisi.
+# `bot_settings["premium_emoji"]` (JSON) da saqlanadi. `pub()` — guruhga ketadigan HAR
+# BIR matn (signal, nusxa, natija, hodisalar) shu yerdan o'tadi, shuning uchun almashtirish
+# shu yerda. Faqat `PROMO_EMOJI` sinovi o'tgan bo'lsa (bot custom emoji ishlata oladi).
+PEMO: dict[str, str] = {}
+_PEMO_RX = None
+
+
+def _pemo_key(e: str) -> str:
+    return e.replace("\ufe0f", "")
+
+
+def _pemo_set(m: dict) -> None:
+    global PEMO, _PEMO_RX
+    PEMO = {_pemo_key(k): v for k, v in (m or {}).items() if k and v}
+    keys = sorted(PEMO, key=len, reverse=True)
+    _PEMO_RX = re.compile("(" + "|".join(re.escape(k) + "\ufe0f?" for k in keys) + ")") if keys else None
+
+
+def premoji(text: str) -> str:
+    """Matndagi xaritadagi emojilarni `<tg-emoji>` bilan o'raydi (mavjud tg-emoji va
+    teglar ichiga tegmaydi)."""
+    if not text or not _PEMO_RX or not PROMO_EMOJI:
+        return text
+    parts = re.split(r"(<tg-emoji\b.*?</tg-emoji>|<[^>]+>)", text, flags=re.S)
+    for i in range(0, len(parts), 2):
+        parts[i] = _PEMO_RX.sub(
+            lambda m: f'<tg-emoji emoji-id="{PEMO[_pemo_key(m.group(1))]}">{m.group(1)}</tg-emoji>', parts[i])
+    return "".join(parts)
+
+
+async def pemo_load() -> None:
+    try:
+        _pemo_set(json.loads(await db.get_setting("premium_emoji") or "{}"))
+    except Exception:
+        log.warning("Premium emoji xaritasi o'qilmadi", exc_info=True)
+
+
+async def cmd_emoji(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """/emoji <premium emojilar> — xaritaga qo'shadi; /emoji clear — tozalaydi;
+    /emoji — joriy ro'yxat va yo'riqnoma. FAQAT super-admin."""
+    msg = update.effective_message
+    if not msg or not is_admin(update.effective_user.id):
+        return
+    ents = [e for e in (msg.entities or []) if e.type == "custom_emoji" and e.custom_emoji_id]
+    if ctx.args and ctx.args[0].lower() in ("clear", "tozalash") and not ents:
+        await db.set_setting("premium_emoji", None)
+        _pemo_set({})
+        await msg.reply_text("🧹 Premium emoji ro'yxati tozalandi — postlarda oddiy emojilar.")
+        return
+    if ents:
+        m = dict(PEMO)
+        for e in ents:
+            base = _pemo_key(msg.parse_entity(e))
+            if base:
+                m[base] = e.custom_emoji_id
+        await db.set_setting("premium_emoji", json.dumps(m, ensure_ascii=False))
+        _pemo_set(m)
+    if not PEMO:
+        await msg.reply_text(
+            "Premium emoji ro'yxati bo'sh.\n\n/emoji dan keyin bo'sh joy qo'yib, postlarda ishlatiladigan "
+            "emojilarning premium variantlarini yozing (masalan 📊 🟢 🔴 🎯 🛑 💥 ⚡ ✅ ❌ 📈 📉 💰).\n"
+            "Har biri qaysi oddiy emoji o'rnida turishini bot o'zi aniqlaydi. Tozalash: /emoji clear")
+        return
+    rows = " ".join(f'{k}→<tg-emoji emoji-id="{v}">{k}</tg-emoji>' for k, v in PEMO.items())
+    note = "" if PROMO_EMOJI else "\n\n⚠️ Bot hozir custom emoji ishlata olmayapti (promo sinovi o'tmagan) — postlarda oddiy qoladi."
+    await msg.reply_text(
+        f"{'✅ Saqlandi. ' if ents else ''}Postlarda almashtiriladi ({len(PEMO)} ta):\n\n{rows}\n\n"
+        f"Qo'shish/almashtirish: /emoji + premium emojilar. Tozalash: /emoji clear{note}",
+        parse_mode=ParseMode.HTML)
 
 
 def tw(key: str, ws, **kwargs) -> str:
@@ -11564,7 +11640,7 @@ async def cmd_richtest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     d = {"symbol": "BTCUSDT", "side": "LONG", "entry": 104200.0, "sl": 101500.0,
          "tps": [106800.0, 109500.0], "market": "crypto", "entry_mode": "market", "leverage": 10}
     ws = {"type": "group", "owner_id": uid, "id": 0, "lang": "uz", "name": "Test"}
-    body = draft_text(d, None, "uz")
+    body = premoji(draft_text(d, None, "uz"))
     img = Image.new("RGB", (1200, 630), (11, 11, 12))
     buf = io.BytesIO()
     img.save(buf, "PNG")
@@ -12163,6 +12239,7 @@ def main() -> None:
     app.add_handler(CommandHandler("karta", cmd_karta))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("richtest", cmd_richtest))
+    app.add_handler(CommandHandler("emoji", cmd_emoji))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))
     app.add_handler(CommandHandler("tg_password", cmd_tg_password))

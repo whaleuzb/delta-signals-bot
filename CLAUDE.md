@@ -8288,3 +8288,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Eslatma: eski Telegram ilovalari rich xabarni ko'rsatmasligi mumkin — foydalanuvchiga aytilgan.
 - Sinov: `test_372.py` 16/16 (HTML konvertatsiya, tugma+premium emoji, sukutda o'chiq, so'rov shakli, attach multipart, style serializatsiya, xato → zaxira, 3 xatodan keyin o'chish).
 - Tuzatish: foydalanuvchi "orasida bo'sh joylar bo'lsin" — `rich_html` endi bitta `<p>`, har qator `<br>` (bo'sh qatorlar oddiy postdagidek saqlanadi); alohida `<p>` paragraflar rich'da zich chiqqan edi.
+
+## 373. Guruh/kanal postlaridagi emojilar → premium (custom) emoji (`/emoji`)
+- Foydalanuvchi: "postdagi hamma emojilarni premiumga o'tqiza olamizmi?" → "ha".
+- Super-admin botga `/emoji <premium emojilar>` yuboradi: xabardagi har bir `custom_emoji` entity matni — uning oddiy emojisi (kalit, VS16 olib tashlanadi) → `custom_emoji_id`. `bot_settings["premium_emoji"]` (JSON), ishga tushganda `promo_emoji_job` boshida `pemo_load()`. `/emoji` — ro'yxat (oldindan ko'rinish bilan), `/emoji clear` — tozalash.
+- `pub()` (guruhga ketadigan har bir matn: signal, nusxa, natija, hodisalar) oxirida `premoji()` — xaritadagi emojilarni `<tg-emoji emoji-id>` bilan o'raydi; mavjud `<tg-emoji>` va teglar ichiga tegmaydi. Faqat `PROMO_EMOJI` sinovi o'tgan bo'lsa (bot custom emoji ishlata oladi). Oddiy va rich formatda ishlaydi; `/richtest` namunasi ham.
+- Sinov: `test_373.py` 8/8.
