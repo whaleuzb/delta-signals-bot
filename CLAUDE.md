@@ -8287,3 +8287,4 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `/richtest` (super-admin): namunaviy signal postini rich formatda O'ZIGA yuboradi, xato bo'lsa Telegram javobini ko'rsatadi.
 - Eslatma: eski Telegram ilovalari rich xabarni ko'rsatmasligi mumkin — foydalanuvchiga aytilgan.
 - Sinov: `test_372.py` 16/16 (HTML konvertatsiya, tugma+premium emoji, sukutda o'chiq, so'rov shakli, attach multipart, style serializatsiya, xato → zaxira, 3 xatodan keyin o'chish).
+- Tuzatish: foydalanuvchi "orasida bo'sh joylar bo'lsin" — `rich_html` endi bitta `<p>`, har qator `<br>` (bo'sh qatorlar oddiy postdagidek saqlanadi); alohida `<p>` paragraflar rich'da zich chiqqan edi.
