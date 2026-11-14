@@ -1980,15 +1980,16 @@ async def promo_button(bot, ws) -> str:
 
 
 def rich_html(body: str, tail: str = "") -> str | None:
-    """Oddiy Telegram HTML matnini rich HTML'ga: bo'sh qator — yangi paragraf, qator — <br>.
+    """Oddiy Telegram HTML matnini rich HTML'ga: bitta paragraf, har qator (bo'sh qator ham) — <br>.
     Blok teglar (blockquote/pre) bo'lsa — None (eski formatda yuborilsin)."""
     if re.search(r"<(blockquote|pre)\b", body):
         return None
-    paras = [p.strip("\n") for p in re.split(r"\n\s*\n", body.strip())]
-    out = "".join(f"<p>{p.replace(chr(10), '<br>')}</p>" for p in paras if p.strip())
+    # 372: bo'sh qatorlar (bo'limlar orasidagi joy) oddiy postdagidek saqlansin —
+    # alohida <p> paragraflar rich'da zich chiqdi; shuning uchun bitta <p>, har qator <br>.
+    t = re.sub(r"\n{3,}", "\n\n", body.strip())
     if tail:
-        out += f"<p>{tail}</p>"
-    return out
+        t += "\n\n" + tail
+    return "<p>" + t.replace("\n", "<br>") + "</p>"
 
 
 async def rich_send(bot, chat_id, body: str, tail: str = "", photo=None, *,
