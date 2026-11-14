@@ -895,6 +895,69 @@ except Exception:
 COINS = sorted(_COINS_LOCAL | set(_W3I))
 
 
+# 374-2: to'plamda yo'q token (SPCXON, MEGA, ...) — logotip CoinGecko'dan (search → bir xil tikerlilardan
+# bozor qiymati bo'yicha eng yuqorisi → "large" rasm), bir marta yuklanib bazada (bot_settings "cimg:<tiker>")
+# saqlanadi: deploy'dan keyin ham qayta so'ralmaydi. Topilmasa — "none:<ts>", 3 kundan keyin qayta urinadi.
+_CIMG: dict = {}
+_CIMG_LOCK = asyncio.Lock()
+_CIMG_SEM = asyncio.Semaphore(2)
+
+
+async def _cimg_fetch(c: str):
+    import aiohttp
+    import base64
+    async with _CIMG_SEM, aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as cs:
+        async with cs.get("https://api.coingecko.com/api/v3/search", params={"query": c},
+                          headers={"accept": "application/json"}) as r:
+            if r.status != 200:
+                raise RuntimeError(f"cg {r.status}")
+            d = await r.json()
+        L = [x for x in d.get("coins") or [] if str(x.get("symbol") or "").lower() == c and x.get("large")]
+        if not L:
+            return None
+        L.sort(key=lambda x: x.get("market_cap_rank") or 10 ** 9)
+        async with cs.get(L[0]["large"]) as r:
+            if r.status != 200:
+                return None
+            ct = r.headers.get("Content-Type", "image/png").split(";")[0]
+            body = await r.read()
+        if not ct.startswith("image/") or len(body) > 300_000:
+            return None
+        return ct, base64.b64encode(body).decode()
+
+
+async def coin_ext(request):
+    import base64
+    c = request.match_info["c"].lower()
+    hit = _CIMG.get(c)
+    if hit is None:
+        v = None
+        try:
+            v = await db.get_setting("cimg:" + c)
+        except Exception:
+            pass
+        if v and v.startswith("none:") and time.time() - float(v[5:]) < 3 * 86400:
+            hit = False
+        elif v and not v.startswith("none:"):
+            ct, b64 = v.split("|", 1)
+            hit = (ct, base64.b64decode(b64))
+        else:
+            try:
+                r = await _cimg_fetch(c)
+            except Exception as ex:
+                log.info("Tanga logotipi olinmadi (%s): %s", c, ex)
+                raise web.HTTPNotFound()          # vaqtinchalik xato — keshlamaymiz
+            try:
+                await db.set_setting("cimg:" + c, f"{r[0]}|{r[1]}" if r else f"none:{time.time()}")
+            except Exception:
+                pass
+            hit = (r[0], base64.b64decode(r[1])) if r else False
+        _CIMG[c] = hit
+    if not hit:
+        raise web.HTTPNotFound(headers={"Cache-Control": "public, max-age=86400"})
+    return web.Response(body=hit[1], content_type=hit[0], headers={"Cache-Control": "public, max-age=604800"})
+
+
 _LWC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "vendor", "lightweight-charts", "lightweight-charts-4.2.3.js")
 
 
@@ -1727,6 +1790,7 @@ def routes() -> list:
         web.get("/invite.jpg", invite_jpg),
         web.get("/lwc.js", lwc_js),
         web.get(r"/coins/{c:[a-z0-9]{1,12}}.svg", coin_svg),
+        web.get(r"/coinx/{c:[a-z0-9]{1,15}}", coin_ext),
         web.post("/api/app/me", api_me),
         web.post("/api/app/open", api_open),
         web.post("/api/app/act", api_act),

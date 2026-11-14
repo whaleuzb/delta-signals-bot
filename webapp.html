@@ -1227,7 +1227,10 @@ setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.df||g.cx||g.drag||g.p
 var COINS=__COINS__;
 function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase();b=(b.replace(/(USDT|USDC|BUSD|USD|PERP)$/,'')||b).toLowerCase();if(COINS.indexOf(b)<0)b=b.replace(/^(1000000|100000|10000|1000|1m)(?=[a-z])/,'');   /* 374: 1000PEPE → pepe */
  if(COINS.indexOf(b)>=0)return'<img src="/coins/'+b+'.svg" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none">';
- return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>'}
+ var L='<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>';
+ /* 374-2: to'plamda yo'q — server CoinGecko'dan olib keladi (/coinx), topilmasa harf qoladi */
+ if(!/^[a-z0-9]{1,15}$/.test(b)||S.cxBad&&S.cxBad[b])return L;
+ return'<img src="/coinx/'+b+'" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none;background:rgba(255,255,255,.1)" onerror="(S.cxBad=S.cxBad||{})[\''+b+'\']=1;this.outerHTML=coinIc(\''+b+'\','+z+')">'}
 /* 300: natijani ulashish — rasm + matn + "Botni ochish" (referal ulashishdek) */
 function sigShare(id){toast(esc(t('wait')));api('act',{sig:id,action:'share'}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg)}catch(e){}
  if(r.ok&&d&&d.id&&tg&&tg.shareMessage){try{tg.shareMessage(d.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
