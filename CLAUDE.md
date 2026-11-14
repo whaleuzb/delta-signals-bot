@@ -8294,3 +8294,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Super-admin botga `/emoji <premium emojilar>` yuboradi: xabardagi har bir `custom_emoji` entity matni — uning oddiy emojisi (kalit, VS16 olib tashlanadi) → `custom_emoji_id`. `bot_settings["premium_emoji"]` (JSON), ishga tushganda `promo_emoji_job` boshida `pemo_load()`. `/emoji` — ro'yxat (oldindan ko'rinish bilan), `/emoji clear` — tozalash.
 - `pub()` (guruhga ketadigan har bir matn: signal, nusxa, natija, hodisalar) oxirida `premoji()` — xaritadagi emojilarni `<tg-emoji emoji-id>` bilan o'raydi; mavjud `<tg-emoji>` va teglar ichiga tegmaydi. Faqat `PROMO_EMOJI` sinovi o'tgan bo'lsa (bot custom emoji ishlata oladi). Oddiy va rich formatda ishlaydi; `/richtest` namunasi ham.
 - Sinov: `test_373.py` 8/8.
+
+## 374. Tanga logotiplari: signal kartalarida + ~1800 tanga
+- Foydalanuvchi: "Tokenlar logolarini bot ichida ko'rinmayabti".
+- Sabab: (1) Signallar ro'yxatidagi kartalarda (`sigCard`) tanga belgisi umuman yo'q edi; (2) `coinIc` faqat `static/coins/*.svg` (115 ta) — qolganlarida harf.
+- Tuzatish: `sigCard` sarlavhasida `coinIc(i.symbol,30)`. `static/coins/w3i.json.gz` — "@web3icons/core" 4.0.59 tokens/branded (MIT, 1789 ta, {TICKER: svg}, 1.7 MB); `webapp.COINS` = mahalliy ∪ w3i, `/coins/{c}.svg` avval mahalliy faylni, keyin w3i'ni beradi. `coinIc`: ro'yxatda yo'q bo'lsa `1000PEPE`/`1MBABYDOGE` kabi prefiks olib tashlanadi. Topilmasa — avvalgidek harf.
+- Sinov: brauzer (guruh signallari: btc/eth/sol/epic rasmlari yuklandi), `test_app`, `t_cxc`.

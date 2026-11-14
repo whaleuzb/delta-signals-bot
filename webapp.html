@@ -1073,7 +1073,7 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
  if(i.cp)a+=B('full',"cpAsk("+sid+")",esc(t(i.cp.ch?'cp_ch':'cp_gr')));
  a+=B('d full',"act("+sid+",'close')",esc(pend?t('cancel'):t('close')));
  var lims=i.adds&&i.adds.length?'<div class="tps" style="display:flex;justify-content:space-between;align-items:center"><span><b>'+esc(t('lims'))+'</b>'+i.adds.map(fp).join(' · ')+'</span><span class="r" style="cursor:pointer;font-weight:700" onclick="act('+sid+',\'limx\')">'+esc(t('cancel'))+'</span></div>':'';
- return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh" style="cursor:pointer" onclick="openTerm('+i.id+')"><div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div>'+pnl+'</div>'
+ return '<div class="sig glass rise" id="s'+i.id+'"><div class="sh" style="cursor:pointer" onclick="openTerm('+i.id+')"><div style="display:flex;align-items:center;gap:10px">'+coinIc(i.symbol,30)+'<div><div class="sym">'+esc(i.symbol)+'<span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+(i.tf?'<span class="b bx">'+esc(i.tf)+'</span>':'')+'</div><div class="m" style="font-size:11px;margin-top:2px">#'+i.id+(i.alloc?' · '+esc(t('invested'))+' '+f0(i.alloc):'')+'</div></div></div>'+pnl+'</div>'
  +'<div class="spk" id="k'+i.id+'" style="cursor:pointer" onclick="openTerm('+i.id+')">'+spark(i,false)+'</div><div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(i.entry)+'</div><div><b>'+esc(t('stop'))+'</b>'+fp(i.sl)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(i.price)+'</div></div>'
  +(tps?'<div class="tps"><b>TP</b>'+tps+'</div>':'')+lims+'<div class="acts">'+a+'</div></div>'}
 (function(){var ly=0,tk=0;document.addEventListener('scroll',function(e){var tg_=e.target;if(tg_&&tg_.id=='page'||(tg_&&tg_.closest&&tg_.closest('#page,.slider,#sheet')))return;if(tk)return;tk=1;requestAnimationFrame(function(){tk=0;
@@ -1225,7 +1225,7 @@ setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.df||g.cx||g.drag||g.p
 /* 297/298: pozitsiya kartasi — Dip Funded mobil kartasi kabi (tanga belgisi, P&L/ROI, 6 maydon, ichida tugmalar),
    yorliqlar: Pozitsiya | Buyurtmalar; qo'shimcha ma'lumot «Batafsil» ichida */
 var COINS=__COINS__;
-function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase();b=(b.replace(/(USDT|USDC|BUSD|USD|PERP)$/,'')||b).toLowerCase();
+function coinIc(sym,z){z=z||22;var b=String(sym||'').toUpperCase();b=(b.replace(/(USDT|USDC|BUSD|USD|PERP)$/,'')||b).toLowerCase();if(COINS.indexOf(b)<0)b=b.replace(/^(1000000|100000|10000|1000|1m)(?=[a-z])/,'');   /* 374: 1000PEPE → pepe */
  if(COINS.indexOf(b)>=0)return'<img src="/coins/'+b+'.svg" alt="" width="'+z+'" height="'+z+'" style="border-radius:50%;flex:none">';
  return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-size:'+Math.round(z*.5)+'px;font-weight:800;flex:none">'+esc(b.charAt(0).toUpperCase()||'?')+'</span>'}
 /* 300: natijani ulashish — rasm + matn + "Botni ochish" (referal ulashishdek) */

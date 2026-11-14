@@ -883,7 +883,16 @@ async def invite_jpg(request):
 
 # 298: tanga belgilari (Dip Funded'dan, CC0/MIT — static/coins/LICENSE.md).
 _COIN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "coins")
-COINS = sorted(f[:-4] for f in os.listdir(_COIN_DIR) if f.endswith(".svg")) if os.path.isdir(_COIN_DIR) else []
+_COINS_LOCAL = {f[:-4] for f in os.listdir(_COIN_DIR) if f.endswith(".svg")} if os.path.isdir(_COIN_DIR) else set()
+# 374: qo'shimcha ~1800 tanga belgisi — "@web3icons/core" 4.0.59 tokens/branded (MIT), bitta gz JSON
+# {TICKER: svg}. Avval faqat 115 ta bor edi — qolganlarida harf chiqardi ("tokenlar logolari ko'rinmayabti").
+try:
+    import gzip as _gz
+    with open(os.path.join(_COIN_DIR, "w3i.json.gz"), "rb") as _fh:
+        _W3I = {k.lower(): v for k, v in json.loads(_gz.decompress(_fh.read())).items()}
+except Exception:
+    _W3I = {}
+COINS = sorted(_COINS_LOCAL | set(_W3I))
 
 
 _LWC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "vendor", "lightweight-charts", "lightweight-charts-4.2.3.js")
@@ -898,11 +907,15 @@ async def lwc_js(request):
 
 async def coin_svg(request):
     name = request.match_info["c"].lower()
-    if name not in COINS:
+    if name in _COINS_LOCAL:
+        with open(os.path.join(_COIN_DIR, name + ".svg"), "rb") as fh:
+            body = fh.read()
+    elif name in _W3I:
+        body = _W3I[name].encode()
+    else:
         raise web.HTTPNotFound()
-    with open(os.path.join(_COIN_DIR, name + ".svg"), "rb") as fh:
-        return web.Response(body=fh.read(), content_type="image/svg+xml",
-                            headers={"Cache-Control": "public, max-age=604800"})
+    return web.Response(body=body, content_type="image/svg+xml",
+                        headers={"Cache-Control": "public, max-age=604800"})
 
 
 # ─────────────── 324: birja hisoblari (faqat o'qish) ───────────────
