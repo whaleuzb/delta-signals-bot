@@ -2700,9 +2700,9 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # --- Bosqich (milestone) va noaniq sham (guruhga/egasiga) ---
     "ms.step": {
-        "uz": "{mark} <b>#{sid} {sym}</b> — joriy natija: <b>{pnl:+.2f}%</b> ({band:+d}% bosqichi)",
-        "ru": "{mark} <b>#{sid} {sym}</b> — текущий результат: <b>{pnl:+.2f}%</b> (рубеж {band:+d}%)",
-        "en": "{mark} <b>#{sid} {sym}</b> — running result: <b>{pnl:+.2f}%</b> ({band:+d}% step)",
+        "uz": "{mark} <b>#{sid} {sym}</b> — joriy natija: <b>{pnl:+.2f}%</b>",
+        "ru": "{mark} <b>#{sid} {sym}</b> — текущий результат: <b>{pnl:+.2f}%</b>",
+        "en": "{mark} <b>#{sid} {sym}</b> — running result: <b>{pnl:+.2f}%</b>",
     },
     "ev.ambiguous": {
         "uz": ("⚠️ #{sid} — TP va SL bitta 1m shamda tegdi. Konservativ hisob "
