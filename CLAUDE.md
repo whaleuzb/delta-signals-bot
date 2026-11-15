@@ -8307,3 +8307,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 375. Bosqich xabaridan "(+10% bosqichi)" olib tashlandi
 - Foydalanuvchi: "📈 MEGAUSDT — joriy natija: +10.36% (+10% bosqichi) — 10% bosqichini olib tashla, kerak emas".
 - `i18n` `ms.step` (uz/ru/en): oxiridagi `({band:+d}% bosqichi)` / `(рубеж …)` / `(… step)` olib tashlandi. Xabar mexanizmi (`milestone_job`, har ±5/10% da) o'zgarmagan; `band` argumenti uzatilaveradi, matnda ishlatilmaydi.
+
+## 376. «Birjamda ochish» → Dip Funded: tanga chegarasi (100%/50%) qat'iy
+- Foydalanuvchi: "Birjamda ochish tugmasidan keyin dipfundedda max bosilsa 10k hisob 100% belgilanyabti. Dip Funded'da faqat ishonchli tokenlarda 100%, qolganlarida maks 50% — Dip Funded API'sidan o'qib, qat'iy chegara bilan belgila."
+- `sgAvail` (Dip Funded): `g.av = dfMaxBuy(S.dfs, tanga)` (362 dagi: `equity × dfLim − pozitsiya − ochiq limitlar`, naqd/1.004 dan oshmaydi; `dfLim` — `S.dfs.alloc` = Dip Funded API `alloc`, zaxira {full:[BTC,ETH], default:0.5}), `g.dfp` — foiz. «Mavjud» va 10/25/50/100% shu chegaradan; ostida `df_lim_note` izohi. `sgGo`: summa chegaradan oshsa — yuborilmaydi, toast "Max $…". Dip Funded serveri ham o'zi tekshiradi.
+- Sinov: brauzer `t_sgdf.py` (GRASS → $5,000 / 50%, 100% → 5000, 9000 → rad; BTC → $9,960 / 100%).

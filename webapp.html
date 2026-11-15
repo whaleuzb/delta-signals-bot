@@ -1660,17 +1660,19 @@ function sgRender(){var g=S.sg,b=document.getElementById('sgbox');if(!g||!g.s||!
  h+='<div class="rs" style="margin:12px 2px 6px;font-weight:700">'+esc(t('sg_where'))+'</div><div class="chips" style="margin-bottom:8px">'+D.map(function(z){return'<span class="chip glass'+(z.k==g.dest?' on':'')+'" onclick="S.sg.dest=\''+z.k+'\';S.sg.av=null;sgAvail();sgRender()">'+esc(z.lb)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['market','limit'].map(function(m){return'<span class="chip glass'+(g.type==m?' on':'')+'" onclick="S.sg.type=\''+m+'\';sgKeep();sgRender()">'+(m=='limit'?'Limit · '+fp(x.entry):'Market')+'</span>'}).join('')+'</div>';
  h+='<div class="rs" style="margin:2px 2px 5px">'+esc(t(dd.mkt=='fut'?'sg_margin':'df_amount'))+(g.av!=null?' · '+esc(t('tv_avbl'))+' $'+n2(g.av):'')+'</div>'+dfIn('sg_a','USDT',g.amt)
-  +(g.av?'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(p){return'<span class="chip glass" onclick="document.getElementById(\'sg_a\').value='+Math.floor(g.av*p)/100+'">'+p+'%</span>'}).join('')+'</div>':'');
+  +(g.av?'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(p){return'<span class="chip glass" onclick="document.getElementById(\'sg_a\').value='+Math.floor(g.av*p)/100+'">'+p+'%</span>'}).join('')+'</div>':'')
+  +(dd.ex=='dipfunded'&&g.dfp?'<div class="rs" style="margin:-4px 2px 10px;line-height:1.4">ℹ️ '+esc(t('df_lim_note',{s:x.sym.replace(/USDT$/,''),p:g.dfp}))+'</div>':'');
  if(dd.mkt=='fut')h+='<div class="rs" style="margin:0 2px 8px">'+esc(t('tr_lev'))+': <b>'+(x.lev||10)+'x</b></div>';
  if(dd.mkt=='spot'&&dd.ex!='dipfunded')h+='<div class="rs" style="margin:0 2px 8px;line-height:1.4">ℹ️ '+esc(t('sg_spot_note'))+'</div>';
  h+='<button class="btn full" style="width:100%;margin-top:4px;background:'+(lg?'#2ebd85':'#f6465d')+';color:#fff;border-color:transparent;font-weight:800" onclick="sgGo()">'+(lg?'Long':'Short')+' '+esc(x.sym.replace(/USDT$/,''))+' · '+esc(dd.lb)+'</button>';
  b.innerHTML=h}
 function sgKeep(){var e=document.getElementById('sg_a');if(e&&S.sg)S.sg.amt=e.value}
 function sgAvail(){var g=S.sg;if(!g||!g.dest)return;var D=sgDests(g),dd=D.filter(function(z){return z.k==g.dest})[0];if(!dd)return;
- if(dd.ex=='dipfunded'){g.av=S.dfs?+S.dfs.available||0:null;return}
+ if(dd.ex=='dipfunded'){var b0=g.s.sym.replace(/USDT$/,'');g.av=S.dfs?dfMaxBuy(S.dfs,b0):null;g.dfp=S.dfs?Math.round(dfLim(S.dfs,b0)*100):null;return}   /* 376: Dip Funded tanga chegarasi (API alloc) */
  api('cextrade',{ex:dd.ex,op:'info',a:{mkt:dd.mkt,sym:g.s.sym}}).then(function(d){if(S.sg!==g||g.dest!=dd.k||!d.ok)return;g.av=+((d.r.avail||{}).quote||0);sgKeep();sgRender()}).catch(function(){})}
 function sgGo(){var g=S.sg,x=g&&g.s;if(!x)return;sgKeep();var amt=num(g.amt),D=sgDests(g),dd=D.filter(function(z){return z.k==g.dest})[0];if(!dd)return;
  if(!amt){toast(esc(t('tr_need_amt')));return}var lim=g.type=='limit',lg=x.side=='LONG',tp=x.tp_next,sl=x.sl;
+ if(dd.ex=='dipfunded'&&g.av!=null&&amt>g.av+0.005){toast(esc(t('df_lim_note',{s:x.sym.replace(/USDT$/,''),p:g.dfp||50}))+'<br><b>Max $'+n2(g.av)+'</b>');return}   /* 376 */
  var sum=(lg?'LONG ':'SHORT ')+x.sym+' · $'+n2(amt)+' · '+(lim?'Limit '+fp(x.entry):'Market')+(dd.mkt=='fut'?' · '+(x.lev||10)+'x':'')+(sl!=null&&!(dd.mkt=='spot'&&dd.ex!='dipfunded')?' · SL '+fp(sl):'')+(tp!=null&&!(dd.mkt=='spot'&&dd.ex!='dipfunded')?' · TP '+fp(tp):'')+'\n'+dd.lb;
  confirmBox(t('tr_confirm')+'\n\n'+sum,function(){
   if(dd.ex=='dipfunded'){var a={op:'buy',symbol:x.sym.replace(/USDT$/,''),amount:Math.round(amt*100)/100};if(lim)a.limit=x.entry;if(sl!=null)a.sl=sl;if(tp!=null)a.tp=tp;
