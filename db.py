@@ -2269,6 +2269,21 @@ async def set_entry(sig_id: int, entry: float) -> None:
             sig_id, _d(entry))
 
 
+async def dup_open_signals(owner_id: int | None, days: int = 3) -> list:
+    """382: takrorlangan ochiq signallar — bir workspace'da bir xil juftlik/yo'nalish/kirish narxi,
+    oxirgi `days` kunda. owner_id None — hamma (super-admin)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT s.workspace_id, w.name, s.symbol, s.side, s.entry, "
+            "       array_agg(s.id ORDER BY s.id) AS ids "
+            "FROM signals s JOIN workspaces w ON w.id=s.workspace_id "
+            "WHERE s.status IN ('PENDING','ACTIVE') AND NOT s.excluded "
+            "  AND s.created_at > now() - make_interval(days => $2) "
+            "  AND ($1::bigint IS NULL OR w.owner_id=$1) "
+            "GROUP BY s.workspace_id, w.name, s.symbol, s.side, s.entry HAVING COUNT(*) > 1 "
+            "ORDER BY MAX(s.id) DESC LIMIT 20", owner_id, days)
+
+
 async def set_signal_excluded(sig_id: int, excluded: bool) -> None:
     async with pool().acquire() as c:
         await c.execute("UPDATE signals SET excluded=$2 WHERE id=$1", sig_id, excluded)

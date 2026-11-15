@@ -11638,6 +11638,55 @@ async def cmd_karta(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                        sym=html.escape(sig["symbol"])))
 
 
+async def cmd_delsig(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """382: /delsig 785 786 — takror/xato signalni izsiz olib tashlash: bekor (CANCELLED), statistikadan
+    chiqariladi (excluded), guruhdagi posti o'chiriladi, guruhga "yopildi" xabari KETMAYDI.
+    /delsig (raqamsiz) — oxirgi 3 kundagi takrorlangan ochiq signallarni topib ko'rsatadi.
+    Faqat workspace egasi yoki super-admin."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    if not ctx.args:
+        rows = await db.dup_open_signals(None if is_admin(uid) else uid)
+        if not rows:
+            await msg.reply_text("Takrorlangan ochiq signal topilmadi.\nO'chirish: /delsig <raqam> [raqam ...]")
+            return
+        out = ["Takrorlangan ochiq signallar (birinchisi qoladi, qolganlarini o'chirish buyrug'i):", ""]
+        for r in rows:
+            ids = list(r["ids"])
+            out.append(f"• {r['name']} — {r['symbol']} {r['side']} @ {fmt_price(float(r['entry']))}: "
+                       + ", ".join(f"#{i}" for i in ids))
+            out.append("   /delsig " + " ".join(str(i) for i in ids[1:]))
+        await msg.reply_text("\n".join(out))
+        return
+    done, bad = [], []
+    for a in ctx.args[:20]:
+        try:
+            sid = int(a.lstrip("#"))
+        except ValueError:
+            bad.append(a)
+            continue
+        sig = await db.get_signal(sid)
+        ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+        if not sig or not ws or not can_manage(uid, ws):
+            bad.append(f"#{sid}")
+            continue
+        await db.cancel_signal(sid, "CANCELLED")
+        await db.set_signal_excluded(sid, True)
+        if ws["type"] == "group" and ws["group_chat_id"]:
+            for mid in {sig["group_msg_id"], sig.get("result_msg_id")}:
+                if mid:
+                    try:
+                        await ctx.bot.delete_message(ws["group_chat_id"], mid)
+                    except Exception as ex:
+                        log.info("delsig: post o'chmadi (#%s, %s): %s", sid, mid, ex)
+        log.info("delsig: #%s olib tashlandi (uid=%s)", sid, uid)
+        done.append(f"#{sid}")
+    txt = ("✅ Olib tashlandi: " + ", ".join(done)) if done else "Hech narsa o'chirilmadi."
+    if bad:
+        txt += "\n⚠️ Topilmadi yoki huquq yo'q: " + ", ".join(bad)
+    await msg.reply_text(txt)
+
+
 async def cmd_richtest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """372: /richtest — FAQAT super-admin. Namunaviy signal postini rich xabar sifatida
     (rasm + matn + «🤖 Trade Controller orqali» tugmasi) O'ZIGA yuboradi; xato bo'lsa
@@ -12247,6 +12296,7 @@ def main() -> None:
     app.add_handler(CommandHandler("karta", cmd_karta))
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("richtest", cmd_richtest))
+    app.add_handler(CommandHandler("delsig", cmd_delsig))
     app.add_handler(CommandHandler("emoji", cmd_emoji))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))

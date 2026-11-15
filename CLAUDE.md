@@ -8340,3 +8340,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "acu ga signal bermoqchi edim error chiqdi". Loglar: `_app_newsig → publish_signal → rich_send → photo.seek(0)` — ilova grafik rasmini `bytes` qilib uzatadi; 372 dagi `rich_send` BytesIO kutgan. Xato `publish_signal`da signal bazaga yozilgandan KEYIN, guruh postidan OLDIN chiqqani uchun #781, #783–#786 bazada yaratilib, guruhga chiqmay qolgan.
 - `rich_send`: rasm bytes/BytesIO/fayl — hammasi `io.BytesIO(raw)` nusxaga (asl obyektga tegilmaydi, zaxira yo'l qayta o'qiy oladi); tayyorlash bosqichidagi HAR QANDAY xato ushlanadi → None (eski formatda yuboriladi). Yangi qoida: rich yo'lidagi xato hech qachon signal postini to'xtatmasligi kerak.
 - Sinov: `test_372.py` 18/18 (bytes rasm, noto'g'ri tur → None).
+
+## 382. `/delsig` — takror/xato signallarni izsiz olib tashlash
+- Foydalanuvchi: "Guruhga chiqdi lekin menga bittasi kerak, bu yerda 5 ta signal bo'lib ketgan" (381 xatosidan keyingi qayta urinishlar).
+- `/delsig` (raqamsiz) — `db.dup_open_signals`: oxirgi 3 kundagi ochiq signallar, bir workspace'da bir xil juftlik/yo'nalish/kirish bilan 2+ ta → ro'yxat va tayyor buyruq (birinchisi qoladi). `/delsig 785 786` — har biri: `cancel_signal(CANCELLED)` + `set_signal_excluded(TRUE)` (statistikaga kirmaydi), guruhdagi posti (`group_msg_id`, `result_msg_id`) o'chiriladi; guruhga «yopildi» xabari yuborilmaydi. Faqat workspace egasi yoki super-admin (`can_manage`).
+- Sinov: `test_382.py` 6/6.
