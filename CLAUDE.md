@@ -8330,3 +8330,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi (terminal skrinshoti, Telegram «Orqaga» ostidagi ‹ belgilangan): "bu tugma nega kerak?"
 - Sahifa sarlavhasidagi `.ghd>.bk[onclick="closeGroup()"]` Telegram'ning «Orqaga» tugmasi bilan bir xil ish qilardi. Telegram ichida (initData + BackButton, 6.1+) `<html class="tgb">` → bu tugma yashirin; oddiy brauzerda (ochiq rejim) ko'rinadi. Ichki qadamlar (`nsRender` — tekshiruvdan formaga, `openDf(1)`) qoladi.
 - Sinov: brauzer `t_bk.py` (terminal, statistika — display:none).
+
+## 380. Grafik ochiq bo'lsa «Orqaga» uni to'liq yopadi
+- Foydalanuvchi: "Chartda bitta o'zgarish qilsam va qaytish bossam baribir oldingi o'zgarishga qaytaryabti." (377 dan keyin ham; brauzerda takrorlanmadi.)
+- `navBack`: `S.page.id=='term'` bo'lsa — saqlanmagan `pend/drag` bekor, stack'dan har qanday terminal yozuvi (`openTerm|cxTerm|dfTerm:`) tashlab o'tiladi → bir bosishda grafikdan oldingi bo'lim/sahifaga. Grafik ichidagi qaytarish — faqat «↶» (377). `navWrap` kaliti argumentlarni satrga keltiradi (364 va "364" — bitta kalit).
+- Sinov: `t_lwu2.py` (stack'ga qo'shimcha terminal yozuvlari kiritilganda ham bitta «Orqaga» → Signallar), `t_nav`.

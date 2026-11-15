@@ -1436,7 +1436,10 @@ function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);if(nav
  S.nh.push({tab:S.tab,cur:S.cur,re:S.page?S.pageRe:null,key:S.page?S.pageKey:null,y:S.page?0:window.scrollY});if(S.nh.length>40)S.nh.shift();backSync()}
 function backSync(){try{var on=S.nh.length||S.page||document.getElementById('sheet').classList.contains('show');if(on)tg.BackButton.show();else tg.BackButton.hide()}catch(e){}}
 function navBack(fromPage){if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
- var e=S.nh.pop();while(e&&navSame(e))e=S.nh.pop();   /* 377: joriy holatning o'zi — tashlab o'tiladi */
+ /* 380: grafik (terminal) ochiq bo'lsa — «Orqaga» uni to'liq yopadi: saqlanmagan surish bekor, tarixdagi har qanday
+    terminal holati (signal/birja/Dip Funded) tashlab o'tiladi; grafik ichidagi qaytarish — faqat «↶» */
+ var tm=S.page&&S.page.id=='term';if(tm){S.page.pend=null;S.page.drag=null}
+ var e=S.nh.pop();while(e&&(navSame(e)||tm&&/^(openTerm|cxTerm|dfTerm):/.test(e.key||'')))e=S.nh.pop();
  if(!e){if(S.page)pageHide();backSync();return}
  NAVT=1;setTimeout(function(){NAVT=0},0);tick();
  if(S.page)pageHide();
@@ -1447,7 +1450,7 @@ function navBack(fromPage){if(!fromPage&&document.getElementById('sheet').classL
  backSync()}
 /* sahifa ochuvchilar: chaqirilganda tarixga yoziladi va qayta ochish uchun eslab qolinadi */
 function navWrap(names,page){names.forEach(function(n){var f=window[n];if(typeof f!='function')return;
- window[n]=function(){var a=Array.prototype.slice.call(arguments),k=n+':'+JSON.stringify(a);
+ window[n]=function(){var a=Array.prototype.slice.call(arguments),k=n+':'+JSON.stringify(a.map(function(v){return v==null?v:String(v)}));   /* 380: 364 va "364" — bitta kalit */
   if(!(page&&S.page&&S.pageKey==k))navPush();var r=f.apply(this,a);
   if(page&&S.page){S.pageRe=function(){f.apply(null,a)};S.pageKey=k}backSync();return r}})}
 function pageHead(d){return'<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div>'+(d?logoHtml(d.id,d.logo,d.name)+'<div style="min-width:0"><h2>'+esc(d.name)+'</h2><div class="rs">'+esc(d.channel?t('channel'):t('group'))+'</div></div>':'')+'</div>'}
