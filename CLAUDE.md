@@ -8319,3 +8319,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Grafik tarixi alohida: `S.page.uh` (30 tagacha) — `termTf` oldidan va har surish/kattalashtirish seriyasidan oldin (`subscribeVisibleLogicalRangeChange`, 700 ms jimlik = yangi qadam; yuklash/o'lcham o'zgarishidan keyingi 900 ms e'tiborsiz — `LW.qu`) `{tf, vr, as(autoScale)}` yoziladi. `lwUndo()` — TF boshqa bo'lsa `termTf` (`LW.noUndo`, `g.vrKeep` → `lwData` shu ko'rinishni qo'yadi), aks holda `g.vr` + `lwView`; narx shkalasi avval avto bo'lgan bo'lsa qayta avto. Tugma «↶» — TF chiplari qatorining o'ng chetida (`#lwu`), tarix bo'sh bo'lsa yashirin; uchala terminalda (signal, birja, Dip Funded).
 - Sinov: brauzer `t_lwu.py` (4h → surish ×2 → ↶ ×3 → 1h asl ko'rinish; «Orqaga» — bir bosishda chiqadi), `t_nav2/t_nav3` (stack o'smaydi), `t_nav`, `t_cxc`.
 - 2026-11-15: foydalanuvchi so'rovi bilan Railway bot servisida `RICH_POSTS=1` yoqildi (guruh/kanal signal va natija postlari — rich).
+
+## 378. Ko'z tugmasi — hisoblar/summalarni yashirish
+- Foydalanuvchi: "hisoblarni ko'z tugmasi orqali yashirish funksiyasini qo'shaylik".
+- Tepadagi panel: «Bot» yonida `#eyeBtn` (ko'z / chizilgan ko'z SVG, `eyeIc`). `hideTog()` → `S.hide`, `localStorage tc_hide` (qurilmada eslab qolinadi); qayta chizish: `render()` + ochiq sahifa (term/cxst/ns/guruh) + «Birjamda ochish» oynasi. Ochiq rejimda (Telegram tashqarisi) tugma yashirin.
+- Yashiriladi (`••••`): `fm()` (±$ foyda/zarar), `f0()` (depozit/summa), yangi `mn()` — balans joylari (birja jami/Spot/Futures, aktivlar USD, marja, mavjud qoldiq, Dip Funded equity/balans/bo'sh/kunlik/maks. zarar/maqsad, hisoblar ro'yxati, aksiya portfeli qiymati/uPnL, USDC/USDT, ws tanlovidagi birja jami). Narxlar, foizlar, kiritish maydonlari va tasdiqlash xulosalari ko'rinadi.
+- Sinov: brauzer `t_eye.py` (yoqilgach sahifada `$<raqam>` qolmaydi — birja Bosh, guruh Bosh, Signallar; qayta yuklashda saqlanadi; o'chirish), `test_app`, `t_cxc`.

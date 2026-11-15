@@ -333,7 +333,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 </style></head><body>
 <canvas id="bg"></canvas><div class="neb a"></div><div class="neb b"></div><div class="neb c"></div><div class="grain"></div>
 <i class="streak s1"></i><i class="streak s2"></i><i class="streak s3"></i>
-<div class="top"><div class="pill glass" id="wsPill">…</div><a class="pill glass" id="botLink" href="#"><span id="botIc"></span><span id="tBot"></span></a></div>
+<div class="top"><div class="pill glass" id="wsPill">…</div><a class="pill glass" id="eyeBtn" href="#" onclick="event.preventDefault();hideTog()" style="margin-left:auto;padding-left:12px;padding-right:12px;display:none" aria-label="hide"></a><a class="pill glass" id="botLink" href="#"><span id="botIc"></span><span id="tBot"></span></a></div>
 <div id="view"></div>
 <div class="toast glass" id="toast"></div>
 <div class="shade" id="shade" onclick="sheetClose()"></div><div class="sheet glass" id="sheet"></div>
@@ -371,11 +371,19 @@ function ic(n,z){z=z||22;return '<svg class="ic" width="'+z+'" height="'+z+'" vi
 var tg=window.Telegram&&window.Telegram.WebApp;
 var TABS=['home','wallet','signals','dip','top','tour','profile'];
 var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
+/* 378: ko'z tugmasi — balans/summalarni yashirish (qurilmada eslab qolinadi) */
+try{S.hide=localStorage.getItem('tc_hide')=='1'}catch(e){S.hide=false}
+function eyeIc(){var o=!S.hide;return'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'+(o?'':'<line x1="3" y1="3" x2="21" y2="21"/>')+'</svg>'}
+function eyeSync(){var e=document.getElementById('eyeBtn');if(e){e.innerHTML=eyeIc();e.style.display=''}}
+function hideTog(){S.hide=!S.hide;try{localStorage.setItem('tc_hide',S.hide?'1':'0')}catch(e){}tick();eyeSync();var y=window.scrollY;S.anim=false;render();window.scrollTo(0,y);
+ var g=S.page;if(g){try{if(g.id=='term')termRender();else if(g.id=='cxst')cxStRender();else if(g.id=='ns')nsRender();else if(+g.id)pageRender()}catch(e){}}
+ if(S.sg&&document.getElementById('sgbox'))sgRender()}
 function t(k,o){var s=(T[S.lang]||T.uz)[k]||k;if(o)for(var x in o)s=s.replace('{'+x+'}',o[x]);return s}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function fp(x){if(x==null)return'—';x=+x;if(x>=100)return x.toLocaleString('en-US',{maximumFractionDigits:2});if(x>=1)return x.toFixed(4);return(+x.toFixed(8)).toString()}
-function fm(x){return(x>=0?'+':'−')+'$'+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function f0(x){return '$'+x.toLocaleString('en-US',{maximumFractionDigits:0})}
+function mn(v){return S.hide?'••••':n2(v)}   /* 378: ko'z — summalarni yashirish */
+function fm(x){if(S.hide)return(x>=0?'+':'−')+'$••••';return(x>=0?'+':'−')+'$'+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function f0(x){if(S.hide)return'$••••';return '$'+x.toLocaleString('en-US',{maximumFractionDigits:0})}
 function fpc(x){return(x>=0?'+':'')+x.toFixed(2)+'%'}
 function api(p,b){b=b||{};b.initData=tg?tg.initData:'';return fetch('/api/app/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){if(!r.ok)throw r.status;return r.json()})}
 function noEmoji(s){return String(s).replace(/[✀-➿☀-⛿️]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF]/g,'').trim()}
@@ -417,7 +425,7 @@ function pill(){var w=cur();var el=document.getElementById('wsPill');
  /* 331: ulangan birjalar ham shu ro'yxatda — tanlansa Birja bo'limida o'sha birja ochiladi */
  var CX=cxList();
  var opts=S.ws.map(function(x){return'<option value="'+x.id+'"'+(x.id==S.cur?' selected':'')+'>'+esc(wsName(x))+'</option>'}).join('');
- if(CX.length)opts+='<optgroup label="'+esc(t('wallet'))+'">'+CX.map(function(a){return'<option value="cx:'+esc(a.ex)+'"'+(S.cur=='cx:'+a.ex?' selected':'')+'>'+esc(cexMeta(a.ex)[1])+(a.err?'':' · $'+n2(a.total||0))+'</option>'}).join('')+'</optgroup>';
+ if(CX.length)opts+='<optgroup label="'+esc(t('wallet'))+'">'+CX.map(function(a){return'<option value="cx:'+esc(a.ex)+'"'+(S.cur=='cx:'+a.ex?' selected':'')+'>'+esc(cexMeta(a.ex)[1])+(a.err?'':' · $'+mn(a.total||0))+'</option>'}).join('')+'</optgroup>';
  el.innerHTML=wsIc(w)+'<span>'+esc(wsName(w))+'</span>'+(S.ws.length>1||CX.length?ic('chev',14)+'<select id="wsSel">'+opts+'</select>':'');
  el.style.position='relative';var s=document.getElementById('wsSel');if(s)s.onchange=function(){var v=s.value;navPush();
   /* 333: birja tanlansa — butun ilova (Bosh, Signallar/pozitsiyalar, terminal, statistika) shu birja konteksiga o'tadi */
@@ -464,13 +472,13 @@ function walletView(v){var c=S.cex;if(!c||Date.now()-c.at>30000)cexLoad();
  if(!c){v.innerHTML=h+'<div class="empty glass rise">'+esc(t('loading'))+'</div>';return}
  var acc=cxList(),tot=0,up=0,ok=0;acc.forEach(function(a){if(!a.err&&!a.df){tot+=a.total||0;ok++;if(a.fut)up+=a.fut.upnl||0}});if(S.dflink&&!S.dfoff&&!S.dfx)dfxLoad();
  if(acc.length){h+='<div class="slide glass acc rise" style="min-height:0;padding:18px 18px 16px" onclick="cexLoad(1);toast(esc(t(\'cx_upd\')))"><div class="k">'+esc(t('cx_total'))+'</div>'
-  +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+n2(tot)+'</div>'
+  +'<div style="font-size:32px;font-weight:900;letter-spacing:-.03em;margin-top:4px">$'+mn(tot)+'</div>'
   +'<div class="rs" style="margin-top:4px">'+ok+' '+esc(t('cx_n'))+(up?' · uPnL <b class="'+(up>=0?'g':'r')+'">'+fm(up)+'</b>':'')+'</div>'
   +'</div>';
   h+='<div class="sect rise">'+esc(t('cx_mine'))+'</div>'+acc.map(function(a){var m=cexMeta(a.ex),np=(a.pos||[]).length;
    return'<div class="row glass rise" onclick="cexOpen(\''+a.ex+'\')">'+cexBadge(a.ex)+'<div class="rm"><div class="rn">'+esc(m[1])+(a.df?' <span class="b bx">Prop</span>':'')+'</div><div class="rs">'
    +(a.err?'<span class="r">'+esc(cexErr(a.err))+'</span>':esc(a.mask)+(np?' · '+np+' '+esc(t('cx_pos_n')):''))+'</div></div>'
-   +(a.err?'':'<div class="rv">$'+n2(a.total||0)+(a.fut&&a.fut.upnl?'<small class="'+(a.fut.upnl>=0?'g':'r')+'">'+fm(a.fut.upnl)+'</small>':'')+'</div>')+'</div>'}).join('')}
+   +(a.err?'':'<div class="rv">$'+mn(a.total||0)+(a.fut&&a.fut.upnl?'<small class="'+(a.fut.upnl>=0?'g':'r')+'">'+fm(a.fut.upnl)+'</small>':'')+'</div>')+'</div>'}).join('')}
  var have={};acc.forEach(function(a){have[a.ex]=1});var rest=CEX.filter(function(x){return!have[x[0]]});
  if(S.dflink&&!have.dipfunded)rest=rest.concat([['dipfunded','Dip Funded']]);
  if(rest.length){h+='<div class="sect rise">'+esc(t(acc.length?'cx_more':'cx_connect'))+'</div>';
@@ -504,7 +512,7 @@ function cexOpen(ex){if(ex=='dipfunded'){dfOpen();return}var a=cexAcc(ex);if(!a)
  var h='<h4 style="display:flex;align-items:center;gap:10px">'+cexBadge(ex,30)+esc(m[1])+' <span class="rs" style="font-weight:600">'+esc(a.mask)+'</span></h4>';
  if(a.err)h+='<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(255,92,92,.35)"><b class="r">✕ '+esc(cexErr(a.err))+'</b></div>';
  else h+='<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(194,242,58,.3)"><b class="g">✓ '+esc(t('cx_ok_conn'))+'</b>'+(S.cex&&S.cex.at?'<div class="rs" style="margin-top:3px">'+esc(t('cx_checked'))+': '+ctrDate(S.cex.at)+'</div>':'')+'</div>';
- if(!a.err){h+=row(t('cx_total'),'$'+n2(a.total||0))+row('Spot','$'+n2(a.spot_usd||0))+row('Futures',a.fut?'$'+n2(a.fut.eq||0):'—');
+ if(!a.err){h+=row(t('cx_total'),'$'+mn(a.total||0))+row('Spot','$'+mn(a.spot_usd||0))+row('Futures',a.fut?'$'+mn(a.fut.eq||0):'—');
   var tr=a.trade||{},yn=function(v){return v?'<span class="g">✓</span>':'<span class="m">—</span>'};
   h+='<div class="rs" style="margin:12px 2px 2px;font-weight:700">'+esc(t('cx_perm'))+'</div>'+row(t('cx_p_read'),yn(true))
    +row('Spot '+t('tr_trade'),yn(tr.spot))+row('Futures '+t('tr_trade'),ex=='mexc'?'<span class="m">'+esc(t('tv_mexc_fut_s'))+'</span>':yn(tr.fut));
@@ -533,7 +541,7 @@ function cxHome(v,w){var a=w.acc,ex=w.ex,m=cexMeta(ex);
  var st=(S.cxst||{})[ex];if(!st)cxStatLoad(ex,'ytd');var sy=st&&st.ytd;
  var sl=[];
  sl.push('<div class="slide glass acc" onclick="cexOpen(\''+ex+'\')"><div class="art" style="opacity:1">'+cexBadge(ex,34)+'</div><div class="k"><span class="pulse"></span>'+esc(t('cx_total'))+'</div>'
-  +'<div class="v">$'+n2(a.total||0)+'</div><div class="d">Spot $'+n2(a.spot_usd||0)+(a.fut?' · Futures $'+n2(a.fut.eq||0):'')+(hp&&hp.length>1?' · '+balChg(hp):'')+'</div>'+(hp&&hp.length>1?'<div class="sch">'+balChart(hp,52,'cxs1')+'</div>':'')+'</div>');
+  +'<div class="v">$'+mn(a.total||0)+'</div><div class="d">Spot $'+mn(a.spot_usd||0)+(a.fut?' · Futures $'+mn(a.fut.eq||0):'')+(hp&&hp.length>1?' · '+balChg(hp):'')+'</div>'+(hp&&hp.length>1?'<div class="sch">'+balChart(hp,52,'cxs1')+'</div>':'')+'</div>');
  sl.push('<div class="slide glass'+(up>0?' acc':'')+'" onclick="go(\'signals\')"><div class="art">'+ic('trend',28)+'</div><div class="k">'+esc(t('pnl_total'))+'</div><div class="v '+(up>=0?'g':'r')+'">'+(P.length?fm(up):'—')+'</div>'
   +'<div class="d">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="sch">'+mbars(P.map(function(p){return p.upnl||0}),300,46)+'</div>':'')+'</div>');
  if(sy&&sy.n)sl.push('<div class="slide glass" onclick="cxStats(\''+ex+'\')"><div class="art">'+ic('bars',28)+'</div><div class="k">'+esc(t('cx_st_ytd'))+'</div><div class="v '+(sy.pnl>=0?'g':'r')+'">'+fm(sy.pnl)+'</div>'
@@ -565,7 +573,7 @@ function cxSignals(v,w){var a=w.acc,ex=w.ex;if(!a){v.innerHTML='<div class="spk"
    return'<div class="sig glass rise" onclick="cxTerm(\''+ex+'\',\''+esc(p.sym)+'\')" style="cursor:pointer"><div class="sh"><div style="display:flex;align-items:center;gap:10px">'+coinIc(p.sym,30)+'<div><div class="sym">'+esc(p.sym)+'<span class="b '+(lg?'bl':'bs')+'">'+(lg?'LONG':'SHORT')+'</span>'+(p.lev?'<span class="b bx">'+(+p.lev)+'x</span>':'')+'</div>'
    +'<div class="m" style="font-size:11px;margin-top:2px">'+esc(cexMeta(ex)[1])+' · '+(+p.qty)+'</div></div></div><div class="pnl '+(p.upnl>=0?'g':'r')+'">'+fm(p.upnl||0)+'<small>'+fpc(roi)+'</small></div></div>'
    +'<div class="kv"><div><b>'+esc(t('entry'))+'</b>'+fp(p.entry)+'</div><div><b>'+esc(t('price'))+'</b>'+fp(p.mark)+'</div><div><b>LIQ</b>'+fp(p.liq)+'</div></div>'
-   +'<div class="kv" style="margin-top:4px"><div><b>TP</b>'+fp(tz.tp)+'</div><div><b>SL</b>'+fp(tz.sl)+'</div><div><b>'+esc(t('cx_margin'))+'</b>$'+n2(p.entry*p.qty/(p.lev||1))+'</div></div>'
+   +'<div class="kv" style="margin-top:4px"><div><b>TP</b>'+fp(tz.tp)+'</div><div><b>SL</b>'+fp(tz.sl)+'</div><div><b>'+esc(t('cx_margin'))+'</b>$'+mn(p.entry*p.qty/(p.lev||1))+'</div></div>'
    +(tr.fut?'<div class="acts" onclick="event.stopPropagation()"><button class="btn" onclick="trTpslSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">TP / SL</button><button class="btn" onclick="trCloseSheet(\''+esc(p.sym)+'\',\''+esc(p.ps||'BOTH')+'\')">'+esc(t('tr_close'))+'</button></div>':'')+'</div>'}).join('')
   :'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('cx_no_pos'))+'</div></div>';
  v.innerHTML=h}
@@ -626,7 +634,7 @@ function stkView(v,w){var K=stkS(),i=K.info,buy=K.side=='buy',lim=K.type=='limit
  if(lim){h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('tv_price').replace(/\s*\(.*\)\s*$/,''))+' (USD)</div>'+inp('price',i?n2(i.price):'',K.price||(i?String(Math.round(i.price*100)/100):''),phA(i?i.price:0,0));
   h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('stk_qty'))+(fx.fr?' · '+esc(t('stk_frac')):'')+'</div>'+inp('qty','0',K.qty);
   h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('stk_ses'))+'</div><div class="chips" style="margin-bottom:8px">'+ch('ses','RTH','RTH',K.ses=='RTH')+(fx.ext?ch('ses','EXTENDED','Extended',K.ses=='EXTENDED'):'')+(fx.on?ch('ses','24H','24H',K.ses=='24H'):'')+'<span style="width:10px"></span>'+ch('tif','DAY','DAY',K.tif=='DAY')+ch('tif','GTC','GTC',K.tif=='GTC')+'</div>'}
- else if(buy){var av=i?i.avail.quote:null;h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('stk_amt'))+(av!=null?' · '+esc(t('tv_avbl'))+': <b style="color:var(--ink)">$'+n2(av)+'</b>':'')+'</div>'+inp('amt','0',K.amt)
+ else if(buy){var av=i?i.avail.quote:null;h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('stk_amt'))+(av!=null?' · '+esc(t('tv_avbl'))+': <b style="color:var(--ink)">$'+mn(av)+'</b>':'')+'</div>'+inp('amt','0',K.amt)
   +(av?'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(p){return'<span class="chip glass" onclick="var e=document.getElementById(\'sk_amt\');e.value='+(Math.floor(av*p)/100)+';stkKeep();stkHint()">'+p+'%</span>'}).join('')+'</div>':'')}
  else{h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('stk_qty'))+' · '+esc(t('tv_avbl'))+': <b style="color:var(--ink)">'+(+held.toPrecision(9))+'</b></div>'+inp('qty','0',K.qty)
   +(held?'<div class="chips" style="margin:-2px 0 10px">'+[25,50,100].map(function(p){var q=p==100?held:Math.floor(held*p/100*1e6)/1e6;return'<span class="chip glass" onclick="document.getElementById(\'sk_qty\').value='+q+';stkKeep();stkHint()">'+p+'%</span>'}).join('')+'</div>':'')}
@@ -637,11 +645,11 @@ function stkView(v,w){var K=stkS(),i=K.info,buy=K.side=='buy',lim=K.type=='limit
  /* portfel */
  var H=K.hold;h+='<div class="sec rise"><h3>'+esc(t('stk_port'))+'</h3></div><div class="eq glass rise">';
  if(!H)h+='<div class="spk" style="height:60px;margin:0"><div class="sk"></div></div>';
- else{var c=H.cash||{};h+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span class="rs" style="margin:0">USDC <b style="color:var(--ink)">$'+n2(c.USDC||0)+'</b></span><span class="rs" style="margin:0">USDT <b style="color:var(--ink)">$'+n2(c.USDT||0)+'</b></span></div>';
+ else{var c=H.cash||{};h+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span class="rs" style="margin:0">USDC <b style="color:var(--ink)">$'+mn(c.USDC||0)+'</b></span><span class="rs" style="margin:0">USDT <b style="color:var(--ink)">$'+mn(c.USDT||0)+'</b></span></div>';
   if(!(H.pos||[]).length)h+='<p class="rs" style="margin:8px 2px">'+esc(t('stk_none'))+'</p>';
   (H.pos||[]).forEach(function(p){var up=p.upnl;h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.06);cursor:pointer" onclick="S.stk.sym=\''+esc(p.sym)+'\';S.stk.side=\'sell\';S.stk.info=null;stkLoad();stkRe()">'+stkIc(p.sym,28)
    +'<div style="flex:1;min-width:0"><b>'+esc(p.sym)+'</b> <span class="rs" style="display:inline">'+(+(+p.qty).toPrecision(8))+' · avg $'+n2(p.avg)+'</span>'+(p.tok?'<div class="rs" style="margin:0">'+esc(p.tok)+(p.tok_qty?' · '+(+p.tok_qty.toPrecision(8)):'')+'</div>':'')+'</div>'
-   +'<div style="text-align:right"><b>'+(p.val!=null?'$'+n2(p.val):'—')+'</b>'+(up!=null?'<div class="'+(up>=0?'g':'r')+'" style="font-size:12px;font-weight:700">'+(up>=0?'+':'−')+'$'+n2(Math.abs(up))+'</div>':'')+'</div></div>'
+   +'<div style="text-align:right"><b>'+(p.val!=null?'$'+mn(p.val):'—')+'</b>'+(up!=null?'<div class="'+(up>=0?'g':'r')+'" style="font-size:12px;font-weight:700">'+(up>=0?'+':'−')+'$'+mn(Math.abs(up))+'</div>':'')+'</div></div>'
    +(p.tok?'<div style="display:flex;gap:6px;margin:0 0 8px 38px">'+(p.qty>0?'<button class="btn" style="margin:0;padding:6px 10px;font-size:11.5px;width:auto" onclick="event.stopPropagation();stkConv(\'mint\',\''+esc(p.sym)+'\','+p.qty+')">→ '+esc(p.tok)+'</button>':'')+(p.tok_qty>0?'<button class="btn" style="margin:0;padding:6px 10px;font-size:11.5px;width:auto" onclick="event.stopPropagation();stkConv(\'redeem\',\''+esc(p.tok)+'\','+p.tok_qty+')">'+esc(p.tok)+' → '+esc(p.sym)+'</button>':'')+'</div>':'')})}
  h+='</div>';
  var O=K.open||[];if(O.length){h+='<div class="sec rise"><h3>'+esc(t('tr_open'))+' ('+O.length+')</h3></div><div class="eq glass rise">'+O.map(function(o){return'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)"><div style="flex:1"><b>'+esc(o.sym)+'</b> <span class="'+(o.side=='buy'?'g':'r')+'" style="font-size:11px;font-weight:800">'+o.side.toUpperCase()+'</span> <span class="rs" style="display:inline">'+o.type.toUpperCase()+(o.price?' $'+n2(o.price):'')+' · '+(o.qty?(+o.qty)+' dona':'$'+n2(o.notional))+(o.session?' · '+esc(o.session):'')+'</span></div><button class="btn" style="margin:0;width:auto;flex:none;padding:6px 12px;color:var(--r)" onclick="stkCancel(\''+esc(o.id)+'\')">✕</button></div>'}).join('')+'</div>'}
@@ -716,7 +724,7 @@ function tvView(v,w){var a=w.acc,ex=w.ex,DF=ex=='dipfunded',T;if(!a){if(DF)dfxLo
  var tb=function(k,l){return'<a onclick="tvSet(\'tab\',\''+k+'\')" style="padding:10px 2px;margin-right:14px;font-weight:800;font-size:13px;white-space:nowrap;'+(T.tab==k?'color:var(--ink);border-bottom:2px solid #f0b90b':'color:var(--mut)')+'">'+esc(l)+'</a>'};
  h+='<div class="rise" style="display:flex;margin:18px 2px 10px;border-bottom:1px solid rgba(255,255,255,.08)">'+tb('orders',t('tv_orders')+' ('+O.length+')')+tb('pos',t('tv_pos')+' ('+P.length+')')+(DF?'':tb('hold',t('tv_hold')+' ('+A.length+')'))+'</div>';
  if(T.tab=='pos')h+=P.length?P.map(function(p){return DF?dfPosCard(p):cxPosCard(ex,p,tr)}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('cx_no_pos'))+'</div></div>';
- else if(T.tab=='hold')h+=A.length?A.map(function(x){return'<div class="row glass rise" onclick="tvSellAsset(\''+esc(x.a)+'\','+x.q+')">'+coinIc(x.a,28)+'<div class="rm"><div class="rn">'+esc(x.a)+'</div><div class="rs">'+(+x.q.toPrecision(8))+'</div></div><div class="rv">'+(x.usd!=null?'$'+n2(x.usd):'—')+(tr.spot?'<small style="color:#f6465d">Sell ›</small>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+esc(t('cx_empty'))+'</div>';
+ else if(T.tab=='hold')h+=A.length?A.map(function(x){return'<div class="row glass rise" onclick="tvSellAsset(\''+esc(x.a)+'\','+x.q+')">'+coinIc(x.a,28)+'<div class="rm"><div class="rn">'+esc(x.a)+'</div><div class="rs">'+(+x.q.toPrecision(8))+'</div></div><div class="rv">'+(x.usd!=null?'$'+mn(x.usd):'—')+(tr.spot?'<small style="color:#f6465d">Sell ›</small>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+esc(t('cx_empty'))+'</div>';
  else h+=O.length?O.map(function(o){return'<div class="sig glass rise" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:9px">'+coinIc(o.sym,26)
    +'<div style="flex:1;min-width:0"><div style="font-weight:800">'+esc(o.sym)+' <span class="b '+(o.side=='buy'?'bl':'bs')+'">'+o.side.toUpperCase()+'</span> <span class="rs" style="display:inline">'+esc(String(o.type).replace(/_/g,' ').toUpperCase())+'</span></div><div class="rs">'+(o.trigger?'⚡ '+fp(o.trigger):fp(o.price))+(o.qty?' · '+(+o.qty):'')+(o.filled?' · '+esc(t('tv_filled'))+' '+(+o.filled):'')+'</div></div>'
    +(can?'<button class="btn" style="margin:0;color:var(--r);flex:none;width:42px;padding:8px 0" onclick="tvCancel(\''+esc(o.sym)+'\',\''+o.id+'\','+(o.algo?1:0)+')">✕</button>':'')+'</div></div>'}).join(''):'<div class="empty glass rise">'+ic('orbit',40)+'<div>'+esc(t('tv_no_orders'))+'</div></div>';
@@ -918,7 +926,7 @@ function trRender(){var T=S.tr;if(!T)return;var i=T.info,fut=T.mkt=='fut',v=T.v|
  if(T.type=='limit')h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('tr_p',t('df_limit_p'),v.tr_p!=null?v.tr_p:(i?i.price:''));
  if(fut){h+='<div class="rs" style="margin:0 2px 5px">'+esc(t('tr_lev'))+': <b style="color:var(--ink)">'+(T.lev||'—')+'x</b></div><div class="chips" style="margin-bottom:10px;flex-wrap:wrap">'+[1,2,3,5,10,20,50].map(function(x){return ch('lev',x,x+'x')}).join('')+'</div>'}
  var sell=!fut&&T.side=='sell',av=i?(sell?i.avail.base:i.avail.quote):null;
- h+='<div class="rs" style="margin:0 2px 5px">'+esc(t(fut?'tr_margin':sell?'tr_qty':'df_amount'))+(av!=null?' · '+esc(t('df_free'))+': <b style="color:var(--ink)">'+(sell?(+av.toPrecision(8))+' '+esc(base):'$'+n2(av))+'</b>':'')+'</div>'+dfIn('tr_a','0',v.tr_a||'')
+ h+='<div class="rs" style="margin:0 2px 5px">'+esc(t(fut?'tr_margin':sell?'tr_qty':'df_amount'))+(av!=null?' · '+esc(t('df_free'))+': <b style="color:var(--ink)">'+(sell?(+av.toPrecision(8))+' '+esc(base):'$'+mn(av))+'</b>':'')+'</div>'+dfIn('tr_a','0',v.tr_a||'')
   +'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="trPct('+x+')">'+x+'%</span>'}).join('')+'</div>';
  var amt=parseFloat(v.tr_a),px=T.type=='limit'?parseFloat(v.tr_p):(i?i.price:NaN);
  if(amt>0&&px>0){var line=fut?(esc(t('tr_size'))+' ≈ $'+n2(amt*(T.lev||1))+' · '+(+(amt*(T.lev||1)/px).toPrecision(6))+' '+esc(base)):sell?('≈ $'+n2(amt*px)):('≈ '+(+(amt/px).toPrecision(6))+' '+esc(base));h+='<div class="rs" style="margin:-4px 2px 10px">'+line+'</div>'}
@@ -1566,7 +1574,7 @@ function dfOpen(){var x=S.dfx||{},s=S.dfs;tick();
  var h='<h4 style="display:flex;align-items:center;gap:10px">'+dfLogo(30)+'Dip Funded</h4>';
  h+=x.err?'<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(255,92,92,.35)"><b class="r">✕ '+esc(t('df_unav'))+'</b></div>'
   :'<div class="glass" style="border-radius:14px;padding:12px;margin-bottom:10px;border-color:rgba(194,242,58,.3)"><b class="g">✓ '+esc(t('cx_ok_conn'))+'</b><div class="rs" style="margin-top:3px">'+esc(t('dfx_auto'))+'</div></div>';
- if(s)h+=row(t('df_equity2'),'$'+n2(+s.equity||0))+row(t('df_balance'),'$'+n2(+s.balance||0))+row(t('df_free'),'$'+n2(+s.available||0));
+ if(s)h+=row(t('df_equity2'),'$'+mn(+s.equity||0))+row(t('df_balance'),'$'+mn(+s.balance||0))+row(t('df_free'),'$'+mn(+s.available||0));
  h+=dfAccList(1);
  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"><button class="btn p" style="margin:0" onclick="sheetClose();dfGo()">'+esc(t('cx_open_ws'))+'</button>'
   +'<button class="btn" style="margin:0" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button></div>'
@@ -1577,7 +1585,7 @@ function dfOpen(){var x=S.dfx||{},s=S.dfs;tick();
 function dfAccList(inSheet){var x=S.dfx||{},L=x.accs||[];if(L.length<2)return'';
  return'<div class="sect" style="margin-top:12px">'+esc(t('dfx_accs'))+' · '+L.length+'</div>'+L.map(function(a){var on=a.id==x.cur,pos=(+a.pnl_pct||0)>=0;
   return'<div class="row glass'+(on?' acc':'')+'" style="padding:10px 12px" onclick="'+(inSheet?'sheetClose();':'')+'dfSwitch('+a.id+')"><div class="av" style="font-size:11px;width:34px;height:34px">#'+a.id+'</div><div class="rm"><div class="rn" style="font-size:14px">'+esc(a.name)+(on?' <span class="b bl">✓</span>':'')+'</div><div class="rs">'+esc(a.status_txt)+'</div></div>'
-  +(a.equity!=null?'<div class="rv '+(pos?'g':'r')+'" style="font-size:14px">$'+n2(+a.equity)+'<small>'+fpc(+a.pnl_pct||0)+'</small></div>':'')+'</div>'}).join('')}
+  +(a.equity!=null?'<div class="rv '+(pos?'g':'r')+'" style="font-size:14px">$'+mn(+a.equity)+'<small>'+fpc(+a.pnl_pct||0)+'</small></div>':'')+'</div>'}).join('')}
 /* Bosh sahifa (Dip Funded konteksti) */
 function dfHome(v){var x=S.dfx,s=S.dfs;
  if(!x){dfxLoad();v.innerHTML='<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
@@ -1585,21 +1593,21 @@ function dfHome(v){var x=S.dfx,s=S.dfs;
  var L=x.accs||[];
  if(!L.length){v.innerHTML='<div class="empty glass rise">'+dfLogo(44)+'<div style="margin:10px 0 14px">'+esc(t('df_none'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dfbuy)">'+esc(t('df_buy'))+'</button></div>'+tourAd();return}
  var h='';
- if(L.length>1)h+='<div class="chips rise" style="margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">'+L.map(function(a){return'<span class="chip glass'+(a.id==x.cur?' on':'')+'" style="white-space:nowrap" onclick="dfSwitch('+a.id+')">'+(a.tour?'🏆 ':'')+'#'+a.id+' · $'+n2(+a.equity||0)+'</span>'}).join('')+'</div>';
+ if(L.length>1)h+='<div class="chips rise" style="margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto">'+L.map(function(a){return'<span class="chip glass'+(a.id==x.cur?' on':'')+'" style="white-space:nowrap" onclick="dfSwitch('+a.id+')">'+(a.tour?'🏆 ':'')+'#'+a.id+' · $'+mn(+a.equity||0)+'</span>'}).join('')+'</div>';
  if(!s||s.id!=x.cur){if(!s)dfOneLoad();v.innerHTML=h+'<div class="spk"><div class="sk"></div></div><div class="spk"><div class="sk"></div></div>';return}
  var P=s.positions||[],up=0;P.forEach(function(p){up+=+p.upnl||0});var st=(S.cxst||{}).dipfunded;if(!st)cxStatLoad('dipfunded','ytd');var sy=st&&st.ytd;
  var sl=[];
  sl.push('<div class="slide glass acc" onclick="dfOpen()"><div class="art" style="opacity:1">'+dfLogo(34)+'</div><div class="k"><span class="pulse"></span>#'+s.id+' · '+esc(dfAccName(s.id,s.name))+'</div>'
-  +'<div class="v">$'+n2(+s.equity||0)+'</div><div class="d"><span class="'+((+s.pnl||0)>=0?'g':'r')+'">'+fm(+s.pnl||0)+'</span> · '+esc(s.status_txt)+'</div></div>');
+  +'<div class="v">$'+mn(+s.equity||0)+'</div><div class="d"><span class="'+((+s.pnl||0)>=0?'g':'r')+'">'+fm(+s.pnl||0)+'</span> · '+esc(s.status_txt)+'</div></div>');
  sl.push('<div class="slide glass'+(up>0?' acc':'')+'" onclick="go(\'signals\')"><div class="art">'+ic('trend',28)+'</div><div class="k">'+esc(t('pnl_total'))+'</div><div class="v '+(up>=0?'g':'r')+'">'+(P.length?fm(up):'—')+'</div>'
   +'<div class="d">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="sch">'+mbars(P.map(function(p){return +p.upnl||0}),300,46)+'</div>':'')+'</div>');
  if(sy&&sy.n)sl.push('<div class="slide glass" onclick="cxStats(\'dipfunded\')"><div class="art">'+ic('bars',28)+'</div><div class="k">'+esc(t('cx_st_ytd'))+'</div><div class="v '+(sy.pnl>=0?'g':'r')+'">'+fm(sy.pnl)+'</div>'
   +'<div class="d">'+esc(t('cx_tr_cnt',{n:sy.n}))+' · '+Math.round(sy.wr)+'% WR</div>'+(sy.curve&&sy.curve.length>1?'<div class="sch">'+mline(sy.curve.map(function(z){return z[1]}),300,52,'dfs3')+'</div>':'')+'</div>');
  S.nslides=sl.length;if(S.slide>=sl.length)S.slide=0;
  h+='<div class="slider rise" id="slider">'+sl.join('')+'</div><div class="dots rise" id="dots">'+sl.map(function(_,k){return'<i class="'+(k==S.slide?'on':'')+'"></i>'}).join('')+'</div>';
- h+='<div class="tiles rise"><div class="tile2 glass"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">$'+n2(+s.balance||0)+'</div></div><div class="tile2 glass"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">$'+n2(+s.available||0)+'</div></div></div>';
- if(s.tradable){h+='<div class="eq glass rise">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,'$'+n2(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,'$'+n2(+s.max.left));
-  if(s.target&&s.target.progress!=null)h+=bar(t('df_target'),s.target.progress,'$'+n2(+s.target.amount));if(s.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+s.days.done+' / '+s.days.min+'</div>';h+='</div>';
+ h+='<div class="tiles rise"><div class="tile2 glass"><div class="k">'+esc(t('df_balance'))+'</div><div class="v" style="font-size:16px">$'+mn(+s.balance||0)+'</div></div><div class="tile2 glass"><div class="k">'+esc(t('df_free'))+'</div><div class="v" style="font-size:16px">$'+mn(+s.available||0)+'</div></div></div>';
+ if(s.tradable){h+='<div class="eq glass rise">';if(s.daily)h+=bar(t('df_daily'),s.daily.used_pct,'$'+mn(+s.daily.left));if(s.max)h+=bar(t('df_maxdd'),s.max.used_pct,'$'+n2(+s.max.left));
+  if(s.target&&s.target.progress!=null)h+=bar(t('df_target'),s.target.progress,'$'+mn(+s.target.amount));if(s.days)h+='<div class="rs" style="margin-top:6px">'+esc(t('df_days'))+': '+s.days.done+' / '+s.days.min+'</div>';h+='</div>';
   h+='<div class="rise" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><button class="btn p" style="margin:0;padding:13px;font-size:14px" onclick="go(\'signals\')">Spot '+esc(t('tr_trade'))+'</button><button class="btn" style="margin:0;padding:13px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:7px" onclick="dfTerm('+s.id+',\''+esc((P[0]||{}).symbol||'BTC')+'\')">'+ic('candle',16)+' '+esc(t('dfx_chart'))+'</button></div>'}
  h+='<div class="card glass acc rise" onclick="go(\'signals\')"><h2>'+esc(t('cx_pos'))+'</h2><div class="s">'+esc(t('open_sub'))+'</div><div class="tag">'+esc(t('cx_pos_open',{n:P.length}))+'</div>'+(P.length?'<div class="cch">'+mbars(P.map(function(p){return +p.upnl||0}),300,40)+'</div>':'<div class="deco">'+ic('trend',50)+'</div>')+'</div>'
   +'<div class="row2"><div class="card glass rise" onclick="cxStats(\'dipfunded\')"><h2>'+esc(t('stats'))+'</h2><div class="s">'+esc(sy&&sy.n?t('cx_st_ytd'):t('stats_sub'))+'</div>'+(sy&&sy.n?'<div class="deco" style="right:12px;bottom:10px">'+mring(sy.wr,52)+'</div>':'<div class="deco">'+ic('bars',36)+'</div>')+'</div>'
@@ -1626,7 +1634,7 @@ function dfPosCard(p){var key='df:'+p.symbol,more=(S.cxMore||{})[key],up=+p.upnl
   +'<div class="mcg">'+it('t_vol',n2(+p.value||0))+it('t_qty',String(+(+p.qty||0).toPrecision(8)))+it('t_entry_px',fp(p.avg))
   +it('t_now',fp(p.price))+it('stop',p.sl!=null?fp(p.sl):'—',p.sl!=null?'r':'')+it('tp_btn',p.tp!=null?fp(p.tp):'—',p.tp!=null?'g':'')+'</div>';
  if(more){var eq=+s.equity||0;h+='<div class="mcg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)">'+it('t_margin',n2((+p.avg||0)*(+p.qty||0)))+it('dfx_share',eq?(((+p.value||0)/eq*100).toFixed(1)+'%'):'—')+it('df_free',n2(+s.available||0))
-  +it('df_equity2',n2(eq))+it('df_daily',s.daily?n2(+s.daily.left):'—')+it('df_maxdd',s.max?n2(+s.max.left):'—')+'</div>'}
+  +it('df_equity2',mn(eq))+it('df_daily',s.daily?mn(+s.daily.left):'—')+it('df_maxdd',s.max?mn(+s.max.left):'—')+'</div>'}
  h+='</div><div class="mcb">'+(s.tradable?'<button class="btn" onclick="dfPTpsl(\''+esc(p.symbol)+'\')">TP/SL</button>':'')
   +'<button class="btn" onclick="dfShare(\''+esc(p.symbol)+'\')">'+esc(t('t_share'))+'</button>'
   +'<button class="btn" onclick="cxMoreT(\''+esc(key)+'\')">'+esc(t('t_more'))+' '+(more?'▴':'▾')+'</button>'
@@ -1644,7 +1652,7 @@ function dfPTpsl(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){retur
  sheetOpen('<h4>TP / SL · '+esc(sym)+'</h4><p>'+esc(t('df_tpsl_hint'))+'</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfp_sl','SL',p.sl)+dfIn('dfp_tp','TP',p.tp)+'</div>'
   +'<button class="btn p full" style="width:100%" onclick="dfAct({op:\'protect\',symbol:\''+esc(sym)+'\',sl:dfV(\'dfp_sl\'),tp:dfV(\'dfp_tp\')},sheetClose)">'+esc(t('save'))+'</button>')}
 function dfPSell(sym){var p=((S.dfs||{}).positions||[]).filter(function(x){return x.symbol==sym})[0];if(!p)return;
- sheetOpen('<h4>'+coinIc(sym,20)+' SELL · '+esc(sym)+'</h4><p>'+esc(t('df_qty'))+': '+esc(p.qty||'')+' · $'+n2(+p.value||0)+'</p><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
+ sheetOpen('<h4>'+coinIc(sym,20)+' SELL · '+esc(sym)+'</h4><p>'+esc(t('df_qty'))+': '+esc(p.qty||'')+' · $'+mn(+p.value||0)+'</p><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'
   +[25,50,75,100].map(function(x){return'<button class="btn" style="margin:0'+(x==100?';background:rgba(255,92,92,.16);color:var(--r);border-color:rgba(255,92,92,.3)':'')+'" onclick="dfAct({op:\'sell\',symbol:\''+esc(sym)+'\',fraction:'+(x/100)+'},sheetClose)">'+x+'%</button>'}).join('')+'</div>')}
 /* eski kirish nuqtalari — endi Dip Funded konteksti */
 function openDf(){dfGo()}
@@ -1672,7 +1680,7 @@ function sgRender(){var g=S.sg,b=document.getElementById('sgbox');if(!g||!g.s||!
  if(!D.length){b.innerHTML=h+'<p style="margin-top:12px;line-height:1.5">'+esc(t(lg?'sg_nodest':'sg_nodest_s'))+'</p><button class="btn p full" style="width:100%" onclick="sheetClose();go(\'wallet\')">'+esc(t('cx_connect'))+'</button>';return}
  h+='<div class="rs" style="margin:12px 2px 6px;font-weight:700">'+esc(t('sg_where'))+'</div><div class="chips" style="margin-bottom:8px">'+D.map(function(z){return'<span class="chip glass'+(z.k==g.dest?' on':'')+'" onclick="S.sg.dest=\''+z.k+'\';S.sg.av=null;sgAvail();sgRender()">'+esc(z.lb)+'</span>'}).join('')+'</div>';
  h+='<div class="chips" style="margin-bottom:8px">'+['market','limit'].map(function(m){return'<span class="chip glass'+(g.type==m?' on':'')+'" onclick="S.sg.type=\''+m+'\';sgKeep();sgRender()">'+(m=='limit'?'Limit · '+fp(x.entry):'Market')+'</span>'}).join('')+'</div>';
- h+='<div class="rs" style="margin:2px 2px 5px">'+esc(t(dd.mkt=='fut'?'sg_margin':'df_amount'))+(g.av!=null?' · '+esc(t('tv_avbl'))+' $'+n2(g.av):'')+'</div>'+dfIn('sg_a','USDT',g.amt)
+ h+='<div class="rs" style="margin:2px 2px 5px">'+esc(t(dd.mkt=='fut'?'sg_margin':'df_amount'))+(g.av!=null?' · '+esc(t('tv_avbl'))+' $'+mn(g.av):'')+'</div>'+dfIn('sg_a','USDT',g.amt)
   +(g.av?'<div class="chips" style="margin:-2px 0 10px">'+[10,25,50,100].map(function(p){return'<span class="chip glass" onclick="document.getElementById(\'sg_a\').value='+Math.floor(g.av*p)/100+'">'+p+'%</span>'}).join('')+'</div>':'')
   +(dd.ex=='dipfunded'&&g.dfp?'<div class="rs" style="margin:-4px 2px 10px;line-height:1.4">ℹ️ '+esc(t('df_lim_note',{s:x.sym.replace(/USDT$/,''),p:g.dfp}))+'</div>':'');
  if(dd.mkt=='fut')h+='<div class="rs" style="margin:0 2px 8px">'+esc(t('tr_lev'))+': <b>'+(x.lev||10)+'x</b></div>';
@@ -1685,7 +1693,7 @@ function sgAvail(){var g=S.sg;if(!g||!g.dest)return;var D=sgDests(g),dd=D.filter
  api('cextrade',{ex:dd.ex,op:'info',a:{mkt:dd.mkt,sym:g.s.sym}}).then(function(d){if(S.sg!==g||g.dest!=dd.k||!d.ok)return;g.av=+((d.r.avail||{}).quote||0);sgKeep();sgRender()}).catch(function(){})}
 function sgGo(){var g=S.sg,x=g&&g.s;if(!x)return;sgKeep();var amt=num(g.amt),D=sgDests(g),dd=D.filter(function(z){return z.k==g.dest})[0];if(!dd)return;
  if(!amt){toast(esc(t('tr_need_amt')));return}var lim=g.type=='limit',lg=x.side=='LONG',tp=x.tp_next,sl=x.sl;
- if(dd.ex=='dipfunded'&&g.av!=null&&amt>g.av+0.005){toast(esc(t('df_lim_note',{s:x.sym.replace(/USDT$/,''),p:g.dfp||50}))+'<br><b>Max $'+n2(g.av)+'</b>');return}   /* 376 */
+ if(dd.ex=='dipfunded'&&g.av!=null&&amt>g.av+0.005){toast(esc(t('df_lim_note',{s:x.sym.replace(/USDT$/,''),p:g.dfp||50}))+'<br><b>Max $'+mn(g.av)+'</b>');return}   /* 376 */
  var sum=(lg?'LONG ':'SHORT ')+x.sym+' · $'+n2(amt)+' · '+(lim?'Limit '+fp(x.entry):'Market')+(dd.mkt=='fut'?' · '+(x.lev||10)+'x':'')+(sl!=null&&!(dd.mkt=='spot'&&dd.ex!='dipfunded')?' · SL '+fp(sl):'')+(tp!=null&&!(dd.mkt=='spot'&&dd.ex!='dipfunded')?' · TP '+fp(tp):'')+'\n'+dd.lb;
  confirmBox(t('tr_confirm')+'\n\n'+sum,function(){
   if(dd.ex=='dipfunded'){var a={op:'buy',symbol:x.sym.replace(/USDT$/,''),amount:Math.round(amt*100)/100};if(lim)a.limit=x.entry;if(sl!=null)a.sl=sl;if(tp!=null)a.tp=tp;
@@ -1730,7 +1738,7 @@ function dfBuySheet(mode){var g=S.page,i=termItem(),s=S.dfs;if(!s)return;mode=mo
  sheetOpen('<h4>'+coinIc(i.symbol,20)+' BUY · '+esc(i.symbol)+'</h4><p>'+esc(t('df_free'))+': <b>'+f0(av)+'</b>'+(i.price!=null?' · '+fp(i.price):'')+'</p>'
   +'<div class="chips" style="margin-bottom:10px">'+ch('market',t('df_market'))+ch('limit',t('limit'))+'</div>'
   +(mode=='limit'?'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_limit_p'))+'</div>'+dfIn('dfb_l',t('df_limit_p'),g.nlp?g.nlp:i.price!=null?termRound(i.price*.99):'',phA(i.price,0)):'')
-  +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+' · '+esc(t('tv_max'))+': <b style="color:var(--ink)">$'+n2(mx)+'</b></div>'+dfIn('dfb_a','0','')
+  +'<div class="rs" style="margin:0 2px 5px">'+esc(t('df_amount'))+' · '+esc(t('tv_max'))+': <b style="color:var(--ink)">$'+mn(mx)+'</b></div>'+dfIn('dfb_a','0','')
   +'<div class="chips" style="margin:-2px 0 6px">'+[10,25,50,100].map(function(x){return'<span class="chip glass" onclick="document.getElementById(\'dfb_a\').value='+(x==100?mx:Math.floor(mx*x)/100)+'">'+x+'%</span>'}).join('')+'</div>'
   +'<div class="rs" style="font-size:11px;margin:0 2px 10px">'+esc(t('df_lim_note',{s:b0,p:Math.round(dfLim(s,b0)*100)}))+'</div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+dfIn('dfb_sl',t('df_sl_opt'),'',phA(i.price,1,1,0,mode=='limit'?'dfb_l':''))+dfIn('dfb_tp',t('df_tp_opt'),'',phA(i.price,1,1,0,mode=='limit'?'dfb_l':''))+'</div>'
@@ -2124,7 +2132,7 @@ navWrap(['openGroup','cxTerm','cxStats','openTerm','dfTrades','dfTerm','newSig',
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};
   S.tab=TABS.indexOf(q0.get('tab'))>=0?q0.get('tab'):'top';render();if(q0.get('g'))setTimeout(function(){openGroup(+q0.get('g'))},50);return}
  if(/^nws_\d+$/.test(sp))newsShare(+sp.slice(4));
- api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.dfoff=!!d.df_off;S.ntfoff=!!d.ntf_off;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
+ api('me').then(function(d){S.ws=d.ws;S.df=d.df;S.dfbuy=d.df_buy;S.dflink=d.df_link;S.dfoff=!!d.df_off;S.ntfoff=!!d.ntf_off;S.lang=d.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])S.lang=sl}catch(e){}S.bot=d.bot;document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);eyeSync();
   document.getElementById('botLink').onclick=function(e){e.preventDefault();toBot()};
   var saved=null;try{saved=localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==+saved})[0]||S.ws[0]||{}).id;if(saved&&String(saved).indexOf('cx:')==0)S.cur=saved;
