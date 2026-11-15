@@ -5852,6 +5852,44 @@ def _open_on_cex_kb(sig_id: int, d: dict, lang):
         InlineKeyboardButton(i18n.t("sig.chat_trade", lang), url=f"https://t.me/{BOT_USERNAME}?start=tw_{sig_id}")]])
 
 
+async def post_group_signal(bot, ws, sig_id: int, d: dict, uid: int, username, first_name,
+                            post_file_id: str | None = None, photo=None) -> int | None:
+    """383: signal kartasini guruh/kanalga yuboradi (rich yoki oddiy) va group_msg_id'ni saqlaydi —
+    `publish_signal` va `/repost` uchun bitta joy. Qaytaradi: xabar id yoki None."""
+    group_msg_id = None
+    body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
+        ws, uid, username, first_name, ws_lang(ws))
+    body = pub(ws, body)
+    rich = await rich_send(bot, ws["group_chat_id"], body, await promo_button(bot, ws),
+                           post_file_id or photo, thread_id=ws["group_topic_id"],
+                           reply_markup=_open_on_cex_kb(sig_id, d, ws_lang(ws))) if RICH_POSTS else None
+    body += await promo_line(bot, ws, body, 1024 if (post_file_id or photo) else 4096)
+    try:
+        kb = _open_on_cex_kb(sig_id, d, ws_lang(ws))
+        if rich is not None:                      # 372: rich xabar ketdi
+            sent = rich
+        elif post_file_id or photo:
+            sent = await bot.send_photo(
+                ws["group_chat_id"], post_file_id or InputFile(photo, "signal.png"), caption=body,
+                parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"], reply_markup=kb)
+        else:
+            sent = await bot.send_message(
+                ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
+                message_thread_id=ws["group_topic_id"],
+                disable_web_page_preview=True, reply_markup=kb)
+        group_msg_id = sent.message_id
+        await db.set_group_msg(sig_id, group_msg_id)
+        _promo_emoji_seen(sent, ws)
+    except Exception:
+        log.exception("Guruhga yuborib bo'lmadi")
+    if widgets.GROUPS and group_msg_id:          # 364-2/365: jonli signal kartasi (o'zi tekshiradi)
+        try:
+            await widgets.send_group_sig(bot, ws, await db.get_signal(sig_id), ws_lang(ws))
+        except Exception:
+            log.warning("Guruh widjeti xato", exc_info=True)
+    return group_msg_id
+
+
 async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
                          first_name: str | None, post_file_id: str | None = None,
                          chart_tf: str | None = None, photo: bytes | None = None) -> int:
@@ -5868,36 +5906,8 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
 
     group_msg_id = None
     if ws["type"] == "group" and ws["group_chat_id"]:
-        body = draft_text(d, sig_id, ws_lang(ws)) + author_line(
-            ws, uid, username, first_name, ws_lang(ws))
-        body = pub(ws, body)
-        rich = await rich_send(ctx.bot, ws["group_chat_id"], body, await promo_button(ctx.bot, ws),
-                               post_file_id or photo, thread_id=ws["group_topic_id"],
-                               reply_markup=_open_on_cex_kb(sig_id, d, ws_lang(ws))) if RICH_POSTS else None
-        body += await promo_line(ctx.bot, ws, body, 1024 if (post_file_id or photo) else 4096)
-        try:
-            kb = _open_on_cex_kb(sig_id, d, ws_lang(ws))
-            if rich is not None:                      # 372: rich xabar ketdi
-                sent = rich
-            elif post_file_id or photo:
-                sent = await ctx.bot.send_photo(
-                    ws["group_chat_id"], post_file_id or InputFile(photo, "signal.png"), caption=body,
-                    parse_mode=ParseMode.HTML, message_thread_id=ws["group_topic_id"], reply_markup=kb)
-            else:
-                sent = await ctx.bot.send_message(
-                    ws["group_chat_id"], body, parse_mode=ParseMode.HTML,
-                    message_thread_id=ws["group_topic_id"],
-                    disable_web_page_preview=True, reply_markup=kb)
-            group_msg_id = sent.message_id
-            await db.set_group_msg(sig_id, group_msg_id)
-            _promo_emoji_seen(sent, ws)
-        except Exception:
-            log.exception("Guruhga yuborib bo'lmadi")
-        if widgets.GROUPS and group_msg_id:          # 364-2/365: jonli signal kartasi (o'zi tekshiradi)
-            try:
-                await widgets.send_group_sig(ctx.bot, ws, await db.get_signal(sig_id), ws_lang(ws))
-            except Exception:
-                log.warning("Guruh widjeti xato", exc_info=True)
+        group_msg_id = await post_group_signal(ctx.bot, ws, sig_id, d, uid, username, first_name,
+                                               post_file_id=post_file_id, photo=photo)
 
     elif ws["type"] == "personal":
         # Shaxsiy jurnalda signal kartasi AVVAL umuman yuborilmasdi — faqat
@@ -11691,6 +11701,60 @@ async def cmd_delsig(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await msg.reply_text(txt)
 
 
+async def cmd_repost(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """383: /repost 1126 — bazada bor, lekin guruhga chiqmay qolgan ochiq signalni guruhga yuboradi
+    (yangi signaldagi AYNI post: grafik, muallif, «Trade Controller orqali», tugmalar). Posti bor bo'lsa —
+    faqat `/repost 1126 force` bilan. Faqat workspace egasi yoki super-admin."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    if not ctx.args:
+        await msg.reply_text("Foydalanish: /repost <signal raqami>")
+        return
+    try:
+        sid = int(ctx.args[0].lstrip("#"))
+    except ValueError:
+        await msg.reply_text("Foydalanish: /repost <signal raqami>")
+        return
+    force = len(ctx.args) > 1 and ctx.args[1].lower() == "force"
+    sig = await db.get_signal(sid)
+    ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+    if not sig or not ws or not can_manage(uid, ws):
+        await msg.reply_text(f"#{sid} topilmadi yoki huquq yo'q.")
+        return
+    if ws["type"] != "group" or not ws["group_chat_id"]:
+        await msg.reply_text(f"#{sid} guruh/kanalga tegishli emas.")
+        return
+    if sig["status"] not in ("PENDING", "ACTIVE") or sig["excluded"]:
+        await msg.reply_text(f"#{sid} ochiq emas (holati: {sig['status']}{', olib tashlangan' if sig['excluded'] else ''}).")
+        return
+    if sig["group_msg_id"] and not force:
+        await msg.reply_text(f"#{sid} ning guruhda posti allaqachon bor. Baribir qayta yuborish: /repost {sid} force")
+        return
+    d = {"symbol": sig["symbol"], "side": sig["side"], "entry": float(sig["entry"]),
+         "sl": float(sig["sl"]) if sig["sl"] is not None else None,
+         "tps": [float(t) for t in sig["tps"]], "market": sig["market"],
+         "entry_mode": sig["entry_mode"], "leverage": sig["leverage"]}
+    photo = None
+    if not sig["chart_file_id"]:
+        try:
+            buf = await asyncio.wait_for(chart.setup_chart(d, ws["name"], ctx.bot.username,
+                                                           tf=sig["chart_tf"] or "1h"), 15)
+            photo = buf.getvalue() if buf else None
+        except Exception:
+            log.warning("repost: grafik yasalmadi (#%s)", sid, exc_info=True)
+    author = sig["author_id"] or uid
+    try:
+        ch = await ctx.bot.get_chat(author)
+        uname, fname = ch.username, ch.first_name
+    except Exception:
+        uname = fname = None
+    mid = await post_group_signal(ctx.bot, ws, sid, d, author, uname, fname,
+                                  post_file_id=sig["chart_file_id"], photo=photo)
+    log.info("repost: #%s -> ws#%s msg=%s (uid=%s)", sid, ws["id"], mid, uid)
+    await msg.reply_text(f"✅ #{sid} «{ws['name']}» ga yuborildi." if mid else
+                         f"❌ #{sid} yuborilmadi — botning guruhdagi huquqlarini tekshiring.")
+
+
 async def cmd_richtest(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """372: /richtest — FAQAT super-admin. Namunaviy signal postini rich xabar sifatida
     (rasm + matn + «🤖 Trade Controller orqali» tugmasi) O'ZIGA yuboradi; xato bo'lsa
@@ -12301,6 +12365,7 @@ def main() -> None:
     app.add_handler(CommandHandler("charttest", cmd_charttest))
     app.add_handler(CommandHandler("richtest", cmd_richtest))
     app.add_handler(CommandHandler("delsig", cmd_delsig))
+    app.add_handler(CommandHandler("repost", cmd_repost))
     app.add_handler(CommandHandler("emoji", cmd_emoji))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))

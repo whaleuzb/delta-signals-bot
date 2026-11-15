@@ -8345,3 +8345,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "Guruhga chiqdi lekin menga bittasi kerak, bu yerda 5 ta signal bo'lib ketgan" (381 xatosidan keyingi qayta urinishlar).
 - `/delsig` (raqamsiz) — `db.dup_open_signals`: oxirgi 3 kundagi ochiq signallar, bir workspace'da bir xil juftlik/yo'nalish/kirish bilan 2+ ta → ro'yxat va tayyor buyruq (birinchisi qoladi). `/delsig 785 786` — har biri: `cancel_signal(CANCELLED)` + `set_signal_excluded(TRUE)` (statistikaga kirmaydi), guruhdagi posti (`group_msg_id`, `result_msg_id`) o'chiriladi; guruhga «yopildi» xabari yuborilmaydi. Faqat workspace egasi yoki super-admin (`can_manage`).
 - Sinov: `test_382.py` 6/6.
+
+## 383. `/repost` — guruhga chiqmay qolgan signalni yuborish
+- Foydalanuvchi: "1126 ni Whales Uzb guruhiga postini yubor" (381 xatosidan bazada qolgan, guruhga chiqmagan signal).
+- Guruh posti `publish_signal` ichidan `post_group_signal(bot, ws, sig_id, d, uid, username, first_name, post_file_id, photo)` ga ajratildi (rich/oddiy, `group_msg_id` saqlash, widjet) — yangi signal ham, repost ham AYNI kod.
+- `/repost <id>`: ochiq (PENDING/ACTIVE, excluded emas), guruh/kanal workspace'i, egasi yoki super-admin. Grafik — `chart_file_id` yoki `chart.setup_chart(..., tf=chart_tf)`; muallif — `author_id` (get_chat). Posti bor bo'lsa faqat `/repost <id> force`.
+- Sinov: `test_383.py` 6/6 (oddiy va rich yo'l, takror himoyasi, huquq, yopilgan signal), `test_369/360/app/372/382`.
