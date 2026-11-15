@@ -1999,10 +1999,13 @@ async def rich_send(bot, chat_id, body: str, tail: str = "", photo=None, *,
     eski usulda yuboradi). photo — file_id (str) yoki BytesIO."""
     global _RICH_FAILS
     if not force and (not RICH_POSTS or _RICH_FAILS >= 3):
+        if RICH_POSTS:
+            log.info("Rich xabar o'tkazildi (%s): ketma-ket xatolar %s", chat_id, _RICH_FAILS)
         return None
     try:
         h = rich_html(body, tail)
         if h is None:
+            log.info("Rich xabar o'tkazildi (%s): matnda blok teg", chat_id)
             return None
         rm: dict = {"html": h, "skip_entity_detection": True}
         kw: dict = {"chat_id": chat_id}
@@ -2033,6 +2036,7 @@ async def rich_send(bot, chat_id, body: str, tail: str = "", photo=None, *,
     try:
         r = await bot.do_api_request("sendRichMessage", api_kwargs=kw)
         _RICH_FAILS = 0
+        log.info("Rich xabar yuborildi (%s)", chat_id)
         return Message.de_json(r, bot) if isinstance(r, dict) else r
     except Exception as ex:
         _RICH_FAILS += 1
