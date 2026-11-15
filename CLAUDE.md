@@ -8325,3 +8325,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Tepadagi panel: «Bot» yonida `#eyeBtn` (ko'z / chizilgan ko'z SVG, `eyeIc`). `hideTog()` → `S.hide`, `localStorage tc_hide` (qurilmada eslab qolinadi); qayta chizish: `render()` + ochiq sahifa (term/cxst/ns/guruh) + «Birjamda ochish» oynasi. Ochiq rejimda (Telegram tashqarisi) tugma yashirin.
 - Yashiriladi (`••••`): `fm()` (±$ foyda/zarar), `f0()` (depozit/summa), yangi `mn()` — balans joylari (birja jami/Spot/Futures, aktivlar USD, marja, mavjud qoldiq, Dip Funded equity/balans/bo'sh/kunlik/maks. zarar/maqsad, hisoblar ro'yxati, aksiya portfeli qiymati/uPnL, USDC/USDT, ws tanlovidagi birja jami). Narxlar, foizlar, kiritish maydonlari va tasdiqlash xulosalari ko'rinadi.
 - Sinov: brauzer `t_eye.py` (yoqilgach sahifada `$<raqam>` qolmaydi — birja Bosh, guruh Bosh, Signallar; qayta yuklashda saqlanadi; o'chirish), `test_app`, `t_cxc`.
+
+## 379. Telegram ichida sahifadagi «‹» yashirildi
+- Foydalanuvchi (terminal skrinshoti, Telegram «Orqaga» ostidagi ‹ belgilangan): "bu tugma nega kerak?"
+- Sahifa sarlavhasidagi `.ghd>.bk[onclick="closeGroup()"]` Telegram'ning «Orqaga» tugmasi bilan bir xil ish qilardi. Telegram ichida (initData + BackButton, 6.1+) `<html class="tgb">` → bu tugma yashirin; oddiy brauzerda (ochiq rejim) ko'rinadi. Ichki qadamlar (`nsRender` — tekshiruvdan formaga, `openDf(1)`) qoladi.
+- Sinov: brauzer `t_bk.py` (terminal, statistika — display:none).
