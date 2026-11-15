@@ -813,7 +813,7 @@ function cxTermRender(g){var i=termItem(),ex=g.cx.ex,a=cexAcc(ex)||{},p=document
  var spot=g.cx.mkt=='spot',P=spot?[]:(a.pos||[]),can=cxCan(g);
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0"><h2>'+esc(i.symbol)+' <span class="b bx" style="vertical-align:middle">'+(spot?'Spot':'Futures')+'</span></h2><div class="rs">'+esc(cexMeta(ex)[1])+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(P.length>1)h+='<div class="chips" style="margin-bottom:8px">'+P.map(function(x){return'<span class="chip glass'+(x.sym==i.symbol?' on':'')+'" onclick="cxSym(\''+esc(x.sym)+'\')">'+esc(x.sym)+'</span>'}).join('')+'</div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
@@ -1088,7 +1088,15 @@ function termLoad(){var g=S.page;if(!g||g.id!='term')return;
  if(g.cx){api('dfcandles',{sym:g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,''),tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];termRender()}).catch(function(){});return}
  if(g.df){api('dfcandles',{sym:g.df.sym,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];termRender()}).catch(function(){});return}
  api('candles',{sig:g.sig,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];g.adds=d.adds||[];termRender()}).catch(function(){})}
-function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df||g.cx)return;
+function lwAuto(){try{return LW.ch.priceScale('right').options().autoScale!==false}catch(e){return true}}
+function lwUndoPush(g){g.uh=g.uh||[];g.uh.push({tf:g.tf,vr:g.vr?{span:g.vr.span,right:g.vr.right}:null,as:lwAuto()});if(g.uh.length>30)g.uh.shift();lwUndoSync(g)}
+function lwUndoSync(g){var b=document.getElementById('lwu');if(b)b.style.display=g&&g.uh&&g.uh.length?'inline-flex':'none'}
+function lwUndo(){var g=S.page;if(!g||!g.uh||!g.uh.length)return;var u=g.uh.pop();tick();
+ if(u.tf!=g.tf){g.vrKeep=u.vr;LW.noUndo=1;termTf(u.tf);LW.noUndo=0}
+ else if(u.vr){g.vr=u.vr;LW.qu=Date.now()+500;lwView(g)}
+ try{if(u.as)LW.ch.priceScale('right').applyOptions({autoScale:true})}catch(e){}
+ lwUndoSync(g)}
+function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;if(!LW.noUndo&&LW.g===g)lwUndoPush(g);g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df||g.cx)return;
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
 function termMarks(i){var M=[];
  if(i.cx)return M;
@@ -1123,7 +1131,7 @@ function termRound(p){if(p<=0)return p;var st=Math.pow(10,Math.floor(Math.log10(
 function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.cx){cxTermRender(g);return}if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
  TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
@@ -1156,10 +1164,13 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;
    autoscaleInfoProvider:function(orig){var r=orig();if(!r||!r.priceRange||LW.drag)return r;var lo=r.priceRange.minValue,hi=r.priceRange.maxValue,pad=(hi-lo)*1.2;
     (LW.L||[]).forEach(function(l){if(l.ns)return;if(l.p<lo&&l.p>=lo-pad)r.priceRange.minValue=Math.min(r.priceRange.minValue,l.p);if(l.p>hi&&l.p<=hi+pad)r.priceRange.maxValue=Math.max(r.priceRange.maxValue,l.p)});return r}});
   var ov=document.createElement('div');ov.className='lwo';el.appendChild(ov);
-  LW={el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[]};
+  LW={el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};
   ov.addEventListener('pointerdown',lwDown);
   ov.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('[data-x]');if(x){e.stopPropagation();(g.df?dfLineX:cxLineX)(x.getAttribute('data-x'))}});
-  ch.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(r&&LW.g===g&&!LW.busy&&LW.n)g.vr={span:r.to-r.from,right:LW.n-1-r.to}});
+  ch.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(r&&LW.g===g&&!LW.busy&&LW.n){
+   /* 377: grafik ichidagi "↶" — har surish/kattalashtirish seriyasidan oldingi ko'rinish yoziladi (700 ms jimlik = yangi qadam) */
+   if(Date.now()>(LW.qu||0)&&!LW.vrT&&g.vr)lwUndoPush(g);clearTimeout(LW.vrT);LW.vrT=setTimeout(function(){LW.vrT=0},700);
+   g.vr={span:r.to-r.from,right:LW.n-1-r.to}}});
   (function loop(){if(LW.g!==g)return;lwPos();requestAnimationFrame(loop)})()}
  host.appendChild(LW.el);lwData(g);lwLines(true)}
 function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
@@ -1169,7 +1180,7 @@ function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
  if(dk!==LW.dk){var nk=LW.dk.split('|').slice(0,2).join('|')!==dk.split('|').slice(0,2).join('|');LW.dk=dk;
   se.applyOptions({priceFormat:{type:'price',precision:lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)),minMove:Math.pow(10,-lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)))}});
   /* ko'rinish o'ng chetga nisbatan saqlanadi (yangi sham kelsa — grafik u bilan birga suriladi) */
-  LW.busy=1;se.setData(rows);var n=rows.length;LW.n=n;if(nk||!g.vr)g.vr={span:76,right:-6};
+  LW.busy=1;LW.qu=Date.now()+900;se.setData(rows);var n=rows.length;LW.n=n;if(nk&&g.vrKeep){g.vr=g.vrKeep;g.vrKeep=null}else if(nk||!g.vr)g.vr={span:76,right:-6};
   lwView(g);LW.busy=0;if(!LW.sized){LW.sized=1;setTimeout(function(){if(LW.g===g)lwView(g)},60);setTimeout(function(){if(LW.g===g)lwView(g)},400)}}
  else if(rows.length)se.update(rows[rows.length-1]);
  /* belgilar: xarid ▲ (oq, ostida), sotuv ▼ (sariq, ustida) — sham vaqtiga */
@@ -1412,11 +1423,13 @@ function closeGroup(){if(S.page&&S.nh.length)navBack(1);else pageHide()}
    saqlanadi; Telegram «Orqaga» tugmasi (va sahifadagi ‹) faqat BITTA oldingi holatga qaytaradi — oldingi sahifa bo'lsa
    o'sha sahifa qayta ochiladi. Ochiq oyna (sheet) bo'lsa — avval u yopiladi. Tarix bo'sh va sahifa yo'q — tugma yashirinadi (X). */
 S.nh=[];var NAVT=0;
-function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);
+function navSame(e){return e&&e.tab==S.tab&&e.cur==S.cur&&(e.key||null)==(S.page?S.pageKey||null:null)}
+function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);if(navSame(S.nh[S.nh.length-1]))return;   /* 377: takror yozilmaydi */
  S.nh.push({tab:S.tab,cur:S.cur,re:S.page?S.pageRe:null,key:S.page?S.pageKey:null,y:S.page?0:window.scrollY});if(S.nh.length>40)S.nh.shift();backSync()}
 function backSync(){try{var on=S.nh.length||S.page||document.getElementById('sheet').classList.contains('show');if(on)tg.BackButton.show();else tg.BackButton.hide()}catch(e){}}
 function navBack(fromPage){if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
- var e=S.nh.pop();if(!e){if(S.page)pageHide();backSync();return}
+ var e=S.nh.pop();while(e&&navSame(e))e=S.nh.pop();   /* 377: joriy holatning o'zi — tashlab o'tiladi */
+ if(!e){if(S.page)pageHide();backSync();return}
  NAVT=1;setTimeout(function(){NAVT=0},0);tick();
  if(S.page)pageHide();
  var rr=false;if(e.cur!=null&&e.cur!=S.cur){S.cur=e.cur;S.items=[];S.spark={};S.slide=0;try{localStorage.setItem('tc_ws',S.cur)}catch(x){}rr=true}
@@ -1775,7 +1788,7 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(dfAccName(s.id,s.name)):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>';
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
