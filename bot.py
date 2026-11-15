@@ -2000,28 +2000,36 @@ async def rich_send(bot, chat_id, body: str, tail: str = "", photo=None, *,
     global _RICH_FAILS
     if not force and (not RICH_POSTS or _RICH_FAILS >= 3):
         return None
-    h = rich_html(body, tail)
-    if h is None:
+    try:
+        h = rich_html(body, tail)
+        if h is None:
+            return None
+        rm: dict = {"html": h, "skip_entity_detection": True}
+        kw: dict = {"chat_id": chat_id}
+        if photo is not None:
+            if isinstance(photo, str):
+                media = photo
+            else:
+                # 381: rasm bytes ham, BytesIO ham bo'lishi mumkin (ilovadan — bytes; .seek yo'q edi → signal
+                # bazaga yozilib, guruhga chiqmay qolardi). Asl obyektga tegmaymiz — zaxira yo'l uni qayta o'qiydi.
+                raw = photo if isinstance(photo, (bytes, bytearray)) else (photo.getvalue() if hasattr(photo, "getvalue") else photo.read())
+                f = InputFile(io.BytesIO(raw), "rich.png", attach=True)
+                kw["rich_photo"] = f
+                media = f.attach_uri
+            rm["html"] = '<img src="tg://photo?id=p1"/>' + h
+            rm["media"] = [{"id": "p1", "media": {"type": "photo", "media": media}}]
+        kw["rich_message"] = rm
+        if thread_id:
+            kw["message_thread_id"] = thread_id
+        if reply_markup is not None:
+            kw["reply_markup"] = reply_markup
+        if reply_to:
+            kw["reply_parameters"] = {"message_id": reply_to, "allow_sending_without_reply": True}
+    except Exception as ex:                       # 381: tayyorlashdagi har qanday xato — eski formatga
+        log.warning("Rich xabar tayyorlanmadi (%s): %s — eski formatda", chat_id, ex)
+        if force:
+            raise
         return None
-    rm: dict = {"html": h, "skip_entity_detection": True}
-    kw: dict = {"chat_id": chat_id}
-    if photo is not None:
-        if isinstance(photo, str):
-            media = photo
-        else:
-            photo.seek(0)
-            f = InputFile(photo, "rich.png", attach=True)
-            kw["rich_photo"] = f
-            media = f.attach_uri
-        rm["html"] = '<img src="tg://photo?id=p1"/>' + h
-        rm["media"] = [{"id": "p1", "media": {"type": "photo", "media": media}}]
-    kw["rich_message"] = rm
-    if thread_id:
-        kw["message_thread_id"] = thread_id
-    if reply_markup is not None:
-        kw["reply_markup"] = reply_markup
-    if reply_to:
-        kw["reply_parameters"] = {"message_id": reply_to, "allow_sending_without_reply": True}
     try:
         r = await bot.do_api_request("sendRichMessage", api_kwargs=kw)
         _RICH_FAILS = 0

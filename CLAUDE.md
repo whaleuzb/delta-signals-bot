@@ -8335,3 +8335,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: "Chartda bitta o'zgarish qilsam va qaytish bossam baribir oldingi o'zgarishga qaytaryabti." (377 dan keyin ham; brauzerda takrorlanmadi.)
 - `navBack`: `S.page.id=='term'` bo'lsa — saqlanmagan `pend/drag` bekor, stack'dan har qanday terminal yozuvi (`openTerm|cxTerm|dfTerm:`) tashlab o'tiladi → bir bosishda grafikdan oldingi bo'lim/sahifaga. Grafik ichidagi qaytarish — faqat «↶» (377). `navWrap` kaliti argumentlarni satrga keltiradi (364 va "364" — bitta kalit).
 - Sinov: `t_lwu2.py` (stack'ga qo'shimcha terminal yozuvlari kiritilganda ham bitta «Orqaga» → Signallar), `t_nav`.
+
+## 381. TUZATISH: ilovadan signal yuborishda xato ("'bytes' object has no attribute 'seek'")
+- Foydalanuvchi: "acu ga signal bermoqchi edim error chiqdi". Loglar: `_app_newsig → publish_signal → rich_send → photo.seek(0)` — ilova grafik rasmini `bytes` qilib uzatadi; 372 dagi `rich_send` BytesIO kutgan. Xato `publish_signal`da signal bazaga yozilgandan KEYIN, guruh postidan OLDIN chiqqani uchun #781, #783–#786 bazada yaratilib, guruhga chiqmay qolgan.
+- `rich_send`: rasm bytes/BytesIO/fayl — hammasi `io.BytesIO(raw)` nusxaga (asl obyektga tegilmaydi, zaxira yo'l qayta o'qiy oladi); tayyorlash bosqichidagi HAR QANDAY xato ushlanadi → None (eski formatda yuboriladi). Yangi qoida: rich yo'lidagi xato hech qachon signal postini to'xtatmasligi kerak.
+- Sinov: `test_372.py` 18/18 (bytes rasm, noto'g'ri tur → None).
