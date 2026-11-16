@@ -22,18 +22,20 @@ import tracker
 
 log = logging.getLogger("chart")
 
-BG = "#101013"      # Whale uslubi: sahifa foni bilan bir xil oila
-GRID = "#28282E"
+# 385: brend palitrasi — Mini App / terminal (Lightweight Charts) bilan bir xil: qora fon,
+# ko'tarilish — lime #c2f23a, tushish — #ff5c5c, matn — iliq kulrang-yashil.
+BG = "#0b0b0c"
+GRID = "#1d2016"
 # Kichik grafik KARTA ichida turadi — foni karta rangida bo'lsa, rasm
 # chegarasi ko'rinmaydi va grafik kartaning bir qismidek o'qiladi.
-CARD_BG = "#17171B"
-TXT = "#9aa4b2"
-TITLE = "#e6e9ef"
-GREEN = "#26a69a"
-RED = "#ef5350"
-ACC = "#DADDE2"     # kumush — kirish darajasi chizig'i
-SILVER = "#8a8f99"
-VP_COLOR = "#d4a636"    # kumush emas, mo''jaz oltin — hajm profili shamlardan ajralib turishi uchun
+CARD_BG = "#131510"
+TXT = "#a2a896"
+TITLE = "#f1f4ea"
+GREEN = "#c2f23a"
+RED = "#ff5c5c"
+ACC = "#e9ece2"     # kirish darajasi chizig'i
+SILVER = "#8b9081"
+VP_COLOR = "#7f9a2c"    # 385: to'q lime — hajm profili shamlardan ajralib tursin, lekin brendga mos
 
 # Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
 TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}

@@ -8357,3 +8357,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Sabab: profil `exchange.volume_delta_profile` — oxirgi 48 soatlik MEXC aggTrades (60 000 tagacha) dan edi; grafik esa 120 sham (1h da 5 kun) — profil narx oralig'ining bir qismini qamrardi.
 - Endi `chart.candle_profile(candles, lo, hi, ratios)`: GRAFIKDAGI har sham hajmi uning [low, high] oralig'iga kesishgan ustunlarga ulush bilan taqsimlanadi (hajm saqlanadi). Xarid ulushi — `exchange.taker_buy_ratios` (Binance ommaviy market-data `data-api.binance.vision` klines[9]/klines[5], hudud bo'yicha bloklanmaydi, kalitsiz; sham `open_ms` bo'yicha), Binance'da yo'q bo'lsa — sham shaklidan `(close−low)/(high−low)`. Delta = xarid − sotuv. `setup_chart` va `signal_chart` shamlar va tf'ni uzatadi. «Hajm portlashi» posti (`surge_profile_chart`, aggTrades) o'zgarmagan.
 - Sinov: `test_384.py` 6/6 (30 ustundan ≥27 to'ladi, hajm saqlanadi, ulush 1/0 → delta ±hajm, hajmsiz → None, setup_chart tf/oyna), rasm ko'rib chiqildi.
+
+## 385. Grafiklar (matplotlib) — brend palitrasi
+- Foydalanuvchi: "Grafik stilini yangicha ranglarga o'tkaz".
+- `chart.py` konstantalari Mini App / terminal (Lightweight Charts) ranglariga: BG `#0b0b0c`, GRID `#1d2016`, CARD_BG `#131510`, TXT `#a2a896`, TITLE `#f1f4ea`, GREEN (ko'tarilish/TP/LONG/xarid delta) `#c2f23a`, RED `#ff5c5c`, ACC (kirish) `#e9ece2`, SILVER `#8b9081`, VP_COLOR (hajm profili) `#7f9a2c`. Barcha grafik turlari (signal, natija, News Trade, surge, MACD) shu konstantalarni ishlatadi. `card.py` (PnL kartasi) o'zgarmagan.
