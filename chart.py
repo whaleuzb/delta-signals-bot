@@ -363,27 +363,62 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float | None,
     return buf
 
 
+def candle_profile(candles, lo: float, hi: float, ratios: dict[int, float] | None,
+                   n_bins: int = DELTA_BINS) -> tuple[list[float], list[float]] | None:
+    """384: Volume / Volume Delta profili — GRAFIKDAGI shamlardan (foydalanuvchi: "umumiy chart
+    datasidan foydalanmayabti"; avval faqat oxirgi 48 soat savdolari edi, profil narx oralig'ining
+    bir qismini qamrardi). Har sham hajmi uning [low, high] oralig'iga kesishgan ustunlarga
+    ulush bo'yicha taqsimlanadi. Xarid ulushi — `ratios[open_ms]` (Binance taker buy), bo'lmasa sham
+    shaklidan: (close − low) / (high − low). Delta = xarid − sotuv."""
+    if hi <= lo or not candles:
+        return None
+    size = (hi - lo) / n_bins
+    vol = [0.0] * n_bins
+    dlt = [0.0] * n_bins
+    for c in candles:
+        v = float(getattr(c, "volume", 0) or 0)
+        if v <= 0:
+            continue
+        rng = c.high - c.low
+        br = (ratios or {}).get(c.open_ms)
+        if br is None:
+            br = (c.close - c.low) / rng if rng > 0 else 0.5
+        d = v * (2 * br - 1)
+        if rng <= 0:
+            i = max(0, min(n_bins - 1, int((c.close - lo) / size)))
+            vol[i] += v
+            dlt[i] += d
+            continue
+        i0 = max(0, min(n_bins - 1, int((c.low - lo) / size)))
+        i1 = max(0, min(n_bins - 1, int((c.high - lo) / size)))
+        for i in range(i0, i1 + 1):
+            b0, b1 = lo + i * size, lo + (i + 1) * size
+            f = (min(b1, c.high) - max(b0, c.low)) / rng
+            if f > 0:
+                vol[i] += v * f
+                dlt[i] += d * f
+    if not any(vol):
+        return None
+    return vol, dlt
+
+
 async def _delta_profile(market: str, symbol: str, lo: float, hi: float,
-                         end_ms: int) -> tuple[list[float], list[float], float, float] | None:
-    """`setup_chart()`/`signal_chart()` uchun umumiy — faqat KRIPTO uchun
-    (aksiya/forex'da bunday tarixiy savdo darajasidagi ma'lumot yo'q),
-    oxirgi `DELTA_WINDOW_MS` (48 soat) ichidagi HAQIQIY MEXC savdolaridan
-    Volume/Volume Delta profilini hisoblaydi. Har qanday xato yoki mos
-    kelmaslik — `None` (chaqiruvchi shunda ODDIY, profilsiz grafikka
-    qaytadi, xato hech qachon ko'tarilmaydi)."""
-    if market != "crypto" or hi <= lo:
+                         end_ms: int, candles=None, tf: str | None = None
+                         ) -> tuple[list[float], list[float], float, float] | None:
+    """`setup_chart()`/`signal_chart()` uchun: grafikdagi shamlardan (384) Volume/Volume Delta
+    profili. Faqat KRIPTO. Xato yoki hajm yo'q — `None` (grafik profilsiz chiziladi)."""
+    if market != "crypto" or hi <= lo or not candles:
         return None
+    ratios = None
     try:
-        result = await exchange.volume_delta_profile(
-            symbol, end_ms - DELTA_WINDOW_MS, end_ms, lo, hi, n_bins=DELTA_BINS)
+        ratios = await exchange.taker_buy_ratios(symbol, candles[0].open_ms, end_ms, norm_tf(tf))
     except Exception:
-        log.warning("Volume delta profili olinmadi (%s)", symbol, exc_info=True)
+        log.info("Taker ulushi olinmadi (%s) — sham shaklidan", symbol)
+    res = candle_profile(candles, lo, hi, ratios)
+    if res is None:
         return None
-    if result is None:
-        return None
-    vol_bins, delta_bins = result
-    bin_size = (hi - lo) / DELTA_BINS
-    return vol_bins, delta_bins, lo, bin_size
+    vol_bins, delta_bins = res
+    return vol_bins, delta_bins, lo, (hi - lo) / DELTA_BINS
 
 
 async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
@@ -412,7 +447,7 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     lo = min(c.low for c in candles)
     hi = max(c.high for c in candles)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    profile = await _delta_profile(market, symbol, lo, hi, now_ms)
+    profile = await _delta_profile(market, symbol, lo, hi, now_ms, candles, tf)
     vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
     return _render(
         candles, header=symbol, side=draft["side"],
@@ -576,7 +611,7 @@ async def signal_chart(sig, ws_name: str, bot_username: str | None,
     lo = min(c.low for c in candles)
     hi = max(c.high for c in candles)
     profile = await _delta_profile(sig["market"], sig["symbol"], lo, hi,
-                                   int(closed_at.timestamp() * 1000))
+                                   int(closed_at.timestamp() * 1000), candles, tf)
     vol_bins, delta_bins, bin_lo, bin_size = profile if profile else (None, None, None, None)
 
     return _render(

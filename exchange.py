@@ -484,6 +484,38 @@ async def resolve_touch_order(symbol: str, start_ms: int, end_ms: int, side: str
     return None   # savdolar orasida hech biri ANIQ tegilmadi
 
 
+# 384: grafik shamlari bo'yicha xaridor tashabbusidagi (taker buy) hajm ulushi — Binance'ning ommaviy
+# market-data oynasidan (data-api.binance.vision: hudud bo'yicha bloklanmaydi, kalit kerak emas).
+# klines[9] = taker buy base volume, klines[5] = jami hajm. Juftlik Binance'da bo'lmasa — None.
+_bn_data = httpx.AsyncClient(base_url="https://data-api.binance.vision", timeout=12)
+
+
+async def taker_buy_ratios(symbol: str, start_ms: int, end_ms: int, tf: str) -> dict[int, float] | None:
+    out: dict[int, float] = {}
+    cur = start_ms
+    for _ in range(3):                                # 1000 × 3 — grafik shamlari uchun yetarli
+        try:
+            r = await _bn_data.get("/api/v3/klines", params={
+                "symbol": symbol, "interval": tf, "startTime": cur, "endTime": end_ms, "limit": 1000})
+        except Exception:
+            log.info("Binance taker hajmi olinmadi (%s)", symbol)
+            break
+        if r.status_code != 200:
+            break
+        rows = r.json() or []
+        for k in rows:
+            try:
+                v, tb = float(k[5]), float(k[9])
+            except (IndexError, TypeError, ValueError):
+                continue
+            if v > 0:
+                out[int(k[0])] = max(0.0, min(1.0, tb / v))
+        if len(rows) < 1000:
+            break
+        cur = int(rows[-1][0]) + 1
+    return out or None
+
+
 async def volume_delta_profile(symbol: str, start_ms: int, end_ms: int,
                                lo: float, hi: float,
                                n_bins: int = 40) -> tuple[list[float], list[float]] | None:
@@ -521,4 +553,5 @@ async def volume_delta_profile(symbol: str, start_ms: int, end_ms: int,
 
 async def close() -> None:
     await _binance_client.aclose()
+    await _bn_data.aclose()
     await _client.aclose()

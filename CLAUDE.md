@@ -8351,3 +8351,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Guruh posti `publish_signal` ichidan `post_group_signal(bot, ws, sig_id, d, uid, username, first_name, post_file_id, photo)` ga ajratildi (rich/oddiy, `group_msg_id` saqlash, widjet) — yangi signal ham, repost ham AYNI kod.
 - `/repost <id>`: ochiq (PENDING/ACTIVE, excluded emas), guruh/kanal workspace'i, egasi yoki super-admin. Grafik — `chart_file_id` yoki `chart.setup_chart(..., tf=chart_tf)`; muallif — `author_id` (get_chat). Posti bor bo'lsa faqat `/repost <id> force`.
 - Sinov: `test_383.py` 6/6 (oddiy va rich yo'l, takror himoyasi, huquq, yopilgan signal), `test_369/360/app/372/382`.
+
+## 384. Signal grafigi: Volume / Volume Delta — grafikdagi shamlardan
+- Foydalanuvchi (XPLUSDT 1h skrinshoti, profil faqat 0.042–0.0455 da): "volume delta va volume profilni tuzatish kerak, umumiy chart datasidan foydalanmayabti".
+- Sabab: profil `exchange.volume_delta_profile` — oxirgi 48 soatlik MEXC aggTrades (60 000 tagacha) dan edi; grafik esa 120 sham (1h da 5 kun) — profil narx oralig'ining bir qismini qamrardi.
+- Endi `chart.candle_profile(candles, lo, hi, ratios)`: GRAFIKDAGI har sham hajmi uning [low, high] oralig'iga kesishgan ustunlarga ulush bilan taqsimlanadi (hajm saqlanadi). Xarid ulushi — `exchange.taker_buy_ratios` (Binance ommaviy market-data `data-api.binance.vision` klines[9]/klines[5], hudud bo'yicha bloklanmaydi, kalitsiz; sham `open_ms` bo'yicha), Binance'da yo'q bo'lsa — sham shaklidan `(close−low)/(high−low)`. Delta = xarid − sotuv. `setup_chart` va `signal_chart` shamlar va tf'ni uzatadi. «Hajm portlashi» posti (`surge_profile_chart`, aggTrades) o'zgarmagan.
+- Sinov: `test_384.py` 6/6 (30 ustundan ≥27 to'ladi, hajm saqlanadi, ulush 1/0 → delta ±hajm, hajmsiz → None, setup_chart tf/oyna), rasm ko'rib chiqildi.
