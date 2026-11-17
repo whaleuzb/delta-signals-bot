@@ -135,6 +135,8 @@ _PING = {
     "bingx": "https://open-api.bingx.com/openApi/swap/v2/server/time",
     "bitunix": "https://fapi.bitunix.com/api/v1/futures/market/tickers?symbols=BTCUSDT",
     "bybit": "https://api.bybit.com/v5/market/time",
+    "aster": "https://fapi.asterdex.com/fapi/v1/time",
+    "lighter": "https://mainnet.zklighter.elliot.ai/api/v1/status",
 }
 
 

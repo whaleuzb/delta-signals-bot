@@ -22,6 +22,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import logging
 import os
 import time
@@ -3311,3 +3312,256 @@ HIST_EX["bitunix"] = bu_hist
 _IMPL["bybit"] = (bb_spot, bb_fut, bb_pos, bb_perms)
 DEPTH_EX["bybit"] = bb_depth
 HIST_EX["bybit"] = bb_hist
+
+
+# ═══════════════ 386: DEX'lar — Hyperliquid, Aster, Lighter (1-bosqich: ulash va kuzatish) ═══════════════
+# Foydalanuvchi: "hyperliquid, aster va lighterni qo'sh". Hammasida savdo hamyon imzosi (agent/API hamyon)
+# bilan ishlaydi, shuning uchun 1-bosqich — o'qish: balans, spot aktivlar, perp hisobi, pozitsiyalar,
+# order book. Saqlash: k["key"] — asosiy hamyon manzili (0x…). Hyperliquid va Lighter'da o'qish OCHIQ
+# (manzil yetadi, secret — "-"). Aster V3 da o'qish ham imzoli: k["pass"] — API hamyon (agent) manzili,
+# k["secret"] — uning maxfiy kaliti (agentga pul yechish ruxsati berilmaydi). Rasmiy SDK/hujjatlar:
+# hyperliquid-python-sdk 0.24.0, lighter-sdk 1.1.8, github.com/asterdex/api-docs (V3).
+DEX = ("hyperliquid", "aster", "lighter")
+ADDR_ONLY = {"hyperliquid", "lighter"}
+_ADDR_RX = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+def dex_addr_ok(s: str) -> bool:
+    return bool(_ADDR_RX.match(s or ""))
+
+
+def _dex_sym(coin: str) -> str:
+    """Perp tangasi → ilovadagi juftlik (grafik va narxlar USDT juftliklari bo'yicha)."""
+    c = str(coin or "").upper().split(":")[-1]
+    return c if c.endswith(("USDT", "USDC")) else c + "USDT"
+
+
+# ── Hyperliquid (POST https://api.hyperliquid.xyz/info, ochiq) ──
+HLI = "https://api.hyperliquid.xyz/info"
+_HL_ALIAS = {"UBTC": "BTC", "UETH": "ETH", "USOL": "SOL", "UFART": "FARTCOIN", "UPUMP": "PUMP", "USDT0": "USDT"}
+
+
+async def _hl(body: dict):
+    return await _req("POST", HLI, {"Content-Type": "application/json"}, body=json.dumps(body))
+
+
+async def hl_spot(k):
+    d = await _hl({"type": "spotClearinghouseState", "user": k["key"]}) or {}
+    out: dict = {}
+    for b in d.get("balances") or []:
+        c = str(b.get("coin") or "").upper()
+        c = _HL_ALIAS.get(c, c)
+        q = _f(b.get("total"))
+        if c and q:
+            out[c] = out.get(c, 0.0) + q
+    return out
+
+
+async def _hl_state(k) -> dict:
+    return await _hl({"type": "clearinghouseState", "user": k["key"]}) or {}
+
+
+async def hl_fut(k):
+    d = await _hl_state(k)
+    ms = d.get("marginSummary") or {}
+    up = sum(_f((p.get("position") or {}).get("unrealizedPnl")) for p in d.get("assetPositions") or [])
+    return _f(ms.get("accountValue")), up
+
+
+async def hl_pos(k):
+    d = await _hl_state(k)
+    out = []
+    for x in d.get("assetPositions") or []:
+        p = x.get("position") or {}
+        szi = _f(p.get("szi"))
+        if not szi:
+            continue
+        qty = abs(szi)
+        lev = p.get("leverage") or {}
+        out.append({"sym": _dex_sym(p.get("coin")), "side": "long" if szi > 0 else "short", "qty": qty,
+                    "entry": _f(p.get("entryPx")), "mark": (_f(p.get("positionValue")) / qty) or None,
+                    "upnl": _f(p.get("unrealizedPnl")), "lev": _f(lev.get("value")),
+                    "liq": _f(p.get("liquidationPx")) or None, "ps": "BOTH", "coin": p.get("coin")})
+    return out
+
+
+async def hl_depth(k, a) -> dict:
+    sym = _sym(a)
+    coin = re.sub(r"(USDT|USDC)$", "", sym)
+    d, m = await asyncio.gather(_hl({"type": "l2Book", "coin": coin}), _hl({"type": "allMids"}),
+                                return_exceptions=True)
+    lv = (d.get("levels") or [[], []]) if isinstance(d, dict) else [[], []]
+    row = lambda L: [[x.get("px"), x.get("sz")] for x in L or [] if isinstance(x, dict)]
+    last = _f((m or {}).get(coin)) if isinstance(m, dict) else 0
+    return _book(sym, "fut", _lv(row(lv[0])), _lv(row(lv[1] if len(lv) > 1 else [])), last, 0)
+
+
+# ── Lighter (GET https://mainnet.zklighter.elliot.ai/api/v1/…, hisob o'qish ochiq) ──
+LTB = "https://mainnet.zklighter.elliot.ai"
+_LT_MK: dict = {}
+
+
+async def _lt_acc(k) -> dict:
+    d = await _get(LTB + "/api/v1/account", {}, urlencode({"by": "l1_address", "value": k["key"]})) or {}
+    accs = d.get("accounts") or []
+    if not accs:
+        raise ApiErr("auth", "Lighter: bu manzilda hisob topilmadi")
+    # asosiy hisob (sub-hisoblar emas) — eng kichik indeks
+    return sorted(accs, key=lambda a: int(_f(a.get("index") or a.get("account_index"))))[0]
+
+
+async def lt_spot(k):
+    a = await _lt_acc(k)
+    out: dict = {}
+    for s in a.get("assets") or []:
+        c = str(s.get("symbol") or "").upper()
+        q = _f(s.get("balance")) + _f(s.get("locked_balance"))
+        if c and q and c != "USDC":          # USDC — perp garovi (fyuchers hisobida ko'rsatiladi)
+            out[c] = out.get(c, 0.0) + q
+    return out
+
+
+async def lt_fut(k):
+    a = await _lt_acc(k)
+    up = sum(_f(p.get("unrealized_pnl")) for p in a.get("positions") or [])
+    col = _f(a.get("collateral"))
+    return (col + up) if col else _f(a.get("total_asset_value")), up
+
+
+async def lt_pos(k):
+    a = await _lt_acc(k)
+    out = []
+    for p in a.get("positions") or []:
+        qty = abs(_f(p.get("position")))
+        if not qty:
+            continue
+        imf = _f(p.get("initial_margin_fraction"))
+        lev = (100 / imf if imf > 1 else 1 / imf) if imf else 0
+        sign = int(_f(p.get("sign")) or 1)
+        out.append({"sym": _dex_sym(p.get("symbol")), "side": "long" if sign > 0 else "short", "qty": qty,
+                    "entry": _f(p.get("avg_entry_price")), "mark": (_f(p.get("position_value")) / qty) or None,
+                    "upnl": _f(p.get("unrealized_pnl")), "lev": round(lev, 1),
+                    "liq": _f(p.get("liquidation_price")) or None, "ps": "BOTH", "mid": p.get("market_id")})
+    return out
+
+
+async def _lt_market(sym: str):
+    hit = _LT_MK.get("m")
+    if not hit or time.time() - hit[0] > 3600:
+        d = await _get(LTB + "/api/v1/orderBooks", {}) or {}
+        m = {str(x.get("symbol") or "").upper(): x.get("market_id") for x in d.get("order_books") or []}
+        _LT_MK["m"] = hit = (time.time(), m)
+    return hit[1].get(re.sub(r"(USDT|USDC)$", "", sym))
+
+
+async def lt_depth(k, a) -> dict:
+    sym = _sym(a)
+    mid = await _lt_market(sym)
+    if mid is None:
+        raise ApiErr("api", f"Lighter: {sym} topilmadi")
+    d = await _get(LTB + "/api/v1/orderBookOrders", {}, f"market_id={mid}&limit=15") or {}
+    row = lambda L: [[x.get("price"), x.get("remaining_base_amount") or x.get("size")] for x in L or []]
+    return _book(sym, "fut", _lv(row(d.get("bids"))), _lv(row(d.get("asks"))), 0, 0)
+
+
+# ── Aster V3 (API hamyon / agent imzosi, EIP-712 "Message{msg}", chainId 1666) ──
+ASF, ASS = "https://fapi.asterdex.com", "https://sapi.asterdex.com"
+_AS_N = {"t": 0, "i": 0}
+
+
+def _as_nonce() -> str:
+    s = int(time.time())
+    if s == _AS_N["t"]:
+        _AS_N["i"] += 1
+    else:
+        _AS_N["t"], _AS_N["i"] = s, 0
+    return str(s * 1_000_000 + _AS_N["i"])
+
+
+def _as_sign(priv: str, msg: str) -> str:
+    from eth_account import Account
+    from eth_account.messages import encode_typed_data
+    data = {"types": {"EIP712Domain": [{"name": "name", "type": "string"}, {"name": "version", "type": "string"},
+                                       {"name": "chainId", "type": "uint256"},
+                                       {"name": "verifyingContract", "type": "address"}],
+                      "Message": [{"name": "msg", "type": "string"}]},
+            "primaryType": "Message",
+            "domain": {"name": "AsterSignTransaction", "version": "1", "chainId": 1666,
+                       "verifyingContract": "0x0000000000000000000000000000000000000000"},
+            "message": {"msg": msg}}
+    sig = Account.sign_message(encode_typed_data(full_message=data), private_key=priv).signature.hex()
+    return sig if sig.startswith("0x") else "0x" + sig
+
+
+async def _as(k, base: str, path: str, params: dict | None = None, method: str = "GET"):
+    if not k.get("pass") or not dex_addr_ok(k.get("pass")) or not k.get("secret") or k["secret"] == "-":
+        raise ApiErr("auth", "Aster: API hamyon manzili va kaliti kerak")
+    p = {kk: str(v) for kk, v in (params or {}).items()}
+    p.update({"asterChain": "Mainnet", "user": k["key"], "signer": k["pass"], "nonce": _as_nonce()})
+    msg = "&".join(f"{a}={b}" for a, b in p.items())
+    try:
+        sig = _as_sign(k["secret"], msg)
+    except Exception as e:
+        raise ApiErr("auth", f"Aster: kalit noto'g'ri ({type(e).__name__})")
+    d = await _req(method, base + path, {"Content-Type": "application/x-www-form-urlencoded"},
+                   msg + "&signature=" + sig)
+    if isinstance(d, dict) and isinstance(d.get("code"), int) and d["code"] < 0:
+        raise ApiErr("auth" if d["code"] in (-1022, -2014, -2015, -1000) else "api", json.dumps(d)[:200])
+    return d
+
+
+async def as_spot(k):
+    try:
+        d = await _as(k, ASS, "/api/v3/account") or {}
+    except ApiErr as e:
+        if e.code == "auth":
+            raise
+        log.info("Aster spot o'qilmadi: %s", e.text[:120])
+        return {}
+    return {str(b.get("asset") or "").upper(): _f(b.get("free")) + _f(b.get("locked"))
+            for b in d.get("balances") or [] if b.get("asset")}
+
+
+async def as_fut(k):
+    d = await _as(k, ASF, "/fapi/v3/balance") or []
+    eq = up = 0.0
+    for b in d if isinstance(d, list) else []:
+        if str(b.get("asset")).upper() in STABLE or str(b.get("asset")).upper() == "USDF":
+            u = _f(b.get("crossUnPnl"))
+            eq += _f(b.get("balance")) + u
+            up += u
+    return eq, up
+
+
+async def as_pos(k):
+    d = await _as(k, ASF, "/fapi/v3/positionRisk") or []
+    out = []
+    for p in d if isinstance(d, list) else []:
+        amt = _f(p.get("positionAmt"))
+        if not amt:
+            continue
+        out.append({"sym": str(p.get("symbol") or "").upper(), "side": "long" if amt > 0 else "short",
+                    "qty": abs(amt), "entry": _f(p.get("entryPrice")), "mark": _f(p.get("markPrice")) or None,
+                    "upnl": _f(p.get("unRealizedProfit")), "lev": _f(p.get("leverage")),
+                    "liq": _f(p.get("liquidationPrice")) or None, "ps": p.get("positionSide") or "BOTH"})
+    return out
+
+
+async def as_depth(k, a) -> dict:
+    sym = _sym(a)
+    fut = a.get("mkt") == "fut"
+    base, path = (ASF, "/fapi/v1/depth") if fut else (ASS, "/api/v1/depth")
+    d = await _get(base + path, {}, f"symbol={sym}&limit=20") or {}
+    return _book(sym, "fut" if fut else "spot", _lv(d.get("bids")), _lv(d.get("asks")), 0, 0)
+
+
+async def dex_perms(k):
+    return None          # DEX'da kalit ruxsatlari so'ralmaydi (agentga pul yechish huquqi berilmaydi)
+
+
+EXCHANGES = EXCHANGES + DEX
+NAMES.update({"hyperliquid": "Hyperliquid", "aster": "Aster", "lighter": "Lighter"})
+_IMPL["hyperliquid"] = (hl_spot, hl_fut, hl_pos, dex_perms)
+_IMPL["lighter"] = (lt_spot, lt_fut, lt_pos, dex_perms)
+_IMPL["aster"] = (as_spot, as_fut, as_pos, dex_perms)
+DEPTH_EX.update({"hyperliquid": hl_depth, "lighter": lt_depth, "aster": as_depth})
