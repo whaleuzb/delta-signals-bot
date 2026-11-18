@@ -8374,3 +8374,13 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Ilova: `CEX` ro'yxatiga 3 DEX, `DEXS`; Hyperliquid rasmiy belgisi (`@web3icons` hyper-evm, MIT); Aster va Lighter — harfli belgi (rasmiy logotip foydalanuvchidan kutilmoqda — "logosi bilan qo'sh" qoidasi). Ulash oynasi: DEX'da hamyon manzili (+ Aster: API hamyon manzili, kaliti), `dx_how_*` yo'riqnomalar, `dx_ro` («hozircha kuzatish»), ro'yxatda «DEX · hamyon manzili orqali».
 - Real hamyon bilan TEKSHIRILMAGAN (API'larga bu yerdan kirib bo'lmaydi).
 - Sinov: `test_386.py` 13/13 (HL/Lighter/Aster snapshot, depth, Aster imzosi agent manziliga qaytadi, agent kalitisiz rad, savdo rad), brauzer `t_dex.py` (ro'yxat, Aster oynasi, noto'g'ri manzil, HL faqat manzil bilan yuboriladi), `test_357/358/370/app`, `t_cxc`.
+
+## 387. Terminal grafigida chizish asboblari (TradingView uslubi)
+- `webapp.html`: TF qatori ostida asboblar paneli `drBar(g)` (`#lwtb`) — uchala terminalda (signal, birja, Dip Funded): trend chizig'i, gorizontal chiziq, blok (to'rtburchak), Fibonachchi (0/.236/.382/.5/.618/.786/1, o'ngga cho'zilgan), AVP (anchored volume profile), 🗑.
+- Chizish: `LW.sv` (SVG `.lwd`, z 2 — narx yorliqlari ostida) har kadrda `drDraw()` (rAF loop), faqat ko'rinish/narx o'qi/chizmalar o'zgarsa qayta chiziladi. Nuqtalar `{t: soniya, p: narx}`; x — mantiqiy indeks orqali (`drX`, kelajak hududi ham), shuning uchun TF almashsa joyida qoladi.
+- Joylashtirish: asbob tanlansa `.lwc` qatlam yoqiladi; 1 nuqtali (gorizontal, AVP) — bosish, 2 nuqtali — bosib tortish yoki ikki nuqtani ketma-ket bosish; magnit (14 px ichida sham OHLC'iga). Joylangach asbob o'chadi va chizma tanlangan bo'ladi.
+- Tahrir: chizmani bosish → tanlanadi (ushlagichlar); ushlagichni surish — nuqta, tanasini surish — butun chizma; bo'sh joyni bosish — tanlov bekor. 🗑: tanlangan bo'lsa o'shani, bo'lmasa 2 marta bosib hammasini o'chiradi.
+- Saqlash: `localStorage tc_dr` — tanga bo'yicha (`BTCUSDT`/`BTC` bir xil), har biriga 50 tagacha.
+- AVP (`drVP`): langar shamidan oxirigacha, 24 narx bo'lagi, hajm shamning H-L oralig'iga teng taqsimlanadi, xarid ulushi = (C-L)/(H-L); POC, 70% qiymat hududi (VAH/VAL). Buning uchun `api_candles`/`api_dfcandles` qatorlariga 6-ustun — hajm qo'shildi.
+- i18n: `dr_p1`, `dr_p2`, `dr_tap2`, `dr_clr`.
+- Sinov: brauzer `t_dr.py` (5 asbob joylashdi, saqlandi, tanlash, ushlagich surish, TF almashganda saqlanadi, tanlanganni o'chirish).
