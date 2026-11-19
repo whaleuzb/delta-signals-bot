@@ -8395,3 +8395,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Himoya: Binance oxirgi narxi MEXC narxidan 5% dan ko'p farq qilsa (bir xil tiker — boshqa tanga), Binance tashlanadi.
 - Sham qatorlari 7-ustun — taker buy (faqat Binance'dan); AVP (`drVP`) xarid ulushini undan oladi, bo'lmasa (C-L)/(H-L).
 - Kuzatuv (tracker, 1m TP/SL) o'zgarmadi — u MEXC'da qoladi.
+
+## 390. Guruh/kanal posti grafigi ham zaxira manbadan
+- Foydalanuvchi: TRBUSDT signali kanalga grafiksiz chiqdi. `chart._fetch` faqat `tracker.provider(market)` dan olardi; shamlar bo'sh → `setup_chart` jimgina None.
+- `_klines_any` (388/389) `tracker.klines_any(market, pair, start, tf, end, limit=)` ga ko'chirildi; `webapp` (terminal) va `chart._fetch` (post, natija grafigi) shundan foydalanadi.
+- `setup_chart` endi shamlar yetmasa log yozadi: "Signal grafigi: shamlar yetarli emas (…)".

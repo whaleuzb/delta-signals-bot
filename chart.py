@@ -106,8 +106,8 @@ async def _fetch(market: str, symbol: str, start_ms: int, limit: int, tf: str,
     oraliqning oxiridan `limit` ta sham qaytaradi va so'ralgan oyna emas,
     eng so'nggi shamlar kelib qoladi."""
     try:
-        return await tracker.provider(market).klines(symbol, start_ms, limit=limit,
-                                                     tf=tf, end_ms=end_ms)
+        # 390: Binance -> MEXC spot -> MEXC fyuchers (TRB postida grafik chiqmagan edi)
+        return await tracker.klines_any(market, symbol, start_ms, tf, end_ms, limit=limit)
     except Exception:
         log.warning("Grafik uchun shamlar olinmadi (%s %s %s)", market, symbol, tf,
                     exc_info=True)
@@ -440,6 +440,8 @@ async def setup_chart(draft: dict, ws_name: str, bot_username: str | None,
     start_ms = align(int(datetime.now(timezone.utc).timestamp() * 1000) - span_ms, tf)
     candles = await _fetch(market, symbol, start_ms, min(MAX_CANDLES, SETUP_BARS + 5), tf)
     if not candles or len(candles) < 3:
+        log.warning("Signal grafigi: shamlar yetarli emas (%s %s %s: %s ta)", market, symbol, tf,
+                    len(candles or []))
         return None
 
     # Sarlavhada signal raqami yo'q: grafik signal BAZAGA YOZILISHIDAN OLDIN,

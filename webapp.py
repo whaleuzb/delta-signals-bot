@@ -227,40 +227,6 @@ async def api_sighist(request):
 _CANDLES: dict = {}
 
 
-async def _klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int) -> list:
-    """388: shamlar — bozorning o'z manbaidan; bo'sh kelsa ikkinchisidan (MEXC spot <-> MEXC fyuchers).
-    Foydalanuvchi: "TRB nega chiqmayabti?" — TRBUSDT MEXC spotda yo'q (400), fyuchersda bor."""
-    import exchange as _ex
-    import futures as _fu
-    first = tracker.provider(market)
-    if market == "crypto":          # 389: Binance spot birinchi ("binancedan olsakchi?"), keyin MEXC spot, MEXC fyuchers
-        order = [(_ex.bn_klines, "binance"), (_ex.klines, "exchange"), (_fu.klines, "futures")]
-    elif market == "futures":       # fyuchers signali — o'z kontrakti, keyin Binance spot, MEXC spot
-        order = [(_fu.klines, "futures"), (_ex.bn_klines, "binance"), (_ex.klines, "exchange")]
-    else:
-        order = [(first.klines, getattr(first, "__name__", "?"))]
-    for i, (fn, name) in enumerate(order):
-        try:
-            cs = await fn(pair, start_ms, limit=200, tf=tf, end_ms=end_ms)
-        except Exception:
-            log.warning("Terminal shamlari olinmadi (%s %s, %s)", pair, tf, name, exc_info=True)
-            cs = []
-        if cs and name == "binance" and len(order) > 1:
-            # bir xil tiker Binance va MEXC'da boshqa tanga bo'lishi mumkin — narx 5% dan ko'p farq qilsa ishlatilmaydi
-            try:
-                ref = await (_fu if market == "futures" else _ex).last_price(pair)
-            except Exception:
-                ref = None
-            if ref and abs(cs[-1].close - ref) / ref > 0.05:
-                log.info("Binance %s narxi mos emas (%s vs %s) — MEXC ishlatiladi", pair, cs[-1].close, ref)
-                cs = []
-        if cs:
-            if i:
-                log.info("Shamlar zaxira manbadan: %s %s <- %s", pair, tf, name)
-            return cs
-    return []
-
-
 async def api_candles(request):
     """289: signal terminali — shamlar (egasi/boshqaruvchisi). 30 soniya kesh."""
     import time as _t
@@ -279,7 +245,7 @@ async def api_candles(request):
         rows = hit[1]
     else:
         now = int(_t.time() * 1000)
-        cs = await _klines_any(sig["market"], sig["symbol"], now - 160 * _TF_MS[tf], tf, now)
+        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - 160 * _TF_MS[tf], tf, now)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs][-160:]   # 387: hajm; 389: taker buy
@@ -312,7 +278,7 @@ async def api_dfcandles(request):
         rows = hit[1]
     else:
         now = int(_t.time() * 1000)
-        cs = await _klines_any("crypto", pair, now - 160 * _TF_MS[tf], tf, now)
+        cs = await tracker.klines_any("crypto", pair, now - 160 * _TF_MS[tf], tf, now)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs][-160:]   # 387: hajm; 389: taker buy
