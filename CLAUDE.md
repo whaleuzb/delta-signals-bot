@@ -8400,3 +8400,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Foydalanuvchi: TRBUSDT signali kanalga grafiksiz chiqdi. `chart._fetch` faqat `tracker.provider(market)` dan olardi; shamlar bo'sh → `setup_chart` jimgina None.
 - `_klines_any` (388/389) `tracker.klines_any(market, pair, start, tf, end, limit=)` ga ko'chirildi; `webapp` (terminal) va `chart._fetch` (post, natija grafigi) shundan foydalanadi.
 - `setup_chart` endi shamlar yetmasa log yozadi: "Signal grafigi: shamlar yetarli emas (…)".
+
+## 391. Fyuchers signali grafigida ham Volume / Volume Delta
+- Foydalanuvchi: "volume deltani nega olib tashlading?" — `chart._delta_profile` faqat `market == "crypto"` uchun ishlardi (384 dan beri), fyuchers signali (TRB) grafigi profilsiz chiqardi.
+- Endi `crypto` va `futures`. Shamlar Binance'dan kelgan bo'lsa (`c.tb`, 389) taker buy ulushi shamdan olinadi, aks holda `exchange.taker_buy_ratios`, u ham bo'lmasa sham shaklidan.

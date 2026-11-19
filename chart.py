@@ -408,14 +408,18 @@ async def _delta_profile(market: str, symbol: str, lo: float, hi: float,
                          end_ms: int, candles=None, tf: str | None = None
                          ) -> tuple[list[float], list[float], float, float] | None:
     """`setup_chart()`/`signal_chart()` uchun: grafikdagi shamlardan (384) Volume/Volume Delta
-    profili. Faqat KRIPTO. Xato yoki hajm yo'q — `None` (grafik profilsiz chiziladi)."""
-    if market != "crypto" or hi <= lo or not candles:
+    profili. Kripto (spot) va fyuchers (391: fyuchers signalida profil yo'q edi — "volume deltani
+    nega olib tashlading?"). Xato yoki hajm yo'q — `None` (grafik profilsiz chiziladi)."""
+    if market not in ("crypto", "futures") or hi <= lo or not candles:
         return None
-    ratios = None
-    try:
-        ratios = await exchange.taker_buy_ratios(symbol, candles[0].open_ms, end_ms, norm_tf(tf))
-    except Exception:
-        log.info("Taker ulushi olinmadi (%s) — sham shaklidan", symbol)
+    # Shamlar Binance'dan kelgan bo'lsa (389), taker buy ulushi shamning o'zida — qayta so'ralmaydi
+    ratios = {c.open_ms: max(0.0, min(1.0, c.tb / c.volume)) for c in candles
+              if getattr(c, "tb", None) is not None and c.volume > 0} or None
+    if ratios is None:
+        try:
+            ratios = await exchange.taker_buy_ratios(symbol, candles[0].open_ms, end_ms, norm_tf(tf))
+        except Exception:
+            log.info("Taker ulushi olinmadi (%s) — sham shaklidan", symbol)
     res = candle_profile(candles, lo, hi, ratios)
     if res is None:
         return None
