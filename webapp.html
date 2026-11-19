@@ -323,7 +323,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .lwo{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
 .lwd{position:absolute;left:0;top:0;pointer-events:none;z-index:2;overflow:hidden}.lwd .drh{pointer-events:stroke;touch-action:none;cursor:pointer}.lwd .drp{pointer-events:all;touch-action:none;cursor:move}
 .lwc{position:absolute;inset:0;z-index:5;touch-action:none;cursor:crosshair;display:none}
-.lwtb{margin:-2px 0 8px;flex-wrap:nowrap}.lwtb .chip{padding:6px 10px;display:inline-flex;align-items:center;gap:4px;font-size:11px}.lwtb .chip b{font-weight:800}.lwtb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.lwtb{margin:-2px 0 8px;flex-wrap:nowrap}.lwtb .chip{padding:6px 10px;display:inline-flex;align-items:center;gap:4px;font-size:11px}.lwtb .chip b{font-weight:800}.lwtb #lwdel{margin-left:auto}.lwtb #lwu[style*=inline-flex]+#lwdel{margin-left:0}.lwtb svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .lwl{position:absolute;left:4px;top:0;display:flex;align-items:center;gap:5px;height:18px;padding:0 3px 0 7px;border-radius:7px;background:rgba(10,11,9,.82);border:1px solid rgba(255,255,255,.16);color:var(--lt);font-size:10.5px;font-weight:700;white-space:nowrap;pointer-events:auto;font-variant-numeric:tabular-nums}
 .lwl{border-color:rgba(255,255,255,.16)}@supports (color:color-mix(in srgb,red 50%,blue)){.lwl{border-color:color-mix(in srgb,var(--lc) 55%,transparent)}}
 .lwl .lwt{padding-right:4px}.lwl.dr{cursor:ns-resize;touch-action:none}
@@ -827,7 +827,7 @@ function cxTermRender(g){var i=termItem(),ex=g.cx.ex,a=cexAcc(ex)||{},p=document
  var spot=g.cx.mkt=='spot',P=spot?[]:(a.pos||[]),can=cxCan(g);
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0"><h2>'+esc(i.symbol)+' <span class="b bx" style="vertical-align:middle">'+(spot?'Spot':'Futures')+'</span></h2><div class="rs">'+esc(cexMeta(ex)[1])+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(P.length>1)h+='<div class="chips" style="margin-bottom:8px">'+P.map(function(x){return'<span class="chip glass'+(x.sym==i.symbol?' on':'')+'" onclick="cxSym(\''+esc(x.sym)+'\')">'+esc(x.sym)+'</span>'}).join('')+'</div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>'+drBar(g);
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d','1w'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
@@ -1147,7 +1147,7 @@ function termRound(p){if(p<=0)return p;var st=Math.pow(10,Math.floor(Math.log10(
 function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.cx){cxTermRender(g);return}if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
  TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>'+drBar(g);
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d','1w'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
@@ -1207,7 +1207,7 @@ function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
 /* 387: chizish asboblari (TradingView uslubi) — trend, gorizontal, blok, Fibonachchi, anchored volume profile.
    SVG qatlam grafik ustida; nuqtalar {t: soniya, p: narx} — taymfreym almashsa ham joyida qoladi; localStorage tc_dr (tanga bo'yicha) */
 var DRC={tl:'#c2f23a',hl:'#ffc83d',rc:'#4da3ff',fb:'#b48cff',vp:'#ffc83d'},FIBL=[0,.236,.382,.5,.618,.786,1],
- FIBC=['#9aa0a6','#ff5c5c','#ffc83d','#c2f23a','#2ed3b7','#4da3ff','#9aa0a6'],TFS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+ FIBC=['#9aa0a6','#ff5c5c','#ffc83d','#c2f23a','#2ed3b7','#4da3ff','#9aa0a6'],TFS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800};
 var DRI={tl:'<svg viewBox="0 0 16 16"><path d="M3 13L13 3"/><circle cx="3" cy="13" r="1.7"/><circle cx="13" cy="3" r="1.7"/></svg>',
  hl:'<svg viewBox="0 0 16 16"><path d="M1.5 8h13"/><circle cx="8" cy="8" r="1.7"/></svg>',
  rc:'<svg viewBox="0 0 16 16"><rect x="2.5" y="4" width="11" height="8" rx="1"/></svg>',
@@ -1215,7 +1215,7 @@ var DRI={tl:'<svg viewBox="0 0 16 16"><path d="M3 13L13 3"/><circle cx="3" cy="1
  vp:'<svg viewBox="0 0 16 16"><path d="M3 2v12M3 4h5M3 7h9M3 10h6M3 13h3"/></svg><b>AVP</b>',
  del:'<svg viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg>'};
 function drBar(g){var s='';['tl','hl','rc','fb','vp'].forEach(function(k){s+='<span class="chip glass'+(g.tool==k?' on':'')+'" data-t="'+k+'" onclick="drTool(\''+k+'\')">'+DRI[k]+'</span>'});
- return'<div class="chips lwtb" id="lwtb">'+s+'<span class="chip glass" id="lwdel" data-t="del" onclick="drDel()" style="margin-left:auto">'+DRI.del+'</span></div>'}
+ return'<div class="chips lwtb" id="lwtb">'+s+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span><span class="chip glass" id="lwdel" data-t="del" onclick="drDel()">'+DRI.del+'</span></div>'}
 function drKey(){var i=termItem();return i?String(i.symbol||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/(USDT|USDC|FDUSD|USD)$/,''):''}
 function drAll(){try{return JSON.parse(localStorage.getItem('tc_dr')||'{}')||{}}catch(e){return{}}}
 function drGet(){var k=drKey();if(LW.drk!==k){LW.drk=k;LW.D=(drAll()[k]||[]).slice();LW.sel=null}return LW.D||[]}
@@ -1906,7 +1906,7 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0" onclick="dfPick()"><h2 style="cursor:pointer">'+esc(i.symbol)+' <span style="opacity:.45;font-size:14px">▾</span></h2><div class="rs">'+dfLogo(12)+' #'+g.df.acc+(s&&s.id==g.df.acc?' · '+esc(dfAccName(s.id,s.name)):'')+(i.price!=null?' · <b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
  if(g.dferr&&!(s&&s.id==g.df.acc)){p.innerHTML=h+dfErr(g.dferr);return}
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
- h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'<span id="lwu" class="chip glass" onclick="lwUndo()" style="margin-left:auto;padding:6px 11px;font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span></div>'+drBar(g);
+ h+='<div class="chips" style="margin-bottom:8px">'+['1m','5m','15m','1h','4h','1d','1w'].map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
@@ -1945,7 +1945,7 @@ function nsRender(){var p=document.getElementById('page');var w=S.ws.filter(func
   h+=lb(t('ns_side'))+nsSeg('sd',[['LONG','LONG'],['SHORT','SHORT']],NS.side,'nsSide')}
  h+=lb(t('ns_entry_mode'))+nsSeg('m',[['market',t('ns_market')],['limit',t('ns_limit')]],NS.mode,'nsMode');
  if(NS.mode=='limit')h+=lb(t('ns_entry'))+fi('entry','',NS.entry,'decimal',phA(0,0,1,0,'','ns'));
- NS.tf=NS.tf||'1h';h+=lb(t('ns_tf'))+'<div class="chips" style="flex-wrap:wrap">'+['1m','5m','15m','1h','4h','1d'].map(function(x){return'<span class="chip glass'+(NS.tf==x?' on':'')+'" onclick="nsSet(\'tf\',\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
+ NS.tf=NS.tf||'1h';h+=lb(t('ns_tf'))+'<div class="chips" style="flex-wrap:wrap">'+['1m','5m','15m','1h','4h','1d','1w'].map(function(x){return'<span class="chip glass'+(NS.tf==x?' on':'')+'" onclick="nsSet(\'tf\',\''+x+'\')">'+x+'</span>'}).join('')+'</div>';
  h+=lb(t('ns_sl'))+fi('sl','',NS.sl,'decimal',phA(0,ndir,nlev,0,nref,'ns'))+lb(t('ns_tps'))+fi('tps','110 120 130',NS.tps,'decimal',phA(0,ndir,nlev,1,nref,'ns'));
  var dep=NS.kind=='fut'?w.fut_deposit:w.deposit;if(dep!=null)h+=lb(t('ns_amount'))+fi('amount','',NS.amount,'decimal')+'<div style="height:6px"></div>'+freeLine(w,NS.kind=='fut');
  h+='<button class="btn p full" id="ns_go" style="width:100%;padding:14px;font-size:15px;margin-top:16px" onclick="nsSend()">'+esc(t('nsp_check'))+' ›</button>';

@@ -1453,7 +1453,7 @@ async def _card_marks(sig, closed: bool = False) -> list:
     return out
 
 
-_TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+_TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000}
 
 
 async def _card_candles(sig, closed: bool = False) -> tuple[list, str]:
@@ -5553,7 +5553,7 @@ async def send_final_preview(target, ctx, token: str) -> None:
 
 # Tanlov uchun timeframe'lar. chart.TF_MINUTES dagilarning ichidan eng ko'p
 # ishlatiladiganlari — ro'yxat uzun bo'lsa tugmalar o'qilmay qoladi.
-TF_CHOICES = ["1m", "5m", "15m", "1h", "4h", "1d"]
+TF_CHOICES = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]   # 392: 1w
 
 
 def tf_kb(token: str) -> InlineKeyboardMarkup:

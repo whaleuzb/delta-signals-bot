@@ -8404,3 +8404,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 391. Fyuchers signali grafigida ham Volume / Volume Delta
 - Foydalanuvchi: "volume deltani nega olib tashlading?" — `chart._delta_profile` faqat `market == "crypto"` uchun ishlardi (384 dan beri), fyuchers signali (TRB) grafigi profilsiz chiqardi.
 - Endi `crypto` va `futures`. Shamlar Binance'dan kelgan bo'lsa (`c.tb`, 389) taker buy ulushi shamdan olinadi, aks holda `exchange.taker_buy_ratios`, u ham bo'lmasa sham shaklidan.
+
+## 392. 1w (haftalik) taymfreym
+- Mini App terminali (uchala), yangi signal formasi, bot sehrgari (`TF_CHOICES`), widjet, `webapp._TF_MS`, chizmalar `TFS`.
+- Manbalar: MEXC spot `1W`, Binance `1w`, MEXC fyuchers `Week1`. `chart.align` 1w uchun dushanba 00:00 UTC ga tushiradi (epoch — payshanba, +4 kun).
+- TF qatori 7 ta bo'lgach ↶ sig'madi — ↶ chizish asboblari qatoriga (🗑 yoniga) ko'chdi.

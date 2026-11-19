@@ -38,7 +38,7 @@ SILVER = "#8b9081"
 VP_COLOR = "#7f9a2c"    # 385: to'q lime — hajm profili shamlardan ajralib tursin, lekin brendga mos
 
 # Tanlanadigan timeframe'lar va ularning daqiqadagi uzunligi.
-TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
 DEFAULT_TF = "15m"     # tf berilmagan (eski) signallar uchun
 
 SETUP_BARS = 120       # yangi signal grafigida ko'rsatiladigan sham soni
@@ -73,6 +73,9 @@ def align(start_ms: int, tf: str) -> int:
     muammoga duch kelmaydi, chunki uning vaqti sham ochilish vaqtidan olinadi
     va allaqachon chegarada; grafikda esa `opened_at` — ixtiyoriy soniya."""
     step = TF_MINUTES[tf] * 60_000
+    if tf == "1w":   # 392: haftalik sham dushanba 00:00 UTC da ochiladi (1970-01-01 — payshanba, +4 kun)
+        off = 4 * 86_400_000
+        return start_ms - ((start_ms - off) % step)
     return start_ms - (start_ms % step)
 
 

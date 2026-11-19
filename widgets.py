@@ -419,7 +419,7 @@ async def chart_data(sig, n: int = 40) -> dict | None:
     """364-2 (1): oxirgi n sham (signal TF'i, yo'q bo'lsa 1h), 0..4095 ga kodlangan; oraliq —
     shamlar + kirish/SL/TP (juda uzoq bo'lsa kesiladi, chiziq chetga yopishadi)."""
     import tracker
-    tfm = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
+    tfm = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800}
     tf = sig["chart_tf"] if sig["chart_tf"] in tfm else "1h"
     now = int(time.time() * 1000)
     try:

@@ -27,9 +27,9 @@ BASE = "https://contract.mexc.com"
 _client = httpx.AsyncClient(base_url=BASE, timeout=15)
 
 _INTERVALS = {"1m": "Min1", "5m": "Min5", "15m": "Min15", "30m": "Min30",
-              "1h": "Min60", "4h": "Hour4", "1d": "Day1"}
+              "1h": "Min60", "4h": "Hour4", "1d": "Day1", "1w": "Week1"}
 _TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
-          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000}
 
 _symbols: set[str] = set()      # bot ko'rinishida: TRBUSDT
 _symbols_ts = 0.0

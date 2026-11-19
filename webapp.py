@@ -158,7 +158,7 @@ _SPARK_SEM = asyncio.Semaphore(3)
 _TFS = (("5m", 300_000), ("15m", 900_000), ("1h", 3_600_000),
         ("4h", 14_400_000), ("1d", 86_400_000))
 # 281: signalga taymfreym tanlangan bo'lsa (`chart_tf`) — kichik grafik shu taymda.
-_TF_MS = {"1m": 60_000, **dict(_TFS)}
+_TF_MS = {"1m": 60_000, **dict(_TFS), "1w": 604_800_000}   # 392: 1w
 
 
 def _spark_tf(start_ms: int, now_ms: int) -> tuple[str, int]:
