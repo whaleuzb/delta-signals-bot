@@ -227,6 +227,27 @@ async def api_sighist(request):
 _CANDLES: dict = {}
 
 
+async def _klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int) -> list:
+    """388: shamlar — bozorning o'z manbaidan; bo'sh kelsa ikkinchisidan (MEXC spot <-> MEXC fyuchers).
+    Foydalanuvchi: "TRB nega chiqmayabti?" — TRBUSDT MEXC spotda yo'q (400), fyuchersda bor."""
+    import exchange as _ex
+    import futures as _fu
+    first = tracker.provider(market)
+    order = [first] + [m for m in (_ex, _fu) if m is not first and market in ("crypto", "futures")]
+    for i, src in enumerate(order):
+        try:
+            cs = await src.klines(pair, start_ms, limit=200, tf=tf, end_ms=end_ms)
+        except Exception:
+            log.warning("Terminal shamlari olinmadi (%s %s, %s)", pair, tf,
+                        getattr(src, "__name__", src), exc_info=True)
+            cs = []
+        if cs:
+            if i:
+                log.info("Shamlar zaxira manbadan: %s %s <- %s", pair, tf, getattr(src, "__name__", src))
+            return cs
+    return []
+
+
 async def api_candles(request):
     """289: signal terminali — shamlar (egasi/boshqaruvchisi). 30 soniya kesh."""
     import time as _t
@@ -245,12 +266,7 @@ async def api_candles(request):
         rows = hit[1]
     else:
         now = int(_t.time() * 1000)
-        try:
-            cs = await tracker.provider(sig["market"]).klines(
-                sig["symbol"], now - 160 * _TF_MS[tf], limit=200, tf=tf, end_ms=now)
-        except Exception:
-            log.warning("Terminal shamlari olinmadi (%s %s)", sig["symbol"], tf, exc_info=True)
-            cs = []
+        cs = await _klines_any(sig["market"], sig["symbol"], now - 160 * _TF_MS[tf], tf, now)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)] for c in cs][-160:]   # 387: hajm (AVP uchun)
         if rows:
@@ -282,12 +298,7 @@ async def api_dfcandles(request):
         rows = hit[1]
     else:
         now = int(_t.time() * 1000)
-        try:
-            cs = await tracker.provider("crypto").klines(
-                pair, now - 160 * _TF_MS[tf], limit=200, tf=tf, end_ms=now)
-        except Exception:
-            log.warning("DF terminal shamlari olinmadi (%s %s)", pair, tf, exc_info=True)
-            cs = []
+        cs = await _klines_any("crypto", pair, now - 160 * _TF_MS[tf], tf, now)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)] for c in cs][-160:]   # 387: hajm (AVP uchun)
         if rows:

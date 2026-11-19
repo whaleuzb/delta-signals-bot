@@ -8384,3 +8384,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - AVP (`drVP`): langar shamidan oxirigacha, 24 narx bo'lagi, hajm shamning H-L oralig'iga teng taqsimlanadi, xarid ulushi = (C-L)/(H-L); POC, 70% qiymat hududi (VAH/VAL). Buning uchun `api_candles`/`api_dfcandles` qatorlariga 6-ustun — hajm qo'shildi.
 - i18n: `dr_p1`, `dr_p2`, `dr_tap2`, `dr_clr`.
 - Sinov: brauzer `t_dr.py` (5 asbob joylashdi, saqlandi, tanlash, ushlagich surish, TF almashganda saqlanadi, tanlanganni o'chirish).
+
+## 388. Terminal shamlari: zaxira manba (MEXC spot <-> MEXC fyuchers)
+- Foydalanuvchi: "TRB nega chiqmayabti?" — log: `MEXC 400: TRBUSDT 1d uchun ma'lumot yo'q`. TRBUSDT MEXC spotda yo'q, fyuchersda bor; `api_dfcandles` faqat spotdan so'rardi → grafik bo'sh.
+- `webapp._klines_any(market, pair, start, tf, end)`: bozorning o'z manbai (`tracker.provider`), bo'sh/xato bo'lsa ikkinchisi (crypto/futures uchun). `api_candles` va `api_dfcandles` shundan foydalanadi. Log: "Shamlar zaxira manbadan: …".
