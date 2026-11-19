@@ -8388,3 +8388,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 388. Terminal shamlari: zaxira manba (MEXC spot <-> MEXC fyuchers)
 - Foydalanuvchi: "TRB nega chiqmayabti?" — log: `MEXC 400: TRBUSDT 1d uchun ma'lumot yo'q`. TRBUSDT MEXC spotda yo'q, fyuchersda bor; `api_dfcandles` faqat spotdan so'rardi → grafik bo'sh.
 - `webapp._klines_any(market, pair, start, tf, end)`: bozorning o'z manbai (`tracker.provider`), bo'sh/xato bo'lsa ikkinchisi (crypto/futures uchun). `api_candles` va `api_dfcandles` shundan foydalanadi. Log: "Shamlar zaxira manbadan: …".
+
+## 389. Terminal grafigi — Binance shamlari birinchi
+- Foydalanuvchi: "binancedan olsakchi?". `exchange.bn_klines()` — `data-api.binance.vision` (`_bn_data`; api.binance.com Railway'da 451, bu oyna ochiq), har shamga `c.tb` (taker buy hajmi).
+- `_klines_any` tartibi: crypto → Binance spot, MEXC spot, MEXC fyuchers; futures → MEXC fyuchers, Binance spot, MEXC spot; boshqalar — o'z provayderi.
+- Himoya: Binance oxirgi narxi MEXC narxidan 5% dan ko'p farq qilsa (bir xil tiker — boshqa tanga), Binance tashlanadi.
+- Sham qatorlari 7-ustun — taker buy (faqat Binance'dan); AVP (`drVP`) xarid ulushini undan oladi, bo'lmasa (C-L)/(H-L).
+- Kuzatuv (tracker, 1m TP/SL) o'zgarmadi — u MEXC'da qoladi.

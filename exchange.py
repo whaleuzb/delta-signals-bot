@@ -490,6 +490,39 @@ async def resolve_touch_order(symbol: str, start_ms: int, end_ms: int, side: str
 _bn_data = httpx.AsyncClient(base_url="https://data-api.binance.vision", timeout=12)
 
 
+_BN_TF = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1h", "4h": "4h", "1d": "1d"}
+
+
+async def bn_klines(symbol: str, start_ms: int, limit: int = 500,
+                    tf: str = "1m", end_ms: int | None = None) -> list[Candle]:
+    """389: Binance spot shamlari (data-api.binance.vision — Railway'da ham ochiq, kalitsiz).
+    Terminal grafigining birinchi manbai. Har shamga `tb` (taker buy base hajmi) atributi
+    qo'shiladi — AVP xarid/sotuv ulushi shundan. Juftlik yo'q / xato bo'lsa — bo'sh ro'yxat."""
+    interval = _BN_TF.get(tf, "1m")
+    dur = _TF_MS.get(tf, 60_000)
+    params = {"symbol": symbol, "interval": interval, "startTime": start_ms, "limit": min(limit, 1000)}
+    if end_ms is not None:
+        params["endTime"] = end_ms
+    try:
+        r = await _bn_data.get("/api/v3/klines", params=params)
+    except Exception:
+        log.info("Binance shamlari olinmadi (%s %s)", symbol, tf)
+        return []
+    if r.status_code != 200:
+        log.info("Binance %s: %s %s uchun sham yo'q", r.status_code, symbol, tf)
+        return []
+    out = []
+    for k in r.json() or []:
+        try:
+            o = int(k[0])
+            c = Candle(o, float(k[1]), float(k[2]), float(k[3]), float(k[4]), o + dur - 1, float(k[5]))
+            c.tb = float(k[9])
+        except (IndexError, TypeError, ValueError):
+            continue
+        out.append(c)
+    return out
+
+
 async def taker_buy_ratios(symbol: str, start_ms: int, end_ms: int, tf: str) -> dict[int, float] | None:
     out: dict[int, float] = {}
     cur = start_ms

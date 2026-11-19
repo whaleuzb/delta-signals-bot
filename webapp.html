@@ -1238,7 +1238,7 @@ function drN(v){return Math.round(v*10)/10}
 function drVP(t){var C=LW.rc||[],key=t+'|'+C.length+'|'+LW.rlast;LW.vpc=LW.vpc||{};if(LW.vpc[t]&&LW.vpc[t].key===key)return LW.vpc[t];
  var S=C.filter(function(x){return x[0]/1000>=t-1}),lo=1e99,hi=-1e99,N=24;S.forEach(function(x){lo=Math.min(lo,+x[3]);hi=Math.max(hi,+x[2])});
  if(!S.length||!(hi>lo))return LW.vpc[t]={key:key,B:[]};var st=(hi-lo)/N,B=[];for(var i=0;i<N;i++)B.push({b:0,s:0});
- S.forEach(function(x,j){var h=+x[2],l=+x[3],c=+x[4],v=+(x[5]||0)||1;if(j==S.length-1&&LW.rlast)c=LW.rlast;var bf=h>l?(c-l)/(h-l):.5,rg=Math.max(h-l,st*1e-6);
+ S.forEach(function(x,j){var h=+x[2],l=+x[3],c=+x[4],v=+(x[5]||0)||1;if(j==S.length-1&&LW.rlast)c=LW.rlast;var bf=x[6]!=null&&+x[5]>0?Math.max(0,Math.min(1,+x[6]/+x[5])):h>l?(c-l)/(h-l):.5,rg=Math.max(h-l,st*1e-6);
   for(var i=Math.max(0,Math.floor((l-lo)/st));i<N&&lo+st*i<=h;i++){var a=Math.max(l,lo+st*i),b=Math.min(h,lo+st*(i+1)),f=h>l?Math.max(0,b-a)/rg:1;if(f<=0&&h>l)continue;B[i].b+=v*f*bf;B[i].s+=v*f*(1-bf)}});
  var tot=0,pc=0;B.forEach(function(x,i){x.v=x.b+x.s;tot+=x.v;if(x.v>B[pc].v)pc=i});
  var va=B[pc].v,u=pc,d=pc;while(va<tot*.7&&(u<N-1||d>0)){var nu=u<N-1?B[u+1].v:-1,nd=d>0?B[d-1].v:-1;if(nu>=nd){u++;va+=nu}else{d--;va+=nd}}
