@@ -1516,6 +1516,9 @@ function topView(v){if(!S.top){v.innerHTML='<h3 class="rise">'+esc(t('top'))+'</
   api('top').then(function(d){S.top=d;S.anim=true;if(S.tab=='top')render()}).catch(function(){});return}
  var L=S.top[S.topSeg]||[];
  var h='<h3 class="rise">'+esc(t('top'))+'<small>'+esc(t('top_sub'))+'</small></h3>'+seg('tseg',[['groups',t('groups')],['channels',t('channels')],['futures','Futures']],S.topSeg,'setTop');
+ /* 394: guruh/kanalni ulash — Telegram'ning o'z chat tanlash oynasi (bot.add_to_chat_url bilan bir xil havolalar) */
+ h+='<div class="rise" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px"><button class="btn glass" style="margin:0;padding:12px;font-size:14px" onclick="topAdd(\'group\')">'+ic('plus',15)+' '+esc(t('top_add_g'))+'</button>'
+  +'<button class="btn glass" style="margin:0;padding:12px;font-size:14px" onclick="topAdd(\'channel\')">'+ic('plus',15)+' '+esc(t('top_add_c'))+'</button></div>';
  if(!L.length){v.innerHTML=h+'<div class="empty glass rise">'+ic('crown',40)+'<div>'+esc(t('top_empty'))+'</div></div>';return}
  var p=L.slice(0,3);if(p.length==3){var o=[p[1],p[0],p[2]],pl=[2,1,3];
   h+='<div class="podium">'+o.map(function(x,k){return'<div class="pod glass rise'+(pl[k]==1?' acc p1':'')+'" onclick="openGroup('+x.id+')"><div class="pr">#'+pl[k]+'</div>'+logoHtml(x.id,x.logo,x.name)+'<div class="pn">'+esc(x.name)+'</div><div class="pv '+(x.net>=0?'g':'r')+'">'+fpc(x.net)+'</div></div>'}).join('')+'</div>';L=L.slice(3)}
@@ -1524,6 +1527,8 @@ function topView(v){if(!S.top){v.innerHTML='<h3 class="rise">'+esc(t('top'))+'</
   +'<div class="rm"><div class="rn">'+esc(x.name)+'</div><div class="rs">'+x.total+' '+esc(t('sig_w'))+' · '+x.wr.toFixed(0)+'% WR'+(x.lev?' · '+x.lev+'x':'')+(x.open?' · '+esc(t('open_n',{n:x.open})):'')+'</div></div>'
   +'<div class="rv '+(x.net>=0?'g':'r')+'">'+fpc(x.net)+'<small>'+rel(x.last)+'</small></div></div>'}).join('');
  v.innerHTML=h}
+function topAdd(k){var u='https://t.me/'+S.bot+(k=='channel'?'?startchannel&admin=post_messages+edit_messages':'?startgroup=true');try{tg.HapticFeedback.selectionChanged()}catch(e){}
+ try{tg.openTelegramLink(u)}catch(e){openLink(u)}}
 function setTop(k){if(k==S.topSeg)return;S.topSeg=k;S.anim=true;tick();render()}
 function cdown(iso){var ms=new Date(iso)-Date.now();if(ms<=0)return'0';var d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),m=Math.floor(ms%36e5/6e4);return(d?d+'d ':'')+h+'h '+('0'+m).slice(-2)+'m'}
 function tourView(v){if(!S.tour){v.innerHTML='<h3 class="rise">'+esc(t('tour'))+'</h3><div class="spk"><div class="sk"></div></div>';

@@ -8413,3 +8413,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 393. Terminal grafigida Volume Delta + Aster/Lighter logolari
 - `webapp.html`: LWC'da `LW.vd` — gistogramma (`priceScaleId:'vd'`, pastki ~20%), har sham uchun delta = hajm×(2·ulush−1); ulush — 7-ustun taker buy (Binance, 389), bo'lmasa (C−L)/(H−L). `lwVdRow/lwVdSet/lwVdTog`, asboblar qatorida «VΔ» (yoqish/o'chirish, `localStorage tc_vd`). Yoqiq bo'lsa narx shkalasi pastdan 22% bo'sh.
 - Logolar: `CXL.aster/lighter = '<url>/coinx/exaster|exlighter'` — `cexBadge` yangi `<url>` turi (img, yuklanmasa harf). Server: `webapp._CIMG_FIX` — CoinGecko'dagi rasmiy token rasmlari (aniq manzil, LIT tikeri Litentry bilan to'qnashgani uchun qidiruvsiz), `coin_ext` orqali `bot_settings cimg:*` da keshlanadi.
+
+## 394. Top bo'limida «Guruh ulash» / «Kanal ulash»
+- `topView`: segment ostida ikki tugma → `topAdd('group'|'channel')` — `t.me/<bot>?startgroup=true` / `?startchannel&admin=post_messages+edit_messages` (`bot.add_to_chat_url` bilan bir xil), `tg.openTelegramLink`. i18n `top_add_g`, `top_add_c`.
