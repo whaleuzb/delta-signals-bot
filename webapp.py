@@ -967,11 +967,19 @@ async def cg_map_warm(_app=None):
     asyncio.get_running_loop().create_task(run())
 
 
+# 393: birja logolari (rasmiy token belgisi, CoinGecko) — aniq rasm manzili, tiker bo'yicha qidirilmaydi
+# (LIT tikeri Litentry bilan to'qnashadi). Ilovada /coinx/exaster, /coinx/exlighter.
+_CIMG_FIX = {
+    "exaster": "https://coin-images.coingecko.com/coins/images/69040/large/_ASTER.png",
+    "exlighter": "https://coin-images.coingecko.com/coins/images/71121/large/lighter.png",
+}
+
+
 async def _cimg_fetch(c: str):
     import aiohttp
     import base64
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as cs:
-        url = (await _cg_map(cs)).get(c)
+        url = _CIMG_FIX.get(c) or (await _cg_map(cs)).get(c)
         if not url:
             if _CG_Q["n"] >= 6:
                 raise RuntimeError("navbat to'la")

@@ -8409,3 +8409,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Mini App terminali (uchala), yangi signal formasi, bot sehrgari (`TF_CHOICES`), widjet, `webapp._TF_MS`, chizmalar `TFS`.
 - Manbalar: MEXC spot `1W`, Binance `1w`, MEXC fyuchers `Week1`. `chart.align` 1w uchun dushanba 00:00 UTC ga tushiradi (epoch — payshanba, +4 kun).
 - TF qatori 7 ta bo'lgach ↶ sig'madi — ↶ chizish asboblari qatoriga (🗑 yoniga) ko'chdi.
+
+## 393. Terminal grafigida Volume Delta + Aster/Lighter logolari
+- `webapp.html`: LWC'da `LW.vd` — gistogramma (`priceScaleId:'vd'`, pastki ~20%), har sham uchun delta = hajm×(2·ulush−1); ulush — 7-ustun taker buy (Binance, 389), bo'lmasa (C−L)/(H−L). `lwVdRow/lwVdSet/lwVdTog`, asboblar qatorida «VΔ» (yoqish/o'chirish, `localStorage tc_vd`). Yoqiq bo'lsa narx shkalasi pastdan 22% bo'sh.
+- Logolar: `CXL.aster/lighter = '<url>/coinx/exaster|exlighter'` — `cexBadge` yangi `<url>` turi (img, yuklanmasa harf). Server: `webapp._CIMG_FIX` — CoinGecko'dagi rasmiy token rasmlari (aniq manzil, LIT tikeri Litentry bilan to'qnashgani uchun qidiruvsiz), `coin_ext` orqali `bot_settings cimg:*` da keshlanadi.
