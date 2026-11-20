@@ -13,6 +13,7 @@ Xavfsizlik:
     funksiya orqali bajaradi va huquqni o'zi qayta tekshiradi.
 """
 import asyncio
+import io
 import json
 import re
 import time
@@ -970,8 +971,8 @@ async def cg_map_warm(_app=None):
 # 393: birja logolari (rasmiy token belgisi, CoinGecko) — aniq rasm manzili, tiker bo'yicha qidirilmaydi
 # (LIT tikeri Litentry bilan to'qnashadi). Ilovada /coinx/exaster, /coinx/exlighter.
 _CIMG_FIX = {
-    "exaster": "https://coin-images.coingecko.com/coins/images/69040/large/_ASTER.png",
-    "exlighter": "https://coin-images.coingecko.com/coins/images/71121/large/lighter.png",
+    "exaster2": "https://coin-images.coingecko.com/coins/images/69040/large/_ASTER.png",
+    "exlighter2": "https://coin-images.coingecko.com/coins/images/71121/large/lighter.png",
 }
 
 
@@ -1002,11 +1003,25 @@ async def _cimg_fetch(c: str):
                 return None
             L.sort(key=lambda x: x.get("market_cap_rank") or 10 ** 9)
             url = L[0]["large"]
-        async with cs.get(url) as r:
+        # 395: Accept — CDN AVIF/boshqa format bermasin (ilovada birja logolari harf bo'lib qoldi)
+        async with cs.get(url, headers={"Accept": "image/png,image/webp;q=0.9,image/*;q=0.5"}) as r:
             if r.status != 200:
                 return None
             ct = r.headers.get("Content-Type", "image/png").split(";")[0]
             body = await r.read()
+        if c in _CIMG_FIX:
+            # birja logosi — har doim PNG ga o'tkaziladi (format/sarlavha qanday bo'lmasin brauzer o'qiydi)
+            log.info("Birja logosi %s: %s, %s bayt, boshi %r", c, ct, len(body), body[:12])
+            try:
+                from PIL import Image
+                im = Image.open(io.BytesIO(body)).convert("RGBA")
+                im.thumbnail((160, 160))
+                out = io.BytesIO()
+                im.save(out, "PNG")
+                return "image/png", base64.b64encode(out.getvalue()).decode()
+            except Exception as ex:
+                log.warning("Birja logosi %s o'qilmadi: %s", c, ex)
+                return None
         if not ct.startswith("image/") or len(body) > 300_000:
             return None
         return ct, base64.b64encode(body).decode()

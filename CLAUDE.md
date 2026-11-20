@@ -8416,3 +8416,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 394. Top bo'limida «Guruh ulash» / «Kanal ulash»
 - `topView`: segment ostida ikki tugma → `topAdd('group'|'channel')` — `t.me/<bot>?startgroup=true` / `?startchannel&admin=post_messages+edit_messages` (`bot.add_to_chat_url` bilan bir xil), `tg.openTelegramLink`. i18n `top_add_g`, `top_add_c`.
+
+## 395. Aster/Lighter logolari harf bo'lib chiqdi — tuzatish
+- Server `/coinx/exaster` 200 (25 KB) qaytardi, lekin ilova (Windows, Edge WebView) rasmni o'qiy olmadi → `onerror` harf. Baytlarni bu yerdan ko'rib bo'lmadi (CoinGecko va Railway domeni proksi orqali yopiq).
+- `_cimg_fetch`: `Accept: image/png,image/webp…` (CDN AVIF bermasin); `_CIMG_FIX` (birja logolari) har doim Pillow bilan 160px PNG ga o'tkaziladi, log: "Birja logosi …: ct, bayt, boshi". Eski kesh chetlab o'tilishi uchun kalitlar `exaster2`/`exlighter2`.
