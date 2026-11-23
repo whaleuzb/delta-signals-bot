@@ -44,6 +44,10 @@ def provider(market: str):
     return exchange
 
 
+_AGG = {"2m": ("1m", 2), "3m": ("1m", 3), "10m": ("5m", 2), "2h": ("1h", 2)}
+_BASE_MS = {"1m": 60_000, "5m": 300_000, "1h": 3_600_000}
+
+
 async def klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int | None,
                      limit: int = 200, only: str | None = None, info: dict | None = None) -> list:
     """388-390/399: grafiklar uchun (terminal, guruh posti) shamlar — bozorning o'z manbaidan, bo'sh kelsa keyingisidan.
@@ -54,10 +58,35 @@ async def klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int
     va grafik boshqa bozor shamlariga o'tib ketardi (GRASS, ACU, SPCXON: "real grafikka o'xshamaydi")."""
     import exchange as _ex
     import futures as _fu
+    if tf in _AGG:
+        # 404: birjada yo'q TF (2m, 3m, 10m, 2h) — kichigidan yig'iladi; asosiy shamlar oxirgi 1000 tasi bilan cheklanadi
+        base, k = _AGG[tf]
+        bms = _BASE_MS[base]
+        if end_ms is not None:
+            start_ms = max(start_ms, end_ms - 999 * bms)
+        cs = await klines_any(market, pair, start_ms, base, end_ms, limit=1000, only=only, info=info)
+        out, cur = [], None
+        for c in cs:
+            b = c.open_ms - c.open_ms % (k * bms)
+            if cur is None or cur.open_ms != b:
+                cur = exchange.Candle(b, c.open, c.high, c.low, c.close, b + k * bms - 1, c.volume)
+                cur.tb = getattr(c, "tb", None)
+                out.append(cur)
+            else:
+                cur.high, cur.low, cur.close = max(cur.high, c.high), min(cur.low, c.low), c.close
+                cur.volume += c.volume
+                cur.tb = cur.tb + c.tb if cur.tb is not None and getattr(c, "tb", None) is not None else None
+        return out[-limit:]
+    start_ms = max(start_ms, 1_483_228_800_000)      # 2017-01-01 — juda eski startTime'ni birjalar rad etadi
+    if tf == "1M":
+        # oylik sham oy boshida (UTC) ochiladi
+        d = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
+        start_ms = int(datetime(d.year, d.month, 1, tzinfo=timezone.utc).timestamp() * 1000)
     step = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
-            "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000}.get(tf, 60_000)
+            "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000, "1M": 2_592_000_000}.get(tf, 60_000)
     off = 4 * 86_400_000 if tf == "1w" else 0          # haftalik sham dushanba 00:00 UTC
-    start_ms = start_ms - ((start_ms - off) % step)
+    if tf != "1M":
+        start_ms = start_ms - ((start_ms - off) % step)
     first = provider(market)
     if market == "crypto":
         order = [(_ex.bn_klines, "binance"), (_ex.klines, "exchange"), (_fu.klines, "futures")]

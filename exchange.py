@@ -216,10 +216,11 @@ async def resolve_stock_token(raw: str) -> str | None:
 
 # Ichki timeframe kodi -> MEXC interval nomi. MEXC 1 soatni "60m" deb ataydi.
 _INTERVALS = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
-              "1h": "60m", "4h": "4h", "1d": "1d", "1w": "1W"}   # 392: MEXC haftani "1W" deydi
+              "1h": "60m", "4h": "4h", "1d": "1d", "1w": "1W", "1M": "1M"}   # 392: MEXC haftani "1W" deydi
 # Sham davomiyligi (ms) — close_ms ni hisoblash uchun.
 _TF_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
-          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000}
+          "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000,
+          "1M": 2_592_000_000}
 
 
 async def klines(symbol: str, start_ms: int, limit: int = 500,
@@ -351,6 +352,33 @@ async def price_list() -> list[tuple[str, float]]:
     rows.sort(reverse=True)
     _plist = (time.monotonic(), [(s, p) for _v, s, p in rows])
     return _plist[1]
+
+
+_tmap: tuple[float, dict] = (0.0, {})
+
+
+async def ticker_map() -> dict[str, tuple[float, float]]:
+    """404: watchlist — barcha USDT spot juftliklari: asosiy nom -> (oxirgi narx, 24 soatlik o'zgarish %).
+    Bitta so'rov, 8 s kesh. % = (last − open) / open (MEXC/Binance priceChangePercent birligi har xil)."""
+    global _tmap
+    if _tmap[1] and time.monotonic() - _tmap[0] < 8:
+        return _tmap[1]
+    r = await _client.get("/api/v3/ticker/24hr")
+    r.raise_for_status()
+    out = {}
+    for t in r.json():
+        sym = t.get("symbol", "")
+        if not sym.endswith(config.QUOTE):
+            continue
+        try:
+            last = float(t["lastPrice"])
+            op = float(t.get("openPrice") or t.get("prevClosePrice") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if last > 0:
+            out[sym[: -len(config.QUOTE)]] = (last, (last - op) / op * 100 if op > 0 else 0.0)
+    _tmap = (time.monotonic(), out)
+    return out
 
 
 async def volume_ticker_24hr() -> dict[str, float]:
@@ -501,7 +529,7 @@ async def resolve_touch_order(symbol: str, start_ms: int, end_ms: int, side: str
 _bn_data = httpx.AsyncClient(base_url="https://data-api.binance.vision", timeout=12)
 
 
-_BN_TF = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1w"}
+_BN_TF = {"1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1w", "1M": "1M"}
 
 
 async def bn_klines(symbol: str, start_ms: int, limit: int = 500,

@@ -159,7 +159,8 @@ _SPARK_SEM = asyncio.Semaphore(3)
 _TFS = (("5m", 300_000), ("15m", 900_000), ("1h", 3_600_000),
         ("4h", 14_400_000), ("1d", 86_400_000))
 # 281: signalga taymfreym tanlangan bo'lsa (`chart_tf`) — kichik grafik shu taymda.
-_TF_MS = {"1m": 60_000, **dict(_TFS), "1w": 604_800_000}   # 392: 1w
+_TF_MS = {"1m": 60_000, **dict(_TFS), "1w": 604_800_000,   # 392: 1w
+          "2m": 120_000, "3m": 180_000, "10m": 600_000, "30m": 1_800_000, "2h": 7_200_000, "1M": 2_592_000_000}   # 404
 
 
 def _spark_tf(start_ms: int, now_ms: int) -> tuple[str, int]:
@@ -244,6 +245,25 @@ def _before(body) -> int:
     except (TypeError, ValueError):
         return 0
     return b if b > 946684800000 else 0      # 2000-yildan keyingi ms
+
+
+async def api_tickers(request):
+    """404: watchlist — so'ralgan tangalar (asosiy nom, ≤60 ta) uchun oxirgi narx va 24 soatlik %. MEXC spot, 8 s kesh."""
+    import exchange as _ex
+    body, _uid = await _body(request)
+    syms = body.get("syms") if isinstance(body.get("syms"), list) else []
+    syms = [re.sub(r"[^A-Z0-9]", "", str(x).upper()) for x in syms[:60]]
+    try:
+        m = await _ex.ticker_map()
+    except Exception:
+        log.info("Watchlist narxlari olinmadi", exc_info=True)
+        m = {}
+    out = {}
+    for b in syms:
+        b0 = re.sub(r"(USDT|USDC)$", "", b) or b
+        if b0 in m:
+            out[b0] = [m[b0][0], round(m[b0][1], 2)]
+    return web.json_response({"t": out}, headers=NO_CACHE)
 
 
 _BLOGO: dict = {"at": 0.0, "data": None}
@@ -2036,6 +2056,7 @@ def routes() -> list:
         web.post("/api/app/candles", api_candles),
         web.post("/api/app/chartshot", api_chartshot),
         web.get("/blogo.png", bot_logo_png),
+        web.post("/api/app/tickers", api_tickers),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),
