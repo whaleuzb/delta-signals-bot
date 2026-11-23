@@ -348,7 +348,9 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .lwat{text-align:right;font-size:9px;color:rgba(232,236,223,.32);margin:-4px 6px 6px}.lwat a{color:inherit;text-decoration:none}
 .lwct{position:absolute;z-index:4;display:flex;gap:6px}.lwct span{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(20,22,18,.82);border:1px solid rgba(255,255,255,.14);color:#e8ecdf;font-size:17px;font-weight:800;cursor:pointer}
 #lwfs{position:fixed;inset:0;z-index:400;background:#0b0b0c;display:flex;flex-direction:column}
-html.lwfs-on,html.lwfs-on body{overflow:hidden}html.lwfs-on #toast{z-index:500}
+html.lwfs-on,html.lwfs-on body{overflow:hidden}html.lwfs-on #sheet{z-index:520}html.lwfs-on #shade{z-index:510}
+#lwfs .fsf{flex:none;padding:6px 8px 8px;border-top:1px solid rgba(255,255,255,.07)}#lwfs .fsf .rs{display:none}#lwfs .fsf .tile2{margin:0!important;padding:8px 10px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
+#lwfs .fsf .tile2 .k{font-size:12px}#lwfs .fsf .tile2 .v{font-size:14px!important;flex:1}#lwfs .fsf .tile2>div:last-child{margin:0!important;flex:1 1 100%}#lwfs .fsf .btn{padding:9px;font-size:14px}#lwfs .fsf .mcb{margin:0!important}html.lwfs-on #toast{z-index:500}
 #lwfs .fsh{display:flex;align-items:center;gap:4px;padding:6px 8px;flex:none;overflow-x:auto;scrollbar-width:none}#lwfs .fsh::-webkit-scrollbar{display:none}
 #lwfs .fsx{width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:9px;color:#e8ecdf;font-size:15px;cursor:pointer}
 #lwfs .sym{font-weight:800;font-size:14px;white-space:nowrap}#lwfs .px{font-size:13px;font-weight:700;color:#c2f23a;margin-left:6px;white-space:nowrap}#lwfs .sp{flex:1;min-width:6px}
@@ -874,10 +876,11 @@ function cxTermRender(g){var i=termItem(),ex=g.cx.ex,a=cexAcc(ex)||{},p=document
  if(P.length>1)h+='<div class="chips" style="margin-bottom:8px">'+P.map(function(x){return'<span class="chip glass'+(x.sym==i.symbol?' on':'')+'" onclick="cxSym(\''+esc(x.sym)+'\')">'+esc(x.sym)+'</span>'}).join('')+'</div>';
  h+='<div class="chips tfrow" style="margin-bottom:8px">'+TFL.map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
+ h+='<div id="tctl">';if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
  else if(can&&i.price){var ab=function(k,l,c){return'<button class="btn" style="margin:0;color:'+c+'" onclick="cxAdd(\''+k+'\')">+ '+l+'</button>'};
   h+='<div class="mcb" style="margin-top:10px">'+(i.pos&&i.pos.tp==null?ab('tp','TP','#c2f23a'):'')+(i.pos&&i.pos.sl==null?ab('sl','SL','#ff5c5c'):'')+ab('nl','Limit','#4ea1ff')+'</div>'}
+ h+='</div>';
  var x=i.pos;
  if(x){var lg=x.side=='long',r=x.raw,it=function(k,v){return'<div><div class="rs">'+esc(t(k))+'</div><div style="font-weight:800">'+v+'</div></div>'};
   h+='<div class="eq glass" style="margin-top:10px"><div style="display:flex;align-items:center;gap:8px"><span class="b '+(lg?'bl':'bs')+'">'+(lg?'LONG':'SHORT')+'</span><span class="b bx">'+(+x.lev||1)+'x</span><span style="margin-left:auto;font-weight:900;font-size:20px" class="'+(x.upnl>=0?'g':'r')+'">'+fm(x.upnl)+'</span></div>'
@@ -1210,9 +1213,10 @@ function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.cx){cxTermRen
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
  h+='<div class="chips tfrow" style="margin-bottom:8px">'+TFL.map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
+ h+='<div id="tctl">';if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
  else h+='<div class="rs" style="text-align:center;margin:10px 4px">'+esc(t('term_hint'))+'</div>';
+ h+='</div>';
  h+=termInfo(i)+termActs(i);
  p.innerHTML=h;termBind()}
 /* 367: terminal grafigi — TradingView Lightweight Charts (Dip Funded terminalidagi kabi).
@@ -1589,7 +1593,7 @@ function lwShot(mode){if(!LW.ch||LW.shot)return;LW.shot=1;try{tg.HapticFeedback.
 function lwFsInset(){var t=0,b=0;try{t=(tg.safeAreaInset&&tg.safeAreaInset.top||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0);b=(tg.safeAreaInset&&tg.safeAreaInset.bottom||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)}catch(e){}
  var f=document.getElementById('lwfs');if(f){f.style.paddingTop='max('+t+'px, env(safe-area-inset-top))';f.style.paddingBottom='max('+b+'px, env(safe-area-inset-bottom))'}}
 function lwFs(on){var g=LW.g;if(!LW.el||!g)return;on=!!on;if(on===!!LW.fs)return;LW.fs=on;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}
- if(on){var f=document.createElement('div');f.id='lwfs';f.innerHTML='<div class="fsh" id="lwfsh"></div><div class="fso" id="lwfso"></div><div class="fsb" id="lwfsb"><div id="lwfsl"></div><div id="lwfsc"></div></div>';
+ if(on){var f=document.createElement('div');f.id='lwfs';f.innerHTML='<div class="fsh" id="lwfsh"></div><div class="fso" id="lwfso"></div><div class="fsb" id="lwfsb"><div id="lwfsl"></div><div id="lwfsc"></div></div><div class="fsf" id="lwfsf"></div>';
   document.body.appendChild(f);document.documentElement.classList.add('lwfs-on');document.getElementById('lwfsc').appendChild(LW.el);lwFsHdr();lwFsInset();
   /* 399: Telegram to'liq ekrani faqat telefonda (kompyuterda butun oyna to'liq ekranga o'tib ketardi) */
   try{var mob=/^(ios|android)/.test(String(tg.platform||''));if(mob&&tg.requestFullscreen&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))&&!tg.isFullscreen){tg.requestFullscreen();LW.tgfs=1}}catch(e){}
@@ -1623,7 +1627,10 @@ function lwFsHdr(){var h=document.getElementById('lwfsh'),g=LW.g;if(!h||!g)retur
  var vs=g.view,vp=vs&&LW.wlp&&LW.wlp[vs]?LW.wlp[vs][0]:null;
  h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span><span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span><span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="sp"></span>'
   +TFL.map(function(x){return'<span class="tf'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('');
- var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);drTb();lwLeg(null)}
+ var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);lwFsCtl();drTb();lwLeg(null)}
+/* 411: to'liq ekranda limit/TP/SL boshqaruvi (Saqlash/Bekor, + TP/SL/Limit) — sahifadagi #tctl nusxasi grafik ostida */
+function lwFsCtl(){var f=document.getElementById('lwfsf');if(!f)return;var c=document.getElementById('tctl'),h=c?c.innerHTML.replace(/ id="[^"]*"/g,''):'';
+ if(LW.g&&LW.g.view)h='';if(f.innerHTML!==h)f.innerHTML=h;f.style.display=h.replace(/<[^>]*>/g,'').trim()||/<button/.test(h)?'':'none'}
 /* OHLC qatori (TradingView kabi): kursor/barmoq ostidagi sham, bo'lmasa oxirgisi */
 function lwLeg(pr){var o=document.getElementById('lwfso');if(!o||!LW.g)return;var c=LW.g.c||[];if(!c.length){o.innerHTML='';return}
  var k=c.length-1;if(pr&&pr.time!=null&&LW.rt){var t=pr.time,lo=0,hi=LW.rt.length-1;while(lo<hi){var m=(lo+hi+1)>>1;if(LW.rt[m]<=t)lo=m;else hi=m-1}k=lo}
@@ -2247,10 +2254,11 @@ function dfTermRender(g){var i=termItem(),s=S.dfs,p=document.getElementById('pag
  if(s&&s.positions&&s.positions.length>1)h+='<div class="chips" style="margin-bottom:8px">'+s.positions.map(function(x){return'<span class="chip glass'+(x.symbol==i.symbol?' on':'')+'" onclick="dfSym(\''+esc(x.symbol)+'\')">'+esc(x.symbol)+'</span>'}).join('')+'</div>';
  h+='<div class="chips tfrow" style="margin-bottom:8px">'+TFL.map(function(x){return'<span class="chip glass'+(g.tf==x?' on':'')+'" onclick="termTf(\''+x+'\')">'+x+'</span>'}).join('')+'</div>'+drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
- if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
+ h+='<div id="tctl">';if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+(g.pend.from==null?'':fp(g.pend.from)+' → ')+'<span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(g.pend.k=='nl'?t('cx_nl_next'):t('save'))+'</button></div></div>';
  else if(s&&s.id==g.df.acc&&s.tradable&&i.price){var ab=function(k,l,c){return'<button class="btn" style="margin:0;color:'+c+'" onclick="cxAdd(\''+k+'\')">+ '+l+'</button>'};
   h+='<div class="mcb" style="margin-top:10px">'+(i.pos&&i.pos.tp==null?ab('tp','TP','#c2f23a'):'')+(i.pos&&i.pos.sl==null?ab('sl','SL','#ff5c5c'):'')+ab('nl','Limit','#4ea1ff')+'</div>'}
+ h+='</div>';
  if(!s||s.id!=g.df.acc){p.innerHTML=h+'<div class="spk"><div class="sk"></div></div>';termBind();return}
  var tr=s.tradable;
  h+='<div style="display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 0">'+'<button class="btn" style="margin:0;background:var(--g);color:#050506;font-weight:800;padding:13px" '+(tr?'':'disabled ')+'onclick="dfBuySheet()">BUY '+esc(i.symbol)+'</button>'

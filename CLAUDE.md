@@ -8500,3 +8500,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 410. Grafikdagi ✕ — bir bosish → «Ha / Yo'q» oynasi
 - Avval ✕ ikki marta bosilardi (`g.xarm`, "yana bosing" toast). Endi `cxLineX(k)` / `dfLineX(k)` birinchi bosishda `xAsk(k, item, cb)` — o'z oynasi (`#xask`, z 650 — to'liq ekran ustida): savol (pozitsiyani to'liq yopish / TP / SL olib tashlash / buyurtmani bekor qilish), juftlik va chiziq narxi, «Yo'q» / «Ha» (uz/ru/en — `XQ`).
 - «Ha»: pozitsiya ✕ — to'liq yopiladi darhol (birja: `fut_close frac=1`; Dip Funded: `sell fraction=1`), foiz tanlash oynasi chiqmaydi; TP/SL — olib tashlanadi; buyurtma — bekor qilinadi.
+
+## 411. To'liq ekranda limit/TP/SL boshqaruvi grafik oynasining o'zida
+- Muammo: to'liq ekranda chiziq surilganda «Saqlash/Bekor» sahifada (grafik ostida, to'liq ekran orqasida) qolardi — saqlash uchun chiqish kerak edi.
+- Uchala terminalda pending/qo'shish bloki `#tctl` ichida; `lwFsCtl()` (har `lwFsHdr` da, ya'ni har `termRender` dan keyin) uni `#lwfsf` ga — to'liq ekranning pastki paneliga nusxalaydi: «Limit 100,000 → 100,512 · % · Bekor qilish / Saqlash», pending yo'q bo'lsa «+ TP / + SL / + Limit». Tugmalar o'sha global funksiyalar (`termSave/termCancel/cxAdd`). Ko'rish rejimida (`g.view`) yashirin.
+- To'liq ekranda `#sheet`/`#shade` z-index 520/510 — «Keyingi» (yangi limit) oynasi to'liq ekran ustida ochiladi.
