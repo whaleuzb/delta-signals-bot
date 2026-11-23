@@ -246,6 +246,43 @@ def _before(body) -> int:
     return b if b > 946684800000 else 0      # 2000-yildan keyingi ms
 
 
+_BLOGO: dict = {"at": 0.0, "data": None}
+
+
+async def bot_logo_png(request):
+    """402: botning profil rasmi (Trade Controller logosi) — grafik burchagidagi belgi (TradingView logosi o'rniga).
+    Bot API: getMe -> getUserProfilePhotos -> getFile; topilsa 6 soat, topilmasa 10 daqiqa xotirada."""
+    import aiohttp
+    from PIL import Image
+    ttl = 6 * 3600 if _BLOGO["data"] else 600
+    if time.time() - _BLOGO["at"] > ttl:
+        _BLOGO["at"] = time.time()
+        api = f"https://api.telegram.org/bot{config.BOT_TOKEN}"
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as cs:
+                async with cs.get(api + "/getMe") as r:
+                    me = (await r.json())["result"]["id"]
+                async with cs.get(api + "/getUserProfilePhotos", params={"user_id": me, "limit": 1}) as r:
+                    ph = (await r.json()).get("result") or {}
+                sizes = (ph.get("photos") or [[]])[0]
+                if sizes:
+                    fid = next((x for x in sizes if x.get("width", 0) >= 160), sizes[-1])["file_id"]
+                    async with cs.get(api + "/getFile", params={"file_id": fid}) as r:
+                        path = (await r.json())["result"]["file_path"]
+                    async with cs.get(f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{path}") as r:
+                        raw = await r.read()
+                    im = Image.open(io.BytesIO(raw)).convert("RGB")
+                    im.thumbnail((128, 128))
+                    out = io.BytesIO()
+                    im.save(out, "PNG")
+                    _BLOGO["data"] = out.getvalue()
+        except Exception as ex:
+            log.info("Bot logosi olinmadi: %s", ex)
+    if not _BLOGO["data"]:
+        raise web.HTTPNotFound(headers={"Cache-Control": "public, max-age=600"})
+    return web.Response(body=_BLOGO["data"], content_type="image/png", headers={"Cache-Control": "public, max-age=21600"})
+
+
 _SHOT_RL: dict = {}
 
 
@@ -1998,6 +2035,7 @@ def routes() -> list:
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/candles", api_candles),
         web.post("/api/app/chartshot", api_chartshot),
+        web.get("/blogo.png", bot_logo_png),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),

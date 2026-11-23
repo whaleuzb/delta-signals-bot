@@ -8453,3 +8453,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `exchange.klines`: `limit > 500` va `end_ms` bo'lsa — 500 talik bo'laklarga bo'lib so'raydi.
 - `tracker.klines_any`: joriy oyna so'ralganda manba eskirgan shamlar bersa (oxirgisi 3 shamdan ko'p orqada) — keyingi manbaga o'tadi (log "eskirgan shamlar").
 - `lwData`: jonli narx faqat oxirgi sham joriy bo'lsa (2 TF ichida) qo'llanadi.
+
+## 402. Grafikda TradingView logosi o'rniga o'zimizning logo
+- LWC `layout.attributionLogo:false`; grafikning pastki chap burchagida (vaqt o'qi qatorida, eski TV logosi joyida) `.lwbl` — `/blogo.png`.
+- `/blogo.png` (`webapp.bot_logo_png`): botning profil rasmi Bot API orqali (getMe → getUserProfilePhotos → getFile), 128px PNG, xotirada 6 soat (topilmasa 10 daqiqa); topilmasa img olib tashlanadi.
+- Litsenziya (LWC, Apache-2.0): logo o'chirilsa TradingView'ga havola sahifada bo'lishi kerak — grafik ostida kichik «Charts by TradingView» (`.lwat`). Olib tashlamang.
+- Yuklab olinadigan/ulashiladigan rasm pastida ham shu logo + «Trade Controller».
