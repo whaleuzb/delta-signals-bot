@@ -331,7 +331,7 @@ async def api_candles(request):
     else:
         now = before - 1 if before else int(_t.time() * 1000)
         inf = {}
-        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN,
+        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - (_CN - 1) * _TF_MS[tf], tf, now, limit=_CN,
                                       only=src, info=inf)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
@@ -369,7 +369,7 @@ async def api_dfcandles(request):
     else:
         now = before - 1 if before else int(_t.time() * 1000)
         inf = {}
-        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN, only=src, info=inf)
+        cs = await tracker.klines_any("crypto", pair, now - (_CN - 1) * _TF_MS[tf], tf, now, limit=_CN, only=src, info=inf)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix

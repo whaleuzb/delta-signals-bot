@@ -1185,6 +1185,10 @@ function lwLoad(cb){if(window.LightweightCharts){cb();return}if(LW.ld){LW.ld.pus
 function termSvg(i,g){return'<div id="tlw" style="height:'+(TER.H+TER.AX)+'px;position:relative"></div>'}
 function termBind(){var g=S.page;if(!document.getElementById('tlw'))return;lwLoad(function(){if(S.page===g&&document.getElementById('tlw'))lwMount(g)})}
 function termRedraw(){if(LW.g===S.page)lwLines(true)}
+function lwP2(n){return('0'+n).slice(-2)}
+var LWM=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function lwTimeFmt(t){var d=new Date(t*1000);return lwP2(d.getDate())+' '+LWM[d.getMonth()]+" '"+String(d.getFullYear()).slice(2)+'  '+lwP2(d.getHours())+':'+lwP2(d.getMinutes())}
+function lwTickFmt(t,k){var d=new Date(t*1000);if(k===0)return String(d.getFullYear());if(k===1)return LWM[d.getMonth()];if(k===2)return String(d.getDate());return lwP2(d.getHours())+':'+lwP2(d.getMinutes())}
 function lwPrec(p){if(!(p>0))return 2;var k=Math.max(2,Math.min(10,Math.ceil(-Math.log10(p))+4));if(p>=1000)k=2;else if(p>=1)k=Math.min(k,4);return k}
 function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(LW.fs&&LW.g!==g)lwFs(false);if(LW.fs&&document.getElementById('lwfsc'))host=document.getElementById('lwfsc');
  if(LW.g!==g||!LW.el){if(LW.ch){try{LW.ch.remove()}catch(e){}}
@@ -1195,7 +1199,9 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
    rightPriceScale:{borderColor:'rgba(255,255,255,.08)',scaleMargins:{top:.1,bottom:lwVdOn()?.22:.08}},
    timeScale:{borderColor:'rgba(255,255,255,.08)',timeVisible:true,rightOffset:6,barSpacing:7,minBarSpacing:1.5},
    crosshair:{mode:0,vertLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'},horzLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'}},
-   localization:{locale:'en-US'}});   /* 368: vertTouchDrag yoqiq — o'chirilsa narx o'qini barmoq bilan cho'zish ham ishlamaydi */
+   localization:{locale:'en-US',timeFormatter:lwTimeFmt}});
+  /* 400: vaqt o'qi — mahalliy vaqtda (TradingView/birja ilovasi kabi; avval UTC edi — Toshkentda 5 soat farq) */
+  ch.timeScale().applyOptions({tickMarkFormatter:lwTickFmt});   /* 368: vertTouchDrag yoqiq — o'chirilsa narx o'qini barmoq bilan cho'zish ham ishlamaydi */
   var se=ch.addCandlestickSeries({upColor:'#c2f23a',downColor:'#ff5c5c',borderVisible:false,wickUpColor:'#c2f23a',wickDownColor:'#ff5c5c',
    autoscaleInfoProvider:function(orig){var r=orig();if(!r||!r.priceRange||LW.drag)return r;var lo=r.priceRange.minValue,hi=r.priceRange.maxValue,pad=(hi-lo)*1.2;
     (LW.L||[]).forEach(function(l){if(l.ns)return;if(l.p<lo&&l.p>=lo-pad)r.priceRange.minValue=Math.min(r.priceRange.minValue,l.p);if(l.p>hi&&l.p<=hi+pad)r.priceRange.maxValue=Math.max(r.priceRange.maxValue,l.p)});return r}});

@@ -8443,3 +8443,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Manba yopishqoq: javobda `src` (binance/exchange/futures); ilova `g.src` ni saqlab tarix sahifalarida yuboradi → `only=src`, sahifalar aralashmaydi. Yangilanishda manba o'zgarsa yuklangan tarix tashlanadi (`termMerge`).
 - Binance narx tekshiruvi faqat oxirgi sahifada (tarix sahifasida eski shamni joriy narx bilan solishtirib Binance'ni noto'g'ri rad etardi) va chegara 5% → 1.5%.
 - To'liq ekran: `tg.requestFullscreen` faqat ios/android (kompyuterda butun oyna to'liq ekranga o'tardi); xavfsiz hudud 350/1000 ms dan keyin qayta hisoblanadi + `env(safe-area-inset-*)`; to'liq ekranda toast ustida.
+
+## 400. Grafik: oxirgi sham tushib qolardi + vaqt UTC edi
+- So'rov oynasi `now − (_CN−1)·tf` (sham chegarasiga tushirilgach 1000 tadan oshmaydi). Avval 1001 sham sig'ardi, Binance boshidan 1000 tasini berib JORIY shamni tashlab yuborardi, jonli narx esa oldingi sham ustiga yozilib "sakrardi".
+- LWC vaqt o'qi va kursor yorlig'i — mahalliy vaqtda (`lwTimeFmt`, `lwTickFmt`), ma'lumot vaqtlari (UTC soniyalar) o'zgarmagan — chizmalar/AVP joyida.
