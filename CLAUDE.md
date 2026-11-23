@@ -8484,3 +8484,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 407. AVP yana grafik chetiga yopishadi
 - Foydalanuvchi: "AVP nega chart chetida emas? Avvalgidek qil". `x0 = max(0, x(langar))` — langar ekrandan chapga chiqsa profil grafikning chap chetidan boshlanadi (406 da ekrandan tashqarida qolib ketardi). Eni vaqtga bog'liqligicha qoldi: `(x(oxirgi sham) − x0) × wp%`, kamida 36 px.
+
+## 408. VP (ko'rinayotgan oraliq) olib tashlandi — AVP uning o'rnida (o'ng chetda)
+- Foydalanuvchi: "VP ni olib tashla, o'rniga AVP ni joylashtir". `vprOn/vprTog/vprSvg`, «VP» chip va Indikatorlar oynasidagi VP yorlig'i o'chirildi (Indikatorlar — faqat VΔ).
+- AVP: ma'lumot — langar shamidan hozirgacha; ustunlar grafikning O'NG chetidan (narx shkalasi yonidan) chapga, eni `P.w × wp%` (standart 30%, 10–60), qatorlar standart 30. POC/VAH/VAL chiziqlari langardan o'ng chetgacha, yorliqlar profil chap chetida. Langar chizig'i (punktir) — ushlagich; langar ekrandan chiqsa — profilning o'zi bosiladi (tanlash/surish).
