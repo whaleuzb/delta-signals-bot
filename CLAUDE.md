@@ -8447,3 +8447,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 400. Grafik: oxirgi sham tushib qolardi + vaqt UTC edi
 - So'rov oynasi `now − (_CN−1)·tf` (sham chegarasiga tushirilgach 1000 tadan oshmaydi). Avval 1001 sham sig'ardi, Binance boshidan 1000 tasini berib JORIY shamni tashlab yuborardi, jonli narx esa oldingi sham ustiga yozilib "sakrardi".
 - LWC vaqt o'qi va kursor yorlig'i — mahalliy vaqtda (`lwTimeFmt`, `lwTickFmt`), ma'lumot vaqtlari (UTC soniyalar) o'zgarmagan — chizmalar/AVP joyida.
+
+## 401. GRASS 1h: ~25 eski sham + ulkan qizil sham (skrinshot)
+- Sabab: MEXC spot `limit=1000` oynada oynaning BOSHIDAN bir necha shamni qaytardi; jonli narx eski oxirgi sham ustiga yozilib ulkan sham chizildi.
+- `exchange.klines`: `limit > 500` va `end_ms` bo'lsa — 500 talik bo'laklarga bo'lib so'raydi.
+- `tracker.klines_any`: joriy oyna so'ralganda manba eskirgan shamlar bersa (oxirgisi 3 shamdan ko'p orqada) — keyingi manbaga o'tadi (log "eskirgan shamlar").
+- `lwData`: jonli narx faqat oxirgi sham joriy bo'lsa (2 TF ichida) qo'llanadi.

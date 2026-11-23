@@ -236,6 +236,17 @@ async def klines(symbol: str, start_ms: int, limit: int = 500,
     o'qiydi, shuning uchun end_ms'siz ham to'g'ri ishlaydi."""
     interval = _INTERVALS.get(tf, "1m")
     dur = _TF_MS.get(tf, 60_000)
+    if limit > 500 and end_ms is not None:
+        # 401: MEXC spot katta oynada (1000 sham) oynaning BOSHIDAN bir necha shamni qaytarib qo'yardi (GRASS 1h:
+        # ~25 eski sham, keyin bo'shliq). 500 talik bo'laklarga bo'lib olinadi (MEXC'ning standart limiti).
+        out: list[Candle] = []
+        cur = start_ms
+        while cur <= end_ms and len(out) < limit:
+            ce = min(end_ms, cur + 500 * dur - 1)
+            part = await klines(symbol, cur, limit=500, tf=tf, end_ms=ce)
+            out.extend(c for c in part if not out or c.open_ms > out[-1].open_ms)
+            cur = ce + 1
+        return out[:limit]
     params = {"symbol": symbol, "interval": interval, "startTime": start_ms,
               "limit": limit}
     if end_ms is not None:

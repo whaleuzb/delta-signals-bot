@@ -1223,7 +1223,8 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
 function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
  var dk=(g.tf||'')+'|'+(i&&i.symbol)+'|'+c.length+'|'+(c.length?c[0][0]:0);
  var rows=c.map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}});
- if(i&&i.price!=null&&rows.length){var lr=rows[rows.length-1],p=+i.price;lr.close=p;lr.high=Math.max(lr.high,p);lr.low=Math.min(lr.low,p)}
+ /* 401: jonli narx faqat joriy shamga (oxirgi sham eski bo'lsa — soxta ulkan sham chizilardi) */
+ if(i&&i.price!=null&&rows.length&&Date.now()/1000-rows[rows.length-1].time<2*(TFS[g.tf]||3600)){var lr=rows[rows.length-1],p=+i.price;lr.close=p;lr.high=Math.max(lr.high,p);lr.low=Math.min(lr.low,p)}
  LW.rt=rows.map(function(r){return r.time});LW.rc=c;LW.rlast=rows.length?rows[rows.length-1].close:0;   /* 387: chizmalar uchun */
  if(dk!==LW.dk){var nk=LW.dk.split('|').slice(0,2).join('|')!==dk.split('|').slice(0,2).join('|');LW.dk=dk;
   se.applyOptions({priceFormat:{type:'price',precision:lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)),minMove:Math.pow(10,-lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)))}});

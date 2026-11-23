@@ -73,6 +73,11 @@ async def klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int
         except Exception:
             log.warning("Grafik shamlari olinmadi (%s %s, %s)", pair, tf, name, exc_info=True)
             cs = []
+        if cs and end_ms is not None and not only and len(order) > 1 and end_ms - cs[-1].open_ms > 3 * step \
+                and end_ms > int(time.time() * 1000) - 2 * step:
+            # 401: joriy oyna so'ralgan, lekin manba eskirgan shamlar berdi (oxirgisi 3 shamdan ko'p orqada) — keyingisi
+            log.info("Grafik: %s %s (%s) eskirgan shamlar (oxirgisi %s) — keyingi manba", pair, tf, name, cs[-1].open_ms)
+            cs = []
         if cs and name == "binance" and not only and len(order) > 1:
             # bir xil tiker Binance va MEXC'da boshqa tanga bo'lishi mumkin — joriy narx 1.5% dan ko'p farq qilsa
             # (bir xil tangada farq odatda 0.1-0.3%) Binance ishlatilmaydi. Faqat oxirgi shamlar sahifasida.
