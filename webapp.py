@@ -228,6 +228,18 @@ async def api_sighist(request):
 _CANDLES: dict = {}
 
 
+# 397: grafik tarixi — bir so'rovda 500 sham; `before` (ms) berilsa shundan oldingi 500 tasi (chapga surilganda)
+_CN = 500
+
+
+def _before(body) -> int:
+    try:
+        b = int(body.get("before") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return b if b > 946684800000 else 0      # 2000-yildan keyingi ms
+
+
 async def api_candles(request):
     """289: signal terminali — shamlar (egasi/boshqaruvchisi). 30 soniya kesh."""
     import time as _t
@@ -240,16 +252,17 @@ async def api_candles(request):
     if not _can(ws, uid):
         raise web.HTTPForbidden()
     tf = body.get("tf") if body.get("tf") in _TF_MS else (sig["chart_tf"] if sig["chart_tf"] in _TF_MS else "1h")
-    key = (sig["market"], sig["symbol"], tf)
+    before = _before(body)
+    key = (sig["market"], sig["symbol"], tf, before)
     hit = _CANDLES.get(key)
-    if hit and _t.monotonic() - hit[0] < 30:
+    if hit and _t.monotonic() - hit[0] < (600 if before else 30):
         rows = hit[1]
     else:
-        now = int(_t.time() * 1000)
-        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - 160 * _TF_MS[tf], tf, now)
+        now = before - 1 if before else int(_t.time() * 1000)
+        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN + 5)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
-                + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs][-160:]   # 387: hajm; 389: taker buy
+                + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
         if rows:
             if len(_CANDLES) > 300:
                 _CANDLES.clear()
@@ -273,16 +286,17 @@ async def api_dfcandles(request):
         raise web.HTTPBadRequest()
     tf = body.get("tf") if body.get("tf") in _TF_MS else "1h"
     pair = sym if sym.endswith(config.QUOTE) else sym + config.QUOTE
-    key = ("crypto", pair, tf)
+    before = _before(body)
+    key = ("crypto", pair, tf, before)
     hit = _CANDLES.get(key)
-    if hit and _t.monotonic() - hit[0] < 30:
+    if hit and _t.monotonic() - hit[0] < (600 if before else 30):
         rows = hit[1]
     else:
-        now = int(_t.time() * 1000)
-        cs = await tracker.klines_any("crypto", pair, now - 160 * _TF_MS[tf], tf, now)
+        now = before - 1 if before else int(_t.time() * 1000)
+        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN + 5)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
-                + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs][-160:]   # 387: hajm; 389: taker buy
+                + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
         if rows:
             if len(_CANDLES) > 300:
                 _CANDLES.clear()

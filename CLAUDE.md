@@ -8426,3 +8426,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `lwFs(on)`: `#lwfs` (fixed, z 400) — tepada ✕, juftlik, narx, TF (1m…1w); ostida OHLC/Vol/Δ qatori (`lwLeg`, `subscribeCrosshairMove` — barmoq/kursor ostidagi sham); chapda vertikal asboblar ustuni (`drBar(g,true)`: trend, gorizontal, blok, Fib, AVP, VΔ, ↶, 🗑, chiqish). `LW.el` `#lwfsc` ga ko'chadi, chiqishda `#tlw` ga qaytadi; `lwMount` to'liq ekranda shu joyni host qiladi va sarlavhani yangilaydi.
 - Telegram 8.0+: `tg.requestFullscreen()`/`exitFullscreen()`, xavfsiz hudud (`safeAreaInset`+`contentSafeAreaInset`) `fullscreenChanged/safeAreaChanged` hodisalarida qayta hisoblanadi. «Orqaga» (`navBack`) avval to'liq ekrandan chiqaradi.
 - Bir nechta asboblar paneli: `drTb`, `lwVdTog`, `lwUndoSync` endi `.lwtb [data-t]` / `[data-u]` bo'yicha hammasini yangilaydi.
+
+## 397. Grafik tarixi — chapga surilganda eski shamlar (cheksiz tarix)
+- Backend: `api_candles`/`api_dfcandles` bir so'rovda `_CN = 500` sham (avval 160); `before` (ms) berilsa — shundan oldingi 500 tasi (`_before()`), kesh kaliti `(…, tf, before)`, tarix keshi 10 daqiqa.
+- Frontend: `termReq(g, before)` — uchala terminal uchun bitta so'rov; `termLoad` yangilanishda `termMerge` bilan yuklangan eski qismni saqlaydi; `termHist(g)` — ko'rinish chap chetga 40 shamdan yaqinlashsa eski 500 tani boshiga qo'shadi (`g.cMore`, bo'sh kelsa `g.cEnd`, 20 000 gacha). Ko'rinish o'ng chetga nisbatan saqlangani uchun (`g.vr.right`) sakramaydi. TF/juftlik almashsa `g.cEnd=0`.
+- Diqqat: `termMore` nomi band (signal kartasidagi «ko'proq») — tarix funksiyasi `termHist`.

@@ -919,7 +919,7 @@ function cxStRender(){var g=S.page;if(!g||g.id!='cxst')return;var p=document.get
  if(sy.at)h+='<div class="rs" style="margin:12px 4px 0">'+esc(t('cx_st_synced'))+': '+ctrDate(sy.at)+(d.first?' · '+esc(t('cx_st_from'))+' '+(function(x){var z=function(n){return('0'+n).slice(-2)};return z(x.getDate())+'.'+z(x.getMonth()+1)+'.'+x.getFullYear()})(new Date(d.first)):'')+'</div>';
  h+='<button class="btn full" style="margin-top:10px" onclick="cxStGet(1)"'+(sy.running?' disabled':'')+'>'+esc(t('cx_tr_refresh'))+'</button><div class="endsp"></div>';
  p.innerHTML=h}
-function cxSym(sym){var g=S.page;if(!g||!g.cx)return;g.cx.sym=sym;g.cx.mkt='fut';g.c=null;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
+function cxSym(sym){var g=S.page;if(!g||!g.cx)return;g.cx.sym=sym;g.cx.mkt='fut';g.c=null;g.cEnd=0;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
 setInterval(function(){var g=S.page;if(!g||!g.cx||g.drag||g.pend||document.hidden)return;cexLoad(1);cxOrders(g.cx.ex);cxSpotOpen()},15000);
 /* 330: ilova ichida savdo (Binance Spot + Futures) */
 function trKeep(){var g=function(id){var e=document.getElementById(id);return e?e.value:undefined};var v=S.tr.v||{};['tr_p','tr_a','tr_tp','tr_sl'].forEach(function(id){var x=g(id);if(x!==undefined)v[id]=x});S.tr.v=v}
@@ -1113,10 +1113,17 @@ function sigCard(i){var long=i.side=='LONG';var pend=i.status=='PENDING';var pr=
 var TER={W:360,H:330,PR:58,AX:24};
 function openTerm(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;tick();S.page={id:'term',sig:id,tf:i.tf||'1h',c:null,adds:[],drag:null,pend:null};termRender();pageShow();termLoad()}
 function termItem(){var g=S.page;if(g&&g.cx)return cxItem(g);if(g&&g.df)return dfItem(g);return g&&S.items.filter(function(x){return x.id==g.sig})[0]}
-function termLoad(){var g=S.page;if(!g||g.id!='term')return;
- if(g.cx){api('dfcandles',{sym:g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,''),tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];termRender()}).catch(function(){});return}
- if(g.df){api('dfcandles',{sym:g.df.sym,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];termRender()}).catch(function(){});return}
- api('candles',{sig:g.sig,tf:g.tf}).then(function(d){if(S.page!==g)return;g.c=d.c||[];g.adds=d.adds||[];termRender()}).catch(function(){})}
+/* 397: shamlar so'rovi (termLoad va tarix uchun bitta joy); before — shundan oldingi 500 sham */
+function termReq(g,before){var a={tf:g.tf};if(before)a.before=before;
+ if(g.cx){a.sym=g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'');return api('dfcandles',a)}if(g.df){a.sym=g.df.sym;return api('dfcandles',a)}a.sig=g.sig;return api('candles',a)}
+/* yangilanishda yuklangan tarix yo'qolmasin: eski qism + yangi oxirgi 500 */
+function termMerge(g,nc){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf)return nc;var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
+function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;
+ termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[]);g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
+/* 397: chap chetga yaqinlashganda — eski shamlar (TradingView kabi cheksiz tarix; 20 000 tagacha) */
+function termHist(g){if(!g||g.cMore||g.cEnd||!g.c||!g.c.length||g.c.length>=20000)return;g.cMore=1;var tf=g.tf,b=g.c[0][0];
+ termReq(g,b).then(function(d){g.cMore=0;if(S.page!==g||g.tf!==tf||!g.c||!g.c.length||g.c[0][0]!==b)return;
+  var r=(d.c||[]).filter(function(x){return x[0]<b});if(!r.length){g.cEnd=1;return}g.c=r.concat(g.c);if(LW.g===g)lwData(g)}).catch(function(){g.cMore=0})}
 function lwAuto(){try{return LW.ch.priceScale('right').options().autoScale!==false}catch(e){return true}}
 function lwUndoPush(g){g.uh=g.uh||[];g.uh.push({tf:g.tf,vr:g.vr?{span:g.vr.span,right:g.vr.right}:null,as:lwAuto()});if(g.uh.length>30)g.uh.shift();lwUndoSync(g)}
 function lwUndoSync(g){[].forEach.call(document.querySelectorAll('[data-u]'),function(b){b.style.display=g&&g.uh&&g.uh.length?'inline-flex':'none'})}
@@ -1125,7 +1132,7 @@ function lwUndo(){var g=S.page;if(!g||!g.uh||!g.uh.length)return;var u=g.uh.pop(
  else if(u.vr){g.vr=u.vr;LW.qu=Date.now()+500;lwView(g)}
  try{if(u.as)LW.ch.priceScale('right').applyOptions({autoScale:true})}catch(e){}
  lwUndoSync(g)}
-function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;if(!LW.noUndo&&LW.g===g)lwUndoPush(g);g.tf=tf;g.c=null;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df||g.cx)return;
+function termTf(tf){var g=S.page;if(!g||g.tf==tf)return;if(!LW.noUndo&&LW.g===g)lwUndoPush(g);g.tf=tf;g.c=null;g.cEnd=0;g.cMore=0;g.vn=null;g.ys=1;tick();termRender();termLoad();if(g.df||g.cx)return;
  api('act',{sig:g.sig,action:'tf',args:{tf:tf}}).then(function(r){var i=termItem();if(r.ok&&i)i.tf=tf}).catch(function(){})}
 function termMarks(i){var M=[];
  if(i.cx)return M;
@@ -1204,7 +1211,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
   ch.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(r&&LW.g===g&&!LW.busy&&LW.n){
    /* 377: grafik ichidagi "↶" — har surish/kattalashtirish seriyasidan oldingi ko'rinish yoziladi (700 ms jimlik = yangi qadam) */
    if(Date.now()>(LW.qu||0)&&!LW.vrT&&g.vr)lwUndoPush(g);clearTimeout(LW.vrT);LW.vrT=setTimeout(function(){LW.vrT=0},700);
-   g.vr={span:r.to-r.from,right:LW.n-1-r.to}}});
+   g.vr={span:r.to-r.from,right:LW.n-1-r.to};if(r.from<40)termHist(g)}});
   (function loop(){if(LW.g!==g)return;lwPos();drDraw();lwCt();requestAnimationFrame(loop)})()}
  host.appendChild(LW.el);lwData(g);lwLines(true);drTb();if(LW.fs)lwFsHdr();lwLeg(null)}
 function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
@@ -1943,7 +1950,7 @@ function ppGo(sym){var o=S.pp;sheetClose();if(o&&o.pick)o.pick(sym)}
 S.pairs={};
 function pairsGet(kind){var c=S.pairs[kind];if(c&&Date.now()-c.at<60000)return Promise.resolve(c.p);
  return api('pairs',{kind:kind}).then(function(d){S.pairs[kind]={at:Date.now(),p:d.p||[]};return d.p||[]})}
-function dfSym(sym){var g=S.page;if(!g||!g.df)return;g.df.sym=sym;g.c=null;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
+function dfSym(sym){var g=S.page;if(!g||!g.df)return;g.df.sym=sym;g.c=null;g.cEnd=0;g.vn=null;g.ys=1;g.pend=null;tick();termRender();termLoad()}
 /* 314: pozitsiya kartasi — signal terminalidagi bilan bir xil (yorliqlar, P&L/ROI, 6 maydon, tugmalar) */
 function dfInfo(i,g,s){var tr=s.tradable,x=i.pos,n2=function(v){return v==null?'—':(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
   sg=function(v){return v==null?'—':(v>=0?'+':'−')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},cl=function(v){return v==null?'':v>=0?'g':'r'};
