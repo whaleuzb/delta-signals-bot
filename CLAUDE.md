@@ -8488,3 +8488,11 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 408. VP (ko'rinayotgan oraliq) olib tashlandi — AVP uning o'rnida (o'ng chetda)
 - Foydalanuvchi: "VP ni olib tashla, o'rniga AVP ni joylashtir". `vprOn/vprTog/vprSvg`, «VP» chip va Indikatorlar oynasidagi VP yorlig'i o'chirildi (Indikatorlar — faqat VΔ).
 - AVP: ma'lumot — langar shamidan hozirgacha; ustunlar grafikning O'NG chetidan (narx shkalasi yonidan) chapga, eni `P.w × wp%` (standart 30%, 10–60), qatorlar standart 30. POC/VAH/VAL chiziqlari langardan o'ng chetgacha, yorliqlar profil chap chetida. Langar chizig'i (punktir) — ushlagich; langar ekrandan chiqsa — profilning o'zi bosiladi (tanlash/surish).
+
+## 409. Har bir asbobda TradingView kabi to'liq sozlamalar: Kirish · Uslub · Matn · Koordinatalar · Ko'rinish
+- AVP/FRVP hisobi bitta `vpCalc` (kesh `LW.vpk`): **Kirish** — qatorlar tartibi (qatorlar soni / tik), qator o'lchami, hajm turi (Up/Down, Jami, Delta), qiymat hududi %. Rivojlanuvchi POC/VA — har sham uchun (`dev`).
+- AVP/FRVP **Uslub** (`VPSTY`, chizish `vpSvg`): Volume profile (ko'rsatish), qiymatlar (ustunda hajm), eni %, joylashuv (o'ngda/chapda), xarid/sotuv va qiymat hududi xarid/sotuv ranglari, shaffofliklar, POC/VAH/VAL/rivojlanuvchi POC/rivojlanuvchi VA/gistogramma qutisi — har biri belgi + rang (`setCC`), narx shkalasida yorliqlar.
+- **Matn** (trend, gorizontal, blok): matn, rang, shrift o'lchami. Long/Short **Kirish**: hisob hajmi ($), risk % → yorliqlarda Qty, risk $, foyda $.
+- **Koordinatalar**: narx + bar raqami (`drIdx`/`drTat`) har nuqta uchun; AVP — #1 bar, FRVP — #1/#2 bar, Long/Short — kirish, TP, SL, oxirgi bar.
+- **Ko'rinish**: daqiqalar/soatlar/kunlar/haftalar/oylar — belgi + min–max (`s.vis`, `drVisible`, `tfUnit`) — chizma faqat mos TF da chiziladi.
+- Oyna pastida «Standart» (uslubni standartga qaytaradi, ko'rinish saqlanadi). Eski kalitlar (n, vav, pl raqam, lb) `drS` da yangisiga o'tkaziladi.
