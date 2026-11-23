@@ -8481,3 +8481,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - AVP eni endi ekranga emas, vaqtga bog'liq: `(x(oxirgi sham) − x(langar)) × wp%` — zoom/surishda grafik bilan birga masshtablanadi, nisbati o'zgarmaydi; ma'lumot — langardan hozirgi shamgacha (o'zgarmagan).
 - FRVP (`fr`, «FRVP» asbobi, 2 nuqta: boshlanish va tugash vaqti): `frVP(t1,t2,N,VA)` — faqat shu oraliq shamlari; quti (oraliq × narx diapazoni), ustunlar qutining chap (yoki «Profil o'ng tomonda») chetidan, eni quti enining wp% i; POC, VAH/VAL. Sozlamalar: qatorlar, eni, qiymat hududi, ranglar, POC, VAH/VAL, yorliqlar, joylashuv, quti rangi/to'ldirish. Koordinatalar yorlig'i yo'q (narx ishlatilmaydi).
 - Ko'rinayotgan oraliq VP (VPVR, «VP» chip) — standart O'CHIQ (zoom'da o'zgaradi), `tc_vpr='1'` bo'lsa yoqiq.
+
+## 407. AVP yana grafik chetiga yopishadi
+- Foydalanuvchi: "AVP nega chart chetida emas? Avvalgidek qil". `x0 = max(0, x(langar))` — langar ekrandan chapga chiqsa profil grafikning chap chetidan boshlanadi (406 da ekrandan tashqarida qolib ketardi). Eni vaqtga bog'liqligicha qoldi: `(x(oxirgi sham) − x0) × wp%`, kamida 36 px.
