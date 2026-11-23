@@ -8521,3 +8521,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 415. TP/SL/Limit yorliqlarida narx yozilmaydi
 - Foydalanuvchi: "narx baribir chetda (narx shkalasida) belgilanadi — ramka kichrayadi". `lwPos`: yorliq matniga narx faqat chiziq ekrandan chiqqanda (▲/▼, shkalada ko'rinmaydi) yoki bajarilgan (✓, shkala yorlig'i o'chiq) bo'lsa qo'shiladi. Masalan: «TP · +$553.97», «SL · −$10.00», «Buy 0.002».
+
+## 416. Shablonlar (TradingView «Template»)
+- Sozlamalar oynasi pastida «Shablon ▾» (`tplMenu/tplDraw`): joriy uslubni nom bilan saqlash, ro'yxatdan bosib qo'llash (`SET.tp.put` → jonli), ★ — standart (shu turdagi YANGI chizmalar shu uslub bilan: `drAdd`), ✕ — o'chirish. Har tur alohida (tl, hl, rc, fb, vp, fr, lp, sp, `ind` — indikatorlar). Ko'rinish (`vis`) shablonga kirmaydi.
+- Saqlash: `localStorage tc_tpl {tur: {nom: uslub}}`, `tc_tpd {tur: nom}` (faqat shu qurilmada).
