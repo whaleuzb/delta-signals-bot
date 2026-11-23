@@ -8459,3 +8459,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `/blogo.png` (`webapp.bot_logo_png`): botning profil rasmi Bot API orqali (getMe → getUserProfilePhotos → getFile), 128px PNG, xotirada 6 soat (topilmasa 10 daqiqa); topilmasa img olib tashlanadi.
 - Litsenziya (LWC, Apache-2.0): logo o'chirilsa TradingView'ga havola sahifada bo'lishi kerak — grafik ostida kichik «Charts by TradingView» (`.lwat`). Olib tashlamang.
 - Yuklab olinadigan/ulashiladigan rasm pastida ham shu logo + «Trade Controller».
+
+## 403. TradingView kabi: Visible Range Volume Profile (o'ng tomonda) + Long/Short pozitsiya asbobi
+- VPVR (`vprSvg`, `vprOn/vprTog`, `localStorage tc_vpr`, standart yoqiq, «VP» chip): ko'rinayotgan shamlar bo'yicha 20–64 narx bo'lagi (balandlikka qarab), o'ng chetdan chapga (eni ≤30%), xarid (lime)/sotuv (qizil), 70% qiymat hududi yorqinroq, POC — sariq punktir butun eni bo'ylab. `drDraw` ichida chiziladi (ko'rinish o'zgarsa qayta), chizmalar ustida turadi; yuklab olinadigan rasmga ham tushadi.
+- Long/Short (`lp`/`sp`): bitta bosish — kirish; TP/SL standart — ko'rinayotgan narx oralig'ining 12%/6%, eni 30 sham. Yashil (foyda) va qizil (zarar) zonalar, yorliqlar: TP/SL narx va %, «LONG/SHORT · R:R». Ushlagichlar: `a` (kirish), `tp`, `sl`, `e` (o'ng chet — davomiylik); tanasini surish — hammasi siljiydi. Saqlash: `{k,a,tp,sl,t2}`.
+- Oddiy asboblar qatori gorizontal suriladigan (`overflow-x:auto`).
