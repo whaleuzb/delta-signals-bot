@@ -8437,3 +8437,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - To'liq ekranning chap ustunida (faqat u yerda) ⬇ va ➤: `lwShot('dl'|'share')`. `lwShotCanvas` — `LW.ch.takeScreenshot()` + chizmalar SVG'si (hit/ushlagichlarsiz) + sarlavha (juftlik · TF · narx, OHLC/% — sig'masa shrift kichrayadi) + pastda «Trade Controller · t.me/<bot>» va sana. JPEG ≤ ~2.8 MB.
 - Server `POST /api/app/chartshot` (initData): Pillow bilan tekshirib JPEG + miniatyura → `share_images` (`/sc/<key>.jpg`, 30 kun); odamga soatiga 30 ta. `mode=share` — `savePreparedInlineMessage` (to'g'ridan Bot API, rasm + «🤖 Trade Controller» tugmasi) → ilovada `tg.shareMessage`; bo'lmasa `t.me/share/url`. Yuklab olish — `tg.downloadFile` (8.0+), brauzerda — `<a download>`.
 - `web.py`: `client_max_size=4 MB` (rasm so'rovi uchun).
+
+## 399. Grafik: "real narxga o'xshamaydi, shamlar sakraydi, to'liq ekran buziladi" (GRASS, ACU, SPCXON)
+- `tracker.klines_any`: `start_ms` sham chegarasiga tushiriladi (MEXC chegarasiz startTime'ga BO'SH javob beradi → grafik MEXC fyuchers shamlariga o'tib ketardi — Binance'da yo'q tangalarda doim). 1w — dushanbaga.
+- Manba yopishqoq: javobda `src` (binance/exchange/futures); ilova `g.src` ni saqlab tarix sahifalarida yuboradi → `only=src`, sahifalar aralashmaydi. Yangilanishda manba o'zgarsa yuklangan tarix tashlanadi (`termMerge`).
+- Binance narx tekshiruvi faqat oxirgi sahifada (tarix sahifasida eski shamni joriy narx bilan solishtirib Binance'ni noto'g'ri rad etardi) va chegara 5% → 1.5%.
+- To'liq ekran: `tg.requestFullscreen` faqat ios/android (kompyuterda butun oyna to'liq ekranga o'tardi); xavfsiz hudud 350/1000 ms dan keyin qayta hisoblanadi + `env(safe-area-inset-*)`; to'liq ekranda toast ustida.

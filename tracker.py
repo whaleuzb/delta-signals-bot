@@ -45,36 +45,50 @@ def provider(market: str):
 
 
 async def klines_any(market: str, pair: str, start_ms: int, tf: str, end_ms: int | None,
-                     limit: int = 200) -> list:
-    """388/390: grafiklar uchun (terminal, guruh posti) — shamlar — bozorning o'z manbaidan; bo'sh kelsa ikkinchisidan (MEXC spot <-> MEXC fyuchers).
-    Foydalanuvchi: "TRB nega chiqmayabti?" — TRBUSDT MEXC spotda yo'q (400), fyuchersda bor."""
+                     limit: int = 200, only: str | None = None, info: dict | None = None) -> list:
+    """388-390/399: grafiklar uchun (terminal, guruh posti) shamlar — bozorning o'z manbaidan, bo'sh kelsa keyingisidan.
+    crypto: Binance spot -> MEXC spot -> MEXC fyuchers; futures: MEXC fyuchers -> Binance -> MEXC spot.
+    `only` — faqat shu manba (grafik tarixi sahifalari birinchi sahifa manbaidan chiqmasin: aralashsa
+    shamlar "sakraydi"); `info["src"]` — qaysi manba ishlatilgani.
+    399: `start_ms` sham chegarasiga tushiriladi — MEXC chegarada bo'lmagan startTime ga BO'SH javob beradi
+    va grafik boshqa bozor shamlariga o'tib ketardi (GRASS, ACU, SPCXON: "real grafikka o'xshamaydi")."""
     import exchange as _ex
     import futures as _fu
+    step = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
+            "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000}.get(tf, 60_000)
+    off = 4 * 86_400_000 if tf == "1w" else 0          # haftalik sham dushanba 00:00 UTC
+    start_ms = start_ms - ((start_ms - off) % step)
     first = provider(market)
-    if market == "crypto":          # 389: Binance spot birinchi ("binancedan olsakchi?"), keyin MEXC spot, MEXC fyuchers
+    if market == "crypto":
         order = [(_ex.bn_klines, "binance"), (_ex.klines, "exchange"), (_fu.klines, "futures")]
-    elif market == "futures":       # fyuchers signali — o'z kontrakti, keyin Binance spot, MEXC spot
+    elif market == "futures":
         order = [(_fu.klines, "futures"), (_ex.bn_klines, "binance"), (_ex.klines, "exchange")]
     else:
         order = [(first.klines, getattr(first, "__name__", "?"))]
+    if only:
+        order = [o for o in order if o[1] == only] or order[:1]
     for i, (fn, name) in enumerate(order):
         try:
             cs = await fn(pair, start_ms, limit=limit, tf=tf, end_ms=end_ms)
         except Exception:
-            log.warning("Terminal shamlari olinmadi (%s %s, %s)", pair, tf, name, exc_info=True)
+            log.warning("Grafik shamlari olinmadi (%s %s, %s)", pair, tf, name, exc_info=True)
             cs = []
-        if cs and name == "binance" and len(order) > 1:
-            # bir xil tiker Binance va MEXC'da boshqa tanga bo'lishi mumkin — narx 5% dan ko'p farq qilsa ishlatilmaydi
+        if cs and name == "binance" and not only and len(order) > 1:
+            # bir xil tiker Binance va MEXC'da boshqa tanga bo'lishi mumkin — joriy narx 1.5% dan ko'p farq qilsa
+            # (bir xil tangada farq odatda 0.1-0.3%) Binance ishlatilmaydi. Faqat oxirgi shamlar sahifasida.
+            fresh = end_ms is None or end_ms - cs[-1].open_ms <= 3 * step
             try:
-                ref = await (_fu if market == "futures" else _ex).last_price(pair)
+                ref = await (_fu if market == "futures" else _ex).last_price(pair) if fresh else None
             except Exception:
                 ref = None
-            if ref and abs(cs[-1].close - ref) / ref > 0.05:
+            if ref and abs(cs[-1].close - ref) / ref > 0.015:
                 log.info("Binance %s narxi mos emas (%s vs %s) — MEXC ishlatiladi", pair, cs[-1].close, ref)
                 cs = []
         if cs:
             if i:
                 log.info("Shamlar zaxira manbadan: %s %s <- %s", pair, tf, name)
+            if info is not None:
+                info["src"] = name
             return cs
     return []
 

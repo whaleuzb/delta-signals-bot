@@ -325,7 +325,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .lwc{position:absolute;inset:0;z-index:5;touch-action:none;cursor:crosshair;display:none}
 .lwct{position:absolute;z-index:4;display:flex;gap:6px}.lwct span{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(20,22,18,.82);border:1px solid rgba(255,255,255,.14);color:#e8ecdf;font-size:17px;font-weight:800;cursor:pointer}
 #lwfs{position:fixed;inset:0;z-index:400;background:#0b0b0c;display:flex;flex-direction:column}
-html.lwfs-on,html.lwfs-on body{overflow:hidden}
+html.lwfs-on,html.lwfs-on body{overflow:hidden}html.lwfs-on #toast{z-index:500}
 #lwfs .fsh{display:flex;align-items:center;gap:4px;padding:6px 8px;flex:none;overflow-x:auto;scrollbar-width:none}#lwfs .fsh::-webkit-scrollbar{display:none}
 #lwfs .fsx{width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:9px;color:#e8ecdf;font-size:15px;cursor:pointer}
 #lwfs .sym{font-weight:800;font-size:14px;white-space:nowrap}#lwfs .px{font-size:13px;font-weight:700;color:#c2f23a;margin-left:6px;white-space:nowrap}#lwfs .sp{flex:1;min-width:6px}
@@ -1114,12 +1114,12 @@ var TER={W:360,H:330,PR:58,AX:24};
 function openTerm(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;tick();S.page={id:'term',sig:id,tf:i.tf||'1h',c:null,adds:[],drag:null,pend:null};termRender();pageShow();termLoad()}
 function termItem(){var g=S.page;if(g&&g.cx)return cxItem(g);if(g&&g.df)return dfItem(g);return g&&S.items.filter(function(x){return x.id==g.sig})[0]}
 /* 397: shamlar so'rovi (termLoad va tarix uchun bitta joy); before — shundan oldingi 500 sham */
-function termReq(g,before){var a={tf:g.tf};if(before)a.before=before;
+function termReq(g,before){var a={tf:g.tf};if(before){a.before=before;if(g.src)a.src=g.src}
  if(g.cx){a.sym=g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'');return api('dfcandles',a)}if(g.df){a.sym=g.df.sym;return api('dfcandles',a)}a.sig=g.sig;return api('candles',a)}
 /* yangilanishda yuklangan tarix yo'qolmasin: eski qism + yangi oxirgi 500 */
-function termMerge(g,nc){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf)return nc;var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
+function termMerge(g,nc,src){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf||(src||'')!==(g.src||'')){g.cEnd=0;return nc}var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
 function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;
- termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[]);g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
+ termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[],d.src);g.src=d.src||null;g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
 /* 397: chap chetga yaqinlashganda — eski shamlar (TradingView kabi cheksiz tarix; 20 000 tagacha) */
 function termHist(g){if(!g||g.cMore||g.cEnd||!g.c||!g.c.length||g.c.length>=20000)return;g.cMore=1;var tf=g.tf,b=g.c[0][0];
  termReq(g,b).then(function(d){g.cMore=0;if(S.page!==g||g.tf!==tf||!g.c||!g.c.length||g.c[0][0]!==b)return;
@@ -1370,11 +1370,13 @@ function lwShot(mode){if(!LW.ch||LW.shot)return;LW.shot=1;try{tg.HapticFeedback.
    if(tg.downloadFile&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))){try{tg.downloadFile({url:r.url,file_name:r.name},function(ok){if(ok)haptic('success')});return}catch(e){}}
    openLink(r.url)})}).catch(function(){LW.shot=0;toast(esc(t('shot_err')))})}
 function lwFsInset(){var t=0,b=0;try{t=(tg.safeAreaInset&&tg.safeAreaInset.top||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0);b=(tg.safeAreaInset&&tg.safeAreaInset.bottom||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)}catch(e){}
- var f=document.getElementById('lwfs');if(f){f.style.paddingTop=t+'px';f.style.paddingBottom=b+'px'}}
+ var f=document.getElementById('lwfs');if(f){f.style.paddingTop='max('+t+'px, env(safe-area-inset-top))';f.style.paddingBottom='max('+b+'px, env(safe-area-inset-bottom))'}}
 function lwFs(on){var g=LW.g;if(!LW.el||!g)return;on=!!on;if(on===!!LW.fs)return;LW.fs=on;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}
  if(on){var f=document.createElement('div');f.id='lwfs';f.innerHTML='<div class="fsh" id="lwfsh"></div><div class="fso" id="lwfso"></div><div class="fsb"><div id="lwfsl"></div><div id="lwfsc"></div></div>';
   document.body.appendChild(f);document.documentElement.classList.add('lwfs-on');document.getElementById('lwfsc').appendChild(LW.el);lwFsHdr();lwFsInset();
-  try{if(tg.requestFullscreen&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))&&!tg.isFullscreen){tg.requestFullscreen();LW.tgfs=1}}catch(e){}
+  /* 399: Telegram to'liq ekrani faqat telefonda (kompyuterda butun oyna to'liq ekranga o'tib ketardi) */
+  try{var mob=/^(ios|android)/.test(String(tg.platform||''));if(mob&&tg.requestFullscreen&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))&&!tg.isFullscreen){tg.requestFullscreen();LW.tgfs=1}}catch(e){}
+  setTimeout(lwFsInset,350);setTimeout(lwFsInset,1000);
   if(!LW.fsev){LW.fsev=1;try{['fullscreenChanged','safeAreaChanged','contentSafeAreaChanged'].forEach(function(k){tg.onEvent(k,lwFsInset)})}catch(e){}}}
  else{try{if(LW.tgfs&&tg.exitFullscreen)tg.exitFullscreen()}catch(e){}LW.tgfs=0;var h=document.getElementById('tlw');if(h)h.appendChild(LW.el);
   var f2=document.getElementById('lwfs');if(f2)f2.remove();document.documentElement.classList.remove('lwfs-on')}

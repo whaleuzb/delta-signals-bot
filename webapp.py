@@ -232,6 +232,12 @@ _CANDLES: dict = {}
 _CN = 1000
 
 
+def _src(body) -> str | None:
+    """399: tarix sahifasi birinchi sahifa manbaidan olinadi (aralashmasin)."""
+    v = body.get("src")
+    return v if v in ("binance", "exchange", "futures") else None
+
+
 def _before(body) -> int:
     try:
         b = int(body.get("before") or 0)
@@ -317,22 +323,26 @@ async def api_candles(request):
         raise web.HTTPForbidden()
     tf = body.get("tf") if body.get("tf") in _TF_MS else (sig["chart_tf"] if sig["chart_tf"] in _TF_MS else "1h")
     before = _before(body)
-    key = (sig["market"], sig["symbol"], tf, before)
+    src = _src(body) if before else None
+    key = (sig["market"], sig["symbol"], tf, before, src)
     hit = _CANDLES.get(key)
     if hit and _t.monotonic() - hit[0] < (600 if before else 30):
-        rows = hit[1]
+        rows, used = hit[1], hit[2]
     else:
         now = before - 1 if before else int(_t.time() * 1000)
-        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN)
+        inf = {}
+        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN,
+                                      only=src, info=inf)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
         if rows:
             if len(_CANDLES) > 300:
                 _CANDLES.clear()
-            _CANDLES[key] = (_t.monotonic(), rows)
+            _CANDLES[key] = (_t.monotonic(), rows, inf.get("src"))
+        used = inf.get("src")
     adds = await db.signal_adds(sig["id"], "PENDING")
-    return web.json_response({"tf": tf, "c": rows,
+    return web.json_response({"tf": tf, "c": rows, "src": used,
                               "adds": [float(a["price"]) for a in adds if a["kind"] == "LIMIT"]},
                              headers=NO_CACHE)
 
@@ -351,21 +361,24 @@ async def api_dfcandles(request):
     tf = body.get("tf") if body.get("tf") in _TF_MS else "1h"
     pair = sym if sym.endswith(config.QUOTE) else sym + config.QUOTE
     before = _before(body)
-    key = ("crypto", pair, tf, before)
+    src = _src(body) if before else None
+    key = ("crypto", pair, tf, before, src)
     hit = _CANDLES.get(key)
     if hit and _t.monotonic() - hit[0] < (600 if before else 30):
-        rows = hit[1]
+        rows, used = hit[1], hit[2]
     else:
         now = before - 1 if before else int(_t.time() * 1000)
-        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN)
+        inf = {}
+        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN, only=src, info=inf)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
         if rows:
             if len(_CANDLES) > 300:
                 _CANDLES.clear()
-            _CANDLES[key] = (_t.monotonic(), rows)
-    return web.json_response({"tf": tf, "c": rows}, headers=NO_CACHE)
+            _CANDLES[key] = (_t.monotonic(), rows, inf.get("src"))
+        used = inf.get("src")
+    return web.json_response({"tf": tf, "c": rows, "src": used}, headers=NO_CACHE)
 
 
 async def api_sig(request):
