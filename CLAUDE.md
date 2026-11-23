@@ -8420,3 +8420,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 395. Aster/Lighter logolari harf bo'lib chiqdi — tuzatish
 - Server `/coinx/exaster` 200 (25 KB) qaytardi, lekin ilova (Windows, Edge WebView) rasmni o'qiy olmadi → `onerror` harf. Baytlarni bu yerdan ko'rib bo'lmadi (CoinGecko va Railway domeni proksi orqali yopiq).
 - `_cimg_fetch`: `Accept: image/png,image/webp…` (CDN AVIF bermasin); `_CIMG_FIX` (birja logolari) har doim Pillow bilan 160px PNG ga o'tkaziladi, log: "Birja logosi …: ct, bayt, boshi". Eski kesh chetlab o'tilishi uchun kalitlar `exaster2`/`exlighter2`.
+
+## 396. Grafik — TradingView uslubidagi to'liq ekran
+- Grafikning pastki o'ng burchagida ⛶ (`.lwct .lwfb`) va hozirga qaytish » (`lwRt`, faqat grafik o'tmishga surilganda). `lwCt()` rAF'da joylashtiradi.
+- `lwFs(on)`: `#lwfs` (fixed, z 400) — tepada ✕, juftlik, narx, TF (1m…1w); ostida OHLC/Vol/Δ qatori (`lwLeg`, `subscribeCrosshairMove` — barmoq/kursor ostidagi sham); chapda vertikal asboblar ustuni (`drBar(g,true)`: trend, gorizontal, blok, Fib, AVP, VΔ, ↶, 🗑, chiqish). `LW.el` `#lwfsc` ga ko'chadi, chiqishda `#tlw` ga qaytadi; `lwMount` to'liq ekranda shu joyni host qiladi va sarlavhani yangilaydi.
+- Telegram 8.0+: `tg.requestFullscreen()`/`exitFullscreen()`, xavfsiz hudud (`safeAreaInset`+`contentSafeAreaInset`) `fullscreenChanged/safeAreaChanged` hodisalarida qayta hisoblanadi. «Orqaga» (`navBack`) avval to'liq ekrandan chiqaradi.
+- Bir nechta asboblar paneli: `drTb`, `lwVdTog`, `lwUndoSync` endi `.lwtb [data-t]` / `[data-u]` bo'yicha hammasini yangilaydi.
