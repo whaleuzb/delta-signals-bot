@@ -1242,7 +1242,7 @@ var DRI={tl:'<svg viewBox="0 0 16 16"><path d="M3 13L13 3"/><circle cx="3" cy="1
 function drBar(g,fs){var s='';['tl','hl','rc','fb','vp'].forEach(function(k){s+='<span class="chip glass'+(g.tool==k?' on':'')+'" data-t="'+k+'" onclick="drTool(\''+k+'\')">'+DRI[k]+'</span>'});
  s+='<span class="chip glass'+(lwVdOn()?' on':'')+'" data-t="vd" onclick="lwVdTog()"><b>VΔ</b></span>';
  var u='<span data-u="1" class="chip glass lwun" onclick="lwUndo()" style="font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span>',d='<span class="chip glass lwdl" data-t="del" onclick="drDel()">'+DRI.del+'</span>';
- if(fs)return'<div class="lwtb fsl">'+s+u+d+'<span class="chip glass" style="margin-top:auto" onclick="lwFs(false)">'+FSI.out+'</span></div>';
+ if(fs)return'<div class="lwtb fsl">'+s+u+d+'<span class="chip glass" style="margin-top:auto" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="chip glass" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="chip glass" onclick="lwFs(false)">'+FSI.out+'</span></div>';
  return'<div class="chips lwtb" id="lwtb">'+s+u+d+'</div>'}
 function drKey(){var i=termItem();return i?String(i.symbol||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/(USDT|USDC|FDUSD|USD)$/,''):''}
 function drAll(){try{return JSON.parse(localStorage.getItem('tc_dr')||'{}')||{}}catch(e){return{}}}
@@ -1342,7 +1342,33 @@ function lwVdTog(){var on=!lwVdOn();try{localStorage.setItem('tc_vd',on?'1':'0')
 /* 396: TradingView uslubidagi to'liq ekran: tepada juftlik/narx/TF va OHLC, chapda asboblar ustuni, pastki o'ngda »(hozirga) va ⛶.
    Telegram 8.0+ da tg.requestFullscreen(); «Orqaga» avval to'liq ekrandan chiqaradi */
 var FSI={in:'<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>',
- out:'<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>'};
+ out:'<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>',
+ dl:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 13.5h11"/></svg>',
+ sh:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 7 9M14 2l-4.5 12-2.5-5-5-2.5z"/></svg>'};
+/* 398: grafik rasmi (faqat to'liq ekranda): LWC takeScreenshot + chizmalar (SVG) + sarlavha (juftlik, TF, OHLC) + brend */
+function lwShotCanvas(){return new Promise(function(ok,no){try{var cv=LW.ch.takeScreenshot(),dpr=cv.width/Math.max(1,LW.el.clientWidth),W=cv.width,HH=Math.round(58*dpr),FH=Math.round(30*dpr);
+ var o=document.createElement('canvas');o.width=W;o.height=cv.height+HH+FH;var x=o.getContext('2d'),F='-apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif';
+ x.fillStyle='#0b0b0c';x.fillRect(0,0,o.width,o.height);x.drawImage(cv,0,HH);
+ var i=termItem()||{},g=LW.g,c=(g&&g.c)||[],L=c[c.length-1];x.textBaseline='alphabetic';
+ x.fillStyle='#e8ecdf';x.font='800 '+Math.round(17*dpr)+'px '+F;var sx=Math.round(12*dpr),sy=Math.round(24*dpr);x.fillText(String(i.symbol||''),sx,sy);var w1=x.measureText(String(i.symbol||'')).width;
+ x.font='700 '+Math.round(13*dpr)+'px '+F;x.fillStyle='rgba(232,236,223,.55)';x.fillText(' · '+(g&&g.tf||''),sx+w1,sy);var w2=x.measureText(' · '+(g&&g.tf||'')).width;
+ if(i.price!=null){x.fillStyle='#c2f23a';x.fillText('  '+fp(i.price),sx+w1+w2,sy)}
+ if(L){var op=+L[1],cl=LW.rlast||+L[4],col=cl>=op?'#c2f23a':'#ff5c5c',ch=op?(cl-op)/op*100:0,t2='O '+fp(op)+'   H '+fp(+L[2])+'   L '+fp(+L[3])+'   C '+fp(cl)+'   '+(ch>=0?'+':'')+ch.toFixed(2)+'%';
+  var fz=11*dpr;x.font='600 '+Math.round(fz)+'px '+F;var tw=x.measureText(t2).width;if(tw>W-2*sx){fz=fz*(W-2*sx)/tw;x.font='600 '+Math.floor(fz)+'px '+F}x.fillStyle=col;x.fillText(t2,sx,Math.round(46*dpr))}
+ x.font='700 '+Math.round(11*dpr)+'px '+F;x.fillStyle='rgba(232,236,223,.5)';var fy=o.height-Math.round(11*dpr);x.fillText('Trade Controller'+(S.bot?' · t.me/'+S.bot:''),sx,fy);
+ var d=new Date(),ds=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);x.textAlign='right';x.fillText(ds,W-sx,fy);x.textAlign='left';
+ var sv=LW.sv;if(!sv||!sv.childNodes.length){ok(o);return}var cl2=sv.cloneNode(true);cl2.setAttribute('xmlns','http://www.w3.org/2000/svg');[].forEach.call(cl2.querySelectorAll('.drh,.drp'),function(e){e.remove()});
+ var im=new Image();im.onload=function(){x.drawImage(im,0,HH,(+sv.getAttribute('width'))*dpr,(+sv.getAttribute('height'))*dpr);ok(o)};im.onerror=function(){ok(o)};
+ im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(cl2))}catch(e){no(e)}})}
+function lwShot(mode){if(!LW.ch||LW.shot)return;LW.shot=1;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}toast(esc(t('wait')));
+ lwShotCanvas().then(function(o){var q=.9,u=o.toDataURL('image/jpeg',q);while(u.length>2800000&&q>.5){q-=.1;u=o.toDataURL('image/jpeg',q)}
+  var i=termItem()||{},sym=String(i.symbol||'chart').replace(/[^A-Za-z0-9]/g,''),tf=LW.g&&LW.g.tf||'';
+  if(!tg||!tg.initData){var a=document.createElement('a');a.href=u;a.download=sym+'_'+tf+'.jpg';document.body.appendChild(a);a.click();a.remove();LW.shot=0;document.getElementById('toast').classList.remove('show');return}
+  return api('chartshot',{img:u,mode:mode,sym:sym,tf:tf}).then(function(r){LW.shot=0;document.getElementById('toast').classList.remove('show');
+   if(mode=='share'){if(r.id&&tg.shareMessage){try{tg.shareMessage(r.id,function(ok){if(ok)haptic('success')});return}catch(e){}}
+    try{tg.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(r.url))}catch(e){openLink(r.url)}return}
+   if(tg.downloadFile&&(!tg.isVersionAtLeast||tg.isVersionAtLeast('8.0'))){try{tg.downloadFile({url:r.url,file_name:r.name},function(ok){if(ok)haptic('success')});return}catch(e){}}
+   openLink(r.url)})}).catch(function(){LW.shot=0;toast(esc(t('shot_err')))})}
 function lwFsInset(){var t=0,b=0;try{t=(tg.safeAreaInset&&tg.safeAreaInset.top||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0);b=(tg.safeAreaInset&&tg.safeAreaInset.bottom||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)}catch(e){}
  var f=document.getElementById('lwfs');if(f){f.style.paddingTop=t+'px';f.style.paddingBottom=b+'px'}}
 function lwFs(on){var g=LW.g;if(!LW.el||!g)return;on=!!on;if(on===!!LW.fs)return;LW.fs=on;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}

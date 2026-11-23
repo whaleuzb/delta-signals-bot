@@ -228,8 +228,8 @@ async def api_sighist(request):
 _CANDLES: dict = {}
 
 
-# 397: grafik tarixi — bir so'rovda 500 sham; `before` (ms) berilsa shundan oldingi 500 tasi (chapga surilganda)
-_CN = 500
+# 397/398: grafik tarixi — bir so'rovda 1000 sham (Binance/MEXC spot chegarasi); `before` (ms) berilsa shundan oldingi 1000 tasi
+_CN = 1000
 
 
 def _before(body) -> int:
@@ -238,6 +238,70 @@ def _before(body) -> int:
     except (TypeError, ValueError):
         return 0
     return b if b > 946684800000 else 0      # 2000-yildan keyingi ms
+
+
+_SHOT_RL: dict = {}
+
+
+async def api_chartshot(request):
+    """398: to'liq ekran grafigining rasmi (ilova canvas'da chizadi, JPEG data-URL). Rasm Pillow bilan tekshirilib
+    qayta saqlanadi (`share_images`, /sc/<key>.jpg, 30 kun). mode='dl' — havola (tg.downloadFile);
+    mode='share' — `savePreparedInlineMessage` (rasm + «Trade Controller» tugmasi) → ilovada `shareMessage`."""
+    import base64
+    import secrets
+    import aiohttp
+    from PIL import Image
+    body, uid = await _body(request)
+    now = time.time()                                   # suiiste'mol: odamga soatiga 30 ta rasm
+    q = [x for x in _SHOT_RL.get(uid, []) if now - x < 3600]
+    if len(q) >= 30:
+        raise web.HTTPTooManyRequests()
+    _SHOT_RL[uid] = q + [now]
+    raw = str(body.get("img") or "")
+    if raw.startswith("data:image/"):
+        raw = raw.split(",", 1)[-1]
+    if not raw or len(raw) > 3_000_000:
+        raise web.HTTPBadRequest()
+    try:
+        im = Image.open(io.BytesIO(base64.b64decode(raw)))
+        if im.width * im.height > 12_000_000:
+            raise ValueError("katta")
+        im = im.convert("RGB")
+    except Exception:
+        raise web.HTTPBadRequest()
+    key = secrets.token_urlsafe(10)
+    out = io.BytesIO()
+    im.save(out, format="JPEG", quality=90, optimize=True, progressive=True)
+    th = im.copy()
+    th.thumbnail((360, 360 * im.height // max(1, im.width)))
+    tout = io.BytesIO()
+    th.save(tout, format="JPEG", quality=80)
+    await db.share_image_put(key, out.getvalue())
+    await db.share_image_put(key + "t", tout.getvalue())
+    base = f"{config.WEB_URL}/sc/{key}"
+    sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())[:24] or "chart"
+    tf = str(body.get("tf") or "")[:4]
+    res = {"url": base + ".jpg", "name": f"{sym}_{tf}_{time.strftime('%Y%m%d_%H%M')}.jpg"}
+    if body.get("mode") == "share":
+        bot = request.app["bot_username"]
+        link = f"https://t.me/{bot}" if bot else config.WEB_URL
+        r = {"type": "photo", "id": secrets.token_hex(16), "photo_url": base + ".jpg", "thumbnail_url": base + "t.jpg",
+             "photo_width": im.width, "photo_height": im.height,
+             "caption": f"📊 #{sym} · {tf}",
+             "reply_markup": {"inline_keyboard": [[{"text": "🤖 Trade Controller", "url": link}]]}}
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as cs:
+                async with cs.post(f"https://api.telegram.org/bot{config.BOT_TOKEN}/savePreparedInlineMessage",
+                                   json={"user_id": uid, "result": r, "allow_user_chats": True,
+                                         "allow_group_chats": True, "allow_channel_chats": True}) as resp:
+                    d = await resp.json()
+            if d.get("ok"):
+                res["id"] = d["result"]["id"]
+            else:
+                log.warning("Grafik ulashish tayyorlanmadi: %s", d.get("description"))
+        except Exception as ex:
+            log.warning("Grafik ulashish tayyorlanmadi: %s", ex)
+    return web.json_response(res, headers=NO_CACHE)
 
 
 async def api_candles(request):
@@ -259,7 +323,7 @@ async def api_candles(request):
         rows = hit[1]
     else:
         now = before - 1 if before else int(_t.time() * 1000)
-        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN + 5)
+        cs = await tracker.klines_any(sig["market"], sig["symbol"], now - _CN * _TF_MS[tf], tf, now, limit=_CN)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
@@ -293,7 +357,7 @@ async def api_dfcandles(request):
         rows = hit[1]
     else:
         now = before - 1 if before else int(_t.time() * 1000)
-        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN + 5)
+        cs = await tracker.klines_any("crypto", pair, now - _CN * _TF_MS[tf], tf, now, limit=_CN)
         rows = [[c.open_ms, float(c.open), float(c.high), float(c.low), float(c.close),
                  float(getattr(c, "volume", 0) or 0)]
                 + ([float(c.tb)] if getattr(c, "tb", None) is not None else []) for c in cs if not before or c.open_ms < before][-_CN:]   # 387: hajm; 389: taker buy; 397: tarix
@@ -1920,6 +1984,7 @@ def routes() -> list:
         web.post("/api/app/act", api_act),
         web.post("/api/app/spark", api_spark),
         web.post("/api/app/candles", api_candles),
+        web.post("/api/app/chartshot", api_chartshot),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),
@@ -1997,7 +2062,7 @@ T = {
         "none": "Ochiq signal yo'q", "entry": "Kirish", "stop": "Stop", "price": "Narx",
         "be": "BE", "close": "Yopish", "cancel": "Bekor qilish", "newstop": "Yangi stop narxi",
         "confirm_close": "Pozitsiyani to'liq yopasizmi?", "confirm_cancel": "Limitni bekor qilasizmi?",
-        "confirm_pc": "{p}% qismini yopasizmi?", "wait": "Bajarilmoqda…",
+        "confirm_pc": "{p}% qismini yopasizmi?", "wait": "Bajarilmoqda…", "shot_err": "Rasm tayyorlanmadi, qayta urinib ko'ring",
         "nows": "Sizda hali jurnal yo'q. Botda /start bosing.",
         "personal": "Shaxsiy jurnal",
         "channel": "Kanal", "group": "Guruh", "slow": "Bot hozir band — birozdan keyin qayta urinib ko'ring.", "rc_share": "Ulashish", "rc_post": "Postni ochish",
@@ -2057,7 +2122,7 @@ T = {
         "none": "Нет открытых сигналов", "entry": "Вход", "stop": "Стоп", "price": "Цена",
         "be": "БУ", "close": "Закрыть", "cancel": "Отменить", "newstop": "Новая цена стопа",
         "confirm_close": "Закрыть позицию полностью?", "confirm_cancel": "Отменить лимит?",
-        "confirm_pc": "Закрыть {p}%?", "wait": "Выполняется…",
+        "confirm_pc": "Закрыть {p}%?", "wait": "Выполняется…", "shot_err": "Не удалось подготовить изображение",
         "nows": "У вас ещё нет журнала. Нажмите /start в боте.",
         "personal": "Личный журнал",
         "channel": "Канал", "group": "Группа", "slow": "Бот занят — попробуйте чуть позже.", "rc_share": "Поделиться", "rc_post": "Открыть пост",
@@ -2117,7 +2182,7 @@ T = {
         "none": "No open signals", "entry": "Entry", "stop": "Stop", "price": "Price",
         "be": "BE", "close": "Close", "cancel": "Cancel", "newstop": "New stop price",
         "confirm_close": "Close the whole position?", "confirm_cancel": "Cancel the limit order?",
-        "confirm_pc": "Close {p}%?", "wait": "Working…",
+        "confirm_pc": "Close {p}%?", "wait": "Working…", "shot_err": "Could not prepare the image",
         "nows": "No journal yet. Press /start in the bot.",
         "personal": "Personal journal",
         "channel": "Channel", "group": "Group", "slow": "Bot is busy — try again shortly.", "rc_share": "Share", "rc_post": "Open post",

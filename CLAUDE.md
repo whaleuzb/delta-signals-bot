@@ -8431,3 +8431,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Backend: `api_candles`/`api_dfcandles` bir so'rovda `_CN = 500` sham (avval 160); `before` (ms) berilsa — shundan oldingi 500 tasi (`_before()`), kesh kaliti `(…, tf, before)`, tarix keshi 10 daqiqa.
 - Frontend: `termReq(g, before)` — uchala terminal uchun bitta so'rov; `termLoad` yangilanishda `termMerge` bilan yuklangan eski qismni saqlaydi; `termHist(g)` — ko'rinish chap chetga 40 shamdan yaqinlashsa eski 500 tani boshiga qo'shadi (`g.cMore`, bo'sh kelsa `g.cEnd`, 20 000 gacha). Ko'rinish o'ng chetga nisbatan saqlangani uchun (`g.vr.right`) sakramaydi. TF/juftlik almashsa `g.cEnd=0`.
 - Diqqat: `termMore` nomi band (signal kartasidagi «ko'proq») — tarix funksiyasi `termHist`.
+
+## 398. 1000 sham + to'liq ekranda grafikni yuklab olish/ulashish
+- `_CN = 1000` (bir so'rovda va har tarix sahifasida); `limit=_CN` (Binance/MEXC spot chegarasi 1000).
+- To'liq ekranning chap ustunida (faqat u yerda) ⬇ va ➤: `lwShot('dl'|'share')`. `lwShotCanvas` — `LW.ch.takeScreenshot()` + chizmalar SVG'si (hit/ushlagichlarsiz) + sarlavha (juftlik · TF · narx, OHLC/% — sig'masa shrift kichrayadi) + pastda «Trade Controller · t.me/<bot>» va sana. JPEG ≤ ~2.8 MB.
+- Server `POST /api/app/chartshot` (initData): Pillow bilan tekshirib JPEG + miniatyura → `share_images` (`/sc/<key>.jpg`, 30 kun); odamga soatiga 30 ta. `mode=share` — `savePreparedInlineMessage` (to'g'ridan Bot API, rasm + «🤖 Trade Controller» tugmasi) → ilovada `tg.shareMessage`; bo'lmasa `t.me/share/url`. Yuklab olish — `tg.downloadFile` (8.0+), brauzerda — `<a download>`.
+- `web.py`: `client_max_size=4 MB` (rasm so'rovi uchun).

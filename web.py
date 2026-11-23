@@ -449,7 +449,8 @@ async def security_headers(request, handler):
 
 
 def build_app() -> web.Application:
-    app = web.Application(middlewares=[security_headers])
+    # 398: grafik rasmi (/api/app/chartshot) ~1-2 MB — standart 1 MB chegarasi yetmaydi
+    app = web.Application(middlewares=[security_headers], client_max_size=4 * 1024 * 1024)
     app["bot_username"] = os.getenv("BOT_USERNAME", "")
     # Birjaga bir vaqtda ketadigan grafik so'rovlari soni (pastda izoh).
     app["mini_sem"] = asyncio.Semaphore(2)
