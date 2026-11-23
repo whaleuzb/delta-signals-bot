@@ -8510,3 +8510,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Panel `max-width:460px`, o'rtada (keng monitorda tugmalar ekran bo'ylab cho'zilardi).
 - Xato: bosish animatsiyasi (`tapfx`, `document pointerdown` → `.glass` ichiga span qo'shadi) panelning `:last-child`/flex qoidasini buzib, bosish paytida tugmalar siljirdi → `pointerup` «Bekor qilish»ga tushib, «Saqlash» ishlamasdi (ayniqsa keng ekranda). Endi `.tile2` blok, tugmalar qatori `div[style]` bilan.
 - `lwFsCtl`: tugmalar o'zgarmasa faqat `.k/.v` matni yangilanadi (jonli narx har yangilanganda tugma almashmasin). `.toast` yashirin bo'lsa `pointer-events:none`. To'liq ekranda yangi limit «Keyingi» — avval to'liq ekrandan chiqadi.
+
+## 413. Fibonachchi sozlamalari — TradingView kabi
+- `fbSvg` + `fbStyle`: trend chizig'i (yoqish, rang, tur), daraja chiziqlari (qalinlik, tur), cho'zish (yo'q/chapga/o'ngga/ikki tomonga), 24 daraja (`s.fl = [[yoqiq, qiymat, rang], …]`, standart 0…1 yoqiq; qiymat va rang tahrirlanadi — `<input type=color>`), bitta rang, fon (shaffoflik), teskari, narxlar, darajalar (qiymat/foiz), yorliqlar joyi (chap/o'rta/o'ng × tepa/o'rta/past), matn (+ joyi), shrift o'lchami.
+- Eski `lv/er/lb/fo` `drS` da yangisiga o'tkaziladi. `setInput` — `type=color` qiymatini satr sifatida oladi.
