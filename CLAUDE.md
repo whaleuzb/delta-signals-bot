@@ -8514,3 +8514,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 413. Fibonachchi sozlamalari — TradingView kabi
 - `fbSvg` + `fbStyle`: trend chizig'i (yoqish, rang, tur), daraja chiziqlari (qalinlik, tur), cho'zish (yo'q/chapga/o'ngga/ikki tomonga), 24 daraja (`s.fl = [[yoqiq, qiymat, rang], …]`, standart 0…1 yoqiq; qiymat va rang tahrirlanadi — `<input type=color>`), bitta rang, fon (shaffoflik), teskari, narxlar, darajalar (qiymat/foiz), yorliqlar joyi (chap/o'rta/o'ng × tepa/o'rta/past), matn (+ joyi), shrift o'lchami.
 - Eski `lv/er/lb/fo` `drS` da yangisiga o'tkaziladi. `setInput` — `type=color` qiymatini satr sifatida oladi.
+
+## 414. Dip Funded savdo rad javoblari logga
+- Foydalanuvchi: "dipfunded hisoblarda TP/SL o'zgartirib va pozitsiyani yopib bo'lmayapti". Ilova tomoni soxta hisob bilan sinaldi (✕ → Ha → `protect sl=null`; surish → Saqlash → `protect`) — ishlaydi; web loglarida xato yo'q edi, chunki `dipfunded.ApiError` (Dip Funded rad etsa) logga yozilmasdi.
+- `dfapp.trade`: ApiError — WARNING "Dip Funded savdosi rad etildi (op sym #acc {sl,tp,...}): code text"; NotLinked — INFO.

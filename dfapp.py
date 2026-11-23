@@ -109,8 +109,12 @@ async def trade(uid: int, lang, f: dict) -> tuple[bool, str]:
         else:
             return False, json.dumps({"code": "bad"})
     except dipfunded.NotLinked as e:
+        log.info("Dip Funded savdosi (%s %s #%s): bog'lanmagan — %s", op, sym, acc, e)
         return False, json.dumps({"code": str(e) or "not_linked"})
     except dipfunded.ApiError as e:
+        # 414: rad javoblari ham logga — "TP/SL o'zgartirib, yopib bo'lmayapti" tashxisi uchun
+        log.warning("Dip Funded savdosi rad etildi (%s %s #%s %s): %s %s", op, sym, acc,
+                    {k: f.get(k) for k in ("sl", "tp", "fraction", "limit", "order_id") if k in f}, e.code, e.text)
         return False, json.dumps({"code": e.code, "text": e.text})
     except Exception as e:
         log.warning("Mini App Dip Funded savdosi: %s", e)
