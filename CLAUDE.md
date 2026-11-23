@@ -8505,3 +8505,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Muammo: to'liq ekranda chiziq surilganda «Saqlash/Bekor» sahifada (grafik ostida, to'liq ekran orqasida) qolardi — saqlash uchun chiqish kerak edi.
 - Uchala terminalda pending/qo'shish bloki `#tctl` ichida; `lwFsCtl()` (har `lwFsHdr` da, ya'ni har `termRender` dan keyin) uni `#lwfsf` ga — to'liq ekranning pastki paneliga nusxalaydi: «Limit 100,000 → 100,512 · % · Bekor qilish / Saqlash», pending yo'q bo'lsa «+ TP / + SL / + Limit». Tugmalar o'sha global funksiyalar (`termSave/termCancel/cxAdd`). Ko'rish rejimida (`g.view`) yashirin.
 - To'liq ekranda `#sheet`/`#shade` z-index 520/510 — «Keyingi» (yangi limit) oynasi to'liq ekran ustida ochiladi.
+
+## 412. To'liq ekran pastki paneli: keng ekranda cho'zilmaydi + «Saqlash» bosilmasdi
+- Panel `max-width:460px`, o'rtada (keng monitorda tugmalar ekran bo'ylab cho'zilardi).
+- Xato: bosish animatsiyasi (`tapfx`, `document pointerdown` → `.glass` ichiga span qo'shadi) panelning `:last-child`/flex qoidasini buzib, bosish paytida tugmalar siljirdi → `pointerup` «Bekor qilish»ga tushib, «Saqlash» ishlamasdi (ayniqsa keng ekranda). Endi `.tile2` blok, tugmalar qatori `div[style]` bilan.
+- `lwFsCtl`: tugmalar o'zgarmasa faqat `.k/.v` matni yangilanadi (jonli narx har yangilanganda tugma almashmasin). `.toast` yashirin bo'lsa `pointer-events:none`. To'liq ekranda yangi limit «Keyingi» — avval to'liq ekrandan chiqadi.
