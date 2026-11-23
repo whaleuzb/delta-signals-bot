@@ -324,6 +324,10 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .lwd{position:absolute;left:0;top:0;pointer-events:none;z-index:2;overflow:hidden}.lwd .drh{pointer-events:stroke;touch-action:none;cursor:pointer}.lwd .drp{pointer-events:all;touch-action:none;cursor:move}
 .drmt{position:absolute;z-index:6;display:flex;gap:2px;padding:3px;border-radius:10px;background:rgba(20,22,18,.95);border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .drmt span{width:32px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;color:#e8ecdf;cursor:pointer}.drmt span:hover,.drmt span.on{background:rgba(194,242,58,.16);color:#c2f23a}.drmt svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5}
+#xask{position:fixed;inset:0;z-index:650;display:flex;align-items:center;justify-content:center}#xask .xbk{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+#xask .xbx{position:relative;width:min(320px,88vw);background:#141512;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:18px 16px 14px;text-align:center;color:#e8ecdf;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+#xask .xq{font-size:16px;font-weight:800;margin-bottom:6px}#xask .xs{font-size:12.5px;color:rgba(232,236,223,.6);display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:14px}
+#xask .xb{display:grid;grid-template-columns:1fr 1fr;gap:8px}#xask .btn{margin:0;padding:11px;font-size:15px;font-weight:800}#xask .xy{background:rgba(255,92,92,.18);color:#ff5c5c;border:1px solid rgba(255,92,92,.35)}
 #lwset{position:fixed;inset:0;z-index:600;display:flex;align-items:flex-end;justify-content:center}#lwset .sbk{position:absolute;inset:0;background:rgba(0,0,0,.45)}
 #lwset .sbx{position:relative;width:min(440px,100vw);max-height:82vh;display:flex;flex-direction:column;background:#121310;border:1px solid rgba(255,255,255,.1);border-radius:16px 16px 0 0;padding:12px 14px calc(12px + var(--bot,0px));color:#e8ecdf}
 @media(min-width:700px){#lwset{align-items:center}#lwset .sbx{border-radius:16px}}
@@ -893,15 +897,23 @@ function cxTermRender(g){var i=termItem(),ex=g.cx.ex,a=cexAcc(ex)||{},p=document
 function cxCancel(ex,sym,id,algo){var g=S.page,spot=g&&g.cx&&g.cx.mkt=='spot';confirmBox(t('tr_cancel_q'),function(){api('cextrade',{ex:ex,op:spot?'spot_cancel':'fut_cancel',a:{sym:sym,id:id,algo:!!algo}}).then(function(d){
  if(d.ok){toast(esc(t('tr_cancelled')));cxOrders(ex);cxSpotOpen()}else toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}).catch(function(){toast(esc(t('cx_e_net')))})})}
 /* 342: chiziq yorlig'idagi ✕ (Dip Funded terminalidagidek): 1-bosish — qizaradi, 3 s ichida 2-bosish — bajaradi */
-function cxLineX(k){var g=S.page,i=termItem();if(!g||!i)return;
+function cxLineX(k,ok){var g=S.page,i=termItem();if(!g||!i)return;
  if(g.pend&&g.pend.k==k){termCancel();return}
- if(!g.xarm||g.xarm.k!=k||Date.now()-g.xarm.t>3000){g.xarm={k:k,t:Date.now()};haptic('warning');toast(esc(t('cx_x_again')));termRedraw();setTimeout(function(){if(S.page===g&&g.xarm&&g.xarm.k==k){g.xarm=null;termRedraw()}},3100);return}
+ /* 410: ✕ bir marta bosilganda — «Ha / Yo'q» */
+ if(!ok){xAsk(k,i,function(){cxLineX(k,1)});return}
  g.xarm=null;var ex=g.cx.ex;
- if(k=='entry'&&i.pos){trCloseSheet(i.symbol,i.pos.ps);return}
+ if(k=='entry'&&i.pos){toast(esc(t('wait')));api('cextrade',{ex:ex,op:'fut_close',a:{sym:i.symbol,ps:i.pos.ps||'BOTH',frac:1}}).then(function(d){if(d.ok){haptic('success');toast('✅ '+esc(t('tr_closed')));S.cex=null;cexLoad(1)}else{haptic('error');toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}}).catch(function(){toast(esc(t('cx_e_net')))});return}
  var done=function(d,ok){if(d.ok){haptic('success');toast('✅ '+esc(ok))}else{haptic('error');toast(esc(cexErr(d.err))+(d.msg?'<br><span style="opacity:.7;font-size:12px">'+esc(d.msg)+'</span>':''))}cxOrders(ex);cxSpotOpen();termRender()};
  if(k.charAt(0)=='o'){api('cextrade',{ex:ex,op:g.cx.mkt=='spot'?'spot_cancel':'fut_cancel',a:{sym:i.symbol,id:k.slice(1),algo:false}}).then(function(d){done(d,t('tr_cancelled'))}).catch(function(){toast(esc(t('cx_e_net')))});return}
  if((k=='tp'||k=='sl')&&i.pos){var a={sym:i.symbol,ps:i.pos.ps},o2=k=='tp'?'sl':'tp';if(i.pos[o2]!=null)a[o2]=termRound(+i.pos[o2]);toast(esc(t('wait')));
   api('cextrade',{ex:ex,op:'fut_tpsl',a:a}).then(function(d){done(d,t('tr_tpsl_ok'))}).catch(function(){toast(esc(t('cx_e_net')))})}}
+/* 410: grafikdagi ✕ — tasdiqlash oynasi (Ha / Yo'q); to'liq ekranda ham ustida */
+var XQ={uz:{entry:'Pozitsiyani to\'liq yopasizmi?',tp:'TP olib tashlansinmi?',sl:'SL olib tashlansinmi?',o:'Buyurtma bekor qilinsinmi?',y:'Ha',n:'Yo\'q'},
+ ru:{entry:'Закрыть позицию полностью?',tp:'Убрать TP?',sl:'Убрать SL?',o:'Отменить ордер?',y:'Да',n:'Нет'},en:{entry:'Close the whole position?',tp:'Remove TP?',sl:'Remove SL?',o:'Cancel the order?',y:'Yes',n:'No'}};
+function xAsk(k,i,cb){var Q=XQ[S.lang]||XQ.uz,kk=k.charAt(0)=='o'?'o':k,l=(LW.L||[]).filter(function(x){return x.k==k})[0],old=document.getElementById('xask');if(old)old.remove();haptic('warning');
+ var m=document.createElement('div');m.id='xask';m.innerHTML='<div class="xbk"></div><div class="xbx"><div class="xq">'+esc(Q[kk]||Q.o)+'</div><div class="xs">'+coinIc(i.symbol,16)+' '+esc(i.symbol)+(l?' · '+esc(l.lb)+' '+fp(l.p):'')+'</div>'
+  +'<div class="xb"><button class="btn glass" data-a="n">'+esc(Q.n)+'</button><button class="btn xy" data-a="y">'+esc(Q.y)+'</button></div></div>';
+ m.addEventListener('click',function(e){var b=e.target.closest('[data-a]');if(!b&&!e.target.classList.contains('xbk'))return;m.remove();if(b&&b.getAttribute('data-a')=='y')cb()});document.body.appendChild(m)}
 function cxAdd(k){var g=S.page,i=termItem();if(!g||!i||!i.price)return;var px=+i.price,dir=i.pos&&i.pos.side=='short'?-1:1,f=k=='tp'?1.02:k=='sl'?0.98:0.99;if(k!='nl'&&dir<0)f=2-f;
  g.pend={k:k,lb:k=='nl'?'Limit':k.toUpperCase(),from:null,to:termRound(px*f)};haptic('success');termRender()}
 function cxEditLim(id){var g=S.page,i=termItem();if(!g||!i)return;var o=i.orders.filter(function(x){return x.id==id})[0];if(!o)return;
@@ -2159,10 +2171,10 @@ function dfDo(args,ok){var g=S.page;args.acc=g.df.acc;if(!args.symbol)args.symbo
  return api('act',{action:'dftrade',args:args}).then(function(r){if(r.pending){toast(esc(t('slow')));return}var d=null;try{d=JSON.parse(r.msg||'null')}catch(e){}
   if(r.ok&&d){S.dfs=d;toast(esc(noEmoji(d.msg||'OK')));haptic('success');if(ok)ok();if(S.page===g){g.pend=null;termRender();termLoad()}return}
   toast(esc(noEmoji((d&&d.text)||t('df_unav'))));haptic('error')}).catch(function(){toast('Error')})}
-function dfLineX(k){var g=S.page,i=termItem();if(!g||!i)return;
+function dfLineX(k,ok){var g=S.page,i=termItem();if(!g||!i)return;
  if(g.pend&&g.pend.k==k){termCancel();return}
- if(!g.xarm||g.xarm.k!=k||Date.now()-g.xarm.t>3000){g.xarm={k:k,t:Date.now()};haptic('warning');toast(esc(t('cx_x_again')));termRedraw();setTimeout(function(){if(S.page===g&&g.xarm&&g.xarm.k==k){g.xarm=null;termRedraw()}},3100);return}
- g.xarm=null;if(k=='entry'){dfSellSheet();return}
+ if(!ok){xAsk(k,i,function(){dfLineX(k,1)});return}
+ g.xarm=null;if(k=='entry'){dfDo({op:'sell',fraction:1});return}
  if(k=='sl'||k=='tp'){var a={op:'protect'};a[k]=null;dfDo(a);return}
  if(k.charAt(0)=='o')dfDo({op:'cancel',order_id:+k.slice(1)})}
 function dfSave(){var g=S.page,pd=g.pend;if(!pd)return;var k=pd.k,a={};

@@ -8496,3 +8496,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - **Koordinatalar**: narx + bar raqami (`drIdx`/`drTat`) har nuqta uchun; AVP — #1 bar, FRVP — #1/#2 bar, Long/Short — kirish, TP, SL, oxirgi bar.
 - **Ko'rinish**: daqiqalar/soatlar/kunlar/haftalar/oylar — belgi + min–max (`s.vis`, `drVisible`, `tfUnit`) — chizma faqat mos TF da chiziladi.
 - Oyna pastida «Standart» (uslubni standartga qaytaradi, ko'rinish saqlanadi). Eski kalitlar (n, vav, pl raqam, lb) `drS` da yangisiga o'tkaziladi.
+
+## 410. Grafikdagi ✕ — bir bosish → «Ha / Yo'q» oynasi
+- Avval ✕ ikki marta bosilardi (`g.xarm`, "yana bosing" toast). Endi `cxLineX(k)` / `dfLineX(k)` birinchi bosishda `xAsk(k, item, cb)` — o'z oynasi (`#xask`, z 650 — to'liq ekran ustida): savol (pozitsiyani to'liq yopish / TP / SL olib tashlash / buyurtmani bekor qilish), juftlik va chiziq narxi, «Yo'q» / «Ha» (uz/ru/en — `XQ`).
+- «Ha»: pozitsiya ✕ — to'liq yopiladi darhol (birja: `fut_close frac=1`; Dip Funded: `sell fraction=1`), foiz tanlash oynasi chiqmaydi; TP/SL — olib tashlanadi; buyurtma — bekor qilinadi.
