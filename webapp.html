@@ -1701,7 +1701,7 @@ function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;v
 function lwPos(){var se=LW.se,ov=LW.ov;if(!se||!ov)return;var h=ov.clientHeight-26,sw=0;try{sw=LW.ch.priceScale('right').width()}catch(e){}
  var top=0,bot=0,R=[];Object.keys(LW.pl).forEach(function(k){var o=LW.pl[k],l=o.l;if(!l)return;var p=LW.drag&&LW.drag.k==k?LW.drag.p:l.p,y=se.priceToCoordinate(p),out=0;
   if(y===null||y<8){out=-1}else if(y>h-6){out=1}
-  var txt=(out<0?'▲ ':out>0?'▼ ':'')+l.lb+(l.hit?' ✓':'')+(l.np&&!out?'':' '+fp(p))+(l.f&&!l.hit?' · '+l.f(p):'');
+  var txt=(out<0?'▲ ':out>0?'▼ ':'')+l.lb+(l.hit?' ✓':'')+(l.np&&!out||!out&&!l.hit?'':' '+fp(p))+(l.f&&!l.hit?' · '+l.f(p):'');
   if(LW.drag&&LW.drag.k==k){var rf=lwRef(k);if(rf&&rf.ref>0)txt+=' · '+pcT(p,rf.ref,rf.dir,rf.lev)}var t_=o.el.firstChild;if(t_.textContent!==txt)t_.textContent=txt;
   R.push({o:o,y:out<0?9+18*(top++):out>0?h-9-18*(bot++):y,out:out})});
  R.sort(function(a,b){return a.y-b.y});for(var q=1;q<R.length;q++)if(R[q].y<R[q-1].y+18&&!R[q].out)R[q].y=R[q-1].y+18;

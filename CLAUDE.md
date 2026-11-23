@@ -8518,3 +8518,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 414. Dip Funded savdo rad javoblari logga
 - Foydalanuvchi: "dipfunded hisoblarda TP/SL o'zgartirib va pozitsiyani yopib bo'lmayapti". Ilova tomoni soxta hisob bilan sinaldi (✕ → Ha → `protect sl=null`; surish → Saqlash → `protect`) — ishlaydi; web loglarida xato yo'q edi, chunki `dipfunded.ApiError` (Dip Funded rad etsa) logga yozilmasdi.
 - `dfapp.trade`: ApiError — WARNING "Dip Funded savdosi rad etildi (op sym #acc {sl,tp,...}): code text"; NotLinked — INFO.
+
+## 415. TP/SL/Limit yorliqlarida narx yozilmaydi
+- Foydalanuvchi: "narx baribir chetda (narx shkalasida) belgilanadi — ramka kichrayadi". `lwPos`: yorliq matniga narx faqat chiziq ekrandan chiqqanda (▲/▼, shkalada ko'rinmaydi) yoki bajarilgan (✓, shkala yorlig'i o'chiq) bo'lsa qo'shiladi. Masalan: «TP · +$553.97», «SL · −$10.00», «Buy 0.002».
