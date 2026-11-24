@@ -1171,7 +1171,7 @@ function termReq(g,before){var a={tf:g.tf};if(before){a.before=before;if(g.src)a
  if(g.cx){a.sym=g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'');return api('dfcandles',a)}if(g.df){a.sym=g.df.sym;return api('dfcandles',a)}a.sig=g.sig;return api('candles',a)}
 /* yangilanishda yuklangan tarix yo'qolmasin: eski qism + yangi oxirgi 500 */
 function termMerge(g,nc,src){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf||(src||'')!==(g.src||'')){g.cEnd=0;return nc}var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
-function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;
+function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;alLoad(g);
  termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[],d.src);g.src=d.src||null;g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
 /* 397: chap chetga yaqinlashganda — eski shamlar (TradingView kabi cheksiz tarix; 20 000 tagacha) */
 function termHist(g){if(!g||g.cMore||g.cEnd||!g.c||!g.c.length||g.c.length>=20000)return;g.cMore=1;var tf=g.tf,b=g.c[0][0];
@@ -1270,7 +1270,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
   ch.subscribeCrosshairMove(function(pr){lwLeg(pr)});
   LW={indSer:[],indKey:null,bl:bl,ct:ct,vd:vd,el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};
   ov.addEventListener('pointerdown',lwDown);drInit();
-  ov.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('[data-x]');if(x){e.stopPropagation();(g.df?dfLineX:cxLineX)(x.getAttribute('data-x'))}});
+  ov.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('[data-x]');if(x){e.stopPropagation();var xk=x.getAttribute('data-x');if(xk.indexOf('al')==0){alDel(g,xk);return}(g.df?dfLineX:cxLineX)(xk)}});
   ch.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(r&&LW.g===g&&!LW.busy&&LW.n){
    /* 377: grafik ichidagi "↶" — har surish/kattalashtirish seriyasidan oldingi ko'rinish yoziladi (700 ms jimlik = yangi qadam) */
    if(Date.now()>(LW.qu||0)&&!LW.vrT&&g.vr)lwUndoPush(g);clearTimeout(LW.vrT);LW.vrT=setTimeout(function(){LW.vrT=0},700);
@@ -1307,7 +1307,7 @@ var DRI={tl:'<svg viewBox="0 0 16 16"><path d="M3 13L13 3"/><circle cx="3" cy="1
  sp:'<svg viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="5.5" rx=".8" stroke="#ff5c5c"/><rect x="2" y="8" width="12" height="5.5" rx=".8" stroke="#c2f23a"/><path d="M8 9.5v2.7M6.6 10.8 8 12.2l1.4-1.4"/></svg>',
  del:'<svg viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg>'};
 function drBar(g,fs){var s='';['tl','hl','rc','fb','vp','fr','lp','sp'].forEach(function(k){s+='<span class="chip glass'+(g.tool==k?' on':'')+'" data-t="'+k+'" onclick="drTool(\''+k+'\')">'+DRI[k]+'</span>'});
- s+='<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="indicators"><b style="font-style:italic;font-family:Georgia,serif;font-size:14px">ƒx</b></span>';
+ s+='<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="indicators"><b style="font-style:italic;font-family:Georgia,serif;font-size:14px">ƒx</b></span><span class="chip glass'+(g.tool=='al'?' on':'')+'" data-t="al" onclick="drTool(\'al\')" title="alert">'+ALI+'</span>';
  var u='<span data-u="1" class="chip glass lwun" onclick="lwUndo()" style="font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span>',d='<span class="chip glass lwdl" data-t="del" onclick="drDel()">'+DRI.del+'</span>';
  if(fs)return'<div class="lwtb fsl">'+s+u+d+'<span class="chip glass" style="margin-top:auto" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="chip glass" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="chip glass" onclick="lwFs(false)">'+FSI.out+'</span></div>';
  return'<div class="chips lwtb" id="lwtb">'+s+u+d+'</div>'}
@@ -1622,7 +1622,7 @@ function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var 
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='vd'||k=='ind')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
  if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1}
-function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.sel=null;drTb();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='hl'||k=='vp'||k=='lp'||k=='sp'?'dr_p1':'dr_p2')))}}
+function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.sel=null;drTb();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='al'?'al_p':k=='hl'||k=='vp'||k=='lp'||k=='sp'?'dr_p1':'dr_p2')))}}
 function drDel(){var D=drGet();if(LW.sel){LW.D=D.filter(function(x){return x.id!==LW.sel});LW.sel=null;drSave();drTb();return}
  if(!D.length)return;if(Date.now()-(LW.clrT||0)<3500){LW.D=[];LW.clrT=0;drSave();drTb();haptic('success');return}LW.clrT=Date.now();toast(esc(t('dr_clr')))}
 function drAdd(d){d.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);var o={id:d.id,k:d.k,a:d.a};if(d.b&&d.k!='hl'&&d.k!='vp')o.b=d.b;if(d.k=='lp'||d.k=='sp'){o.tp=d.tp;o.sl=d.sl;o.t2=d.t2}
@@ -1630,6 +1630,7 @@ function drAdd(d){d.id=Date.now().toString(36)+Math.random().toString(36).slice(
  drGet();LW.D.push(o);LW.dd=null;LW.g.tool=null;LW.sel=o.id;LW.hitT=Date.now();drSave();drTb();haptic('success')}
 /* joylashtirish: bitta nuqtali (gorizontal, AVP) — bosish; ikki nuqtali — bosib tortish yoki ikki marta bosish */
 function drCDown(e){var g=LW.g,k=g&&g.tool;if(!k)return;e.preventDefault();e.stopPropagation();var p=drPt(e,true);if(!p)return;try{LW.cl.setPointerCapture(e.pointerId)}catch(x){}
+ if(k=='al'){g.tool=null;drTb();alAdd(g,p.p);return}
  if(k=='hl'||k=='vp'){drAdd({k:k,a:p});return}
  /* 403: Long/Short pozitsiya (TradingView kabi): kirish — bosilgan nuqta; TP/SL — ko'rinayotgan narx oralig'ining ~12% / ~6%, eni 30 sham */
  if(k=='lp'||k=='sp'){var P=drPlot(),top=LW.se.coordinateToPrice(0),bot=LW.se.coordinateToPrice(P.h),rg=Math.abs((top||p.p*1.1)-(bot||p.p*.9))||p.p*.1,u=k=='lp'?1:-1;
@@ -1753,7 +1754,17 @@ function lwRef(k){var i=termItem();if(!i)return null;var ent=i.pos?+(i.pos.avg||
  if(k=='sl'||/^tp/.test(k))return{ref:ent,dir:sd,lev:i.pos?(+i.pos.lev||1):(i.lev||1)};return{ref:+i.price,dir:0,lev:1}}
 function pendPc(pd){var r=lwRef(pd.k);return r&&r.ref>0?' <span style="font-size:13px;font-weight:600">'+pcH(pd.to,r.ref,r.dir,r.lev)+'</span>':''}
 function lwArmed(k){return LW.arm&&LW.arm.k==k&&Date.now()<LW.arm.u}
-function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;var i=termItem();if(!i)return;var L=g.view?[]:termLines(i,g);LW.L=L;
+/* 418: narx alertlari — grafikda 🔔 chiziq (surish, ✕), narx kesib o'tsa Telegram xabar (server: notify.alerts_loop) */
+var ALI='<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V7.2a4 4 0 0 1 8 0V11l1.2 1.5H2.8zM6.5 14a1.6 1.6 0 0 0 3 0"/></svg>';
+function alKey(g){if(g.view)return{s:String(g.view).replace(/(USDT|USDC)$/,'')+'USDT',m:'crypto'};if(g.cx)return{s:g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'')+'USDT',m:'crypto'};
+ if(g.df)return{s:String(g.df.sym).replace(/(USDT|USDC)$/,'')+'USDT',m:'crypto'};var i=termItem();return i?{s:i.symbol,m:i.market=='futures'?'futures':'crypto'}:null}
+function alReq(g,a){var k=alKey(g);if(!k)return Promise.reject();a.sym=k.s;a.mkt=k.m;var s0=k.s;return api('alerts',a).then(function(d){if(S.page===g&&(alKey(g)||{}).s===s0){g.al=d.a||[];g.alT=Date.now();lwLines(true)}return d})}
+function alLoad(g){var k=alKey(g);if(!k)return;if(g.alS===k.s&&Date.now()-(g.alT||0)<30000)return;g.alS=k.s;g.alT=Date.now();alReq(g,{op:'list'}).catch(function(){})}
+function alLines(g){return(g.al||[]).filter(function(a){return a.sym===(g.alS||'')}).map(function(a){return{k:'al'+a.id,p:a.p,lb:'🔔'+(a.note?' '+a.note:''),c:'#ffc83d',dr:!a.hit,x:true,hit:a.hit,np:0}})}
+function alAdd(g,p){p=termRound(p);alReq(g,{op:'add',price:p}).then(function(d){if(d.ok===false){toast(esc(t('al_max')));return}haptic('success');toast(esc(t('al_ok')))}).catch(function(){toast(esc(t('err')))})}
+function alMove(g,k,p){alReq(g,{op:'move',id:+k.slice(2),price:p}).then(function(){haptic('success')}).catch(function(){lwLines(true)})}
+function alDel(g,k){g.al=(g.al||[]).filter(function(a){return'al'+a.id!==k});lwLines(true);alReq(g,{op:'del',id:+k.slice(2)}).then(function(){toast(esc(t('al_del')))}).catch(function(){})}
+function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;var i=termItem();if(!i)return;var L=(g.view?[]:termLines(i,g)).concat(alLines(g));LW.L=L;
  var sig=JSON.stringify(L.map(function(l){return[l.k,l.p,l.lb,l.c,l.hit,l.dr]}))+(g.xarm?g.xarm.k:'')+(LW.arm?LW.arm.k:'');
  if(sig!==LW.sig||force){LW.sig=sig;
   Object.keys(LW.pl).forEach(function(k){if(!L.some(function(l){return l.k==k})){se.removePriceLine(LW.pl[k].pl);LW.pl[k].el.remove();delete LW.pl[k]}});
@@ -1789,6 +1800,7 @@ function lwDown(e){var t_=e.target.closest&&e.target.closest('.lwl.dr,.lwh');if(
  var up=function(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up);
   var d=LW.drag;LW.drag=null;g.drag=null;LW.arm=null;LW.ch.applyOptions({handleScroll:true,handleScale:true});
   if(!d||!d.mv||Math.abs(d.p-d.from)<=d.from*1e-7){lwLines(true);return}
+  if(d.k.indexOf('al')==0){alMove(g,d.k,d.p);return}
   g.pend={k:d.k,lb:d.lb,from:g.pend&&g.pend.k==d.k?g.pend.from:d.from,to:d.p};haptic('success');termRender()};
  document.addEventListener('pointermove',mv,{passive:false});document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up)}
 setInterval(function(){var g=S.page;if(!g||g.id!='term'||g.df||g.cx||g.drag||g.pend||document.hidden)return;var w=cur();if(!w)return;

@@ -266,6 +266,47 @@ async def api_tickers(request):
     return web.json_response({"t": out}, headers=NO_CACHE)
 
 
+_AL_SYM = re.compile(r"^[A-Z0-9]{1,20}$")
+
+
+async def api_alerts(request):
+    """418: narx alertlari — {op: list|add|move|del, sym, mkt, price, id, note}. Ro'yxat — shu tanga bo'yicha (sym berilsa)."""
+    import notify
+    body, uid = await _body(request)
+    op = str(body.get("op") or "list")
+    sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())
+    if sym and not sym.endswith(config.QUOTE):
+        sym = re.sub(r"(USDT|USDC|FDUSD)$", "", sym) + config.QUOTE
+    mkt = "futures" if body.get("mkt") == "futures" else "crypto"
+    try:
+        price = float(body.get("price") or 0)
+        aid = int(body.get("id") or 0)
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    if op in ("add", "move"):
+        if not (price > 0 and price < 1e12):
+            raise web.HTTPBadRequest()
+    if op == "add":
+        if not _AL_SYM.match(sym):
+            raise web.HTTPBadRequest()
+        ref = await notify.alert_price(sym, mkt)
+        note = str(body.get("note") or "").strip()[:120] or None
+        nid = await db.alert_add(uid, sym, mkt, price, ref, note)
+        if nid is None:
+            return web.json_response({"ok": False, "err": "max", "max": db.ALERT_MAX}, headers=NO_CACHE)
+    elif op == "move":
+        cur = await db.alert_list(uid)
+        a = next((x for x in cur if x["id"] == aid), None)
+        if not a:
+            raise web.HTTPNotFound()
+        await db.alert_move(uid, aid, price, await notify.alert_price(a["sym"], a["mkt"]))
+    elif op == "del":
+        await db.alert_del(uid, aid)
+    rows = await db.alert_list(uid, sym if _AL_SYM.match(sym or "-") else None)
+    return web.json_response({"ok": True, "a": [{"id": r["id"], "sym": r["sym"], "mkt": r["mkt"], "p": r["price"], "ref": r["ref"],
+                                                  "note": r["note"], "hit": bool(r["fired_at"])} for r in rows]}, headers=NO_CACHE)
+
+
 _BLOGO: dict = {"at": 0.0, "data": None}
 
 
@@ -2057,6 +2098,7 @@ def routes() -> list:
         web.post("/api/app/chartshot", api_chartshot),
         web.get("/blogo.png", bot_logo_png),
         web.post("/api/app/tickers", api_tickers),
+        web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),
@@ -2119,7 +2161,7 @@ T = {
         "df_term": "Savdo terminali", "df_avg": "O'rtacha narx", "df_market": "Market", "df_limit_p": "Limit narx", "df_amount": "Summa, USDT", "df_sl_opt": "SL (ixtiyoriy)", "df_tp_opt": "TP (ixtiyoriy)", "df_qty": "Miqdor", "df_tpsl_hint": "Bo'sh qoldirilsa — olib tashlanadi", "df_pick": "Juftlikni tanlang", "df_pos1": "Pozitsiya", "df_mark": "Joriy narx", "df_value": "Qiymat", "df_no_pos": "Bu juftlikda pozitsiya yo'q — BUY bilan oching", "df_trades": "So'nggi savdolar", "pp_typed": "shu nom bilan", "pp_choose": "Juftlikni tanlang", "df_share": "Hisobdagi ulush", "df_equity2": "Equity", "nws_prep": "Ulashish tayyorlanmoqda…", "wallet": "Birja", "w_soon": "Tez orada", "w_sub": "Birja", "w_txt": "DIP, USDT va Dip Funded balanslaringiz bir joyda — bo'lim tayyorlanmoqda.", "df_inbot": "Botda boshqarish",
         "ns_title": "Yangi signal", "ns_btn": "Yangi signal", "ns_pair": "Juftlik (masalan BTC)",
         "ns_kind": "Turi", "ns_lev": "Leveraj", "ns_side": "Yo'nalish", "ns_entry_mode": "Kirish",
-        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Grafikni suring, ikki barmoq bilan kattalashtiring · narxlar ustida yuqoriga-pastga torting — vertikal masshtab (2 marta bosish — qaytarish) · chiziqni ⇕ yoki yorlig'idan bosib, so'ng surib saqlang", "lw_armed": "Chiziq tanlandi — endi surib qo'ying", "dr_p1": "Grafikda nuqtani bosing", "dr_p2": "Boshlanish nuqtasini bosib torting (yoki ikki nuqtani ketma-ket bosing)", "dr_tap2": "Endi ikkinchi nuqtani bosing", "dr_clr": "Barcha chizmalarni o'chirish uchun yana bosing", "ns_sl": "Stop (SL)",
+        "ns_market": "Bozor narxi", "ns_limit": "Limit", "ns_entry": "Kirish narxi", "ns_tf": "Taymfreym (grafik)", "term_hint": "Grafikni suring, ikki barmoq bilan kattalashtiring · narxlar ustida yuqoriga-pastga torting — vertikal masshtab (2 marta bosish — qaytarish) · chiziqni ⇕ yoki yorlig'idan bosib, so'ng surib saqlang", "lw_armed": "Chiziq tanlandi — endi surib qo'ying", "al_p": "Alert narxini grafikda bosing", "al_ok": "🔔 Alert qo'yildi — narx yetganda Telegram'ga xabar keladi", "al_max": "Alertlar ko'p (maks. 50)", "al_del": "Alert o'chirildi", "dr_p1": "Grafikda nuqtani bosing", "dr_p2": "Boshlanish nuqtasini bosib torting (yoki ikki nuqtani ketma-ket bosing)", "dr_tap2": "Endi ikkinchi nuqtani bosing", "dr_clr": "Barcha chizmalarni o'chirish uchun yana bosing", "ns_sl": "Stop (SL)",
         "ns_tps": "Maqsadlar (TP) — bo'sh joy bilan", "ns_amount": "Summa, $ (ixtiyoriy)",
         "ns_send": "Signal berish", "nsp_check": "Tekshirish", "nsp_title": "Signalni tekshiring", "nsp_edit": "Tahrirlash", "nsp_risk": "Risk", "ph_px": "joriy narxdan", "ns_where": "Qayerga",
         "ref_title": "Taklif qilish", "ref_sub": "Do'stlaringizni taklif qiling — DIP yig'ing", "ref_code": "Taklif kodingiz",
@@ -2179,7 +2221,7 @@ T = {
         "df_term": "Терминал", "df_avg": "Средняя цена", "df_market": "Рынок", "df_limit_p": "Лимит-цена", "df_amount": "Сумма, USDT", "df_sl_opt": "SL (необяз.)", "df_tp_opt": "TP (необяз.)", "df_qty": "Количество", "df_tpsl_hint": "Пустое поле — удалить", "df_pick": "Выберите пару", "df_pos1": "Позиция", "df_mark": "Текущая цена", "df_value": "Стоимость", "df_no_pos": "По этой паре позиции нет — откройте через BUY", "df_trades": "Последние сделки", "pp_typed": "как введено", "pp_choose": "Выберите пару", "df_share": "Доля счёта", "df_equity2": "Equity", "nws_prep": "Готовим к отправке…", "wallet": "Биржа", "w_soon": "Скоро", "w_sub": "Биржа", "w_txt": "DIP, USDT и балансы Dip Funded в одном месте — раздел готовится.", "df_inbot": "Управлять в боте",
         "ns_title": "Новый сигнал", "ns_btn": "Новый сигнал", "ns_pair": "Пара (например BTC)",
         "ns_kind": "Тип", "ns_lev": "Плечо", "ns_side": "Направление", "ns_entry_mode": "Вход",
-        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Двигайте график, масштаб — двумя пальцами · по ценам вверх-вниз — вертикальный масштаб (двойное нажатие — сброс) · линию — нажмите ⇕ или ярлык, затем перетащите и сохраните", "lw_armed": "Линия выбрана — теперь перетащите", "dr_p1": "Нажмите точку на графике", "dr_p2": "Нажмите и потяните от начальной точки (или нажмите две точки подряд)", "dr_tap2": "Теперь нажмите вторую точку", "dr_clr": "Нажмите ещё раз, чтобы удалить все рисунки", "ns_sl": "Стоп (SL)",
+        "ns_market": "По рынку", "ns_limit": "Лимит", "ns_entry": "Цена входа", "ns_tf": "Таймфрейм (график)", "term_hint": "Двигайте график, масштаб — двумя пальцами · по ценам вверх-вниз — вертикальный масштаб (двойное нажатие — сброс) · линию — нажмите ⇕ или ярлык, затем перетащите и сохраните", "lw_armed": "Линия выбрана — теперь перетащите", "al_p": "Нажмите цену алерта на графике", "al_ok": "🔔 Алерт установлен — придёт сообщение в Telegram", "al_max": "Слишком много алертов (макс. 50)", "al_del": "Алерт удалён", "dr_p1": "Нажмите точку на графике", "dr_p2": "Нажмите и потяните от начальной точки (или нажмите две точки подряд)", "dr_tap2": "Теперь нажмите вторую точку", "dr_clr": "Нажмите ещё раз, чтобы удалить все рисунки", "ns_sl": "Стоп (SL)",
         "ns_tps": "Цели (TP) — через пробел", "ns_amount": "Сумма, $ (необязательно)",
         "ns_send": "Отправить сигнал", "nsp_check": "Проверить", "nsp_title": "Проверьте сигнал", "nsp_edit": "Изменить", "nsp_risk": "Риск", "ph_px": "от текущей цены", "ns_where": "Куда",
         "ref_title": "Пригласить", "ref_sub": "Приглашайте друзей — копите DIP", "ref_code": "Ваш код",
@@ -2239,7 +2281,7 @@ T = {
         "df_term": "Trading terminal", "df_avg": "Avg price", "df_market": "Market", "df_limit_p": "Limit price", "df_amount": "Amount, USDT", "df_sl_opt": "SL (optional)", "df_tp_opt": "TP (optional)", "df_qty": "Quantity", "df_tpsl_hint": "Leave empty to remove", "df_pick": "Choose a pair", "df_pos1": "Position", "df_mark": "Mark price", "df_value": "Value", "df_no_pos": "No position in this pair — open one with BUY", "df_trades": "Recent trades", "pp_typed": "as typed", "pp_choose": "Choose a pair", "df_share": "Share of account", "df_equity2": "Equity", "nws_prep": "Preparing to share…", "wallet": "Exchange", "w_soon": "Coming soon", "w_sub": "Exchange", "w_txt": "Your DIP, USDT and Dip Funded balances in one place — this section is on its way.", "df_inbot": "Manage in bot",
         "ns_title": "New signal", "ns_btn": "New signal", "ns_pair": "Pair (e.g. BTC)",
         "ns_kind": "Type", "ns_lev": "Leverage", "ns_side": "Direction", "ns_entry_mode": "Entry",
-        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Pan the chart, pinch to zoom · drag up/down on the prices for vertical scale (double-tap to reset) · tap ⇕ or a line label, then drag and save", "lw_armed": "Line selected — now drag it", "dr_p1": "Tap a point on the chart", "dr_p2": "Press and drag from the start point (or tap two points)", "dr_tap2": "Now tap the second point", "dr_clr": "Tap again to delete all drawings", "ns_sl": "Stop (SL)",
+        "ns_market": "Market", "ns_limit": "Limit", "ns_entry": "Entry price", "ns_tf": "Timeframe (chart)", "term_hint": "Pan the chart, pinch to zoom · drag up/down on the prices for vertical scale (double-tap to reset) · tap ⇕ or a line label, then drag and save", "lw_armed": "Line selected — now drag it", "al_p": "Tap the alert price on the chart", "al_ok": "🔔 Alert set — you'll get a Telegram message", "al_max": "Too many alerts (max 50)", "al_del": "Alert deleted", "dr_p1": "Tap a point on the chart", "dr_p2": "Press and drag from the start point (or tap two points)", "dr_tap2": "Now tap the second point", "dr_clr": "Tap again to delete all drawings", "ns_sl": "Stop (SL)",
         "ns_tps": "Targets (TP) — space-separated", "ns_amount": "Size, $ (optional)",
         "ns_send": "Send signal", "nsp_check": "Review", "nsp_title": "Review the signal", "nsp_edit": "Edit", "nsp_risk": "Risk", "ph_px": "from current price", "ns_where": "Where",
         "ref_title": "Invite", "ref_sub": "Invite friends — earn DIP", "ref_code": "Your code",

@@ -715,6 +715,20 @@ CREATE TABLE IF NOT EXISTS user_avatars (
     img     BYTEA,
     at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 418: narx alertlari (grafikdagi 🔔 chiziq) — narx `price` ni kesib o'tsa Telegram xabar, keyin fired_at
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id       BIGSERIAL PRIMARY KEY,
+    user_id  BIGINT NOT NULL,
+    sym      TEXT NOT NULL,
+    mkt      TEXT NOT NULL DEFAULT 'crypto',
+    price    DOUBLE PRECISION NOT NULL,
+    ref      DOUBLE PRECISION,
+    note     TEXT,
+    at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fired_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS price_alerts_user ON price_alerts (user_id, sym);
+CREATE INDEX IF NOT EXISTS price_alerts_live ON price_alerts (sym) WHERE fired_at IS NULL;
 """
 
 
@@ -3099,3 +3113,58 @@ async def cex_tr_spot_syms(uid: int, ex: str) -> list:
     async with pool().acquire() as c:
         return [r["sym"] for r in await c.fetch(
             "SELECT DISTINCT sym FROM cex_hist_tr WHERE user_id=$1 AND exchange=$2 AND kind='spot'", uid, ex)]
+
+
+# ─────────────────────────── 418: narx alertlari ───────────────────────────
+
+ALERT_MAX = 50
+
+
+async def alert_list(uid: int, sym: str | None = None) -> list:
+    """Faol alertlar + so'nggi 24 soatda ishlaganlar (grafikda ✓ bilan ko'rinadi)."""
+    async with pool().acquire() as c:
+        return await c.fetch(
+            "SELECT id, sym, mkt, price, ref, note, at, fired_at FROM price_alerts WHERE user_id=$1 "
+            "AND ($2::text IS NULL OR sym=$2) AND (fired_at IS NULL OR fired_at > now() - interval '1 day') "
+            "ORDER BY id", uid, sym)
+
+
+async def alert_add(uid: int, sym: str, mkt: str, price: float, ref: float | None, note: str | None) -> int | None:
+    async with pool().acquire() as c:
+        n = await c.fetchval("SELECT count(*) FROM price_alerts WHERE user_id=$1 AND fired_at IS NULL", uid)
+        if n >= ALERT_MAX:
+            return None
+        return await c.fetchval(
+            "INSERT INTO price_alerts (user_id, sym, mkt, price, ref, note) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
+            uid, sym, mkt, price, ref, note)
+
+
+async def alert_move(uid: int, aid: int, price: float, ref: float | None) -> bool:
+    """Surilgan alert qaytadan faol bo'ladi (ishlagan bo'lsa ham)."""
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE price_alerts SET price=$3, ref=$4, fired_at=NULL WHERE id=$2 AND user_id=$1",
+                            uid, aid, price, ref)
+    return r.endswith(" 1")
+
+
+async def alert_del(uid: int, aid: int) -> bool:
+    async with pool().acquire() as c:
+        r = await c.execute("DELETE FROM price_alerts WHERE id=$2 AND user_id=$1", uid, aid)
+    return r.endswith(" 1")
+
+
+async def alerts_live() -> list:
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT id, user_id, sym, mkt, price, ref, note FROM price_alerts WHERE fired_at IS NULL")
+
+
+async def alert_set_ref(aid: int, ref: float) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE price_alerts SET ref=$2 WHERE id=$1 AND fired_at IS NULL", aid, ref)
+
+
+async def alert_fire(aid: int) -> bool:
+    """Bir marta: faqat hali ishlamagan bo'lsa True (ikki jarayon bir vaqtda yubormasin)."""
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE price_alerts SET fired_at=now() WHERE id=$1 AND fired_at IS NULL", aid)
+    return r.endswith(" 1")

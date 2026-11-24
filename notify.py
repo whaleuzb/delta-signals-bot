@@ -268,6 +268,77 @@ async def _df_tick(uid: int):
         await _emit(uid, evs, f"Dip Funded #{a['id']}", f"/app?df=1&acc={a['id']}")
 
 
+# ───────────────────────── 418: narx alertlari ─────────────────────────
+
+async def alert_price(sym: str, mkt: str, tmap: dict | None = None) -> float | None:
+    """Joriy narx: crypto — MEXC spot tickerlari (bitta so'rov), topilmasa exchange.last_price; futures — MEXC fyuchers."""
+    try:
+        import tracker
+        b = sym[: -len(config.QUOTE)] if sym.endswith(config.QUOTE) else sym
+        if mkt != "futures" and tmap and b in tmap:
+            return tmap[b][0]
+        return await tracker.provider(mkt).last_price(sym)
+    except Exception:
+        return None
+
+
+def alert_hit(price: float, ref: float | None, cur: float) -> bool:
+    """Kesib o'tish: yaratilgandagi (yoki oxirgi) narx alert narxidan pastda bo'lsa — cur ≥ price, yuqorida bo'lsa — cur ≤ price."""
+    if ref is None or ref == price:
+        return False
+    return cur >= price if ref < price else cur <= price
+
+
+async def _alerts_tick():
+    rows = await db.alerts_live()
+    if not rows:
+        return
+    tmap = None
+    if any(r["mkt"] != "futures" for r in rows):
+        try:
+            import exchange
+            tmap = await exchange.ticker_map()
+        except Exception:
+            tmap = None
+    px: dict = {}
+    langs: dict = {}
+    for r in rows:
+        k = (r["sym"], r["mkt"])
+        if k not in px:
+            px[k] = await alert_price(r["sym"], r["mkt"], tmap)
+        cur = px[k]
+        if not cur or cur <= 0:
+            continue
+        if r["ref"] is None or r["ref"] == r["price"]:
+            await db.alert_set_ref(r["id"], cur)
+            continue
+        if not alert_hit(r["price"], r["ref"], cur) or not await db.alert_fire(r["id"]):
+            continue
+        uid = r["user_id"]
+        if uid not in langs:
+            langs[uid] = i18n.normalize(await db.get_user_lang(uid))
+        lang = langs[uid]
+        up = r["ref"] < r["price"]
+        msg = i18n.t("ntf.alert_up" if up else "ntf.alert_dn", lang, sym=html.escape(r["sym"]), price=fp(r["price"]), cur=fp(cur))
+        if r["note"]:
+            msg += "\n📝 " + html.escape(r["note"])
+        await send(uid, msg, lang, "/app")
+
+
+async def alerts_loop(_app=None):
+    async def run():
+        await asyncio.sleep(20)
+        while True:
+            try:
+                await _alerts_tick()
+            except Exception:
+                log.warning("Narx alertlari aylanishi xato", exc_info=True)
+            await asyncio.sleep(20)
+    import webapp
+    t = asyncio.get_running_loop().create_task(run())
+    webapp._CEX_BG.add(t)
+
+
 async def loop(_app=None):
     async def run():
         await asyncio.sleep(60)

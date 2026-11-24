@@ -479,6 +479,7 @@ def build_app() -> web.Application:
     app.on_startup.append(webapp.cex_hist_loop)
     app.on_startup.append(webapp.cg_map_warm)
     app.on_startup.append(notify.loop)
+    app.on_startup.append(notify.alerts_loop)
     app.on_cleanup.append(on_stop)
     return app
 
