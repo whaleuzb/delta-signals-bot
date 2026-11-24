@@ -870,6 +870,8 @@ async def _ws_act(body, uid: int, act: str):
         op = str(f.get("op") or "")
         if op not in ("buy", "sell", "protect", "cancel", "modify"):
             raise web.HTTPBadRequest()
+        import notify
+        notify.DUE.pop((uid, "df"), None)          # 441
         clean = {"op": op}
         for k in ("acc", "order_id"):
             if f.get(k) is not None:
@@ -2218,6 +2220,9 @@ async def api_cextrade(request):
     if row is None and op != "depth":
         raise web.HTTPNotFound()
     write = op not in cex.TRADE_READ
+    if write:                                       # 441: savdo qilindi — bildirishnoma kuzatuvi darhol tez rejimga
+        import notify
+        notify.DUE.pop((uid, ex), None)
     try:
         r = await _cx_call("trade", ex, _cex_keys(row) if row else {"key": "", "secret": "", "pass": ""},
                            {"op": op, "a": a})

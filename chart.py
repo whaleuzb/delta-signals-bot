@@ -15,7 +15,7 @@ import io
 import logging
 from datetime import datetime, timezone
 
-from lazymp import patches, plt  # matplotlib birinchi grafikda yuklanadi
+from lazymp import memtrim, patches, plt  # matplotlib birinchi grafikda yuklanadi
 
 import exchange
 import tracker
@@ -364,6 +364,7 @@ def _render(candles, *, header: str, side: str, entry: float, sl: float | None,
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
     plt.close(fig)
+    memtrim()
     buf.seek(0)
     return buf
 
@@ -571,6 +572,7 @@ async def mini_chart(sig) -> io.BytesIO | None:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=CARD_BG)
     plt.close(fig)
+    memtrim()
     buf.seek(0)
     return buf
 
@@ -707,6 +709,7 @@ def news_chart(candles, news_idx: int, symbol: str, live_pct: float,
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
     plt.close(fig)
+    memtrim()
     buf.seek(0)
     return buf
 
@@ -795,6 +798,7 @@ def surge_profile_chart(candles, news_idx: int, symbol: str, live_pct: float,
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
     plt.close(fig)
+    memtrim()
     buf.seek(0)
     return buf
 
@@ -886,5 +890,6 @@ def macd_chart(candles, symbol: str, tf: str, direction: str,
     buf = io.BytesIO()
     fig.savefig(buf, format="png", facecolor=BG)
     plt.close(fig)
+    memtrim()
     buf.seek(0)
     return buf

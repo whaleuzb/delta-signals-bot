@@ -19,6 +19,13 @@ log = logging.getLogger("notify")
 EPS = 1e-9
 STATE: dict = {}          # (uid, ex) -> holat
 RISK_SENT: dict = {}      # (uid, acc, turi) -> sana / bayroq
+# 441: moslashuvchan tekshiruv — ochiq pozitsiya/order yo'q hisob 10 daqiqada bir (bor bo'lsa ~2 daqiqa)
+DUE: dict = {}            # (uid, ex | 'df') -> keyingi tekshiruv (monotonic)
+IDLE_SEC = 600
+
+
+def _idle(st: dict | None) -> bool:
+    return bool(st) and not st.get("pos") and not st.get("ord")
 
 
 def _f(x) -> float:
@@ -234,6 +241,8 @@ async def _cex_tick(row):
     key = (uid, ex)
     prev = STATE.get(key)
     STATE[key] = cur
+    if _idle(cur) and orders is not None:
+        DUE[key] = time.monotonic() + IDLE_SEC
     if prev is None:
         return
     if orders is None:            # order ma'lumoti yo'q — faqat pozitsiyalar
@@ -253,6 +262,7 @@ async def _df_tick(uid: int):
         return
     data = await dipfunded.accounts(uid)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    busy = False
     for a in data.get("accounts") or []:
         if a.get("status") not in ("active", "funded"):
             continue
@@ -264,8 +274,11 @@ async def _df_tick(uid: int):
         key = (uid, f"df{a['id']}")
         prev = STATE.get(key)
         STATE[key] = cur
+        busy = busy or not _idle(cur)
         evs = (df_events(prev, cur) if prev is not None else []) + df_risk(uid, a["id"], st, today)
         await _emit(uid, evs, f"Dip Funded #{a['id']}", f"/app?df=1&acc={a['id']}")
+    if not busy:
+        DUE[(uid, "df")] = time.monotonic() + IDLE_SEC
 
 
 # ───────────────────────── 418: narx alertlari ─────────────────────────
@@ -353,10 +366,11 @@ async def loop(_app=None):
                             await coro
                         except Exception as e:
                             log.info("Bildirishnoma tekshiruvi xato: %s", type(e).__name__)
-                jobs = [one(_cex_tick(r)) for r in await db.cex_all()]
+                now = time.monotonic()
+                jobs = [one(_cex_tick(r)) for r in await db.cex_all() if DUE.get((r["user_id"], r["exchange"]), 0) <= now]
                 import dipfunded
                 if dipfunded.enabled():
-                    jobs += [one(_df_tick(u)) for u in await db.setting_users("dfw:")]
+                    jobs += [one(_df_tick(u)) for u in await db.setting_users("dfw:") if DUE.get((u, "df"), 0) <= now]
                 await asyncio.gather(*jobs)
             except Exception:
                 log.warning("Bildirishnomalar aylanishi xato", exc_info=True)

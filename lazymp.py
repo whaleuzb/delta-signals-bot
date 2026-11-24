@@ -27,3 +27,24 @@ plt = _Lazy("matplotlib.pyplot")
 ticker = _Lazy("matplotlib.ticker")
 patches = _Lazy("matplotlib.patches")
 lines = _Lazy("matplotlib.lines")
+
+
+
+# 441: xotirani OS'ga qaytarish. Grafik/karta chizilgandan keyin Python bo'shatgan xotira glibc'da
+# qolib, jarayon RSS'i (Railway xotira hisobi) cho'qqida qolardi. gc + malloc_trim(0), 15 s da ko'pi bilan bir marta.
+_TRIM = [0.0]
+
+
+def memtrim(force: bool = False) -> None:
+    import time
+    now = time.monotonic()
+    if not force and now - _TRIM[0] < 15:
+        return
+    _TRIM[0] = now
+    try:
+        import gc
+        gc.collect()
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass

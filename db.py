@@ -1525,7 +1525,6 @@ async def share_image_put(key: str, img: bytes) -> None:
     async with pool().acquire() as c:
         await c.execute("INSERT INTO share_images (key, img) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE "
                         "SET img=EXCLUDED.img, at=now()", key, img)
-        await c.execute("DELETE FROM share_images WHERE at < now() - interval '30 days'")
 
 
 async def add_fill(sig_id: int, at, price: float, share: float | None, kind: str) -> None:
@@ -2859,6 +2858,25 @@ async def housekeeping(drop_volume: bool = False) -> int:
         # (har bosish bitta qator; jadval cheksiz o'sardi).
         await c.execute("DELETE FROM app_actions WHERE status <> 'new' "
                         "AND created_at < now() - interval '14 days'")
+        # 441: o'sib boradigan yordamchi jadvallar — eski qatorlar (ilgari share_images har rasm yozilganda tozalanardi)
+        out = []
+        for name, sql in (
+            ("share_images", "DELETE FROM share_images WHERE at < now() - interval '30 days'"),
+            ("news_share", "DELETE FROM news_share WHERE at < now() - interval '60 days'"),
+            ("chart_share", "DELETE FROM chart_share WHERE (kind='ch' AND at < now() - interval '90 days') "
+                            "OR (kind='tpl' AND at < now() - interval '365 days') OR (kind='sig' AND at < now() - interval '180 days')"),
+            ("price_alerts", "DELETE FROM price_alerts WHERE fired_at < now() - interval '7 days'"),
+            ("cex_orders", "DELETE FROM cex_orders WHERE at < now() - interval '180 days'"),
+            ("user_chart", "DELETE FROM user_chart WHERE v IS NULL AND at < (extract(epoch from now()) * 1000)::bigint - 2592000000::bigint"),
+        ):
+            try:
+                n = int((await c.execute(sql)).split()[-1])
+                if n:
+                    out.append(f"{name}={n}")
+            except Exception:
+                log.warning("Tozalash xato (%s)", name, exc_info=True)
+        if out:
+            log.info("Kunlik tozalash: %s", " ".join(out))
         if drop_volume and await c.fetchval("SELECT EXISTS (SELECT 1 FROM volume_snapshots)"):
             await c.execute("TRUNCATE volume_snapshots")
             log.info("Hajm portlashi o'chiq — volume_snapshots bo'shatildi")

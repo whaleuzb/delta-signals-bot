@@ -389,4 +389,7 @@ def open_card(*, symbol: str, side: str, entry: float, price: float, pnl_pct: fl
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG", optimize=True)
     buf.seek(0)
+    del img, d
+    from lazymp import memtrim
+    memtrim()
     return buf
