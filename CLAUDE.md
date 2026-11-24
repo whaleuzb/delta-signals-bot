@@ -8548,3 +8548,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 421. Grafik turlari va logarifmik shkala
 - Asboblar ustunida grafik turi tugmasi (joriy tur belgisi, `ctMenu`): Shamlar, Heikin Ashi, Barlar, Chiziq, Maydon (area) + «Logarifmik shkala» (`priceScale('right').mode=1`). Saqlash: `localStorage tc_ct {t, log}`.
 - `ctApply(rows, full)` — `lwData` da `se.setData/update` o'rniga. Asosiy sham seriyasi `LW.se` doim qoladi (narx chiziqlari, koordinata, belgilar, chizmalar unga bog'liq): HA da unga HA qiymatlari (`haRows`) beriladi; bar/chiziq/area da `LW.se` shaffof (oxirgi narx yorlig'i ham o'chiq), ustida alohida seriya `LW.cs` (oxirgi narx yorlig'i va punktir chiziq shunda). Indikatorlar va VΔ har doim haqiqiy shamlardan hisoblanadi.
+
+## 422. Yangi chizish asboblari: nur, strelka, parallel kanal, matn, o'lchov
+- Asboblar ustuniga bitta «✎+» tugmasi (`data-t="mo"`, `drMore`) — ichida (`DRX`): Nur (`ry`, trend chizig'i, standart o'ngga davom), Strelka (`ar`, uchida o'q), Parallel kanal (`pc`, 2 nuqta + `d.o` narx siljishi; 3-ushlagich `c` — kanal kengligi; to'ldirish, o'rta punktir, o'ngga davom), Matn (`tx`, bitta nuqta; qo'yilganda sozlamalar «Matn» yorlig'ida ochiladi; fon, rang, o'lcham), O'lchov (`ms`, 2 nuqta: Δnarx, %, shamlar soni, vaqt — `drDur`). Tanlangan qo'shimcha asbob tugmada o'z belgisi bilan yashil ko'rinadi.
+- Hammasida sozlamalar (`DRDEF/DRF`), shablonlar, ko'rinish (TF bo'yicha), qulflash/nusxa, server sinxroni (420) — mavjud mexanizmlar orqali.
