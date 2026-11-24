@@ -8594,3 +8594,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 434. Order book devorlari
 - «ƒx» → **Order Book**: Binance spot stakani (1000 daraja; `cex` servisi `POST /mkt kind=depth`, web `orderflow kind=depth`, 8 s kesh). Ilova (`obwNeed`, 10 s da) narxni `bin` % (standart 0.1%) oraliqlarga yig'adi, har tomondan eng katta `top` (8) tasini grafik o'ng chetida gorizontal ustun (eni hajmga mutanosib, `wp` %) va $ hajm yorlig'i bilan chizadi (`obwSvg`, SVG qatlam). Yashil — bid, qizil — ask. Faqat kripto.
+
+## 435. Likvidatsiyalar indikatori
+- «ƒx» → **Liquidations**: Binance perp likvidatsiyalari (Coinalyze `liquidation-history`, `XXXUSDT_PERP.A`, USD; `webapp._liq_hist`, `orderflow kind=liq`, TF → interval `_LIQ_IV`, oxirgi 1000 interval, 60 s kesh). Pastki panelda: short likvidatsiyasi yuqoriga (yashil), long likvidatsiyasi pastga (qizil), sham ichida yig'iladi.
+- Web servisga `COINALYZE_API_KEY` = `${{bot.COINALYZE_API_KEY}}` (Railway reference) qo'shildi; kalit bo'lmasa indikator bo'sh.

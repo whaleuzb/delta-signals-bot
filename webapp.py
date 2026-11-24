@@ -271,6 +271,36 @@ _OF_P = {"1m": "5m", "2m": "5m", "3m": "5m", "5m": "5m", "10m": "15m", "15m": "1
 _OF_C: dict = {}
 
 
+_LIQ_IV = {"1m": ("1min", 60), "2m": ("1min", 60), "3m": ("1min", 60), "5m": ("5min", 300), "10m": ("15min", 900), "15m": ("15min", 900),
+           "30m": ("30min", 1800), "1h": ("1hour", 3600), "2h": ("2hour", 7200), "4h": ("4hour", 14400), "1d": ("daily", 86400),
+           "1w": ("daily", 86400), "1M": ("daily", 86400)}
+
+
+async def _liq_hist(sym: str, tf: str) -> list | None:
+    """435: likvidatsiyalar tarixi — Coinalyze (Binance perp, `XXXUSDT_PERP.A`), USD: [[ms, long, short], ...]. Kalit yo'q bo'lsa None."""
+    import httpx
+    import liquidations
+    if not config.COINALYZE_API_KEY:
+        return None
+    iv, sec = _LIQ_IV.get(tf, ("1hour", 3600))
+    now = int(time.time())
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{liquidations.BASE_URL}/liquidation-history",
+                        params={"symbols": f"{sym}_PERP.A", "interval": iv, "from": now - 1000 * sec, "to": now,
+                                "convert_to_usd": "true", "api_key": config.COINALYZE_API_KEY})
+    if r.status_code != 200:
+        raise RuntimeError(f"Coinalyze HTTP {r.status_code}")   # URL'da kalit bor — matnga kirmasin
+    out = []
+    for e in r.json() or []:
+        for b in e.get("history") or []:
+            lo, sh = liquidations._bucket_sides(b)
+            try:
+                out.append([int(b.get("t")) * 1000, lo, sh])
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
 async def api_orderflow(request):
     """424: OI (USD), Long/Short nisbati, funding (%) — Binance futures ochiq API, Singapur `cex` servisi orqali (AQSh'dan 451). 60 s kesh."""
     body, _uid = await _body(request)
@@ -278,7 +308,7 @@ async def api_orderflow(request):
     sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())
     sym = re.sub(r"(USDT|USDC|FDUSD)$", "", sym) + "USDT"
     period = _OF_P.get(str(body.get("tf") or ""), "1h")
-    if kind not in ("oi", "ls", "fund", "depth") or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
+    if kind not in ("oi", "ls", "fund", "depth", "liq") or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
         raise web.HTTPBadRequest()
     key = (kind, sym, period if kind not in ("fund", "depth") else "")
     hit = _OF_C.get(key)
@@ -286,7 +316,9 @@ async def api_orderflow(request):
         return web.json_response({"d": hit[1]}, headers=NO_CACHE)
     url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
     try:
-        if url:
+        if kind == "liq":
+            d = await _liq_hist(sym, str(body.get("tf") or "1h"))
+        elif url:
             import httpx
             async with httpx.AsyncClient(timeout=20) as c:
                 r = await c.post(f"{url}/mkt", json={"kind": kind, "sym": sym, "period": period},
