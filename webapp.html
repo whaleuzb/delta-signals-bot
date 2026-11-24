@@ -1171,7 +1171,7 @@ function termReq(g,before){var a={tf:g.tf};if(before){a.before=before;if(g.src)a
  if(g.cx){a.sym=g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'');return api('dfcandles',a)}if(g.df){a.sym=g.df.sym;return api('dfcandles',a)}a.sig=g.sig;return api('candles',a)}
 /* yangilanishda yuklangan tarix yo'qolmasin: eski qism + yangi oxirgi 500 */
 function termMerge(g,nc,src){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf||(src||'')!==(g.src||'')){g.cEnd=0;return nc}var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
-function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;alLoad(g);
+function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;alLoad(g);csLoad();
  termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[],d.src);g.src=d.src||null;g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
 /* 397: chap chetga yaqinlashganda — eski shamlar (TradingView kabi cheksiz tarix; 20 000 tagacha) */
 function termHist(g){if(!g||g.cMore||g.cEnd||!g.c||!g.c.length||g.c.length>=20000)return;g.cMore=1;var tf=g.tf,b=g.c[0][0];
@@ -1315,7 +1315,7 @@ function drKey(){var i=termItem();if(LW.g&&LW.g.view)return LW.g.view;return i?S
 function drAll(){try{return JSON.parse(localStorage.getItem('tc_dr')||'{}')||{}}catch(e){return{}}}
 function drGet(){var k=drKey();if(LW.drk!==k){LW.drk=k;LW.D=(drAll()[k]||[]).slice();LW.sel=null}return LW.D||[]}
 function drSave(){var a=drAll(),k=LW.drk;if(!k)return;if(LW.D&&LW.D.length)a[k]=LW.D.slice(-50);else delete a[k];
- var ks=Object.keys(a);if(ks.length>60)delete a[ks[0]];try{localStorage.setItem('tc_dr',JSON.stringify(a))}catch(e){}LW.dv=(LW.dv||0)+1}
+ var ks=Object.keys(a);if(ks.length>60)delete a[ks[0]];try{localStorage.setItem('tc_dr',JSON.stringify(a))}catch(e){}LW.dv=(LW.dv||0)+1;csPush('dr:'+k,a[k]||null)}
 function drSec(){return TFS[LW.g&&LW.g.tf]||60}
 function drX(t){var R=LW.rt,n=R&&R.length,s=drSec(),l;if(!n)return null;
  if(t<=R[0])l=(t-R[0])/s;else if(t>=R[n-1])l=n-1+(t-R[n-1])/s;
@@ -1502,7 +1502,7 @@ function setDraw(){var m=document.getElementById('lwset');if(!m||!SET)return;var
 /* 416: shablonlar (TradingView «Template») — har tur uchun: saqlash (nom), qo'llash, o'chirish, standart (yangi chizmalarga). localStorage tc_tpl {tur: {n: uslub}}, tc_tpd {tur: nom} */
 function tplAll(){try{return JSON.parse(localStorage.getItem('tc_tpl')||'{}')||{}}catch(e){return{}}}
 function tplDef(){try{return JSON.parse(localStorage.getItem('tc_tpd')||'{}')||{}}catch(e){return{}}}
-function tplPut(a,d){try{localStorage.setItem('tc_tpl',JSON.stringify(a));if(d)localStorage.setItem('tc_tpd',JSON.stringify(d))}catch(e){}}
+function tplPut(a,d){try{localStorage.setItem('tc_tpl',JSON.stringify(a));if(d)localStorage.setItem('tc_tpd',JSON.stringify(d))}catch(e){}csPush('tpl',a);if(d)csPush('tpd',d)}
 function tplMenu(){var b=document.getElementById('stp');if(!b||!SET||!SET.tp)return;if(!b.hidden){b.hidden=true;return}b.hidden=false;tplDraw()}
 function tplDraw(){var b=document.getElementById('stp');if(!b||!SET||!SET.tp)return;var k=SET.tp.k,A=tplAll()[k]||{},D=tplDef()[k],N=Object.keys(A);
  b.innerHTML='<div class="tpa"><input id="tpln" class="nm" type="text" maxlength="40" placeholder="'+esc(stl('tpl_name'))+'"><button class="btn p" onclick="tplSaveCur()">'+esc(stl('tpl_save'))+'</button></div>'
@@ -1556,7 +1556,21 @@ function indDefP(t){return JSON.parse(JSON.stringify(INDC[t].p))}
 function indList(){var L=null;try{L=JSON.parse(localStorage.getItem('tc_inds')||'null')}catch(e){}if(Array.isArray(L))return L;
  var old={};try{old=(JSON.parse(localStorage.getItem('tc_ind')||'{}')||{}).vd||{}}catch(e){}var p=indDefP('vd');for(var k in old)p[k]=old[k];
  var on=1;try{on=localStorage.getItem('tc_vd')!=='0'?1:0}catch(e){}return[{id:'vd',t:'vd',on:on,p:p}]}
-function indLSave(L){try{localStorage.setItem('tc_inds',JSON.stringify(L))}catch(e){}}
+function indLSave(L){try{localStorage.setItem('tc_inds',JSON.stringify(L))}catch(e){}csPush('inds',L)}
+/* 420: grafik sozlamalari serverda — chizmalar (dr:<TANGA>), shablonlar (tpl/tpd), indikatorlar (inds); oxirgi yozuv yutadi (at, ms). tc_sync — mahalliy vaqt belgilari */
+var CSQ={},CST=null,CSL=0;
+function csSt(){try{return JSON.parse(localStorage.getItem('tc_sync')||'{}')||{}}catch(e){return{}}}
+function csStPut(o){try{localStorage.setItem('tc_sync',JSON.stringify(o))}catch(e){}}
+function csPush(k,v,at){var st=csSt();at=at||Date.now();st[k]=at;csStPut(st);CSQ[k]={k:k,v:v==null?null:v,at:at};clearTimeout(CST);CST=setTimeout(csFlush,1500)}
+function csFlush(){var it=Object.keys(CSQ).map(function(k){return CSQ[k]});CSQ={};if(!it.length)return;api('chart',{op:'put',items:it}).catch(function(){it.forEach(function(x){if(!CSQ[x.k])CSQ[x.k]=x});clearTimeout(CST);CST=setTimeout(csFlush,15000)})}
+function csLocal(k){try{if(k.indexOf('dr:')==0)return drAll()[k.slice(3)]||null;var v=localStorage.getItem({tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds'}[k]);return v?JSON.parse(v):null}catch(e){return null}}
+function csSet(k,v){try{if(k.indexOf('dr:')==0){var a=drAll();if(v&&v.length)a[k.slice(3)]=v;else delete a[k.slice(3)];localStorage.setItem('tc_dr',JSON.stringify(a));return}
+ var n={tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds'}[k];if(v==null)localStorage.removeItem(n);else localStorage.setItem(n,JSON.stringify(v))}catch(e){}}
+function csLoad(){if(Date.now()-CSL<60000)return;CSL=Date.now();api('chart',{op:'all'}).then(function(d){var V=d.v||{},st=csSt(),ch=0;
+ Object.keys(V).forEach(function(k){if(V[k][1]>(st[k]||0)){csSet(k,V[k][0]);st[k]=V[k][1];ch=1}});csStPut(st);
+ var L=Object.keys(drAll()).map(function(x){return'dr:'+x}).concat(['tpl','tpd','inds']);
+ L.forEach(function(k){var lv=csLocal(k);if(lv==null)return;if(!V[k]||(st[k]||0)>V[k][1])csPush(k,lv,st[k]||Date.now())});
+ if(ch&&LW.ch){LW.drk=null;LW.dsig='';LW.dv=(LW.dv||0)+1;indApply(true);lwVdRefresh();indLayout();indChip()}}).catch(function(){CSL=0})}
 function indName(x){var p=x.p||{};return INDC[x.t].n+(x.t=='ema'||x.t=='sma'||x.t=='rsi'?' '+p.len:x.t=='bb'?' '+p.len+', '+p.mult:x.t=='macd'?' '+p.fast+' '+p.slow+' '+p.sig:'')}
 /* hisob */
 function iEma(a,n){var o=new Array(a.length).fill(null),k=2/(n+1),s=0,c=0,v=null;for(var i=0;i<a.length;i++){if(a[i]==null)continue;if(v==null){s+=a[i];c++;if(c==n){v=s/n;o[i]=v}}else{v=a[i]*k+v*(1-k);o[i]=v}}return o}
@@ -1596,7 +1610,7 @@ function indSet(){var W={L:JSON.parse(JSON.stringify(indList())),op:null},o0=JSO
   W.L.forEach(function(x,i){h+='<div class="ir"><label class="tg2"><input type="checkbox" data-p="L.'+i+'.on"'+(x.on?' checked':'')+'><i></i></label><b>'+esc(indName(x))+'</b><span class="ia" data-ia="open" data-ii="'+i+'">'+MTI.set+'</span><span class="ia" data-ia="del" data-ii="'+i+'">✕</span></div>';
    if(W.op===x.id)h+='<div class="ip">'+(INDF[x.t]||[]).map(function(f){return setRow(stl('i_'+f[0]),setCtl('L.'+i+'.p.'+f[0],f[1],x.p[f[0]],f[2],f[3],f[4]),f[1]=='c')}).join('')+'</div>'});return h}}];
  var ap=function(W){indLSave(W.L);indApply(true);lwVdRefresh();indLayout();indChip()};
- setOpen(stl('ind'),tabs,W,ap,function(W){indLSave(W.L)},function(){try{localStorage.setItem('tc_inds',o0)}catch(e){}indApply(true);lwVdRefresh();indLayout();indChip()},null,
+ setOpen(stl('ind'),tabs,W,ap,function(W){indLSave(W.L)},function(){indLSave(JSON.parse(o0));indApply(true);lwVdRefresh();indLayout();indChip()},null,
   {k:'inds',get:function(W){return W.L},put:function(W,v){W.L=JSON.parse(JSON.stringify(v))}})}
 function indAct(el){var W=SET&&SET.W;if(!W||!W.L)return;var a=el.getAttribute('data-ia'),i=+el.getAttribute('data-ii');
  if(a=='add'){var t=el.getAttribute('data-it'),x={id:t=='vd'?'vd':t+Date.now().toString(36),t:t,on:1,p:indDefP(t)};W.L.push(x);W.op=x.id}

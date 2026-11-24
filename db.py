@@ -729,6 +729,14 @@ CREATE TABLE IF NOT EXISTS price_alerts (
 );
 CREATE INDEX IF NOT EXISTS price_alerts_user ON price_alerts (user_id, sym);
 CREATE INDEX IF NOT EXISTS price_alerts_live ON price_alerts (sym) WHERE fired_at IS NULL;
+-- 420: grafik sozlamalari serverda (qurilmalar orasida): chizmalar 'dr:<TANGA>', shablonlar 'tpl'/'tpd', indikatorlar 'inds'
+CREATE TABLE IF NOT EXISTS user_chart (
+    user_id BIGINT NOT NULL,
+    k       TEXT NOT NULL,
+    v       JSONB,
+    at      BIGINT NOT NULL,
+    PRIMARY KEY (user_id, k)
+);
 """
 
 
@@ -3168,3 +3176,33 @@ async def alert_fire(aid: int) -> bool:
     async with pool().acquire() as c:
         r = await c.execute("UPDATE price_alerts SET fired_at=now() WHERE id=$1 AND fired_at IS NULL", aid)
     return r.endswith(" 1")
+
+
+# ─────────────────────────── 420: grafik sozlamalari sinxroni ───────────────────────────
+
+CHART_MAX_KEYS = 300
+
+
+async def chart_all(uid: int) -> list:
+    async with pool().acquire() as c:
+        return await c.fetch("SELECT k, v::text AS v, at FROM user_chart WHERE user_id=$1", uid)
+
+
+async def chart_put(uid: int, items: list) -> int:
+    """items: [(k, v_json_text | None, at_ms)]. Yangiroq `at` yutadi; v=None — o'chirilgan (tombstone, at saqlanadi)."""
+    n = 0
+    async with pool().acquire() as c:
+        async with c.transaction():
+            cnt = await c.fetchval("SELECT count(*) FROM user_chart WHERE user_id=$1", uid)
+            for k, v, at in items:
+                ex = await c.fetchval("SELECT at FROM user_chart WHERE user_id=$1 AND k=$2", uid, k)
+                if ex is None and cnt >= CHART_MAX_KEYS:
+                    continue
+                if ex is not None and ex >= at:
+                    continue
+                await c.execute("INSERT INTO user_chart (user_id, k, v, at) VALUES ($1,$2,$3::jsonb,$4) "
+                                "ON CONFLICT (user_id, k) DO UPDATE SET v=EXCLUDED.v, at=EXCLUDED.at", uid, k, v, at)
+                if ex is None:
+                    cnt += 1
+                n += 1
+    return n

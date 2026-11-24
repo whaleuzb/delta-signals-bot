@@ -266,6 +266,40 @@ async def api_tickers(request):
     return web.json_response({"t": out}, headers=NO_CACHE)
 
 
+_CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds)$")
+
+
+async def api_chart(request):
+    """420: grafik sozlamalari sinxroni. {op:'all'} -> {v: {k: [qiymat, at]}}; {op:'put', items:[{k, v, at}]} — oxirgi yozuv yutadi.
+    Kalit: dr:<TANGA> (chizmalar), tpl/tpd (shablonlar), inds (indikatorlar). Har qiymat ≤ 64 KB, foydalanuvchiga ≤ 300 kalit."""
+    import json as _json
+    body, uid = await _body(request)
+    if body.get("op") == "put":
+        now = int(time.time() * 1000)
+        items = []
+        for it in (body.get("items") if isinstance(body.get("items"), list) else [])[:80]:
+            if not isinstance(it, dict):
+                continue
+            k = str(it.get("k") or "")
+            if not _CH_KEY.match(k):
+                continue
+            v = it.get("v")
+            vt = None if v is None else _json.dumps(v, ensure_ascii=False, separators=(",", ":"))
+            if vt is not None and len(vt) > 65536:
+                continue
+            try:
+                at = min(int(it.get("at") or 0), now + 60000)
+            except (TypeError, ValueError):
+                continue
+            if at > 0:
+                items.append((k, vt, at))
+        n = await db.chart_put(uid, items) if items else 0
+        return web.json_response({"ok": True, "n": n}, headers=NO_CACHE)
+    rows = await db.chart_all(uid)
+    return web.json_response({"ok": True, "v": {r["k"]: [None if r["v"] is None else _json.loads(r["v"]), r["at"]] for r in rows}},
+                             headers=NO_CACHE)
+
+
 _AL_SYM = re.compile(r"^[A-Z0-9]{1,20}$")
 
 
@@ -2099,6 +2133,7 @@ def routes() -> list:
         web.get("/blogo.png", bot_logo_png),
         web.post("/api/app/tickers", api_tickers),
         web.post("/api/app/alerts", api_alerts),
+        web.post("/api/app/chart", api_chart),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),
