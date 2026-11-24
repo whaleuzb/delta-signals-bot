@@ -730,6 +730,17 @@ CREATE TABLE IF NOT EXISTS price_alerts (
 CREATE INDEX IF NOT EXISTS price_alerts_user ON price_alerts (user_id, sym);
 CREATE INDEX IF NOT EXISTS price_alerts_live ON price_alerts (sym) WHERE fired_at IS NULL;
 -- 420: grafik sozlamalari serverda (qurilmalar orasida): chizmalar 'dr:<TANGA>', shablonlar 'tpl'/'tpd', indikatorlar 'inds'
+-- 437: ulashilgan grafik (chizmalar + indikatorlar) / signal tahlili ('sig<id>') / shablon havolasi
+CREATE TABLE IF NOT EXISTS chart_share (
+    key     TEXT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    kind    TEXT NOT NULL DEFAULT 'ch',
+    sym     TEXT,
+    tf      TEXT,
+    data    JSONB NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chart_share_user ON chart_share (user_id, at DESC);
 CREATE TABLE IF NOT EXISTS user_chart (
     user_id BIGINT NOT NULL,
     k       TEXT NOT NULL,
@@ -3206,3 +3217,27 @@ async def chart_put(uid: int, items: list) -> int:
                     cnt += 1
                 n += 1
     return n
+
+
+# ─────────────────────────── 437: ulashilgan grafiklar ───────────────────────────
+
+async def chart_share_put(key: str, uid: int, kind: str, sym: str | None, tf: str | None, data_json: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("INSERT INTO chart_share (key, user_id, kind, sym, tf, data) VALUES ($1,$2,$3,$4,$5,$6::jsonb) "
+                        "ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, sym=EXCLUDED.sym, tf=EXCLUDED.tf, at=now()",
+                        key, uid, kind, sym, tf, data_json)
+
+
+async def chart_share_get(key: str):
+    async with pool().acquire() as c:
+        return await c.fetchrow("SELECT key, user_id, kind, sym, tf, data::text AS data, at FROM chart_share WHERE key=$1", key)
+
+
+async def chart_share_del(key: str) -> None:
+    async with pool().acquire() as c:
+        await c.execute("DELETE FROM chart_share WHERE key=$1", key)
+
+
+async def chart_share_count(uid: int) -> int:
+    async with pool().acquire() as c:
+        return await c.fetchval("SELECT count(*) FROM chart_share WHERE user_id=$1 AND at > now() - interval '1 day'", uid)

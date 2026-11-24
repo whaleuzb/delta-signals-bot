@@ -8602,3 +8602,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 436. Watchlist: bir nechta ro'yxat, saralash, tartib
 - Watchlist sarlavhasi: ro'yxat nomi ▾ (`wlLists` — ro'yxatlar orasida almashish, «+ Yangi ro'yxat» (sheet, nom ≤24), joriyini o'chirish; ≤12 ro'yxat) va saralash tugmasi (`wlSort`: ⇅ qo'lda → %↓ → %↑ → A–Z). Qo'lda tartibda har qatorda ▴ — bir pog'ona yuqoriga (`wlUp`).
 - Saqlash `localStorage tc_wls {n, L:{nom:[tangalar]}, so}` (eski `tc_wl` birinchi ochilishda «Watchlist» ro'yxatiga ko'chadi), server sinxroni kaliti `wl` (`_CH_KEY` ga qo'shildi).
+
+## 437. Ijtimoiy: chizmali grafikni ulashish, signalga tahlil, shablon havolasi
+- Jadval `chart_share (key, user_id, kind ch|sig|tpl, sym, tf, data JSONB)`; `POST /api/app/chartpub`: `put {sym,tf,d,inds}` → tasodifiy kalit; `sig {sig,d,inds}` — faqat signal egasi/boshqaruvchisi (`_can`), kalit `sig<id>`, `d` bo'sh → o'chirish; `tpl {k,n,v}`; `get {key}`. ≤200 KB, foydalanuvchiga kuniga ≤100 ta.
+- **Ulashish**: to'liq ekrandagi «Ulashish» endi avval chizmalar+indikatorlarni `put` qiladi, `chartshot` ga `ck` beriladi → xabarda «📊 Grafikni ochish» (`t.me/<bot>?startapp=ch_<key>`) + «Trade Controller». Ochilganda `chOpenKey` → yangi **«faqat grafik» sahifa** (`chTerm(base, sh, tf)`: istalgan tanga, pozitsiyasiz; `g.ch`, sintetik `g.chi`; `dfcandles`; har 15 s yangilanadi). Ulashilgan chizmalar alohida faqat-ko'rish qatlamida (`shSvg`), pastda karta: «Nusxa olish» (o'z chizmalariga, `shCopy`), «+ Indikatorlar» (`shInds`), «Yashirish».
+- **Signal tahlili**: signal terminalida 📎 (`sigAttach`; tor ekranda «⋯» ichida) — joriy chizmalar/indikatorlar signalga biriktiriladi. `api/app/sig` javobida `an`; «Birjamda ochish» oynasida «📊 Signal tahlili» tugmasi → `chOpenKey('sig<id>')`.
+- **Shablon havolasi**: shablon ro'yxatida 🔗 (`tplShare`) → `startapp=tp_<key>` havolasini Telegram'da ulashish; ochganda shablon nomi bilan (band bo'lsa «nom 2») qo'shiladi.

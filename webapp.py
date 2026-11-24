@@ -339,6 +339,63 @@ async def api_orderflow(request):
     return web.json_response({"d": d}, headers=NO_CACHE)
 
 
+_PUB_KEY = re.compile(r"^[A-Za-z0-9_-]{4,40}$")
+
+
+async def api_chartpub(request):
+    """437: ulashish. op=put {sym, tf, d (chizmalar), inds} -> {key} (startapp=ch_<key>);
+    op=sig {sig, d, inds} — signal muallifi tahlilni biriktiradi (kalit 'sig<id>', d bo'sh — o'chirish);
+    op=tpl {k, n, v} -> {key} (startapp=tp_<key>); op=get {key} -> {kind, sym, tf, data}. Hajm ≤ 200 KB, kuniga ≤ 100 ta."""
+    import json as _json
+    import secrets
+    body, uid = await _body(request)
+    op = str(body.get("op") or "")
+    if op == "get":
+        key = str(body.get("key") or "")
+        if not _PUB_KEY.match(key):
+            raise web.HTTPBadRequest()
+        r = await db.chart_share_get(key)
+        if not r:
+            return web.json_response({"ok": False}, headers=NO_CACHE)
+        return web.json_response({"ok": True, "kind": r["kind"], "sym": r["sym"], "tf": r["tf"], "data": _json.loads(r["data"]),
+                                  "mine": r["user_id"] == uid}, headers=NO_CACHE)
+    if await db.chart_share_count(uid) >= 100:
+        raise web.HTTPTooManyRequests()
+    sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())[:20] or None
+    tf = body.get("tf") if body.get("tf") in _TF_MS else None
+    if op == "tpl":
+        k = str(body.get("k") or "")
+        if not re.fullmatch(r"[a-z]{2,6}", k):
+            raise web.HTTPBadRequest()
+        data = {"k": k, "n": str(body.get("n") or "")[:40], "v": body.get("v")}
+        kind, key = "tpl", secrets.token_urlsafe(9)
+    else:
+        d = body.get("d") if isinstance(body.get("d"), list) else []
+        inds = body.get("inds") if isinstance(body.get("inds"), list) else []
+        data = {"d": d[:80], "inds": inds[:20]}
+        if op == "sig":
+            try:
+                sig = await db.get_signal(int(body.get("sig")))
+            except (TypeError, ValueError):
+                raise web.HTTPBadRequest()
+            ws = await db.get_workspace(sig["workspace_id"]) if sig else None
+            if not _can(ws, uid):
+                raise web.HTTPForbidden()
+            key, kind, sym = f"sig{sig['id']}", "sig", sig["symbol"]
+            if not d:
+                await db.chart_share_del(key)
+                return web.json_response({"ok": True, "key": None}, headers=NO_CACHE)
+        elif op == "put":
+            kind, key = "ch", secrets.token_urlsafe(9)
+        else:
+            raise web.HTTPBadRequest()
+    js = _json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    if len(js) > 200_000:
+        raise web.HTTPRequestEntityTooLarge(max_size=200_000, actual_size=len(js))
+    await db.chart_share_put(key, uid, kind, sym, tf, js)
+    return web.json_response({"ok": True, "key": key}, headers=NO_CACHE)
+
+
 _CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds|cs|wl)$")
 
 
@@ -500,6 +557,9 @@ async def api_chartshot(request):
              "photo_width": im.width, "photo_height": im.height,
              "caption": f"📊 #{sym} · {tf}",
              "reply_markup": {"inline_keyboard": [[{"text": "🤖 Trade Controller", "url": link}]]}}
+        ck = str(body.get("ck") or "")
+        if bot and _PUB_KEY.match(ck):     # 437: chizmali grafikni ilovada ochish
+            r["reply_markup"]["inline_keyboard"].insert(0, [{"text": "📊 Grafikni ochish", "url": f"https://t.me/{bot}?startapp=ch_{ck}"}])
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as cs:
                 async with cs.post(f"https://api.telegram.org/bot{config.BOT_TOKEN}/savePreparedInlineMessage",
@@ -608,7 +668,8 @@ async def api_sig(request):
         "entry": float(sig["entry"]), "sl": float(sig["sl"]) if sig["sl"] is not None else None,
         "tps": tps, "tp_next": tps[min(hit, len(tps) - 1)] if tps and hit < len(tps) else None,
         "lev": int(sig["leverage"]) if sig["leverage"] else None, "status": sig["status"],
-        "ws": ws["name"] if ws else "", "price": float(price) if price else None}, headers=NO_CACHE)
+        "ws": ws["name"] if ws else "", "price": float(price) if price else None,
+        "an": bool(await db.chart_share_get(f"sig{sig['id']}"))}, headers=NO_CACHE)
 
 
 async def api_pairs(request):
@@ -2207,6 +2268,7 @@ def routes() -> list:
         web.post("/api/app/tickers", api_tickers),
         web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/chart", api_chart),
+        web.post("/api/app/chartpub", api_chartpub),
         web.post("/api/app/orderflow", api_orderflow),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
