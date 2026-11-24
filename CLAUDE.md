@@ -8572,3 +8572,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 427. Yangi indikatorlar: Supertrend, Ichimoku, Pivot Points, ATR, Stochastic, OBV
 - «ƒx» katalogiga: **Supertrend** (ATR davri, ko'paytiruvchi; chiziq rangi trend bo'yicha — LWC nuqta `color`), **Ichimoku** (Tenkan, Kijun, Senkou A/B — Kijun davriga kelajakka surilgan, shuning uchun vaqt shkalasi o'ngga uzayadi), **Pivot Points** (klassik P, R1–R3, S1–S3; kunlik/haftalik/oylik — oldingi davr H/L/C dan, davr chegarasida uziladi; grafik shkalasiga ta'sir qilmaydi — `autoscaleInfoProvider` null), **ATR** (Wilder), **Stochastic** (%K silliqlash, %D, 80/20), **OBV**. Umumiy `iAtr`.
+
+## 428. Chizmalar uchun Undo/Redo
+- `drSave` har saqlashda oldingi holatni (`LW.dprev`, JSON) umumiy `g.uh` tarixiga qo'shadi (`{dr, k: tanga}`, ≤50) va ↷ (`g.rh`) ni tozalaydi; `drSave(true)` — tarixsiz (tiklash). `lwUndo`: `dr` yozuvi bo'lsa chizmalar tiklanadi (joriy holat `g.rh` ga), aks holda eski TF/ko'rinish orqaga. `lwRedo` + ↷ tugmasi (`data-r`, faqat redo bo'lsa ko'rinadi). Klaviatura: Ctrl/⌘+Z, Ctrl/⌘+Y yoki Ctrl/⌘+Shift+Z. Boshqa tangaga tegishli yozuv o'tkazib yuboriladi.
