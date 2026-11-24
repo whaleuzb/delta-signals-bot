@@ -8588,3 +8588,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 432. Boshqa tanga bilan solishtirish
 - «ƒx» → **Compare**: sozlamada tanga (masalan ETH). Uning shamlari `dfcandles` (shu TF) bilan olinadi (`cmpNeed`, 500 ms debounce — yozish paytida har harfga so'rov ketmaydi; topilmasa xabar), yopilish narxi birinchi umumiy shamda asosiy narxga tenglashtiriladi — ikkala tanganing foiz o'zgarishi bir masshtabda ko'rinadi. O'qda tanga nomi bilan yorliq. Kesh `LW.cmpD[sym|tf]`.
+
+## 433. Seans hajm profili (Session Volume Profile)
+- «ƒx» → **Session Volume Profile**: ko'rinayotgan har kun (yoki hafta) uchun alohida profil, shu kunning shamlari oralig'ida chapdan (`svpSvg` → mavjud `frVP` + `vpSvg`, POC, qiymat zonasi %). Sozlama: davr (kun/hafta), qatorlar, kenglik %, VA %, ranglar, shaffoflik, POC. Chizmalar SVG qatlamida (`drDraw` boshida) chiziladi; `drDraw` imzosi endi `LW.indKey` ni hisobga oladi. Ko'pi bilan 40 seans.

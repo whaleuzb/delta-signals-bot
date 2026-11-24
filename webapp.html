@@ -1419,6 +1419,12 @@ function vpCalc(S0,o,key){LW.vpk=LW.vpk||{};if(LW.vpk[key])return LW.vpk[key];if
 function vpOpts(S2){return{lay:S2.lay,rs:S2.rs,va:S2.va,dev:!!(S2.dpoc||S2.dva)}}
 function vpKey(a,b,S2){var C=LW.rc||[];return a+'|'+b+'|'+C.length+'|'+(C.length?C[0][0]:0)+'|'+LW.rlast+'|'+[S2.lay,S2.rs,S2.va,S2.dpoc||S2.dva?1:0].join(',')}
 function drVP(t,S2){var C=LW.rc||[];return vpCalc(C.filter(function(x){return x[0]/1000>=t-1}),vpOpts(S2),vpKey(t,'*',S2))}
+ /* 433: seans hajm profili — ko'rinayotgan har kun/hafta uchun alohida profil (sham oralig'ida chapdan), POC va qiymat zonasi bilan */
+function svpSvg(P){var x=indList().filter(function(z){return z.on&&z.t=='svp'})[0];if(!x||!LW.rt||!LW.rt.length||!LW.ch)return'';var p=x.p||{},R=LW.rt,vr=LW.ch.timeScale().getVisibleLogicalRange();if(!vr)return'';
+ var a=Math.max(0,Math.floor(vr.from)),b=Math.min(R.length-1,Math.ceil(vr.to));if(b<a)return'';var S2=vpDef({c:'#ffc83d',rs:+p.rs||24,wp:+p.wp||70,va:+p.va||70,up:p.up,dn:p.dn,op:+p.op||.3,pl:'l',poc:p.poc?1:0,lbl:0,vals:0,box:0});
+ var key=function(t){return p.tf=='w'?Math.floor((t/86400+3)/7):Math.floor(t/86400)},G=[],cur=null;for(var i=a;i<=b;i++){var k=key(R[i]);if(!cur||cur.k!==k){cur={k:k,a:R[i],b:R[i]};G.push(cur)}else cur.b=R[i]}
+ if(G.length>40)G=G.slice(-40);var bw=Math.max(1,(drX(R[Math.min(b,a+1)])||0)-(drX(R[a])||0)),o='';
+ G.forEach(function(q){var x1=drX(q.a),x2=drX(q.b);if(x1==null||x2==null)return;x2+=bw*.8;var F=frVP(q.a,q.b,S2);if(!F.B||!F.B.length)return;o+=vpSvg(F,x1,x2,Math.max(4,(x2-x1)*S2.wp/100),S2,P)});return o}
 function frVP(t1,t2,S2){var C=LW.rc||[];return vpCalc(C.filter(function(x){var t=x[0]/1000;return t>=t1-1&&t<=t2+1}),vpOpts(S2),vpKey(t1,t2,S2))}
 /* profilni chizish: x0..xR hudud, mw — eng uzun ustun, pl 'r' (o'ngdan) / 'l' (chapdan) */
 function vpSvg(V,x0,xR,mw,S2,P){var se=LW.se,o='',rt=S2.pl!='l';if(!V.B.length)return'';
@@ -1646,11 +1652,11 @@ var INDC={ema:{n:'EMA',ov:1,p:{len:20,c:'#ffc83d',w:1.5}},sma:{n:'SMA',ov:1,p:{l
  macd:{n:'MACD',ov:0,p:{fast:12,slow:26,sig:9,c:'#4da3ff',c2:'#ff8a3d',up:'#c2f23a',dn:'#ff5c5c'}},cvd:{n:'CVD',ov:0,p:{c:'#4da3ff',w:1.4,rs:0}},
  st:{n:'Supertrend',ov:1,p:{len:10,mult:3,up:'#c2f23a',dn:'#ff5c5c',w:2}},ich:{n:'Ichimoku',ov:1,p:{tk:9,kj:26,sb:52,c:'#4da3ff',c2:'#ff5c5c',up:'#c2f23a',dn:'#ff8a3d'}},
  piv:{n:'Pivot Points',ov:1,p:{tf:'d',c:'#ffc83d',w:1}},atr:{n:'ATR',ov:0,p:{len:14,c:'#ff8a3d',w:1.4}},sto:{n:'Stochastic',ov:0,p:{len:14,k:3,d:3,c:'#4da3ff',c2:'#ff8a3d',ob:80,os:20}},
- obv:{n:'OBV',ov:0,p:{c:'#b48cff',w:1.4}},cmp:{n:'Compare',ov:1,p:{sym:'ETH',c:'#ff8a3d',w:1.5}},afib:{n:'Auto Fib',ov:1,p:{dep:100,c:'#b48cff'}},atl:{n:'Auto Trend',ov:1,p:{dep:5,up:'#c2f23a',dn:'#ff5c5c',w:1.5}},
+ obv:{n:'OBV',ov:0,p:{c:'#b48cff',w:1.4}},svp:{n:'Session Volume Profile',ov:1,p:{tf:'d',rs:24,wp:70,va:70,up:'#c2f23a',dn:'#ff5c5c',op:.3,poc:1}},cmp:{n:'Compare',ov:1,p:{sym:'ETH',c:'#ff8a3d',w:1.5}},afib:{n:'Auto Fib',ov:1,p:{dep:100,c:'#b48cff'}},atl:{n:'Auto Trend',ov:1,p:{dep:5,up:'#c2f23a',dn:'#ff5c5c',w:1.5}},
  oi:{n:'Open Interest',ov:0,p:{c:'#ffc83d',w:1.4},of:1},ls:{n:'Long/Short',ov:0,p:{c:'#b48cff',w:1.4},of:1},fund:{n:'Funding',ov:0,p:{up:'#c2f23a',dn:'#ff5c5c'},of:1},vd:{n:'Volume Delta',ov:0,p:{up:'#c2f23a',dn:'#ff5c5c',op:.55}}};
 var INDF={ema:[['len','int'],['c','c'],['w','w']],sma:[['len','int'],['c','c'],['w','w']],vwap:[['c','c'],['w','w']],bb:[['len','int'],['mult','num'],['c','c'],['w','w']],
  rsi:[['len','int'],['ob','int'],['os','int'],['c','c'],['w','w']],cvd:[['rs','ck'],['c','c'],['w','w']],st:[['len','int'],['mult','num'],['up','c'],['dn','c'],['w','w']],ich:[['tk','int'],['kj','int'],['sb','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],
- piv:[['tf','sel',[['d','pv_d'],['w','pv_w'],['m','pv_m']]],['c','c'],['w','w']],atr:[['len','int'],['c','c'],['w','w']],sto:[['len','int'],['k','int'],['d','int'],['ob','int'],['os','int'],['c','c'],['c2','c']],obv:[['c','c'],['w','w']],cmp:[['sym','txt'],['c','c'],['w','w']],afib:[['dep','int'],['c','c']],atl:[['dep','int'],['up','c'],['dn','c'],['w','w']],oi:[['c','c'],['w','w']],ls:[['c','c'],['w','w']],fund:[['up','c'],['dn','c']],macd:[['fast','int'],['slow','int'],['sig','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],vd:[['up','c'],['dn','c'],['op','rg',.1,1,.05]]};
+ piv:[['tf','sel',[['d','pv_d'],['w','pv_w'],['m','pv_m']]],['c','c'],['w','w']],atr:[['len','int'],['c','c'],['w','w']],sto:[['len','int'],['k','int'],['d','int'],['ob','int'],['os','int'],['c','c'],['c2','c']],obv:[['c','c'],['w','w']],svp:[['tf','sel',[['d','pv_d'],['w','pv_w']]],['rs','int'],['wp','rg',20,100,5],['va','int'],['up','c'],['dn','c'],['op','rg',.05,1,.05],['poc','ck']],cmp:[['sym','txt'],['c','c'],['w','w']],afib:[['dep','int'],['c','c']],atl:[['dep','int'],['up','c'],['dn','c'],['w','w']],oi:[['c','c'],['w','w']],ls:[['c','c'],['w','w']],fund:[['up','c'],['dn','c']],macd:[['fast','int'],['slow','int'],['sig','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],vd:[['up','c'],['dn','c'],['op','rg',.1,1,.05]]};
 function indDefP(t){return JSON.parse(JSON.stringify(INDC[t].p))}
 function indList(){var L=null;try{L=JSON.parse(localStorage.getItem('tc_inds')||'null')}catch(e){}if(Array.isArray(L))return L;
  var old={};try{old=(JSON.parse(localStorage.getItem('tc_ind')||'{}')||{}).vd||{}}catch(e){}var p=indDefP('vd');for(var k in old)p[k]=old[k];
@@ -1670,7 +1676,7 @@ function csLoad(){if(Date.now()-CSL<60000)return;CSL=Date.now();api('chart',{op:
  var L=Object.keys(drAll()).map(function(x){return'dr:'+x}).concat(['tpl','tpd','inds','cs']);
  L.forEach(function(k){var lv=csLocal(k);if(lv==null)return;if(!V[k]||(st[k]||0)>V[k][1])csPush(k,lv,st[k]||Date.now())});
  if(ch&&LW.ch){LW.cst=null;LW.dk='';if(LW.g)lwData(LW.g);LW.drk=null;LW.dsig='';LW.dv=(LW.dv||0)+1;indApply(true);lwVdRefresh();indLayout();indChip()}}).catch(function(){CSL=0})}
-function indName(x){var p=x.p||{};if(x.t=='cmp')return'⇄ '+String(p.sym||'').toUpperCase();if(x.t=='st')return'Supertrend '+p.len+' '+p.mult;if(x.t=='atr')return'ATR '+p.len;if(x.t=='sto')return'Stoch '+p.len+' '+p.k+' '+p.d;if(x.t=='ich')return'Ichimoku '+p.tk+' '+p.kj+' '+p.sb;if(x.t=='piv')return'Pivot ('+({d:'D',w:'W',m:'M'}[p.tf]||'D')+')';return INDC[x.t].n+(x.t=='ema'||x.t=='sma'||x.t=='rsi'?' '+p.len:x.t=='bb'?' '+p.len+', '+p.mult:x.t=='macd'?' '+p.fast+' '+p.slow+' '+p.sig:'')}
+function indName(x){var p=x.p||{};if(x.t=='svp')return'Session VP ('+(p.tf=='w'?'W':'D')+')';if(x.t=='cmp')return'⇄ '+String(p.sym||'').toUpperCase();if(x.t=='st')return'Supertrend '+p.len+' '+p.mult;if(x.t=='atr')return'ATR '+p.len;if(x.t=='sto')return'Stoch '+p.len+' '+p.k+' '+p.d;if(x.t=='ich')return'Ichimoku '+p.tk+' '+p.kj+' '+p.sb;if(x.t=='piv')return'Pivot ('+({d:'D',w:'W',m:'M'}[p.tf]||'D')+')';return INDC[x.t].n+(x.t=='ema'||x.t=='sma'||x.t=='rsi'?' '+p.len:x.t=='bb'?' '+p.len+', '+p.mult:x.t=='macd'?' '+p.fast+' '+p.slow+' '+p.sig:'')}
 /* hisob */
 function iEma(a,n){var o=new Array(a.length).fill(null),k=2/(n+1),s=0,c=0,v=null;for(var i=0;i<a.length;i++){if(a[i]==null)continue;if(v==null){s+=a[i];c++;if(c==n){v=s/n;o[i]=v}}else{v=a[i]*k+v*(1-k);o[i]=v}}return o}
 function iSma(a,n){var o=new Array(a.length).fill(null),s=0;for(var i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n}return o}
@@ -1816,9 +1822,9 @@ function drLock(id){var d=drGet().filter(function(x){return x.id==id})[0];if(!d)
 function drClone(id){var d=drGet().filter(function(x){return x.id==id})[0];if(!d)return;var c=JSON.parse(JSON.stringify(d)),sh=5*drSec();c.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);delete c.lk;
  c.a.t+=sh;if(c.b)c.b.t+=sh;if(c.t2)c.t2+=sh;LW.D.push(c);LW.sel=c.id;drSave();drTb()}
 function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var D=drGet(),P=drPlot(),vr=LW.ch.timeScale().getVisibleLogicalRange(),rp=LW.rlast||1;
- var sig=[LW.g&&LW.g.tf,(function(){try{return localStorage.getItem('tc_ind')||''}catch(e){return''}})(),P.w,P.h,vr?vr.from.toFixed(3)+','+vr.to.toFixed(3):'',LW.se.priceToCoordinate(rp),LW.se.priceToCoordinate(rp*1.01),LW.dv,LW.sel,LW.dd?JSON.stringify(LW.dd):'',LW.rt.length,rp].join('|');
+ var sig=[LW.g&&LW.g.tf,LW.indKey||'',P.w,P.h,vr?vr.from.toFixed(3)+','+vr.to.toFixed(3):'',LW.se.priceToCoordinate(rp),LW.se.priceToCoordinate(rp*1.01),LW.dv,LW.sel,LW.dd?JSON.stringify(LW.dd):'',LW.rt.length,rp].join('|');
  if(sig===LW.dsig)return;LW.dsig=sig;sv.setAttribute('width',P.w);sv.setAttribute('height',P.h);sv.style.width=P.w+'px';sv.style.height=P.h+'px';
- LW.selH=null;var o='';D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);sv.innerHTML=o;drMt(P)}
+ LW.selH=null;var o=svpSvg(P);D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);sv.innerHTML=o;drMt(P)}
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('[data-g]'),function(x){var n=x.getAttribute('data-g'),G=DRG.filter(function(q){return q[0]==n})[0];if(!G)return;var k=drgCur(n);x.classList.toggle('on',G[1].indexOf(g.tool)>=0);if(x.getAttribute('data-k')!==k){x.setAttribute('data-k',k);x.innerHTML=DRI[k]}});[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}if(k=='mc')return;
   if(k=='vd'||k=='ind'||k=='ct')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
