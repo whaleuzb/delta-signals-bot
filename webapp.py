@@ -307,7 +307,7 @@ async def api_orderflow(request):
     return web.json_response({"d": d}, headers=NO_CACHE)
 
 
-_CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds)$")
+_CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds|cs)$")
 
 
 async def api_chart(request):

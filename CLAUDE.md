@@ -8575,3 +8575,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 428. Chizmalar uchun Undo/Redo
 - `drSave` har saqlashda oldingi holatni (`LW.dprev`, JSON) umumiy `g.uh` tarixiga qo'shadi (`{dr, k: tanga}`, ≤50) va ↷ (`g.rh`) ni tozalaydi; `drSave(true)` — tarixsiz (tiklash). `lwUndo`: `dr` yozuvi bo'lsa chizmalar tiklanadi (joriy holat `g.rh` ga), aks holda eski TF/ko'rinish orqaga. `lwRedo` + ↷ tugmasi (`data-r`, faqat redo bo'lsa ko'rinadi). Klaviatura: Ctrl/⌘+Z, Ctrl/⌘+Y yoki Ctrl/⌘+Shift+Z. Boshqa tangaga tegishli yozuv o'tkazib yuboriladi.
+
+## 429. Grafik sozlamalari (⚙)
+- Tepadagi amallar qatorida ⚙ (`chSet`; tor ekranda «⋯» ichida): **Shamlar** — o'sish/tushish rangi, piliklar, ramka, oxirgi narx chizig'i; **Ko'rinish** — fon (standart/qora/ko'k-qora/yashil-qora), panjara, kursor (oddiy/magnit); **Vaqt mintaqasi** — qurilma, UTC, UTC+5 Toshkent, +3, +8, −5 (`lwD` — `lwTimeFmt/lwTickFmt` shu orqali). «Standart» — `CSD`.
+- Saqlash `localStorage tc_cs` (kesh `CSC`), server sinxroni kaliti `cs` (`_CH_KEY` ga qo'shildi). Qo'llash: `ctApply` grafik turi qayta qurilganda (`LW.cst=null`) `chOpts` + sham ranglari; bar/chiziq/area ham o'sish rangini oladi.
