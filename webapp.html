@@ -348,6 +348,9 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 #lwset .stp{border-top:1px solid rgba(255,255,255,.08);margin-top:8px;padding-top:8px;max-height:34vh;overflow-y:auto}#lwset .tpa{display:flex;gap:6px;margin-bottom:6px}#lwset .tpa .nm{flex:1;width:auto}#lwset .tpa .btn{margin:0;padding:7px 12px;font-size:13px;width:auto}
 #lwset .tpr{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.04)}#lwset .tpn{flex:1;cursor:pointer;font-weight:700;font-size:13px}#lwset .tps,#lwset .tpx{cursor:pointer;padding:2px 6px;color:rgba(232,236,223,.4)}#lwset .tps.on{color:#ffc83d}
 #lwset .tph{font-size:11.5px;color:rgba(232,236,223,.5);padding:6px 2px}
+#lwset .ich{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px;border-bottom:1px solid rgba(255,255,255,.06)}#lwset .ich span{padding:6px 10px;border-radius:8px;background:rgba(194,242,58,.1);color:#c2f23a;font-size:12.5px;font-weight:700;cursor:pointer}
+#lwset .ir{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}#lwset .ir b{flex:1;font-size:13.5px}#lwset .ia{cursor:pointer;color:rgba(232,236,223,.55);padding:2px 5px;display:flex}#lwset .ia svg{width:16px;height:16px}
+#lwset .ip{padding:2px 0 6px 12px;border-left:2px solid rgba(194,242,58,.3);margin:2px 0 6px}
 #lwset .sft{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}#lwset .sft .btn{margin:0;padding:10px 10px;font-size:13.5px;width:auto;flex:1 1 auto;white-space:nowrap}#lwset .sft{flex-wrap:wrap}
 .lwc{position:absolute;inset:0;z-index:5;touch-action:none;cursor:crosshair;display:none}
 .lwbl{position:absolute;left:8px;z-index:4;width:20px;height:20px;border-radius:6px;opacity:.9;pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
@@ -1249,7 +1252,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
   var ch=LightweightCharts.createChart(el,{autoSize:true,
    layout:{attributionLogo:false,background:{type:'solid',color:'rgba(0,0,0,0)'},textColor:'rgba(200,205,194,.62)',fontSize:10,fontFamily:'-apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif'},
    grid:{vertLines:{color:'rgba(255,255,255,.035)'},horzLines:{color:'rgba(255,255,255,.035)'}},
-   rightPriceScale:{borderColor:'rgba(255,255,255,.08)',scaleMargins:{top:.1,bottom:lwVdOn()?.22:.08}},
+   rightPriceScale:{borderColor:'rgba(255,255,255,.08)',scaleMargins:{top:.1,bottom:.08}},
    timeScale:{borderColor:'rgba(255,255,255,.08)',timeVisible:true,rightOffset:6,barSpacing:7,minBarSpacing:1.5},
    crosshair:{mode:0,vertLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'},horzLine:{color:'rgba(255,255,255,.22)',labelBackgroundColor:'#1d2116'}},
    localization:{locale:'en-US',timeFormatter:lwTimeFmt}});
@@ -1265,7 +1268,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
   var ct=document.createElement('div');ct.className='lwct';var bl=document.createElement('img');bl.className='lwbl';bl.src='/blogo.png';bl.alt='';bl.onerror=function(){bl.remove()};el.appendChild(bl);
   ct.innerHTML='<span class="lwrt" onclick="lwRt()" title="realtime">»</span><span class="lwfb" onclick="lwFs(!LW.fs)">'+FSI.in+'</span>';el.appendChild(ct);
   ch.subscribeCrosshairMove(function(pr){lwLeg(pr)});
-  LW={bl:bl,ct:ct,vd:vd,el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};
+  LW={indSer:[],indKey:null,bl:bl,ct:ct,vd:vd,el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};
   ov.addEventListener('pointerdown',lwDown);drInit();
   ov.addEventListener('click',function(e){var x=e.target.closest&&e.target.closest('[data-x]');if(x){e.stopPropagation();(g.df?dfLineX:cxLineX)(x.getAttribute('data-x'))}});
   ch.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(r&&LW.g===g&&!LW.busy&&LW.n){
@@ -1284,8 +1287,8 @@ function lwData(g){var c=g.c||[],se=LW.se;if(!se)return;var i=termItem();
   se.applyOptions({priceFormat:{type:'price',precision:lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)),minMove:Math.pow(10,-lwPrec(rows.length?rows[rows.length-1].close:+((i&&i.entry)||1)))}});
   /* ko'rinish o'ng chetga nisbatan saqlanadi (yangi sham kelsa — grafik u bilan birga suriladi) */
   LW.busy=1;LW.qu=Date.now()+900;se.setData(rows);var n=rows.length;LW.n=n;if(nk&&g.vrKeep){g.vr=g.vrKeep;g.vrKeep=null}else if(nk||!g.vr)g.vr={span:76,right:-6};
-  lwVdSet(c,rows,true);lwView(g);LW.busy=0;if(!LW.sized){LW.sized=1;setTimeout(function(){if(LW.g===g)lwView(g)},60);setTimeout(function(){if(LW.g===g)lwView(g)},400)}}
- else if(rows.length){se.update(rows[rows.length-1]);lwVdSet(c,rows,false)}
+  lwVdSet(c,rows,true);indApply(true,c,rows);lwView(g);LW.busy=0;if(!LW.sized){LW.sized=1;setTimeout(function(){if(LW.g===g)lwView(g)},60);setTimeout(function(){if(LW.g===g)lwView(g)},400)}}
+ else if(rows.length){se.update(rows[rows.length-1]);lwVdSet(c,rows,false);indApply(false,c,rows)}
  /* belgilar: xarid ▲ (oq, ostida), sotuv ▼ (sariq, ustida) — sham vaqtiga */
  var M=[];if(i&&c.length&&!g.view)termMarks(i).forEach(function(m){var k=-1;for(var j=c.length-1;j>=0;j--)if(c[j][0]<=m.t){k=j;break}if(k<0)return;
   M.push({time:rows[k].time,position:m.buy?'belowBar':'aboveBar',color:m.buy?'#ffffff':'#ffc83d',shape:m.buy?'arrowUp':'arrowDown',size:.8})});
@@ -1304,7 +1307,7 @@ var DRI={tl:'<svg viewBox="0 0 16 16"><path d="M3 13L13 3"/><circle cx="3" cy="1
  sp:'<svg viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="5.5" rx=".8" stroke="#ff5c5c"/><rect x="2" y="8" width="12" height="5.5" rx=".8" stroke="#c2f23a"/><path d="M8 9.5v2.7M6.6 10.8 8 12.2l1.4-1.4"/></svg>',
  del:'<svg viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg>'};
 function drBar(g,fs){var s='';['tl','hl','rc','fb','vp','fr','lp','sp'].forEach(function(k){s+='<span class="chip glass'+(g.tool==k?' on':'')+'" data-t="'+k+'" onclick="drTool(\''+k+'\')">'+DRI[k]+'</span>'});
- s+='<span class="chip glass'+(lwVdOn()?' on':'')+'" data-t="vd" onclick="lwVdTog()"><b>VΔ</b></span><span class="chip glass" onclick="indSet()" title="indicators">'+MTI.set+'</span>';
+ s+='<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="indicators"><b style="font-style:italic;font-family:Georgia,serif;font-size:14px">ƒx</b></span>';
  var u='<span data-u="1" class="chip glass lwun" onclick="lwUndo()" style="font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span>',d='<span class="chip glass lwdl" data-t="del" onclick="drDel()">'+DRI.del+'</span>';
  if(fs)return'<div class="lwtb fsl">'+s+u+d+'<span class="chip glass" style="margin-top:auto" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="chip glass" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="chip glass" onclick="lwFs(false)">'+FSI.out+'</span></div>';
  return'<div class="chips lwtb" id="lwtb">'+s+u+d+'</div>'}
@@ -1455,16 +1458,13 @@ function drOne(d,P,dr){var se=LW.se,S2=drS(d),c=S2.c||DRC[d.k]||'#fff',sel=!dr&&
  if(sel){LW.selH=H;if(!d.lk)H.forEach(function(h){o+='<circle class="drp" data-id="'+d.id+'" data-h="'+h[0]+'" cx="'+drN(h[1])+'" cy="'+drN(h[2])+'" r="7" fill="#0b0b0c" stroke="'+(c.charAt(0)=='#'?c:'#e8ecdf')+'" stroke-width="2"/>'})}
  return o}
 /* 405: indikator sozlamalari (localStorage tc_ind) — VP (ko'rinayotgan oraliq) va VΔ */
-var INDDEF={vp:{n:0,wp:30,va:70,up:'#c2f23a',dn:'#ff5c5c',poc:1},vd:{up:'#c2f23a',dn:'#ff5c5c',op:.55}};
-function indS(){var r={},s={};try{s=JSON.parse(localStorage.getItem('tc_ind')||'{}')||{}}catch(e){}for(var k in INDDEF){r[k]={};for(var q in INDDEF[k])r[k][q]=INDDEF[k][q];for(q in s[k]||{})r[k][q]=s[k][q]}return r}
-function indSave(I){try{localStorage.setItem('tc_ind',JSON.stringify(I))}catch(e){}}
 function hexA(h,a){h=String(h||'#ffffff').replace('#','');if(h.length==3)h=h.split('').map(function(x){return x+x}).join('');var n=parseInt(h,16);return'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')'}
 /* sozlamalar matnlari */
-var STL={uz:{tpl:'Shablon',tpl_name:'Shablon nomi',tpl_save:'Saqlash',tpl_def:'Standart (yangi chizmalarga)',tpl_none:'Hali shablon yo\'q — joriy uslubni nom berib saqlang',tln:'Trend chizig\'i',lvl:'Daraja chiziqlari',ext:'Cho\'zish',ex_n:'Cho\'zmaslik',ex_l:'Chapga',ex_r:'O\'ngga',ex_b:'Ikki tomonga',one:'Bitta rang',bg:'Fon',rev:'Teskari',prc:'Narxlar',lvs:'Darajalar',lvm_v:'Qiymat',lvm_p:'Foiz',lbp:'Yorliqlar',txp:'Matn joyi',pos_c:'O\'rtada',pos_t:'Tepada',pos_m:'O\'rtada',pos_b:'Pastda',inputs:'Kirish',text:'Matn',lay:'Qatorlar tartibi',lay_n:'Qatorlar soni',lay_tk:'Tik',rs:'Qator o\'lchami',vt:'Hajm',vt_ud:'Up/Down',vt_tot:'Jami',vt_dl:'Delta',sh:'Volume profile',vals:'Qiymatlar',pl_r:'O\'ngda',pl_l:'Chapda',vau:'Qiymat hududi (xarid)',vad:'Qiymat hududi (sotuv)',vop:'Qiymat hududi shaffofligi',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Rivojlanuvchi POC',dva:'Rivojlanuvchi VA',box:'Gistogramma qutisi',lbl:'Narx shkalasida yorliqlar',tx:'Matn',txc:'Matn rangi',txs:'Shrift o\'lchami',bar:'bar',acc:'Hisob hajmi ($)',rk:'Risk (%)',u_m:'Daqiqalar',u_h:'Soatlar',u_d:'Kunlar',u_w:'Haftalar',u_M:'Oylar',set:'Sozlamalar',style:'Uslub',coords:'Koordinatalar',vis:'Ko\'rinish',op:'Hajm shaffofligi',c:'Rang',w:'Qalinlik',ls:'Chiziq turi',el:'Chapga cho\'zish',er:'O\'ngga cho\'zish',lb:'Yorliqlar',fo:'To\'ldirish',lv:'Darajalar',n:'Qatorlar soni',auto:'avto',wp:'Eni (%)',va:'Qiymat hududi (%)',up:'Xarid hajmi',dn:'Sotuv hajmi',poc:'POC chizig\'i',vav:'VAH / VAL',op:'Shaffoflik',p1:'1-nuqta narxi',p2:'2-nuqta narxi',price:'Narx',entry:'Kirish',tp:'Take profit',sl:'Stop loss',cancel:'Bekor qilish',ok:'OK',ind:'Indikatorlar',lock:'Qulflash',unlock:'Qulfdan chiqarish',clone:'Nusxa',del:'O\'chirish',vpr:'Volume Profile (ko\'rinayotgan oraliq)',vd:'Volume Delta',reset:'Standart',
+var STL={uz:{ind_none:'Indikator yo\'q — yuqoridan qo\'shing',i_len:'Uzunlik',i_mult:'Ko\'paytiruvchi (σ)',i_c:'Rang',i_c2:'Signal rangi',i_w:'Qalinlik',i_ob:'Haddan ortiq sotib olingan',i_os:'Haddan ortiq sotilgan',i_fast:'Tez EMA',i_slow:'Sekin EMA',i_sig:'Signal',i_up:'O\'sish rangi',i_dn:'Tushish rangi',i_op:'Shaffoflik',tpl:'Shablon',tpl_name:'Shablon nomi',tpl_save:'Saqlash',tpl_def:'Standart (yangi chizmalarga)',tpl_none:'Hali shablon yo\'q — joriy uslubni nom berib saqlang',tln:'Trend chizig\'i',lvl:'Daraja chiziqlari',ext:'Cho\'zish',ex_n:'Cho\'zmaslik',ex_l:'Chapga',ex_r:'O\'ngga',ex_b:'Ikki tomonga',one:'Bitta rang',bg:'Fon',rev:'Teskari',prc:'Narxlar',lvs:'Darajalar',lvm_v:'Qiymat',lvm_p:'Foiz',lbp:'Yorliqlar',txp:'Matn joyi',pos_c:'O\'rtada',pos_t:'Tepada',pos_m:'O\'rtada',pos_b:'Pastda',inputs:'Kirish',text:'Matn',lay:'Qatorlar tartibi',lay_n:'Qatorlar soni',lay_tk:'Tik',rs:'Qator o\'lchami',vt:'Hajm',vt_ud:'Up/Down',vt_tot:'Jami',vt_dl:'Delta',sh:'Volume profile',vals:'Qiymatlar',pl_r:'O\'ngda',pl_l:'Chapda',vau:'Qiymat hududi (xarid)',vad:'Qiymat hududi (sotuv)',vop:'Qiymat hududi shaffofligi',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Rivojlanuvchi POC',dva:'Rivojlanuvchi VA',box:'Gistogramma qutisi',lbl:'Narx shkalasida yorliqlar',tx:'Matn',txc:'Matn rangi',txs:'Shrift o\'lchami',bar:'bar',acc:'Hisob hajmi ($)',rk:'Risk (%)',u_m:'Daqiqalar',u_h:'Soatlar',u_d:'Kunlar',u_w:'Haftalar',u_M:'Oylar',set:'Sozlamalar',style:'Uslub',coords:'Koordinatalar',vis:'Ko\'rinish',op:'Hajm shaffofligi',c:'Rang',w:'Qalinlik',ls:'Chiziq turi',el:'Chapga cho\'zish',er:'O\'ngga cho\'zish',lb:'Yorliqlar',fo:'To\'ldirish',lv:'Darajalar',n:'Qatorlar soni',auto:'avto',wp:'Eni (%)',va:'Qiymat hududi (%)',up:'Xarid hajmi',dn:'Sotuv hajmi',poc:'POC chizig\'i',vav:'VAH / VAL',op:'Shaffoflik',p1:'1-nuqta narxi',p2:'2-nuqta narxi',price:'Narx',entry:'Kirish',tp:'Take profit',sl:'Stop loss',cancel:'Bekor qilish',ok:'OK',ind:'Indikatorlar',lock:'Qulflash',unlock:'Qulfdan chiqarish',clone:'Nusxa',del:'O\'chirish',vpr:'Volume Profile (ko\'rinayotgan oraliq)',vd:'Volume Delta',reset:'Standart',
   tl:'Trend chizig\'i',hl:'Gorizontal chiziq',rc:'Blok',fb:'Fibonachchi',vp:'Anchored VP',fr:'Fixed Range VP',pl:'Profil o\'ng tomonda',lp:'Long pozitsiya',sp:'Short pozitsiya'},
- ru:{tpl:'Шаблон',tpl_name:'Имя шаблона',tpl_save:'Сохранить',tpl_def:'По умолчанию (для новых)',tpl_none:'Шаблонов пока нет — сохраните текущий стиль',tln:'Линия тренда',lvl:'Линии уровней',ext:'Продлить',ex_n:'Не продлевать',ex_l:'Влево',ex_r:'Вправо',ex_b:'В обе стороны',one:'Один цвет',bg:'Фон',rev:'Обратить',prc:'Цены',lvs:'Уровни',lvm_v:'Значения',lvm_p:'Проценты',lbp:'Метки',txp:'Положение текста',pos_c:'По центру',pos_t:'Сверху',pos_m:'Посередине',pos_b:'Снизу',inputs:'Аргументы',text:'Текст',lay:'Размещение строк',lay_n:'Число строк',lay_tk:'Тики',rs:'Размер строки',vt:'Объём',vt_ud:'Up/Down',vt_tot:'Всего',vt_dl:'Дельта',sh:'Профиль объёма',vals:'Значения',pl_r:'Справа',pl_l:'Слева',vau:'Зона стоимости (покупки)',vad:'Зона стоимости (продажи)',vop:'Прозрачность зоны стоимости',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Развивающийся POC',dva:'Развивающаяся VA',box:'Рамка гистограммы',lbl:'Метки на шкале цен',tx:'Текст',txc:'Цвет текста',txs:'Размер шрифта',bar:'бар',acc:'Размер счёта ($)',rk:'Риск (%)',u_m:'Минуты',u_h:'Часы',u_d:'Дни',u_w:'Недели',u_M:'Месяцы',set:'Настройки',style:'Стиль',coords:'Координаты',vis:'Вид',c:'Цвет',w:'Толщина',ls:'Тип линии',el:'Продлить влево',er:'Продлить вправо',lb:'Метки',fo:'Заливка',lv:'Уровни',n:'Число строк',auto:'авто',wp:'Ширина (%)',va:'Зона стоимости (%)',up:'Объём покупок',dn:'Объём продаж',poc:'Линия POC',vav:'VAH / VAL',op:'Прозрачность',p1:'Цена точки 1',p2:'Цена точки 2',price:'Цена',entry:'Вход',tp:'Тейк-профит',sl:'Стоп-лосс',cancel:'Отмена',ok:'OK',ind:'Индикаторы',lock:'Закрепить',unlock:'Открепить',clone:'Копия',del:'Удалить',vpr:'Volume Profile (видимый диапазон)',vd:'Volume Delta',reset:'По умолчанию',
+ ru:{ind_none:'Нет индикаторов — добавьте сверху',i_len:'Длина',i_mult:'Множитель (σ)',i_c:'Цвет',i_c2:'Цвет сигнала',i_w:'Толщина',i_ob:'Перекупленность',i_os:'Перепроданность',i_fast:'Быстрая EMA',i_slow:'Медленная EMA',i_sig:'Сигнал',i_up:'Цвет роста',i_dn:'Цвет падения',i_op:'Прозрачность',tpl:'Шаблон',tpl_name:'Имя шаблона',tpl_save:'Сохранить',tpl_def:'По умолчанию (для новых)',tpl_none:'Шаблонов пока нет — сохраните текущий стиль',tln:'Линия тренда',lvl:'Линии уровней',ext:'Продлить',ex_n:'Не продлевать',ex_l:'Влево',ex_r:'Вправо',ex_b:'В обе стороны',one:'Один цвет',bg:'Фон',rev:'Обратить',prc:'Цены',lvs:'Уровни',lvm_v:'Значения',lvm_p:'Проценты',lbp:'Метки',txp:'Положение текста',pos_c:'По центру',pos_t:'Сверху',pos_m:'Посередине',pos_b:'Снизу',inputs:'Аргументы',text:'Текст',lay:'Размещение строк',lay_n:'Число строк',lay_tk:'Тики',rs:'Размер строки',vt:'Объём',vt_ud:'Up/Down',vt_tot:'Всего',vt_dl:'Дельта',sh:'Профиль объёма',vals:'Значения',pl_r:'Справа',pl_l:'Слева',vau:'Зона стоимости (покупки)',vad:'Зона стоимости (продажи)',vop:'Прозрачность зоны стоимости',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Развивающийся POC',dva:'Развивающаяся VA',box:'Рамка гистограммы',lbl:'Метки на шкале цен',tx:'Текст',txc:'Цвет текста',txs:'Размер шрифта',bar:'бар',acc:'Размер счёта ($)',rk:'Риск (%)',u_m:'Минуты',u_h:'Часы',u_d:'Дни',u_w:'Недели',u_M:'Месяцы',set:'Настройки',style:'Стиль',coords:'Координаты',vis:'Вид',c:'Цвет',w:'Толщина',ls:'Тип линии',el:'Продлить влево',er:'Продлить вправо',lb:'Метки',fo:'Заливка',lv:'Уровни',n:'Число строк',auto:'авто',wp:'Ширина (%)',va:'Зона стоимости (%)',up:'Объём покупок',dn:'Объём продаж',poc:'Линия POC',vav:'VAH / VAL',op:'Прозрачность',p1:'Цена точки 1',p2:'Цена точки 2',price:'Цена',entry:'Вход',tp:'Тейк-профит',sl:'Стоп-лосс',cancel:'Отмена',ok:'OK',ind:'Индикаторы',lock:'Закрепить',unlock:'Открепить',clone:'Копия',del:'Удалить',vpr:'Volume Profile (видимый диапазон)',vd:'Volume Delta',reset:'По умолчанию',
   tl:'Линия тренда',hl:'Горизонтальная линия',rc:'Прямоугольник',fb:'Фибоначчи',vp:'Anchored VP',fr:'Fixed Range VP',pl:'Профиль справа',lp:'Длинная позиция',sp:'Короткая позиция'},
- en:{tpl:'Template',tpl_name:'Template name',tpl_save:'Save',tpl_def:'Default (for new drawings)',tpl_none:'No templates yet — save the current style',tln:'Trend line',lvl:'Levels line',ext:'Extend',ex_n:'Don\'t extend',ex_l:'Left',ex_r:'Right',ex_b:'Both',one:'Use one color',bg:'Background',rev:'Reverse',prc:'Prices',lvs:'Levels',lvm_v:'Values',lvm_p:'Percents',lbp:'Labels',txp:'Text position',pos_c:'Center',pos_t:'Top',pos_m:'Middle',pos_b:'Bottom',inputs:'Inputs',text:'Text',lay:'Rows layout',lay_n:'Number of rows',lay_tk:'Ticks per row',rs:'Row size',vt:'Volume',vt_ud:'Up/Down',vt_tot:'Total',vt_dl:'Delta',sh:'Volume profile',vals:'Values',pl_r:'Right',pl_l:'Left',vau:'Value area up',vad:'Value area down',vop:'Value area opacity',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Developing POC',dva:'Developing VA',box:'Histogram box',lbl:'Labels on price scale',tx:'Text',txc:'Text color',txs:'Font size',bar:'bar',acc:'Account size ($)',rk:'Risk (%)',u_m:'Minutes',u_h:'Hours',u_d:'Days',u_w:'Weeks',u_M:'Months',set:'Settings',style:'Style',coords:'Coordinates',vis:'Visibility',c:'Color',w:'Width',ls:'Line style',el:'Extend left',er:'Extend right',lb:'Labels',fo:'Fill',lv:'Levels',n:'Row count',auto:'auto',wp:'Width (%)',va:'Value area (%)',up:'Up volume',dn:'Down volume',poc:'POC line',vav:'VAH / VAL',op:'Opacity',p1:'Point 1 price',p2:'Point 2 price',price:'Price',entry:'Entry',tp:'Take profit',sl:'Stop loss',cancel:'Cancel',ok:'Ok',ind:'Indicators',lock:'Lock',unlock:'Unlock',clone:'Clone',del:'Delete',vpr:'Volume Profile (visible range)',vd:'Volume Delta',reset:'Default',
+ en:{ind_none:'No indicators — add one above',i_len:'Length',i_mult:'StdDev multiplier',i_c:'Color',i_c2:'Signal color',i_w:'Width',i_ob:'Overbought',i_os:'Oversold',i_fast:'Fast EMA',i_slow:'Slow EMA',i_sig:'Signal',i_up:'Up color',i_dn:'Down color',i_op:'Opacity',tpl:'Template',tpl_name:'Template name',tpl_save:'Save',tpl_def:'Default (for new drawings)',tpl_none:'No templates yet — save the current style',tln:'Trend line',lvl:'Levels line',ext:'Extend',ex_n:'Don\'t extend',ex_l:'Left',ex_r:'Right',ex_b:'Both',one:'Use one color',bg:'Background',rev:'Reverse',prc:'Prices',lvs:'Levels',lvm_v:'Values',lvm_p:'Percents',lbp:'Labels',txp:'Text position',pos_c:'Center',pos_t:'Top',pos_m:'Middle',pos_b:'Bottom',inputs:'Inputs',text:'Text',lay:'Rows layout',lay_n:'Number of rows',lay_tk:'Ticks per row',rs:'Row size',vt:'Volume',vt_ud:'Up/Down',vt_tot:'Total',vt_dl:'Delta',sh:'Volume profile',vals:'Values',pl_r:'Right',pl_l:'Left',vau:'Value area up',vad:'Value area down',vop:'Value area opacity',vah:'VAH',val:'VAL',pocc:'POC',dpoc:'Developing POC',dva:'Developing VA',box:'Histogram box',lbl:'Labels on price scale',tx:'Text',txc:'Text color',txs:'Font size',bar:'bar',acc:'Account size ($)',rk:'Risk (%)',u_m:'Minutes',u_h:'Hours',u_d:'Days',u_w:'Weeks',u_M:'Months',set:'Settings',style:'Style',coords:'Coordinates',vis:'Visibility',c:'Color',w:'Width',ls:'Line style',el:'Extend left',er:'Extend right',lb:'Labels',fo:'Fill',lv:'Levels',n:'Row count',auto:'auto',wp:'Width (%)',va:'Value area (%)',up:'Up volume',dn:'Down volume',poc:'POC line',vav:'VAH / VAL',op:'Opacity',p1:'Point 1 price',p2:'Point 2 price',price:'Price',entry:'Entry',tp:'Take profit',sl:'Stop loss',cancel:'Cancel',ok:'Ok',ind:'Indicators',lock:'Lock',unlock:'Unlock',clone:'Clone',del:'Delete',vpr:'Volume Profile (visible range)',vd:'Volume Delta',reset:'Default',
   tl:'Trend line',hl:'Horizontal line',rc:'Rectangle',fb:'Fib retracement',vp:'Anchored VP',fr:'Fixed Range VP',pl:'Profile on the right',lp:'Long position',sp:'Short position'}};
 function stl(k){var L=STL[S.lang]||STL.uz;return L[k]||STL.uz[k]||k}
 var PAL=['#c2f23a','#ffc83d','#ff8a3d','#ff5c5c','#ff5ca8','#b48cff','#4da3ff','#2ed3b7','#e8ecdf','#9aa0a6'];
@@ -1517,7 +1517,7 @@ function tplDel(n){var a=tplAll(),d=tplDef(),k=SET.tp.k;if(a[k])delete a[k][n];i
 function setReset(){if(!SET||!SET.reset)return;SET.reset(SET.W);SET.ap(SET.W);setDraw()}
 function setGet(o,p){return p.split('.').reduce(function(a,k){return a==null?a:a[k]},o)}
 function setPut(o,p,v){var k=p.split('.'),x=o;for(var i=0;i<k.length-1;i++){if(x[k[i]]==null)x[k[i]]=/^\d+$/.test(k[i+1])?[]:{};x=x[k[i]]}x[k[k.length-1]]=v}
-function setClick(e){var t=e.target.closest('[data-tab]');if(t){SET.tab=+t.getAttribute('data-tab');setDraw();return}
+function setClick(e){var ia=e.target.closest('[data-ia]');if(ia){indAct(ia);return}var t=e.target.closest('[data-tab]');if(t){SET.tab=+t.getAttribute('data-tab');setDraw();return}
  var s=e.target.closest('[data-v]');if(s&&SET){var p=s.getAttribute('data-p'),v=s.getAttribute('data-v');setPut(SET.W,p,!s.getAttribute('data-s')&&/^[\d.]+$/.test(v)?+v:v);SET.ap(SET.W);setDraw()}}
 function setInput(e){var el=e.target,p=el.getAttribute&&el.getAttribute('data-p');if(!p||!SET)return;var v;
  if(el.type=='checkbox')v=el.checked?1:0;else if(el.type=='text'||el.type=='color')v=el.value;else{v=+el.value;if(el.value===''||isNaN(v))return;if(el.getAttribute('data-pos')&&!(v>0))return}
@@ -1545,12 +1545,63 @@ function drSet(id){var d=drGet().filter(function(x){return x.id==id})[0];if(!d)r
  var ap=function(W){d.s=W.s;var C=W.c;d.a.p=+C.a.p;if(k!='hl')d.a.t=drTat(C.a.i);if(d.b&&C.b){d.b.p=+C.b.p;d.b.t=drTat(C.b.i)}if(pos){d.tp=+C.tp;d.sl=+C.sl;if(C.e!=null)d.t2=Math.max(drTat(C.e),d.a.t+drSec())}LW.dv++;LW.dsig=''};
  setOpen(stl(k),tabs,W,ap,function(){drSave()},function(){var b=JSON.parse(o0);for(var q in d)delete d[q];for(q in b)d[q]=b[q];LW.dv++;LW.dsig=''},
   function(W){var df=drS({k:k});df.vis=W.s.vis;W.s=df},{k:k,get:function(W){return W.s},put:function(W,v){var vis=W.s.vis;W.s=JSON.parse(JSON.stringify(v));if(!W.s.vis)W.s.vis=vis}})}
-/* indikatorlar oynasi */
-function indSet(){var I=indS(),o0=JSON.stringify(I);
- var tabs=[{n:stl('vd'),f:function(W){return setRow(stl('up'),setCtl('vd.up','c',W.vd.up),1)+setRow(stl('dn'),setCtl('vd.dn','c',W.vd.dn),1)+setRow(stl('op'),setCtl('vd.op','rg',W.vd.op,.1,1,.05))}}];
- var ap=function(W){indSave(W);LW.dsig='';lwVdRefresh()};
- setOpen(stl('ind'),tabs,I,ap,function(W){indSave(W)},function(){try{localStorage.setItem('tc_ind',o0)}catch(e){}LW.dsig='';lwVdRefresh()},null,
-  {k:'ind',get:function(W){return W},put:function(W,v){var x=JSON.parse(JSON.stringify(v));for(var q in x)W[q]=x[q]}})}
+/* 417: Indikatorlar — bitta «ƒx» tugmasi ichida (TradingView kabi): qo'shish, yoqish/o'chirish, sozlash, o'chirish. Ro'yxat — localStorage tc_inds [{id,t,on,p}].
+   Grafik ustida (ov): EMA, SMA, VWAP, Bollinger; pastki panellarda: Volume Delta, RSI, MACD (har biri o'z narx shkalasi bandida) */
+var INDC={ema:{n:'EMA',ov:1,p:{len:20,c:'#ffc83d',w:1.5}},sma:{n:'SMA',ov:1,p:{len:50,c:'#4da3ff',w:1.5}},vwap:{n:'VWAP',ov:1,p:{c:'#ff8a3d',w:1.5}},
+ bb:{n:'Bollinger',ov:1,p:{len:20,mult:2,c:'#b48cff',w:1}},rsi:{n:'RSI',ov:0,p:{len:14,c:'#b48cff',w:1.4,ob:70,os:30}},
+ macd:{n:'MACD',ov:0,p:{fast:12,slow:26,sig:9,c:'#4da3ff',c2:'#ff8a3d',up:'#c2f23a',dn:'#ff5c5c'}},vd:{n:'Volume Delta',ov:0,p:{up:'#c2f23a',dn:'#ff5c5c',op:.55}}};
+var INDF={ema:[['len','int'],['c','c'],['w','w']],sma:[['len','int'],['c','c'],['w','w']],vwap:[['c','c'],['w','w']],bb:[['len','int'],['mult','num'],['c','c'],['w','w']],
+ rsi:[['len','int'],['ob','int'],['os','int'],['c','c'],['w','w']],macd:[['fast','int'],['slow','int'],['sig','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],vd:[['up','c'],['dn','c'],['op','rg',.1,1,.05]]};
+function indDefP(t){return JSON.parse(JSON.stringify(INDC[t].p))}
+function indList(){var L=null;try{L=JSON.parse(localStorage.getItem('tc_inds')||'null')}catch(e){}if(Array.isArray(L))return L;
+ var old={};try{old=(JSON.parse(localStorage.getItem('tc_ind')||'{}')||{}).vd||{}}catch(e){}var p=indDefP('vd');for(var k in old)p[k]=old[k];
+ var on=1;try{on=localStorage.getItem('tc_vd')!=='0'?1:0}catch(e){}return[{id:'vd',t:'vd',on:on,p:p}]}
+function indLSave(L){try{localStorage.setItem('tc_inds',JSON.stringify(L))}catch(e){}}
+function indName(x){var p=x.p||{};return INDC[x.t].n+(x.t=='ema'||x.t=='sma'||x.t=='rsi'?' '+p.len:x.t=='bb'?' '+p.len+', '+p.mult:x.t=='macd'?' '+p.fast+' '+p.slow+' '+p.sig:'')}
+/* hisob */
+function iEma(a,n){var o=new Array(a.length).fill(null),k=2/(n+1),s=0,c=0,v=null;for(var i=0;i<a.length;i++){if(a[i]==null)continue;if(v==null){s+=a[i];c++;if(c==n){v=s/n;o[i]=v}}else{v=a[i]*k+v*(1-k);o[i]=v}}return o}
+function iSma(a,n){var o=new Array(a.length).fill(null),s=0;for(var i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n}return o}
+function iStd(a,n,m){var o=new Array(a.length).fill(null);for(var i=n-1;i<a.length;i++){var q=0;for(var j=i-n+1;j<=i;j++)q+=(a[j]-m[i])*(a[j]-m[i]);o[i]=Math.sqrt(q/n)}return o}
+function iRsi(a,n){var o=new Array(a.length).fill(null),g=0,l=0;for(var i=1;i<a.length;i++){var d=a[i]-a[i-1],up=Math.max(d,0),dn=Math.max(-d,0);
+  if(i<=n){g+=up;l+=dn;if(i==n){g/=n;l/=n;o[i]=l==0?100:100-100/(1+g/l)}}else{g=(g*(n-1)+up)/n;l=(l*(n-1)+dn)/n;o[i]=l==0?100:100-100/(1+g/l)}}return o}
+function indCalc(x,c,rows){var p=x.p,cl=rows.map(function(r){return r.close}),T=rows.map(function(r){return r.time}),L=function(a){return a.map(function(v,i){return v==null||!isFinite(v)?{time:T[i]}:{time:T[i],value:v}})};
+ if(x.t=='ema')return[L(iEma(cl,Math.max(1,+p.len||20)))];if(x.t=='sma')return[L(iSma(cl,Math.max(1,+p.len||50)))];
+ if(x.t=='bb'){var n=Math.max(2,+p.len||20),m=iSma(cl,n),sd=iStd(cl,n,m),k=+p.mult||2;return[L(m),L(m.map(function(v,i){return v==null?null:v+k*sd[i]})),L(m.map(function(v,i){return v==null?null:v-k*sd[i]}))]}
+ if(x.t=='vwap'){var day=TFS[LW.g&&LW.g.tf]<86400,pv=0,vv=0,key=null,o=[];rows.forEach(function(r,i){var kk=day?Math.floor(r.time/86400):new Date(r.time*1000).getUTCFullYear()*12+new Date(r.time*1000).getUTCMonth();
+   if(kk!==key){key=kk;pv=0;vv=0}var v=+(c[i]&&c[i][5])||0;pv+=(r.high+r.low+r.close)/3*v;vv+=v;o.push(vv>0?pv/vv:null)});return[L(o)]}
+ if(x.t=='rsi')return[L(iRsi(cl,Math.max(2,+p.len||14)))];
+ if(x.t=='macd'){var f=iEma(cl,+p.fast||12),s=iEma(cl,+p.slow||26),md=f.map(function(v,i){return v==null||s[i]==null?null:v-s[i]}),sg=iEma(md.map(function(v){return v==null?0:v}),+p.sig||9),st=md.findIndex(function(v){return v!=null});
+   sg=sg.map(function(v,i){return i<st+(+p.sig||9)-1?null:v});var hs=md.map(function(v,i){return v==null||sg[i]==null?null:v-sg[i]});
+   return[L(hs).map(function(z){if(z.value!=null)z.color=hexA(z.value>=0?p.up:p.dn,.6);return z}),L(md),L(sg)]}
+ return[]}
+/* seriyalar va panellar joylashuvi */
+function indApply(full,c,rows){var ch=LW.ch,g=LW.g;if(!ch||!g)return;c=c||g.c||[];if(!rows)rows=c.map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}});
+ if(rows.length&&LW.rlast){rows=rows.slice();var lr=rows[rows.length-1];rows[rows.length-1]={time:lr.time,open:lr.open,high:Math.max(lr.high,LW.rlast),low:Math.min(lr.low,LW.rlast),close:LW.rlast}}
+ var L=indList().filter(function(x){return x.on&&INDC[x.t]&&x.t!='vd'}),key=JSON.stringify(L);
+ if(LW.indKey!==key){(LW.indSer||[]).forEach(function(z){z.s.forEach(function(s){try{ch.removeSeries(s)}catch(e){}})});LW.indSer=[];LW.indKey=key;full=true;
+  L.forEach(function(x){var p=x.p,id='o_'+x.id,ls=function(col,w,ps){return ch.addLineSeries({color:col,lineWidth:Math.max(1,Math.round(+w||1)),priceScaleId:ps||'right',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false})},S=[];
+   if(x.t=='ema'||x.t=='sma'||x.t=='vwap')S=[ls(p.c,p.w)];else if(x.t=='bb')S=[ls(p.c,p.w),ls(hexA(p.c,.7),p.w),ls(hexA(p.c,.7),p.w)];
+   else if(x.t=='rsi'){S=[ls(p.c,p.w,id)];[+p.ob||70,+p.os||30].forEach(function(v){S[0].createPriceLine({price:v,color:'rgba(255,255,255,.22)',lineWidth:1,lineStyle:2,axisLabelVisible:false})})}
+   else if(x.t=='macd')S=[ch.addHistogramSeries({priceScaleId:id,lastValueVisible:false,priceLineVisible:false}),ls(p.c,1.4,id),ls(p.c2,1.4,id)];
+   LW.indSer.push({x:x,s:S})});indLayout()}
+ (LW.indSer||[]).forEach(function(z){var D=indCalc(z.x,c,rows);z.s.forEach(function(s,i){var d=D[i]||[];if(full)s.setData(d);else if(d.length){try{s.update(d[d.length-1])}catch(e){}}})})}
+function indLayout(){var ch=LW.ch;if(!ch)return;var vd=lwVdOn(),O=(LW.indSer||[]).filter(function(z){return!INDC[z.x.t].ov}),n=O.length+(vd?1:0),hb=n?Math.min(.17,.5/n):0,b=.01;
+ if(vd){try{ch.priceScale('vd').applyOptions({scaleMargins:{top:1-b-hb,bottom:b},visible:false})}catch(e){}b+=hb}
+ O.forEach(function(z){try{ch.priceScale('o_'+z.x.id).applyOptions({scaleMargins:{top:1-b-hb+.01,bottom:b+.01},visible:false})}catch(e){}b+=hb});
+ ch.priceScale('right').applyOptions({scaleMargins:{top:.1,bottom:Math.max(.08,b+.02)}})}
+/* «ƒx» oynasi */
+function indSet(){var W={L:JSON.parse(JSON.stringify(indList())),op:null},o0=JSON.stringify(W.L);
+ var tabs=[{n:stl('ind'),f:function(W){var h='<div class="ich">'+Object.keys(INDC).filter(function(t){return t!='vd'||!W.L.some(function(x){return x.t=='vd'})}).map(function(t){return'<span data-ia="add" data-it="'+t+'">+ '+esc(INDC[t].n)+'</span>'}).join('')+'</div>';
+  if(!W.L.length)h+='<div class="tph">'+esc(stl('ind_none'))+'</div>';
+  W.L.forEach(function(x,i){h+='<div class="ir"><label class="tg2"><input type="checkbox" data-p="L.'+i+'.on"'+(x.on?' checked':'')+'><i></i></label><b>'+esc(indName(x))+'</b><span class="ia" data-ia="open" data-ii="'+i+'">'+MTI.set+'</span><span class="ia" data-ia="del" data-ii="'+i+'">✕</span></div>';
+   if(W.op===x.id)h+='<div class="ip">'+(INDF[x.t]||[]).map(function(f){return setRow(stl('i_'+f[0]),setCtl('L.'+i+'.p.'+f[0],f[1],x.p[f[0]],f[2],f[3],f[4]),f[1]=='c')}).join('')+'</div>'});return h}}];
+ var ap=function(W){indLSave(W.L);indApply(true);lwVdRefresh();indLayout();indChip()};
+ setOpen(stl('ind'),tabs,W,ap,function(W){indLSave(W.L)},function(){try{localStorage.setItem('tc_inds',o0)}catch(e){}indApply(true);lwVdRefresh();indLayout();indChip()},null,
+  {k:'inds',get:function(W){return W.L},put:function(W,v){W.L=JSON.parse(JSON.stringify(v))}})}
+function indAct(el){var W=SET&&SET.W;if(!W||!W.L)return;var a=el.getAttribute('data-ia'),i=+el.getAttribute('data-ii');
+ if(a=='add'){var t=el.getAttribute('data-it'),x={id:t=='vd'?'vd':t+Date.now().toString(36),t:t,on:1,p:indDefP(t)};W.L.push(x);W.op=x.id}
+ else if(a=='open'){var id=W.L[i]&&W.L[i].id;W.op=W.op===id?null:id}else if(a=='del')W.L.splice(i,1);SET.ap(W);setDraw()}
+function indChip(){var on=indList().some(function(x){return x.on});[].forEach.call(document.querySelectorAll('.lwtb [data-t=ind]'),function(b){b.classList.toggle('on',on)})}
 function lwVdRefresh(){var g=LW.g;if(!g||!LW.vd)return;lwVdSet(g.c||[],(g.c||[]).map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}}),true)}
 /* tanlangan chizma ustidagi kichik panel (TradingView kabi): ⚙ · 🔒 · nusxa · 🗑 */
 var MTI={set:'<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg>',
@@ -1569,7 +1620,7 @@ function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var 
  if(sig===LW.dsig)return;LW.dsig=sig;sv.setAttribute('width',P.w);sv.setAttribute('height',P.h);sv.style.width=P.w+'px';sv.style.height=P.h+'px';
  LW.selH=null;var o='';D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);sv.innerHTML=o;drMt(P)}
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
-  if(k=='vd')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
+  if(k=='vd'||k=='ind')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
  if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1}
 function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.sel=null;drTb();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='hl'||k=='vp'||k=='lp'||k=='sp'?'dr_p1':'dr_p2')))}}
 function drDel(){var D=drGet();if(LW.sel){LW.D=D.filter(function(x){return x.id!==LW.sel});LW.sel=null;drSave();drTb();return}
@@ -1604,14 +1655,12 @@ function drInit(){var sv=document.createElementNS('http://www.w3.org/2000/svg','
  sv.addEventListener('pointerdown',drSDown);cl.addEventListener('pointerdown',drCDown);cl.addEventListener('pointermove',drCMove);cl.addEventListener('pointerup',drCUp);
  LW.ch.subscribeClick(function(){if(LW.sel&&Date.now()-(LW.hitT||0)>400){LW.sel=null;drTb()}})}
 /* 393: Volume Delta: Binance shamida taker buy (7-ustun) bor — aniq; bo'lmasa sham shaklidan (C−L)/(H−L) */
-function lwVdOn(){try{return localStorage.getItem('tc_vd')!=='0'}catch(e){return true}}
+function lwVdOn(){return indList().some(function(x){return x.t=='vd'&&x.on})}
+function lwVdP(){var x=indList().filter(function(x){return x.t=='vd'})[0];return x?x.p:indDefP('vd')}
 function lwVdRow(x,r){var v=+x[5]||0;if(!(v>0))return{time:r.time};var h=r.high,l=r.low,bf=x[6]!=null?Math.max(0,Math.min(1,+x[6]/v)):h>l?(r.close-l)/(h-l):.5,d=v*(2*bf-1);
  return{time:r.time,value:d,color:d>=0?hexA(LW.vdc.up,LW.vdc.op):hexA(LW.vdc.dn,LW.vdc.op)}}
-function lwVdSet(c,rows,all){var vd=LW.vd;if(!vd)return;LW.vdc=indS().vd;if(!lwVdOn()){if(all)vd.setData([]);return}
+function lwVdSet(c,rows,all){var vd=LW.vd;if(!vd)return;LW.vdc=lwVdP();if(!lwVdOn()){if(all)vd.setData([]);return}
  if(all)vd.setData(rows.map(function(r,k){return lwVdRow(c[k],r)}));else if(rows.length)vd.update(lwVdRow(c[c.length-1],rows[rows.length-1]))}
-function lwVdTog(){var on=!lwVdOn();try{localStorage.setItem('tc_vd',on?'1':'0')}catch(e){}if(!LW.ch)return;
- LW.ch.priceScale('right').applyOptions({scaleMargins:{top:.1,bottom:on?.22:.08}});var g=LW.g;lwVdSet(g.c||[],(g.c||[]).map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}}),true);
- [].forEach.call(document.querySelectorAll('.lwtb [data-t=vd]'),function(b){b.classList.toggle('on',on)})}
 /* 396: TradingView uslubidagi to'liq ekran: tepada juftlik/narx/TF va OHLC, chapda asboblar ustuni, pastki o'ngda »(hozirga) va ⛶.
    Telegram 8.0+ da tg.requestFullscreen(); «Orqaga» avval to'liq ekrandan chiqaradi */
 var FSI={in:'<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>',

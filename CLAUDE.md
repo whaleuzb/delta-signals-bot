@@ -8525,3 +8525,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 416. Shablonlar (TradingView «Template»)
 - Sozlamalar oynasi pastida «Shablon ▾» (`tplMenu/tplDraw`): joriy uslubni nom bilan saqlash, ro'yxatdan bosib qo'llash (`SET.tp.put` → jonli), ★ — standart (shu turdagi YANGI chizmalar shu uslub bilan: `drAdd`), ✕ — o'chirish. Har tur alohida (tl, hl, rc, fb, vp, fr, lp, sp, `ind` — indikatorlar). Ko'rinish (`vis`) shablonga kirmaydi.
 - Saqlash: `localStorage tc_tpl {tur: {nom: uslub}}`, `tc_tpd {tur: nom}` (faqat shu qurilmada).
+
+## 417. Indikatorlar — bitta «ƒx» tugmasi ichida
+- Asboblar ustunidagi «VΔ» va ⚙ o'rniga bitta «ƒx» (`data-t="ind"`, `indSet()`); kamida bittasi yoqilgan bo'lsa yashil. Oynada: yuqorida katalog (+ EMA/SMA/VWAP/Bollinger/RSI/MACD, VΔ o'chirilgan bo'lsa + Volume Delta), pastda ro'yxat: yoqish/o'chirish, ⚙ (sozlamalar ochiladi), ✕. Bir turdan bir nechta (masalan EMA 20 + EMA 200) mumkin. «Shablon» — tur `inds`.
+- Saqlash: `localStorage tc_inds [{id,t,on,p}]`; eski `tc_ind.vd` / `tc_vd` birinchi ochilishda ko'chiriladi (`indList`). `lwVdOn/lwVdP` endi shu ro'yxatdan o'qiydi; `INDDEF/indS/lwVdTog` olib tashlandi.
+- Hisob (`indCalc`): EMA (SMA bilan boshlanadi), SMA, VWAP (kunlik TF dan kichikda har kuni UTC, aks holda har oy nolga tushadi), Bollinger (SMA ± k·σ), RSI (Wilder), MACD (chiziq, signal, gistogramma ±rang). Oxirgi sham jonli narx (`LW.rlast`) bilan.
+- Seriyalar (`indApply`): `lwData` to'liq yuklashda `setData`, tikda faqat oxirgi nuqta `update`; ro'yxat o'zgarsa (kalit `LW.indKey`) hammasi qayta quriladi. Ustma-ust (EMA/SMA/VWAP/BB) — asosiy shkalada; panel (VΔ, RSI 70/30 punktir, MACD) — har biri o'z `priceScaleId`'sida pastdan ketma-ket bandlar (`indLayout`, har biri ≤17%, jami ≤50%), asosiy shkalaning `bottom` margini shunga moslanadi.
