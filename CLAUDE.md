@@ -8645,3 +8645,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 445. Sessions: kunlarni ajratish
 - Kun ajratgichi endi standart yoqilgan (`ddv:1`) va yangi «Kunlarni fon bilan ajratish» (`dbg:1`) — juft kunlar och fon bilan; eski sozlamalarda bir marta yoqiladi (`p.v<2` migratsiyasi). Har kun tepasida (y=42, TP/SL yorliqlari ostida) kun nomi va sanasi: keng — «Dushanba 23.11», o'rtacha — «Du 23.11», tor — «Du» (`sessDay/sessDayS`, uz/ru/en). Kun chegarasi vaqt mintaqasi (`tz`) bo'yicha.
+
+## 446. Sessions ichida har seansning o'z Volume profile'i
+- Har seans katakchalari qatoriga «Volume profile» (`a_vp..d_vp`, standart o'chiq). Yoqilganda shu seans shamlari bo'yicha profil (`frVP` + `vpSvg`) seans qutisi ichida chapdan, seans rangida (pastga — qizil), POC va VAH/VAL ham seans rangida.
+- Umumiy bo'lim «Seans hajm profili»: qatorlar soni (`vrs`, 6–80), kenglik % (`vwp`), hajm turi (o'sish/tushish, jami, delta — `vvt`), POC (`vpoc`), qiymat zonasi (`vva`).
