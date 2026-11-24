@@ -8637,3 +8637,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 443. Sessions — savdo seanslari indikatori
 - «ƒx» → **Sessions**: Osiyo/Tokio 00–09, London 07–16, Nyu-York 13–22 (UTC). Har kun uchun seans shamlarining yuqori–past qutisi (`sessSvg`, SVG qatlam, `drDraw` boshida), shaffof fon + punktir ramka, ustida nom (tor bo'lsa TKY/LDN/NY) va keng bo'lsa oraliq %. Sozlama: har seansni yoqish/o'chirish va rangi, shaffoflik, ramka, nom. Faqat kunlikdan kichik TF da (1d+ da yashirin); ko'pi bilan 60 quti.
+
+## 444. Sessions — to'liq sozlamalar (foydalanuvchi yuborgan LuxAlgo Sessions skrinshotlari bo'yicha)
+- 4 seans (A–D; standart: New York 13–22, London 07–16, Tokyo 00–09, Sydney 21–06 — o'chiq), har birida: yoqish, nom, soatlar `HH:MM—HH:MM` (yarim tundan o'tishi mumkin — `sessMin`, kun kaliti boshlanish kuniga), Range (quti), Trendline (seans yopilishlari chiziqli regressiyasi), Mean (joriy o'rtacha HLC3, punktir), VWAP (seans VWAP, nuqtali), Max/Min (joriy max/min), rang.
+- Umumiy: vaqt mintaqasi UTC ± (`tz`), quti shaffofligi 0–100 (TradingView kabi: 90 = juda shaffof), ramka, yorliq (quti tepasida o'rtada, tor bo'lsa 3 harf, keng bo'lsa oraliq %), chiziq qalinligi; **Dashboard** (burchakdagi jadval: seans, holat ochiq/yopiq, oxirgi seans oralig'i %; «Kengaytirilgan» — o'zgarish % va $ hajm; joyi 4 burchak, o'lcham); **ajratgichlar** — seans boshi (rangli punktir) va kun (punktir + hafta kuni nomi).
+- Sozlamalar oynasi maxsus (`sessForm`, bo'limlar `.ish`); eski (443) parametrlar `sessP` bilan standartlarga to'ldiriladi. Chizish `sessSvg` (SVG qatlam), faqat kunlikdan kichik TF.
