@@ -8591,3 +8591,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 433. Seans hajm profili (Session Volume Profile)
 - «ƒx» → **Session Volume Profile**: ko'rinayotgan har kun (yoki hafta) uchun alohida profil, shu kunning shamlari oralig'ida chapdan (`svpSvg` → mavjud `frVP` + `vpSvg`, POC, qiymat zonasi %). Sozlama: davr (kun/hafta), qatorlar, kenglik %, VA %, ranglar, shaffoflik, POC. Chizmalar SVG qatlamida (`drDraw` boshida) chiziladi; `drDraw` imzosi endi `LW.indKey` ni hisobga oladi. Ko'pi bilan 40 seans.
+
+## 434. Order book devorlari
+- «ƒx» → **Order Book**: Binance spot stakani (1000 daraja; `cex` servisi `POST /mkt kind=depth`, web `orderflow kind=depth`, 8 s kesh). Ilova (`obwNeed`, 10 s da) narxni `bin` % (standart 0.1%) oraliqlarga yig'adi, har tomondan eng katta `top` (8) tasini grafik o'ng chetida gorizontal ustun (eni hajmga mutanosib, `wp` %) va $ hajm yorlig'i bilan chizadi (`obwSvg`, SVG qatlam). Yashil — bid, qizil — ask. Faqat kripto.

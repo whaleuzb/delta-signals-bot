@@ -130,6 +130,17 @@ _MKT_P = {"5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"}
 async def mkt_fetch(kind: str, sym: str, period: str) -> list:
     import re
     import httpx
+    if kind == "depth":
+        # 434: order book (spot, 1000 daraja) — grafikdagi «devorlar» uchun
+        if not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
+            raise ValueError("bad")
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get("https://api.binance.com/api/v3/depth", params={"symbol": sym, "limit": 1000})
+        if r.status_code == 400:
+            return []
+        r.raise_for_status()
+        j = r.json() or {}
+        return [[float(p), float(q), 1] for p, q in j.get("bids") or []] + [[float(p), float(q), -1] for p, q in j.get("asks") or []]
     if kind not in _MKT or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym) or (kind != "fund" and period not in _MKT_P):
         raise ValueError("bad")
     q = {"symbol": sym, "limit": 1000} if kind == "fund" else {"symbol": sym, "period": period, "limit": 500}

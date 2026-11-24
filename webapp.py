@@ -278,11 +278,11 @@ async def api_orderflow(request):
     sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())
     sym = re.sub(r"(USDT|USDC|FDUSD)$", "", sym) + "USDT"
     period = _OF_P.get(str(body.get("tf") or ""), "1h")
-    if kind not in ("oi", "ls", "fund") or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
+    if kind not in ("oi", "ls", "fund", "depth") or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
         raise web.HTTPBadRequest()
-    key = (kind, sym, period if kind != "fund" else "")
+    key = (kind, sym, period if kind not in ("fund", "depth") else "")
     hit = _OF_C.get(key)
-    if hit and time.monotonic() - hit[0] < 60:
+    if hit and time.monotonic() - hit[0] < (8 if kind == "depth" else 60):
         return web.json_response({"d": hit[1]}, headers=NO_CACHE)
     url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
     try:
