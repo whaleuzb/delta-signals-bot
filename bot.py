@@ -12044,7 +12044,34 @@ ANNOUNCE_START = "signals"   # 442: kanaldagi tugma — t.me/<bot>?startapp=<shu
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
-ANNOUNCE_HOLD = True     # 442: e'lon albom ko'rinishiga qayta tayyorlanmoqda — vaqtincha yuborilmaydi
+ANNOUNCE_HOLD = False
+
+
+def _ann_album() -> list[str]:
+    """442: `announce/<ANNOUNCE_FILE>/` papkasida rasmlar bo'lsa — albom (2–10 ta, nom tartibida)."""
+    d = os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE)
+    if not os.path.isdir(d):
+        return []
+    return [os.path.join(d, f) for f in sorted(os.listdir(d)) if f.lower().endswith((".jpg", ".jpeg", ".png"))][:10]
+
+
+async def _ann_send(bot, chat_id, caption: str, kb) -> tuple[list[int], int | None]:
+    """E'lonni yuborish: albom bo'lsa — rasmlar + ostida tugmali matn (albomga tugma qo'yib bo'lmaydi);
+    aks holda bitta rasm + izoh + tugma. Qaytaradi: (xabar id'lari, tugmali xabar id yoki None)."""
+    album = _ann_album()
+    if len(album) >= 2:
+        from telegram import InputMediaPhoto
+        files = [open(p, "rb") for p in album]
+        try:
+            msgs = await bot.send_media_group(chat_id, [InputMediaPhoto(f) for f in files])
+        finally:
+            for f in files:
+                f.close()
+        btn = await bot.send_message(chat_id, caption, reply_markup=kb, disable_web_page_preview=True)
+        return [m.message_id for m in msgs], btn.message_id
+    with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
+        msg = await bot.send_photo(chat_id, f, caption=caption[:1024], reply_markup=kb)
+    return [msg.message_id], None
 
 
 async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -12055,16 +12082,17 @@ async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
             caption = f.read().strip()
-        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
-            msg = await ctx.bot.send_photo(admin, f, caption=caption[:1024],
-                                           reply_markup=_announce_kb())
+        ids, btn = await _ann_send(ctx.bot, admin, caption, _announce_kb())
     except Exception:
         log.exception("E'lon tayyorlanmadi — broadcast boshlanmadi")
         return
-    log.info("E'lon broadcast boshlandi (admin=%s, msg=%s)", admin, msg.message_id)
-    ctx.job_queue.run_once(run_broadcast, 3, data={
-        "admin": admin, "from_chat": admin, "msg_id": msg.message_id,
-        "markup": _announce_kb()})
+    log.info("E'lon broadcast boshlandi (admin=%s, msg=%s, tugma=%s)", admin, ids, btn)
+    data = {"admin": admin, "from_chat": admin, "markup": _announce_kb()}
+    if btn:
+        data.update(msg_ids=ids, after=btn)
+    else:
+        data["msg_id"] = ids[0]
+    ctx.job_queue.run_once(run_broadcast, 3, data=data)
 
 
 # 345: o'sha e'lon "Mamurjon mt" kanaliga ham (bir marta). Kanalda web_app tugma
@@ -12089,8 +12117,7 @@ async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
             caption = f.read().strip()
-        with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".png"), "rb") as f:
-            await ctx.bot.send_photo(row["group_chat_id"], f, caption=caption[:1024], reply_markup=kb)
+        await _ann_send(ctx.bot, row["group_chat_id"], caption, kb)
         log.info("E'lon kanalga yuborildi (ws=%s)", row["id"])
     except Exception:
         log.exception("E'lon kanalga yuborilmadi (ws=%s)", row["id"])
