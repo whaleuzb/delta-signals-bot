@@ -8585,3 +8585,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 431. Avto Fib va Avto trend chiziqlari
 - «ƒx» katalogida: **Auto Fib** — oxirgi `dep` (standart 100) shamdagi eng yuqori va eng past nuqta; past nuqta keyin bo'lsa pastga, aks holda yuqoriga retracement; 7 daraja (`FIBL/FIBC`), o'qda daraja nomi, shkalaga ta'sir qilmaydi. **Auto Trend** — pivot (chuqurlik `dep`, standart 5 sham har tomonda) bo'yicha oxirgi ikki cho'qqi → qarshilik (qizil), oxirgi ikki tub → tayanch (yashil), 10 sham o'ngga davom etadi. Har yangi shamda qayta hisoblanadi.
+
+## 432. Boshqa tanga bilan solishtirish
+- «ƒx» → **Compare**: sozlamada tanga (masalan ETH). Uning shamlari `dfcandles` (shu TF) bilan olinadi (`cmpNeed`, 500 ms debounce — yozish paytida har harfga so'rov ketmaydi; topilmasa xabar), yopilish narxi birinchi umumiy shamda asosiy narxga tenglashtiriladi — ikkala tanganing foiz o'zgarishi bir masshtabda ko'rinadi. O'qda tanga nomi bilan yorliq. Kesh `LW.cmpD[sym|tf]`.
