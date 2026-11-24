@@ -8649,3 +8649,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 446. Sessions ichida har seansning o'z Volume profile'i
 - Har seans katakchalari qatoriga «Volume profile» (`a_vp..d_vp`, standart o'chiq). Yoqilganda shu seans shamlari bo'yicha profil (`frVP` + `vpSvg`) seans qutisi ichida chapdan, seans rangida (pastga — qizil), POC va VAH/VAL ham seans rangida.
 - Umumiy bo'lim «Seans hajm profili»: qatorlar soni (`vrs`, 6–80), kenglik % (`vwp`), hajm turi (o'sish/tushish, jami, delta — `vvt`), POC (`vpoc`), qiymat zonasi (`vva`).
+
+## 447. Ikki marta bosish — pastki indikatorlarni yashirish/ko'rsatish
+- Grafik maydonida (narx/vaqt shkalasidan tashqari) ikki marta tez bosish (≤320 ms, ≤30 px, har bosish «tap» — siljimagan) pastki panel indikatorlarini (VΔ, RSI, MACD, CVD, OI, Funding, Likvidatsiyalar va h.k. — `ov:0`) yashiradi (`paneTog`, `localStorage tc_ph`), asosiy grafik to'liq balandlikka yoyiladi; yana ikki marta — qaytadi. Ustki indikatorlar (EMA, Sessions…) va chizmalar ta'sirlanmaydi. Asbob tanlangan, chiziq surilayotgan, yorliq/chizma/mini panel ustida bosilganda ishlamaydi. Holat saqlanadi (`indLayout` har qayta qurishda hisobga oladi).
