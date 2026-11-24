@@ -8582,3 +8582,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 430. Indikator to'plamlari — tezkor almashtirish
 - «ƒx» oynasi tepasida «To'plamlar:» qatori — `tplAll().inds` dagi saqlangan to'plamlar (masalan «Skalp», «Swing») chip ko'rinishida, bosilsa butun ro'yxat almashadi (`tplApply`). Yaratish/o'chirish/standart — mavjud «Shablon ▾» (416) orqali; server sinxroni (420) bilan qurilmalar orasida.
+
+## 431. Avto Fib va Avto trend chiziqlari
+- «ƒx» katalogida: **Auto Fib** — oxirgi `dep` (standart 100) shamdagi eng yuqori va eng past nuqta; past nuqta keyin bo'lsa pastga, aks holda yuqoriga retracement; 7 daraja (`FIBL/FIBC`), o'qda daraja nomi, shkalaga ta'sir qilmaydi. **Auto Trend** — pivot (chuqurlik `dep`, standart 5 sham har tomonda) bo'yicha oxirgi ikki cho'qqi → qarshilik (qizil), oxirgi ikki tub → tayanch (yashil), 10 sham o'ngga davom etadi. Har yangi shamda qayta hisoblanadi.
