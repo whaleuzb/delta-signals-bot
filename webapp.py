@@ -259,11 +259,69 @@ async def api_tickers(request):
         log.info("Watchlist narxlari olinmadi", exc_info=True)
         m = {}
     out = {}
+    miss = []
     for b in syms:
         b0 = re.sub(r"(USDT|USDC)$", "", b) or b
         if b0 in m:
             out[b0] = [m[b0][0], round(m[b0][1], 2)]
+        else:
+            miss.append(b0)
+    if miss:                                    # 439: faqat fyuchersda bor tangalar — MEXC fyuchers narxi (24s % siz)
+        fm = await _wl_fut()
+        for b0 in miss:
+            if b0 in fm:
+                out[b0] = [fm[b0], None]
     return web.json_response({"t": out}, headers=NO_CACHE)
+
+
+async def _wl_fut() -> dict:
+    import futures as _fu
+    try:
+        return {s: p for s, p in await _fu.price_list()}
+    except Exception:
+        return {}
+
+
+async def api_wlsearch(request):
+    """439: watchlist qidiruvi — barcha USDT juftliklari (MEXC spot + fyuchers) ichidan: avval nom bilan boshlanadiganlar
+    (hajm bo'yicha), keyin ichida bo'lganlari; ≤30 ta. [nom, narx, 24s %, faqat_fyuchers]."""
+    import exchange as _ex
+    body, _uid = await _body(request)
+    q = re.sub(r"[^A-Z0-9]", "", str(body.get("q") or "").upper())[:15]
+    q = re.sub(r"(USDT|USDC)$", "", q) or q
+    if not q:
+        return web.json_response({"r": []}, headers=NO_CACHE)
+    try:
+        sp = await _ex.price_list()
+    except Exception:
+        sp = []
+    try:
+        tm = await _ex.ticker_map()
+    except Exception:
+        tm = {}
+    fu = await _wl_fut()
+    order, seen = [], set()
+    for s_, _p in sp:
+        if s_ not in seen:
+            seen.add(s_)
+            order.append(s_)
+    for s_ in fu:
+        if s_ not in seen:
+            seen.add(s_)
+            order.append(s_)
+    pre = [x for x in order if x.startswith(q)]
+    mid = [x for x in order if q in x and not x.startswith(q)]
+    if q in seen and pre and pre[0] != q:
+        pre.remove(q)
+        pre.insert(0, q)
+    spm = dict(sp)
+    res = []
+    for x in (pre + mid)[:30]:
+        if x in tm:
+            res.append([x, tm[x][0], round(tm[x][1], 2), 0])
+        else:
+            res.append([x, spm.get(x) or fu.get(x), None, 0 if x in spm else 1])
+    return web.json_response({"r": res}, headers=NO_CACHE)
 
 
 _OF_P = {"1m": "5m", "2m": "5m", "3m": "5m", "5m": "5m", "10m": "15m", "15m": "15m", "30m": "30m", "1h": "1h", "2h": "2h",
@@ -2266,6 +2324,7 @@ def routes() -> list:
         web.post("/api/app/chartshot", api_chartshot),
         web.get("/blogo.png", bot_logo_png),
         web.post("/api/app/tickers", api_tickers),
+        web.post("/api/app/wlsearch", api_wlsearch),
         web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/chart", api_chart),
         web.post("/api/app/chartpub", api_chartpub),

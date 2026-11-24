@@ -8613,3 +8613,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Indikator sozlamasi (rang, uzunlik va h.k.) o'zgarsa `tc_indlast[tur]` ga yoziladi; ✕ bilan o'chirib qayta qo'shilganda standart emas, shu sozlamalar bilan qo'shiladi (`indLastP`). Yoqish/o'chirish (toggle) sozlamani o'zgartirmaydi.
 - Chizma asbobi sozlamalar oynasida OK bosilsa uslub `tc_drlast[tur]` ga yoziladi (matn `tx` faqat Matn asbobida saqlanadi); shu turdagi yangi chizma shu uslub bilan chiziladi (`drAdd`). Ustuvorlik: ★ standart shablon → oxirgi ishlatilgan → `DRDEF`.
 - Ikkalasi server sinxroni bilan (kalitlar `il`, `dl`) — boshqa qurilmada ham.
+
+## 439. Watchlist qidiruvi — ro'yxatda yo'q tokenlar ham
+- Watchlist maydoniga yozilganda (`wlFind`, 250 ms debounce) `POST /api/app/wlsearch {q}` — MEXC spot (`exchange.price_list` + `ticker_map` 24s %) va MEXC fyuchers (`futures.price_list`) birlashtirilgan ro'yxatdan: avval nom bilan boshlanadiganlar (hajm tartibida, aniq moslik birinchi), keyin ichida bo'lganlar, ≤30 ta. Faqat fyuchersdagilar «F» belgisi bilan.
+- Natija qatorini bosish — grafik shu tangaga o'tadi (`wlGo`), «+» — joriy ro'yxatga qo'shish (`wlAddS`, qo'shilganda ✓); Enter — birinchi natijani qo'shadi; ✕ — qidiruvni tozalash.
+- `api/app/tickers`: spot'da topilmagan tangalar narxi MEXC fyuchersdan (24s % siz).
