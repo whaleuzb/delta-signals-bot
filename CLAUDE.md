@@ -8555,3 +8555,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 423. Bar Replay
 - Asboblar ustunida ▷| (`rpTog`): grafikda sham bosiladi (`drTool('rp')` → `rpStart`) — grafik shu shamgacha qisqaradi (`lwData` boshida `g.rp.t` dan keyingi shamlar kesiladi, jonli narx qo'shilmaydi). Pastdagi panel `.rpui`: ▶/⏸ (`rpPlay`, `setInterval` 1000/tezlik ms), ⏭ bitta sham (`rpStep`), tezlik 1x→3x→10x, sana, ✕ (`rpStop` — to'liq grafikka qaytadi). Indikatorlar, VΔ, chizmalar shu kesilgan ma'lumotdan. `g.rp.t` vaqt bo'yicha — TF almashsa ham davom etadi; oxiriga yetsa to'xtaydi.
+
+## 424. Orderflow indikatorlari: CVD, Open Interest, Long/Short, Funding
+- «ƒx» katalogiga: **CVD** (kümülyativ hajm deltasi — VΔ formulasi `lwVdRow` yig'indisi; «Har kuni noldan» ixtiyoriy), **Open Interest** (USD), **Long/Short** (hisoblar nisbati, 1 punktir), **Funding** (% gistogramma, ± rang). Hammasi alohida pastki panel (`indLayout`).
+- OI/L-S/Funding — Binance futures ochiq API (`/futures/data/openInterestHist`, `/globalLongShortAccountRatio`, `/fapi/v1/fundingRate`). AQSh'dan 451 bo'lgani uchun `cex` servisi (Singapur) yangi `POST /mkt {kind, sym, period}` orqali (oq ro'yxat: 3 yo'l, `XXXUSDT`, davrlar 5m…1d; `RELAY_TOKEN`). Web: `POST /api/app/orderflow {kind, sym, tf}` — TF → davr (`_OF_P`: 1–5m→5m, 10m→15m, 1w/1M→1d), 60 s kesh; relay URL bo'lmasa to'g'ridan.
+- Ilova: `ofNeed(t)` juftlik+TF bo'yicha bir marta so'raydi (`LW.of`, `LW.ofK`), kelgach `indApply(true)`; qiymat shamga: OI/L-S — sham oxirigacha bo'lgan oxirgi nuqta, funding — sham ichidagi to'lovlar yig'indisi. Faqat kripto (futures bozori — MEXC tovarlar — bo'sh). Binance OI tarixi ~30 kun.

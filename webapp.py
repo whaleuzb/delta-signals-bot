@@ -266,6 +266,47 @@ async def api_tickers(request):
     return web.json_response({"t": out}, headers=NO_CACHE)
 
 
+_OF_P = {"1m": "5m", "2m": "5m", "3m": "5m", "5m": "5m", "10m": "15m", "15m": "15m", "30m": "30m", "1h": "1h", "2h": "2h",
+         "4h": "4h", "1d": "1d", "1w": "1d", "1M": "1d"}
+_OF_C: dict = {}
+
+
+async def api_orderflow(request):
+    """424: OI (USD), Long/Short nisbati, funding (%) — Binance futures ochiq API, Singapur `cex` servisi orqali (AQSh'dan 451). 60 s kesh."""
+    body, _uid = await _body(request)
+    kind = str(body.get("kind") or "")
+    sym = re.sub(r"[^A-Z0-9]", "", str(body.get("sym") or "").upper())
+    sym = re.sub(r"(USDT|USDC|FDUSD)$", "", sym) + "USDT"
+    period = _OF_P.get(str(body.get("tf") or ""), "1h")
+    if kind not in ("oi", "ls", "fund") or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym):
+        raise web.HTTPBadRequest()
+    key = (kind, sym, period if kind != "fund" else "")
+    hit = _OF_C.get(key)
+    if hit and time.monotonic() - hit[0] < 60:
+        return web.json_response({"d": hit[1]}, headers=NO_CACHE)
+    url = os.getenv("CEX_RELAY_URL", "").rstrip("/")
+    try:
+        if url:
+            import httpx
+            async with httpx.AsyncClient(timeout=20) as c:
+                r = await c.post(f"{url}/mkt", json={"kind": kind, "sym": sym, "period": period},
+                                 headers={"X-Relay-Token": os.getenv("RELAY_TOKEN", "")})
+            r.raise_for_status()
+            d = r.json().get("d")
+        else:
+            import cexrelay
+            d = await cexrelay.mkt_fetch(kind, sym, period)
+    except Exception as e:
+        log.info("Orderflow olinmadi (%s %s): %s", kind, sym, type(e).__name__)
+        d = None
+    if d is None:
+        return web.json_response({"d": [], "err": 1}, headers=NO_CACHE)
+    if len(_OF_C) > 500:
+        _OF_C.clear()
+    _OF_C[key] = (time.monotonic(), d)
+    return web.json_response({"d": d}, headers=NO_CACHE)
+
+
 _CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds)$")
 
 
@@ -2134,6 +2175,7 @@ def routes() -> list:
         web.post("/api/app/tickers", api_tickers),
         web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/chart", api_chart),
+        web.post("/api/app/orderflow", api_orderflow),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
         web.post("/api/app/sighist", api_sighist),

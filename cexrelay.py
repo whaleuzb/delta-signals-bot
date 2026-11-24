@@ -122,6 +122,49 @@ async def trade(request):
         return web.json_response({"err": "api"})
 
 
+# 424: grafik orderflow — Binance futures ochiq ma'lumotlari (kalitsiz). Faqat oq ro'yxatdagi yo'llar va parametrlar.
+_MKT = {"oi": "/futures/data/openInterestHist", "ls": "/futures/data/globalLongShortAccountRatio", "fund": "/fapi/v1/fundingRate"}
+_MKT_P = {"5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"}
+
+
+async def mkt_fetch(kind: str, sym: str, period: str) -> list:
+    import re
+    import httpx
+    if kind not in _MKT or not re.fullmatch(r"[A-Z0-9]{2,20}USDT", sym) or (kind != "fund" and period not in _MKT_P):
+        raise ValueError("bad")
+    q = {"symbol": sym, "limit": 1000} if kind == "fund" else {"symbol": sym, "period": period, "limit": 500}
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get("https://fapi.binance.com" + _MKT[kind], params=q)
+    if r.status_code == 400:
+        return []          # bu juftlik futures'da yo'q
+    r.raise_for_status()
+    out = []
+    for x in r.json() or []:
+        try:
+            if kind == "oi":
+                out.append([int(x["timestamp"]), float(x["sumOpenInterestValue"])])
+            elif kind == "ls":
+                out.append([int(x["timestamp"]), float(x["longShortRatio"])])
+            else:
+                out.append([int(x["fundingTime"]), float(x["fundingRate"]) * 100])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+async def mkt(request):
+    if not _auth(request):
+        raise web.HTTPForbidden()
+    try:
+        b = await request.json()
+        return web.json_response({"d": await mkt_fetch(str(b.get("kind")), str(b.get("sym")), str(b.get("period")))})
+    except ValueError:
+        raise web.HTTPBadRequest()
+    except Exception as e:
+        log.info("mkt xato: %s", type(e).__name__)
+        return web.json_response({"err": "api"})
+
+
 async def health(_request):
     return web.Response(text="ok")
 
@@ -166,6 +209,7 @@ def build() -> web.Application:
                     web.post("/history", history),
                     web.post("/trades", trades),
                     web.post("/trade", trade),
+                    web.post("/mkt", mkt),
                     web.get("/healthz", health)])
     return app
 
