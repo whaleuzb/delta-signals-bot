@@ -8579,3 +8579,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 429. Grafik sozlamalari (⚙)
 - Tepadagi amallar qatorida ⚙ (`chSet`; tor ekranda «⋯» ichida): **Shamlar** — o'sish/tushish rangi, piliklar, ramka, oxirgi narx chizig'i; **Ko'rinish** — fon (standart/qora/ko'k-qora/yashil-qora), panjara, kursor (oddiy/magnit); **Vaqt mintaqasi** — qurilma, UTC, UTC+5 Toshkent, +3, +8, −5 (`lwD` — `lwTimeFmt/lwTickFmt` shu orqali). «Standart» — `CSD`.
 - Saqlash `localStorage tc_cs` (kesh `CSC`), server sinxroni kaliti `cs` (`_CH_KEY` ga qo'shildi). Qo'llash: `ctApply` grafik turi qayta qurilganda (`LW.cst=null`) `chOpts` + sham ranglari; bar/chiziq/area ham o'sish rangini oladi.
+
+## 430. Indikator to'plamlari — tezkor almashtirish
+- «ƒx» oynasi tepasida «To'plamlar:» qatori — `tplAll().inds` dagi saqlangan to'plamlar (masalan «Skalp», «Swing») chip ko'rinishida, bosilsa butun ro'yxat almashadi (`tplApply`). Yaratish/o'chirish/standart — mavjud «Shablon ▾» (416) orqali; server sinxroni (420) bilan qurilmalar orasida.
