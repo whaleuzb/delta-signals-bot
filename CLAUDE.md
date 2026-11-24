@@ -8552,3 +8552,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 422. Yangi chizish asboblari: nur, strelka, parallel kanal, matn, o'lchov
 - Asboblar ustuniga bitta «✎+» tugmasi (`data-t="mo"`, `drMore`) — ichida (`DRX`): Nur (`ry`, trend chizig'i, standart o'ngga davom), Strelka (`ar`, uchida o'q), Parallel kanal (`pc`, 2 nuqta + `d.o` narx siljishi; 3-ushlagich `c` — kanal kengligi; to'ldirish, o'rta punktir, o'ngga davom), Matn (`tx`, bitta nuqta; qo'yilganda sozlamalar «Matn» yorlig'ida ochiladi; fon, rang, o'lcham), O'lchov (`ms`, 2 nuqta: Δnarx, %, shamlar soni, vaqt — `drDur`). Tanlangan qo'shimcha asbob tugmada o'z belgisi bilan yashil ko'rinadi.
 - Hammasida sozlamalar (`DRDEF/DRF`), shablonlar, ko'rinish (TF bo'yicha), qulflash/nusxa, server sinxroni (420) — mavjud mexanizmlar orqali.
+
+## 423. Bar Replay
+- Asboblar ustunida ▷| (`rpTog`): grafikda sham bosiladi (`drTool('rp')` → `rpStart`) — grafik shu shamgacha qisqaradi (`lwData` boshida `g.rp.t` dan keyingi shamlar kesiladi, jonli narx qo'shilmaydi). Pastdagi panel `.rpui`: ▶/⏸ (`rpPlay`, `setInterval` 1000/tezlik ms), ⏭ bitta sham (`rpStep`), tezlik 1x→3x→10x, sana, ✕ (`rpStop` — to'liq grafikka qaytadi). Indikatorlar, VΔ, chizmalar shu kesilgan ma'lumotdan. `g.rp.t` vaqt bo'yicha — TF almashsa ham davom etadi; oxiriga yetsa to'xtaydi.
