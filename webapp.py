@@ -239,6 +239,21 @@ def _src(body) -> str | None:
     return v if v in ("binance", "exchange", "futures") else None
 
 
+def _since(body) -> int:
+    """440: faqat shu vaqtdan (ms) boshlab ochilgan shamlar — ilova qolganini qurilmadagi keshdan oladi."""
+    try:
+        v = int(body.get("since") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return v if v > 946684800000 else 0
+
+
+def _inc(rows: list, since: int) -> tuple[list, bool]:
+    if since and rows and rows[0][0] <= since:
+        return [r for r in rows if r[0] >= since], True
+    return rows, False
+
+
 def _before(body) -> int:
     try:
         b = int(body.get("before") or 0)
@@ -280,6 +295,32 @@ async def _wl_fut() -> dict:
         return {s: p for s, p in await _fu.price_list()}
     except Exception:
         return {}
+
+
+async def api_wllist(request):
+    """440: watchlist qidiruvi uchun barcha USDT juftliklari bitta ro'yxatda — ilova 1 soat qurilmada saqlab, o'zi qidiradi.
+    [[nom, narx, 24s %|null, faqat_fyuchers 0/1], ...] hajm tartibida."""
+    import exchange as _ex
+    await _body(request)
+    try:
+        sp = await _ex.price_list()
+    except Exception:
+        sp = []
+    try:
+        tm = await _ex.ticker_map()
+    except Exception:
+        tm = {}
+    fu = await _wl_fut()
+    out, seen = [], set()
+    for s_, p_ in sp:
+        if s_ not in seen:
+            seen.add(s_)
+            out.append([s_, tm[s_][0] if s_ in tm else p_, round(tm[s_][1], 2) if s_ in tm else None, 0])
+    for s_, p_ in fu.items():
+        if s_ not in seen:
+            seen.add(s_)
+            out.append([s_, p_, None, 1])
+    return web.json_response({"r": out}, headers={"Cache-Control": "private, max-age=600"})
 
 
 async def api_wlsearch(request):
@@ -665,7 +706,8 @@ async def api_candles(request):
             _CANDLES[key] = (_t.monotonic(), rows, inf.get("src"))
         used = inf.get("src")
     adds = await db.signal_adds(sig["id"], "PENDING")
-    return web.json_response({"tf": tf, "c": rows, "src": used,
+    rows, inc = _inc(rows, 0 if before else _since(body))
+    return web.json_response({"tf": tf, "c": rows, "src": used, "inc": inc,
                               "adds": [float(a["price"]) for a in adds if a["kind"] == "LIMIT"]},
                              headers=NO_CACHE)
 
@@ -701,7 +743,8 @@ async def api_dfcandles(request):
                 _CANDLES.clear()
             _CANDLES[key] = (_t.monotonic(), rows, inf.get("src"))
         used = inf.get("src")
-    return web.json_response({"tf": tf, "c": rows, "src": used}, headers=NO_CACHE)
+    rows, inc = _inc(rows, 0 if before else _since(body))
+    return web.json_response({"tf": tf, "c": rows, "src": used, "inc": inc}, headers=NO_CACHE)
 
 
 async def api_sig(request):
@@ -2297,11 +2340,25 @@ async def api_cexdel(request):
     return web.json_response({"ok": ok}, headers=NO_CACHE)
 
 
+_PAGE_C: dict = {}
+
+
 async def app_page(request):
     # 252: bot nomi sahifaga yoziladi — Telegram tashqarisida (brauzer,
     # to'lov boti) ochilganda ham "Botni ochish" havolasi ishlasin.
-    return web.Response(text=PAGE.replace("__BOT__", json.dumps(request.app["bot_username"] or "")),
-                        content_type="text/html", headers=NO_CACHE)
+    # 440: gzip (≈430 KB → ≈100 KB) + ETag: o'zgarmagan sahifa qayta yuklanmaydi (304), yangi versiyada ETag o'zgaradi.
+    import gzip as _gz
+    bot = request.app["bot_username"] or ""
+    c = _PAGE_C.get(bot)
+    if not c:
+        raw = PAGE.replace("__BOT__", json.dumps(bot)).encode()
+        c = _PAGE_C[bot] = (raw, _gz.compress(raw, 6), '"%s-%s"' % (PAGE_VER, _hl.sha1(bot.encode()).hexdigest()[:6]))
+    hdr = {"Cache-Control": "no-cache", "ETag": c[2], "Vary": "Accept-Encoding"}
+    if c[2] in request.headers.get("If-None-Match", ""):
+        return web.Response(status=304, headers=hdr)
+    if "gzip" in request.headers.get("Accept-Encoding", ""):
+        return web.Response(body=c[1], content_type="text/html", charset="utf-8", headers={**hdr, "Content-Encoding": "gzip"})
+    return web.Response(body=c[0], content_type="text/html", charset="utf-8", headers=hdr)
 
 
 async def api_ver(request):
@@ -2325,6 +2382,7 @@ def routes() -> list:
         web.get("/blogo.png", bot_logo_png),
         web.post("/api/app/tickers", api_tickers),
         web.post("/api/app/wlsearch", api_wlsearch),
+        web.post("/api/app/wllist", api_wllist),
         web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/chart", api_chart),
         web.post("/api/app/chartpub", api_chartpub),

@@ -1192,14 +1192,24 @@ var TER={W:360,H:330,PR:58,AX:24};
 function openTerm(id){var i=S.items.filter(function(x){return x.id==id})[0];if(!i)return;tick();S.page={id:'term',sig:id,tf:i.tf||'1h',c:null,adds:[],drag:null,pend:null};termRender();pageShow();termLoad()}
 function termItem(){var g=S.page;if(g&&g.ch)return g.chi;if(g&&g.cx)return cxItem(g);if(g&&g.df)return dfItem(g);return g&&S.items.filter(function(x){return x.id==g.sig})[0]}
 /* 397: shamlar so'rovi (termLoad va tarix uchun bitta joy); before — shundan oldingi 500 sham */
-function termReq(g,before){var a={tf:g.tf};if(before){a.before=before;if(g.src)a.src=g.src}
+/* 440: shamlar qurilmada (IndexedDB 'tc' → 'c'): terminal darhol keshdan ochiladi, serverdan faqat oxirgi shamdan keyingilari (since) olinadi */
+var IDB=null;function idb(){if(IDB)return IDB;IDB=new Promise(function(ok,no){try{var r=indexedDB.open('tc',1);r.onupgradeneeded=function(){r.result.createObjectStore('c')};r.onsuccess=function(){ok(r.result)};r.onerror=function(){no(r.error)}}catch(e){no(e)}});IDB.catch(function(){IDB=null});return IDB}
+function idbGet(k){return idb().then(function(d){return new Promise(function(ok){try{var q=d.transaction('c').objectStore('c').get(k);q.onsuccess=function(){ok(q.result||null)};q.onerror=function(){ok(null)}}catch(e){ok(null)}})}).catch(function(){return null})}
+function idbPut(k,v){idb().then(function(d){try{d.transaction('c','readwrite').objectStore('c').put(v,k)}catch(e){}}).catch(function(){})}
+function cKey(g){var b=g.view||g.ch||(g.cx&&g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,''))||(g.df&&g.df.sym);return(b?'p:'+String(b).toUpperCase():'s:'+g.sig)+'|'+g.tf}
+function cSave(g){if(!g.c||!g.c.length||g.rp)return;var k=cKey(g);clearTimeout(g.cST);g.cST=setTimeout(function(){idbPut(k,{c:g.c.slice(-1500),src:g.src||null,at:Date.now()})},800)}
+function termReq(g,before,since){var a={tf:g.tf};if(before){a.before=before;if(g.src)a.src=g.src}else if(since)a.since=since;
  if(g.view){a.sym=g.view;return api('dfcandles',a)}
  if(g.ch){a.sym=g.ch;return api('dfcandles',a)}   /* 404: watchlist'dan boshqa tanga — faqat ko'rish */
  if(g.cx){a.sym=g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'');return api('dfcandles',a)}if(g.df){a.sym=g.df.sym;return api('dfcandles',a)}a.sig=g.sig;return api('candles',a)}
 /* yangilanishda yuklangan tarix yo'qolmasin: eski qism + yangi oxirgi 500 */
 function termMerge(g,nc,src){var o=g.c;if(!o||!o.length||!nc.length||g.ctf!==g.tf||(src||'')!==(g.src||'')){g.cEnd=0;return nc}var f=nc[0][0],k=0;while(k<o.length&&o[k][0]<f)k++;return k?o.slice(0,k).concat(nc):nc}
 function termLoad(){var g=S.page;if(!g||g.id!='term')return;var tf=g.tf;alLoad(g);csLoad();
- termReq(g).then(function(d){if(S.page!==g||g.tf!==tf)return;g.c=termMerge(g,d.c||[],d.src);if(g.ch&&g.c.length&&!g.view)g.chi.price=+g.c[g.c.length-1][4];g.src=d.src||null;g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];termRender()}).catch(function(){})}
+ if(!g.c&&g.cTried!==tf){g.cTried=tf;var ck=cKey(g);idbGet(ck).then(function(v){if(S.page===g&&g.tf===tf&&!g.c&&v&&v.c&&v.c.length&&Date.now()-v.at<7*86400000){g.c=v.c;g.src=v.src;g.ctf=tf;g.cEnd=0;termRender()}if(S.page===g&&g.tf===tf)termLoad()});return}
+ var since=g.c&&g.ctf===tf&&g.c.length?g.c[g.c.length-1][0]:0;
+ termReq(g,0,since).then(function(d){if(S.page!==g||g.tf!==tf)return;
+  if(d.inc){if((d.src||null)!==(g.src||null)||!g.c||!g.c.length){g.c=null;g.cTried=tf;termLoad();return}var lo=(d.c[0]||[since])[0];g.c=g.c.filter(function(x){return x[0]<lo}).concat(d.c||[]);if(g.ch&&g.c.length&&!g.view)g.chi.price=+g.c[g.c.length-1][4];if(!g.cx&&!g.df)g.adds=d.adds||g.adds||[];cSave(g);termRender();return}
+  g.c=termMerge(g,d.c||[],d.src);if(g.ch&&g.c.length&&!g.view)g.chi.price=+g.c[g.c.length-1][4];g.src=d.src||null;g.ctf=tf;if(!g.cx&&!g.df)g.adds=d.adds||[];cSave(g);termRender()}).catch(function(){})}
 /* 397: chap chetga yaqinlashganda — eski shamlar (TradingView kabi cheksiz tarix; 20 000 tagacha) */
 function termHist(g){if(!g||g.cMore||g.cEnd||!g.c||!g.c.length||g.c.length>=20000)return;g.cMore=1;var tf=g.tf,b=g.c[0][0];
  termReq(g,b).then(function(d){g.cMore=0;if(S.page!==g||g.tf!==tf||!g.c||!g.c.length||g.c[0][0]!==b)return;
@@ -1960,7 +1970,7 @@ function wlBase(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').r
 function termOwnSym(){var i=termItem();return i?wlBase(i.symbol):''}
 function wlTog(){LW.wl=!LW.wl;wlRender();lwFsHdr();if(LW.wl)wlPoll();else clearTimeout(LW.wlT)}
 function wlPoll(){clearTimeout(LW.wlT);if(!LW.wl||!LW.fs)return;var L=wlGet(),own=termOwnSym();if(own&&L.indexOf(own)<0)L=[own].concat(L);
- api('tickers',{syms:L}).then(function(d){LW.wlp=d.t||{};wlRender()}).catch(function(){});LW.wlT=setTimeout(wlPoll,6000)}
+ api('tickers',{syms:L}).then(function(d){LW.wlp=d.t||{};wlRender()}).catch(function(){});LW.wlT=setTimeout(wlPoll,document.hidden?30000:12000)}
 function wlRender(){var f=document.getElementById('lwfsb');if(!f)return;var p=document.getElementById('lwwl');if(!LW.wl){if(p)p.remove();return}
  if(!p){p=document.createElement('div');p.id='lwwl';f.appendChild(p)}var ae=document.activeElement&&document.activeElement.id=='wlin',iv=ae?document.getElementById('wlin').value:'';
  var O=wlAll(),so=O.so||'m',L=wlGet(),own=termOwnSym(),g=LW.g,cur=g&&g.view?g.view:own,P=LW.wlp||{},L2=L.filter(function(x){return x!==own}),ch_=function(x){return P[x]?P[x][1]:-1e9};
@@ -1972,7 +1982,12 @@ function wlRender(){var f=document.getElementById('lwfsb');if(!f)return;var p=do
  if(ae){var ni=document.getElementById('wlin');ni.value=iv;ni.focus()}}
 /* 439: qidiruv — watchlist'da yo'q tangalar ham (MEXC spot + fyuchers); qatorni bosish — grafik, «+» — ro'yxatga qo'shish */
 function wlFind(v,clr){var q=wlBase(v);if(clr){var i=document.getElementById('wlin');if(i){i.value='';i.blur()}q=''}LW.wlq=q;clearTimeout(LW.wlqT);if(!q){LW.wlr=null;wlRender();return}
- LW.wlqT=setTimeout(function(){api('wlsearch',{q:q}).then(function(d){if(LW.wlq!==q)return;LW.wlr=d.r||[];wlRender()}).catch(function(){})},250);if(!LW.wlr)wlRender()}
+ LW.wlqT=setTimeout(function(){wlAllList().then(function(A){if(LW.wlq!==q)return;var pre=[],mid=[];A.forEach(function(r){var i=r[0].indexOf(q);if(i==0)pre.push(r);else if(i>0)mid.push(r)});
+  pre.sort(function(a,b){return(a[0]==q?-1:0)-(b[0]==q?-1:0)});LW.wlr=pre.concat(mid).slice(0,30).map(function(r){return r.slice()});wlRender();
+  clearTimeout(LW.wlpT);LW.wlpT=setTimeout(function(){if(LW.wlq!==q||!LW.wlr||!LW.wlr.length)return;api('tickers',{syms:LW.wlr.slice(0,12).map(function(r){return r[0]})}).then(function(d){if(LW.wlq!==q)return;var T2=d.t||{};LW.wlr.forEach(function(r){var x=T2[r[0]];if(x){r[1]=x[0];if(x[1]!=null)r[2]=x[1]}});wlRender()}).catch(function(){})},600)})},150);if(!LW.wlr)wlRender()}
+/* 440: barcha juftliklar ro'yxati qurilmada 1 soat (tc_wlall) — qidiruv serverga so'rov yubormaydi */
+function wlAllList(){var c=null;try{c=JSON.parse(localStorage.getItem('tc_wlall')||'null')}catch(e){}if(c&&c.r&&c.r.length&&Date.now()-c.at<3600000)return Promise.resolve(c.r);
+ if(LW.wlaP)return LW.wlaP;LW.wlaP=api('wllist',{}).then(function(d){LW.wlaP=null;var r=d.r||[];if(r.length)try{localStorage.setItem('tc_wlall',JSON.stringify({at:Date.now(),r:r}))}catch(e){}return r}).catch(function(){LW.wlaP=null;return c&&c.r||[]});return LW.wlaP}
 function wlRes(){var R=LW.wlr,L=wlGet();if(!R)return'<div class="wle">…</div>';if(!R.length)return'<div class="wle">'+esc(stl('wl_nf'))+'</div>';
  return R.map(function(r){var s=r[0],ch=r[2],inL=L.indexOf(s)>=0;return'<div class="wlr" onclick="wlGo(\''+s+'\')">'+coinIc(s,18)+'<span class="wls">'+esc(s)+(r[3]?' <i class="wlf">F</i>':'')+'</span><span class="wlq"><span class="wlp">'+(r[1]!=null?fp(r[1]):'—')+'</span><span class="wlc" style="color:'+(ch==null?'inherit':ch>=0?'#c2f23a':'#ff5c5c')+'">'+(ch==null?'':(ch>=0?'+':'')+ch.toFixed(2)+'%')+'</span></span>'
   +(inL?'<span class="wlad on">✓</span>':'<span class="wlad" onclick="event.stopPropagation();wlAddS(\''+s+'\')">+</span>')+'</div>'}).join('')}

@@ -8618,3 +8618,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Watchlist maydoniga yozilganda (`wlFind`, 250 ms debounce) `POST /api/app/wlsearch {q}` — MEXC spot (`exchange.price_list` + `ticker_map` 24s %) va MEXC fyuchers (`futures.price_list`) birlashtirilgan ro'yxatdan: avval nom bilan boshlanadiganlar (hajm tartibida, aniq moslik birinchi), keyin ichida bo'lganlar, ≤30 ta. Faqat fyuchersdagilar «F» belgisi bilan.
 - Natija qatorini bosish — grafik shu tangaga o'tadi (`wlGo`), «+» — joriy ro'yxatga qo'shish (`wlAddS`, qo'shilganda ✓); Enter — birinchi natijani qo'shadi; ✕ — qidiruvni tozalash.
 - `api/app/tickers`: spot'da topilmagan tangalar narxi MEXC fyuchersdan (24s % siz).
+
+## 440. Yuklamani kamaytirish: qurilmada kesh, siqish, kamroq so'rov
+- **Shamlar qurilmada** (IndexedDB `tc` → `c`, kalit `cKey`: `p:<TANGA>|tf` yoki `s:<signal>|tf`, oxirgi 1500 sham, 7 kun): terminal/TF ochilganda avval keshdan darhol chiziladi, keyin serverdan faqat `since` = oxirgi sham vaqtidan boshlab so'raladi. Server (`_since/_inc`, `candles` va `dfcandles`) o'z keshidagi qatorlardan faqat shu vaqtdan keyingilarini `inc:true` bilan qaytaradi (odatda 1–2 sham); manba (`src`) mos kelmasa ilova to'liq qayta yuklaydi. Har 15 s yangilanish ham shu yo'l bilan — trafik ~1000 sham o'rniga 1–2.
+- **Ilova sahifasi**: gzip (≈430 KB → ≈180 KB) + `ETag` (`PAGE_VER` + bot), `Cache-Control: no-cache` — o'zgarmagan bo'lsa 304, yangi versiyada darhol yangisi.
+- **API javoblari** `/api/*` 1.5 KB dan katta bo'lsa gzip (`web.security_headers` middleware).
+- **Watchlist qidiruvi** endi qurilmada: barcha juftliklar `POST /api/app/wllist` bir marta olinib `localStorage tc_wlall` da 1 soat saqlanadi, qidiruv mahalliy; faqat yozish to'xtagandan 600 ms keyin birinchi 12 natija narxi `tickers` bilan yangilanadi. Watchlist narxlari har 12 s (fonda 30 s) — avval 6 s.

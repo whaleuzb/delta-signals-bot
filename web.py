@@ -443,6 +443,11 @@ async def security_headers(request, handler):
     """Asosiy xavfsizlik sarlavhalari (191). `X-Frame-Options` ATAYLAB yo'q:
     sahifa to'lov botining Mini App'i ichida iframe'da ochiladi (`?embed=1`)."""
     resp = await handler(request)
+    # 440: API JSON javoblari gzip bilan (shamlar ~60 KB → ~15 KB)
+    if (request.path.startswith("/api/") and isinstance(resp, web.Response) and not resp.prepared
+            and resp.body is not None and len(resp.body) > 1500 and "gzip" in request.headers.get("Accept-Encoding", "")
+            and "Content-Encoding" not in resp.headers):
+        resp.enable_compression(web.ContentCoding.gzip)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     return resp
