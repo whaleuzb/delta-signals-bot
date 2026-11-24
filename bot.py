@@ -12044,8 +12044,11 @@ ANNOUNCE_START = "signals"   # 442: kanaldagi tugma — t.me/<bot>?startapp=<shu
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
+ANNOUNCE_HOLD = True     # 442: e'lon albom ko'rinishiga qayta tayyorlanmoqda — vaqtincha yuborilmaydi
+
+
 async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if not config.ADMIN_IDS or await db.get_setting(ANNOUNCE_KEY):
+    if ANNOUNCE_HOLD or not config.ADMIN_IDS or await db.get_setting(ANNOUNCE_KEY):
         return
     await db.set_setting(ANNOUNCE_KEY, "started")
     admin = min(config.ADMIN_IDS)
@@ -12070,7 +12073,7 @@ ANNOUNCE_CH_KEY = "announce_2026_11_chart_ch"
 
 
 async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    if await db.get_setting(ANNOUNCE_CH_KEY):
+    if ANNOUNCE_HOLD or await db.get_setting(ANNOUNCE_CH_KEY):
         return
     async with db.pool().acquire() as c:
         row = await c.fetchrow(
