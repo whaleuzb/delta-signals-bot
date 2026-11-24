@@ -1,0 +1,15 @@
+📈 Trade Controller — professional grafik endi botda!
+
+Signal, birja yoki Dip Funded grafigini ⛶ to'liq ekranda oching:
+
+🔹 ƒx — 25+ indikator: EMA, RSI, MACD, Bollinger, Supertrend, Ichimoku, Pivot, Avto Fib
+🔹 Orderflow — CVD, Open Interest, Funding, Likvidatsiyalar, Order Book devorlari
+🔹 Chizish — trend, nur, kanal, Fib, hajm profili, matn, o'lchov
+🔹 🔔 Narx alerti — narx yetganda Telegram'ga xabar
+🔹 ⚡ Long/Short asbobidan order — hajm risk % dan hisoblanadi
+🔹 Replay, ko'p grafik, Heikin Ashi, watchlist va qidiruv
+🔹 Chizmali grafikni do'stlarga ulashish
+
+Sozlamalaringiz telefon va kompyuterda bir xil saqlanadi.
+
+Ochish: pastdagi tugma 👇

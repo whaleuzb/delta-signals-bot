@@ -12037,9 +12037,10 @@ async def _fix_whales_join(bot) -> None:
 # 211: bir martalik yangilanish e'loni — rasm + matn BARCHA foydalanuvchilarga
 # (oddiy broadcast yo'li bilan). Bayroq YUBORISHDAN OLDIN qo'yiladi: qayta
 # ishga tushishda ikkinchi marta ketgandan ko'ra yetmay qolgani yaxshi.
-ANNOUNCE_KEY = "announce_2026_11_exchange"
-ANNOUNCE_FILE = "2026-11-exchange"    # announce/<nom>.png va .txt
-ANNOUNCE_BTN = ("🏦 Birjani ulash", "?tab=wallet")   # 344: tugma matni + ilova manzili qo'shimchasi
+ANNOUNCE_KEY = "announce_2026_11_chart"
+ANNOUNCE_FILE = "2026-11-chart"    # announce/<nom>.png va .txt
+ANNOUNCE_BTN = ("📈 Grafikni ochish", "?tab=signals")   # 344: tugma matni + ilova manzili qo'shimchasi
+ANNOUNCE_START = "signals"   # 442: kanaldagi tugma — t.me/<bot>?startapp=<shu>
 _ANNOUNCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce")
 
 
@@ -12065,7 +12066,7 @@ async def announce_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 # 345: o'sha e'lon "Mamurjon mt" kanaliga ham (bir marta). Kanalda web_app tugma
 # ishlamaydi — `t.me/<bot>?startapp=wallet` (ilova Birja bo'limida ochiladi).
-ANNOUNCE_CH_KEY = "announce_2026_11_exchange_ch"
+ANNOUNCE_CH_KEY = "announce_2026_11_chart_ch"
 
 
 async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -12080,7 +12081,7 @@ async def announce_channel_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await db.set_setting(ANNOUNCE_CH_KEY, "started")
     kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-        ANNOUNCE_BTN[0], url=f"https://t.me/{BOT_USERNAME}?startapp=wallet",
+        ANNOUNCE_BTN[0], url=f"https://t.me/{BOT_USERNAME}?startapp={ANNOUNCE_START}",
         api_kwargs={"style": "success"})]]) if BOT_USERNAME else None
     try:
         with open(os.path.join(_ANNOUNCE_DIR, ANNOUNCE_FILE + ".txt"), encoding="utf-8") as f:
