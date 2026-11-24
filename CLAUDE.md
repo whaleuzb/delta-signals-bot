@@ -8598,3 +8598,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 435. Likvidatsiyalar indikatori
 - «ƒx» → **Liquidations**: Binance perp likvidatsiyalari (Coinalyze `liquidation-history`, `XXXUSDT_PERP.A`, USD; `webapp._liq_hist`, `orderflow kind=liq`, TF → interval `_LIQ_IV`, oxirgi 1000 interval, 60 s kesh). Pastki panelda: short likvidatsiyasi yuqoriga (yashil), long likvidatsiyasi pastga (qizil), sham ichida yig'iladi.
 - Web servisga `COINALYZE_API_KEY` = `${{bot.COINALYZE_API_KEY}}` (Railway reference) qo'shildi; kalit bo'lmasa indikator bo'sh.
+
+## 436. Watchlist: bir nechta ro'yxat, saralash, tartib
+- Watchlist sarlavhasi: ro'yxat nomi ▾ (`wlLists` — ro'yxatlar orasida almashish, «+ Yangi ro'yxat» (sheet, nom ≤24), joriyini o'chirish; ≤12 ro'yxat) va saralash tugmasi (`wlSort`: ⇅ qo'lda → %↓ → %↑ → A–Z). Qo'lda tartibda har qatorda ▴ — bir pog'ona yuqoriga (`wlUp`).
+- Saqlash `localStorage tc_wls {n, L:{nom:[tangalar]}, so}` (eski `tc_wl` birinchi ochilishda «Watchlist» ro'yxatiga ko'chadi), server sinxroni kaliti `wl` (`_CH_KEY` ga qo'shildi).
