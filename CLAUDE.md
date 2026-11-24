@@ -8608,3 +8608,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - **Ulashish**: to'liq ekrandagi «Ulashish» endi avval chizmalar+indikatorlarni `put` qiladi, `chartshot` ga `ck` beriladi → xabarda «📊 Grafikni ochish» (`t.me/<bot>?startapp=ch_<key>`) + «Trade Controller». Ochilganda `chOpenKey` → yangi **«faqat grafik» sahifa** (`chTerm(base, sh, tf)`: istalgan tanga, pozitsiyasiz; `g.ch`, sintetik `g.chi`; `dfcandles`; har 15 s yangilanadi). Ulashilgan chizmalar alohida faqat-ko'rish qatlamida (`shSvg`), pastda karta: «Nusxa olish» (o'z chizmalariga, `shCopy`), «+ Indikatorlar» (`shInds`), «Yashirish».
 - **Signal tahlili**: signal terminalida 📎 (`sigAttach`; tor ekranda «⋯» ichida) — joriy chizmalar/indikatorlar signalga biriktiriladi. `api/app/sig` javobida `an`; «Birjamda ochish» oynasida «📊 Signal tahlili» tugmasi → `chOpenKey('sig<id>')`.
 - **Shablon havolasi**: shablon ro'yxatida 🔗 (`tplShare`) → `startapp=tp_<key>` havolasini Telegram'da ulashish; ochganda shablon nomi bilan (band bo'lsa «nom 2») qo'shiladi.
+
+## 438. Oxirgi ishlatilgan sozlamalar eslab qolinadi
+- Indikator sozlamasi (rang, uzunlik va h.k.) o'zgarsa `tc_indlast[tur]` ga yoziladi; ✕ bilan o'chirib qayta qo'shilganda standart emas, shu sozlamalar bilan qo'shiladi (`indLastP`). Yoqish/o'chirish (toggle) sozlamani o'zgartirmaydi.
+- Chizma asbobi sozlamalar oynasida OK bosilsa uslub `tc_drlast[tur]` ga yoziladi (matn `tx` faqat Matn asbobida saqlanadi); shu turdagi yangi chizma shu uslub bilan chiziladi (`drAdd`). Ustuvorlik: ★ standart shablon → oxirgi ishlatilgan → `DRDEF`.
+- Ikkalasi server sinxroni bilan (kalitlar `il`, `dl`) — boshqa qurilmada ham.

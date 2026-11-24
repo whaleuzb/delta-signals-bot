@@ -1655,7 +1655,7 @@ function drSet(id,tab){var d=drGet().filter(function(x){return x.id==id})[0];if(
   return setRow('#1 ('+stl('price')+')',setCtl('c.a.p','num',C.a.p))+bar(1,'c.a.i')+(C.b?setRow('#2 ('+stl('price')+')',setCtl('c.b.p','num',C.b.p))+bar(2,'c.b.i'):'')}});
  tabs.push({n:stl('vis'),f:setVis});
  var ap=function(W){d.s=W.s;var C=W.c;d.a.p=+C.a.p;if(k!='hl')d.a.t=drTat(C.a.i);if(d.b&&C.b){d.b.p=+C.b.p;d.b.t=drTat(C.b.i)}if(pos){d.tp=+C.tp;d.sl=+C.sl;if(C.e!=null)d.t2=Math.max(drTat(C.e),d.a.t+drSec())}LW.dv++;LW.dsig=''};
- setOpen(stl(k),tabs,W,ap,function(){drSave()},function(){var b=JSON.parse(o0);for(var q in d)delete d[q];for(q in b)d[q]=b[q];LW.dv++;LW.dsig=''},
+ setOpen(stl(k),tabs,W,ap,function(W){drSave();lastPut('tc_drlast',k,W.s)},function(){var b=JSON.parse(o0);for(var q in d)delete d[q];for(q in b)d[q]=b[q];LW.dv++;LW.dsig=''},
   function(W){var df=drS({k:k});df.vis=W.s.vis;W.s=df},{k:k,get:function(W){return W.s},put:function(W,v){var vis=W.s.vis;W.s=JSON.parse(JSON.stringify(v));if(!W.s.vis)W.s.vis=vis}});if(tab&&SET){var ti=tabs.map(function(x){return x.n}).indexOf(stl('text'));if(ti>=0){SET.tab=ti;setDraw()}}}
 /* 417: Indikatorlar — bitta «ƒx» tugmasi ichida (TradingView kabi): qo'shish, yoqish/o'chirish, sozlash, o'chirish. Ro'yxat — localStorage tc_inds [{id,t,on,p}].
    Grafik ustida (ov): EMA, SMA, VWAP, Bollinger; pastki panellarda: Volume Delta, RSI, MACD (har biri o'z narx shkalasi bandida) */
@@ -1669,6 +1669,10 @@ var INDC={ema:{n:'EMA',ov:1,p:{len:20,c:'#ffc83d',w:1.5}},sma:{n:'SMA',ov:1,p:{l
 var INDF={ema:[['len','int'],['c','c'],['w','w']],sma:[['len','int'],['c','c'],['w','w']],vwap:[['c','c'],['w','w']],bb:[['len','int'],['mult','num'],['c','c'],['w','w']],
  rsi:[['len','int'],['ob','int'],['os','int'],['c','c'],['w','w']],cvd:[['rs','ck'],['c','c'],['w','w']],st:[['len','int'],['mult','num'],['up','c'],['dn','c'],['w','w']],ich:[['tk','int'],['kj','int'],['sb','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],
  piv:[['tf','sel',[['d','pv_d'],['w','pv_w'],['m','pv_m']]],['c','c'],['w','w']],atr:[['len','int'],['c','c'],['w','w']],sto:[['len','int'],['k','int'],['d','int'],['ob','int'],['os','int'],['c','c'],['c2','c']],obv:[['c','c'],['w','w']],obw:[['bin','num'],['top','int'],['wp','rg',10,60,2],['up','c'],['dn','c']],svp:[['tf','sel',[['d','pv_d'],['w','pv_w']]],['rs','int'],['wp','rg',20,100,5],['va','int'],['up','c'],['dn','c'],['op','rg',.05,1,.05],['poc','ck']],cmp:[['sym','txt'],['c','c'],['w','w']],afib:[['dep','int'],['c','c']],atl:[['dep','int'],['up','c'],['dn','c'],['w','w']],oi:[['c','c'],['w','w']],ls:[['c','c'],['w','w']],fund:[['up','c'],['dn','c']],liq:[['up','c'],['dn','c']],macd:[['fast','int'],['slow','int'],['sig','int'],['c','c'],['c2','c'],['up','c'],['dn','c']],vd:[['up','c'],['dn','c'],['op','rg',.1,1,.05]]};
+/* 438: oxirgi ishlatilgan sozlamalar — indikator/asbob o'chirilib qayta qo'shilsa shu sozlamalar bilan (tc_indlast, tc_drlast; server sinxroni 'il','dl') */
+function lastGet(n){try{return JSON.parse(localStorage.getItem(n)||'{}')||{}}catch(e){return{}}}
+function lastPut(n,k,v){var a=lastGet(n),v2=JSON.parse(JSON.stringify(v||{}));if(n=='tc_drlast'&&k!='tx')delete v2.tx;if(JSON.stringify(a[k])===JSON.stringify(v2))return;a[k]=v2;try{localStorage.setItem(n,JSON.stringify(a))}catch(e){}csPush(n=='tc_drlast'?'dl':'il',a)}
+function indLastP(t){var d=indDefP(t),l=lastGet('tc_indlast')[t];if(l)for(var k in l)if(k in d)d[k]=l[k];return d}
 function indDefP(t){return JSON.parse(JSON.stringify(INDC[t].p))}
 function indList(){var L=null;try{L=JSON.parse(localStorage.getItem('tc_inds')||'null')}catch(e){}if(Array.isArray(L))return L;
  var old={};try{old=(JSON.parse(localStorage.getItem('tc_ind')||'{}')||{}).vd||{}}catch(e){}var p=indDefP('vd');for(var k in old)p[k]=old[k];
@@ -1680,12 +1684,12 @@ function csSt(){try{return JSON.parse(localStorage.getItem('tc_sync')||'{}')||{}
 function csStPut(o){try{localStorage.setItem('tc_sync',JSON.stringify(o))}catch(e){}}
 function csPush(k,v,at){var st=csSt();at=at||Date.now();st[k]=at;csStPut(st);CSQ[k]={k:k,v:v==null?null:v,at:at};clearTimeout(CST);CST=setTimeout(csFlush,1500)}
 function csFlush(){var it=Object.keys(CSQ).map(function(k){return CSQ[k]});CSQ={};if(!it.length)return;api('chart',{op:'put',items:it}).catch(function(){it.forEach(function(x){if(!CSQ[x.k])CSQ[x.k]=x});clearTimeout(CST);CST=setTimeout(csFlush,15000)})}
-function csLocal(k){try{if(k.indexOf('dr:')==0)return drAll()[k.slice(3)]||null;var v=localStorage.getItem({tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds',cs:'tc_cs',wl:'tc_wls'}[k]);return v?JSON.parse(v):null}catch(e){return null}}
+function csLocal(k){try{if(k.indexOf('dr:')==0)return drAll()[k.slice(3)]||null;var v=localStorage.getItem({tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds',cs:'tc_cs',wl:'tc_wls',il:'tc_indlast',dl:'tc_drlast'}[k]);return v?JSON.parse(v):null}catch(e){return null}}
 function csSet(k,v){CSC=null;try{if(k.indexOf('dr:')==0){var a=drAll();if(v&&v.length)a[k.slice(3)]=v;else delete a[k.slice(3)];localStorage.setItem('tc_dr',JSON.stringify(a));return}
- var n={tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds',cs:'tc_cs',wl:'tc_wls'}[k];if(v==null)localStorage.removeItem(n);else localStorage.setItem(n,JSON.stringify(v))}catch(e){}}
+ var n={tpl:'tc_tpl',tpd:'tc_tpd',inds:'tc_inds',cs:'tc_cs',wl:'tc_wls',il:'tc_indlast',dl:'tc_drlast'}[k];if(v==null)localStorage.removeItem(n);else localStorage.setItem(n,JSON.stringify(v))}catch(e){}}
 function csLoad(){if(Date.now()-CSL<60000)return;CSL=Date.now();api('chart',{op:'all'}).then(function(d){var V=d.v||{},st=csSt(),ch=0;
  Object.keys(V).forEach(function(k){if(V[k][1]>(st[k]||0)){csSet(k,V[k][0]);st[k]=V[k][1];ch=1}});csStPut(st);
- var L=Object.keys(drAll()).map(function(x){return'dr:'+x}).concat(['tpl','tpd','inds','cs','wl']);
+ var L=Object.keys(drAll()).map(function(x){return'dr:'+x}).concat(['tpl','tpd','inds','cs','wl','il','dl']);
  L.forEach(function(k){var lv=csLocal(k);if(lv==null)return;if(!V[k]||(st[k]||0)>V[k][1])csPush(k,lv,st[k]||Date.now())});
  if(ch&&LW.ch){LW.cst=null;LW.dk='';if(LW.g)lwData(LW.g);LW.drk=null;LW.dsig='';LW.dv=(LW.dv||0)+1;indApply(true);lwVdRefresh();indLayout();indChip()}}).catch(function(){CSL=0})}
 function indName(x){var p=x.p||{};if(x.t=='svp')return'Session VP ('+(p.tf=='w'?'W':'D')+')';if(x.t=='cmp')return'⇄ '+String(p.sym||'').toUpperCase();if(x.t=='st')return'Supertrend '+p.len+' '+p.mult;if(x.t=='atr')return'ATR '+p.len;if(x.t=='sto')return'Stoch '+p.len+' '+p.k+' '+p.d;if(x.t=='ich')return'Ichimoku '+p.tk+' '+p.kj+' '+p.sb;if(x.t=='piv')return'Pivot ('+({d:'D',w:'W',m:'M'}[p.tf]||'D')+')';return INDC[x.t].n+(x.t=='ema'||x.t=='sma'||x.t=='rsi'?' '+p.len:x.t=='bb'?' '+p.len+', '+p.mult:x.t=='macd'?' '+p.fast+' '+p.slow+' '+p.sig:'')}
@@ -1784,11 +1788,11 @@ function indSet(){var W={L:JSON.parse(JSON.stringify(indList())),op:null},o0=JSO
   if(!W.L.length)h+='<div class="tph">'+esc(stl('ind_none'))+'</div>';
   W.L.forEach(function(x,i){h+='<div class="ir"><label class="tg2"><input type="checkbox" data-p="L.'+i+'.on"'+(x.on?' checked':'')+'><i></i></label><b>'+esc(indName(x))+'</b><span class="ia" data-ia="open" data-ii="'+i+'">'+MTI.set+'</span><span class="ia" data-ia="del" data-ii="'+i+'">✕</span></div>';
    if(W.op===x.id)h+='<div class="ip">'+(INDF[x.t]||[]).map(function(f){return setRow(stl('i_'+f[0]),setCtl('L.'+i+'.p.'+f[0],f[1],x.p[f[0]],f[2],f[3],f[4]),f[1]=='c')}).join('')+'</div>'});return h}}];
- var ap=function(W){indLSave(W.L);indApply(true);lwVdRefresh();indLayout();indChip()};
+ var ap=function(W){indLSave(W.L);W.L.forEach(function(x){lastPut('tc_indlast',x.t,x.p)});indApply(true);lwVdRefresh();indLayout();indChip()};
  setOpen(stl('ind'),tabs,W,ap,function(W){indLSave(W.L)},function(){indLSave(JSON.parse(o0));indApply(true);lwVdRefresh();indLayout();indChip()},null,
   {k:'inds',get:function(W){return W.L},put:function(W,v){W.L=JSON.parse(JSON.stringify(v))}})}
 function indAct(el){var W=SET&&SET.W;if(!W||!W.L)return;var a=el.getAttribute('data-ia'),i=+el.getAttribute('data-ii');
- if(a=='add'){var t=el.getAttribute('data-it'),x={id:t=='vd'?'vd':t+Date.now().toString(36),t:t,on:1,p:indDefP(t)};W.L.push(x);W.op=x.id}
+ if(a=='add'){var t=el.getAttribute('data-it'),x={id:t=='vd'?'vd':t+Date.now().toString(36),t:t,on:1,p:indLastP(t)};W.L.push(x);W.op=x.id}
  else if(a=='open'){var id=W.L[i]&&W.L[i].id;W.op=W.op===id?null:id}else if(a=='del')W.L.splice(i,1);SET.ap(W);setDraw()}
 function indChip(){var on=indList().some(function(x){return x.on});[].forEach.call(document.querySelectorAll('.lwtb [data-t=ind]'),function(b){b.classList.toggle('on',on)})}
 function lwVdRefresh(){var g=LW.g;if(!g||!LW.vd)return;lwVdSet(g.c||[],(g.c||[]).map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}}),true)}
@@ -1853,7 +1857,7 @@ function drDel(){var D=drGet();if(LW.sel){LW.D=D.filter(function(x){return x.id!
  if(!D.length)return;if(Date.now()-(LW.clrT||0)<3500){LW.D=[];LW.clrT=0;drSave();drTb();haptic('success');return}LW.clrT=Date.now();toast(esc(t('dr_clr')))}
 function drAdd(d){d.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);var o={id:d.id,k:d.k,a:d.a};if(d.b&&d.k!='hl'&&d.k!='vp')o.b=d.b;if(d.k=='lp'||d.k=='sp'){o.tp=d.tp;o.sl=d.sl;o.t2=d.t2}
  if(d.k=='pc'&&d.b){var P0=drPlot(),t0=LW.se.coordinateToPrice(0),b0=LW.se.coordinateToPrice(P0.h);o.o=-Math.abs((t0||d.a.p*1.05)-(b0||d.a.p*.95))*.12}
- var tdn=tplDef()[d.k],tdv=tdn&&(tplAll()[d.k]||{})[tdn];if(tdv)o.s=JSON.parse(JSON.stringify(tdv));   /* 416: standart shablon */
+ var tdn=tplDef()[d.k],tdv=tdn&&(tplAll()[d.k]||{})[tdn],lu=lastGet('tc_drlast')[d.k];if(tdv)o.s=JSON.parse(JSON.stringify(tdv));else if(lu)o.s=JSON.parse(JSON.stringify(lu));   /* 438: shablon bo'lmasa — oxirgi ishlatilgan uslub */   /* 416: standart shablon */
  drGet();LW.D.push(o);LW.dd=null;LW.g.tool=null;LW.sel=o.id;LW.hitT=Date.now();drSave();drTb();haptic('success')}
 /* joylashtirish: bitta nuqtali (gorizontal, AVP) — bosish; ikki nuqtali — bosib tortish yoki ikki marta bosish */
 function drCDown(e){var g=LW.g,k=g&&g.tool;if(!k)return;e.preventDefault();e.stopPropagation();var p=drPt(e,true);if(!p)return;try{LW.cl.setPointerCapture(e.pointerId)}catch(x){}
