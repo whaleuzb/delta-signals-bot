@@ -351,6 +351,14 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .drmi svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .rpui{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:4px;padding:4px;border-radius:12px;background:rgba(20,22,18,.95);border:1px solid rgba(194,242,58,.35);box-shadow:0 6px 18px rgba(0,0,0,.5)}
 .rpui span{min-width:34px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#e8ecdf;cursor:pointer;font-size:15px}.rpui span:hover{background:rgba(194,242,58,.16);color:#c2f23a}.rpui i{font-style:normal;font-size:11.5px;font-weight:700;color:#c2f23a;padding:0 6px;white-space:nowrap}
+#mcg{position:fixed;inset:0;z-index:9990;background:#0b0b0c;display:flex;flex-direction:column;padding:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px) + 6px) 8px 6px}
+#mcg .mch{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px}#mcg .mch b{font-size:16px}#mcg .mch span{cursor:pointer;font-size:18px;padding:4px 10px;color:rgba(232,236,223,.7)}
+#mcg .mcw{flex:1;min-height:0;display:grid;grid-template-columns:1fr;grid-auto-rows:minmax(240px,1fr);gap:6px;overflow-y:auto}
+@media (min-width:700px){#mcg .mcw{grid-template-columns:1fr 1fr;grid-auto-rows:1fr;overflow:hidden}}
+#mcg .mcc{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;min-height:0}
+#mcg .mct{display:flex;gap:2px;padding:4px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(255,255,255,.06)}#mcg .mct::-webkit-scrollbar{display:none}
+#mcg .mct i{font-style:normal;font-size:11px;font-weight:700;padding:3px 6px;border-radius:6px;color:rgba(232,236,223,.55);cursor:pointer;flex:none}#mcg .mct i.on{background:rgba(194,242,58,.16);color:#c2f23a}
+#mcg .mct span{position:sticky;left:0;background:#0b0b0c;cursor:pointer;color:#c2f23a;font-weight:800;padding:0 6px;flex:none}#mcg .mcx{flex:1;min-height:0;position:relative}
 #lwset .ich{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px;border-bottom:1px solid rgba(255,255,255,.06)}#lwset .ich span{padding:6px 10px;border-radius:8px;background:rgba(194,242,58,.1);color:#c2f23a;font-size:12.5px;font-weight:700;cursor:pointer}
 #lwset .ir{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}#lwset .ir b{flex:1;font-size:13.5px}#lwset .ia{cursor:pointer;color:rgba(232,236,223,.55);padding:2px 5px;display:flex}#lwset .ia svg{width:16px;height:16px}
 #lwset .ip{padding:2px 0 6px 12px;border-left:2px solid rgba(194,242,58,.3);margin:2px 0 6px}
@@ -1319,6 +1327,7 @@ var DRX=['ry','ar','pc','tx','ms'];
 function drBar(g,fs){var s='';['tl','hl','rc','fb','vp','fr','lp','sp'].forEach(function(k){s+='<span class="chip glass'+(g.tool==k?' on':'')+'" data-t="'+k+'" onclick="drTool(\''+k+'\')">'+DRI[k]+'</span>'});
  var xk=DRX.indexOf(g.tool)>=0?g.tool:null;s+='<span class="chip glass'+(xk?' on':'')+'" data-t="mo" onclick="drMore()" title="more">'+DRI[xk||'mo']+'</span>';
  s+='<span class="chip glass'+(g.rp||g.tool=='rp'?' on':'')+'" data-t="rp" onclick="rpTog()" title="replay">'+RPI.rp+'</span>';
+ s+='<span class="chip glass" data-t="mc" onclick="mcOpen()" title="multi-chart">'+RPI.mc+'</span>';
  s+='<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="indicators"><b style="font-style:italic;font-family:Georgia,serif;font-size:14px">ƒx</b></span><span class="chip glass" data-t="ct" onclick="ctMenu()" title="chart type">'+CTI[ctS().t]+'</span><span class="chip glass'+(g.tool=='al'?' on':'')+'" data-t="al" onclick="drTool(\'al\')" title="alert">'+ALI+'</span>';
  var u='<span data-u="1" class="chip glass lwun" onclick="lwUndo()" style="font-size:15px;font-weight:800;display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="undo">↶</span>',d='<span class="chip glass lwdl" data-t="del" onclick="drDel()">'+DRI.del+'</span>';
  if(fs)return'<div class="lwtb fsl">'+s+u+d+'<span class="chip glass" style="margin-top:auto" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="chip glass" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="chip glass" onclick="lwFs(false)">'+FSI.out+'</span></div>';
@@ -1713,7 +1722,7 @@ function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var 
  LW.selH=null;var o='';D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);sv.innerHTML=o;drMt(P)}
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='mo'){var xk=DRX.indexOf(g.tool)>=0?g.tool:null;x.classList.toggle('on',!!xk);x.innerHTML=DRI[xk||'mo'];return}
-  if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}
+  if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}if(k=='mc')return;
   if(k=='vd'||k=='ind'||k=='ct')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
  if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1}
 function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.sel=null;drTb();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='rp'?'rp_p':k=='al'?'al_p':k=='hl'||k=='vp'||k=='lp'||k=='sp'||k=='tx'?'dr_p1':'dr_p2')))}}
@@ -1890,7 +1899,7 @@ function ctSet(k,v){var C=ctS();C[k]=v;try{localStorage.setItem('tc_ct',JSON.str
  [].forEach.call(document.querySelectorAll('.lwtb [data-t=ct]'),function(b){b.innerHTML=CTI[C.t]});haptic('success');sheetClose()}
 /* 423: Bar Replay — boshlanish shamini bosing, keyin ▶ (o'ynatish), ⏭ (bitta sham), tezlik, ✕. Grafik faqat g.rp.t gacha bo'lgan shamlarni ko'rsatadi
    (indikatorlar, VΔ, chizmalar ham); jonli narx va yangi shamlar replay paytida qo'shilmaydi. TF almashsa vaqt bo'yicha davom etadi */
-var RPI={rp:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v10M6 4l7 4-7 4z"/></svg>'};
+var RPI={mc:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5.2" height="5.2" rx="1"/><rect x="8.8" y="2" width="5.2" height="5.2" rx="1"/><rect x="2" y="8.8" width="5.2" height="5.2" rx="1"/><rect x="8.8" y="8.8" width="5.2" height="5.2" rx="1"/></svg>',rp:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v10M6 4l7 4-7 4z"/></svg>'};
 function rpTog(){var g=LW.g;if(!g)return;if(g.rp){rpStop(g);return}drTool('rp')}
 function rpBars(g){return(g.c||[]).map(function(x){return Math.floor(x[0]/1000)})}
 function rpStart(g,t){var B=rpBars(g),k=-1;for(var j=B.length-1;j>=0;j--)if(B[j]<=t){k=j;break}if(k<0)k=0;g.rp={t:B[k],on:0,sp:1,tm:null};LW.dk='';lwData(g);rpUi(g);drTb();haptic('success')}
@@ -1901,6 +1910,39 @@ function rpStop(g){if(g.rp)clearInterval(g.rp.tm);g.rp=null;LW.dk='';lwData(g);v
 function rpUi(g){var el=LW.el;if(!el)return;var u=el.querySelector('.rpui');if(!g.rp){if(u)u.remove();return}if(!u){u=document.createElement('div');u.className='rpui';el.appendChild(u)}
  var d=new Date(g.rp.t*1000),ds=d.toLocaleString(S.lang=='ru'?'ru-RU':'en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
  u.innerHTML='<span onclick="rpPlay(LW.g,'+(g.rp.on?0:1)+')">'+(g.rp.on?'⏸':'▶')+'</span><span onclick="rpPlay(LW.g,0);rpStep(LW.g)">⏭</span><span onclick="rpSpeed(LW.g)" style="font-size:12px;font-weight:800">'+g.rp.sp+'x</span><i>'+esc(ds)+'</i><span onclick="rpStop(LW.g)">✕</span>'}
+/* 425: Ko'p grafik — shu tanga 4 xil TF da (2×2, telefonda 1 ustun), har katakda TF tanlovi; katak sarlavhasini bosish — asosiy grafik shu TF ga o'tadi.
+   Tartib localStorage tc_mc; ochiq turganda har 15 s yangilanadi */
+var MC=null;
+function mcTfs(){var d=['15m','1h','4h','1d'];try{var v=JSON.parse(localStorage.getItem('tc_mc')||'null');if(Array.isArray(v)&&v.length==4&&v.every(function(x){return TFL.indexOf(x)>=0}))return v}catch(e){}return d}
+function mcOpen(){var g=LW.g;if(!g)return;mcClose();var T=mcTfs(),k=alKey(g),o=document.createElement('div');o.id='mcg';
+ o.innerHTML='<div class="mch"><b>'+esc(k?k.s:'')+'</b><span onclick="mcClose()">✕</span></div><div class="mcw">'+T.map(function(tf,i){return'<div class="mcc"><div class="mct"><span onclick="mcGo('+i+')">↗</span>'+TFL.map(function(x){return'<i class="'+(x==tf?'on':'')+'" onclick="mcTf('+i+',\''+x+'\')">'+x+'</i>'}).join('')+'</div><div class="mcx" data-i="'+i+'"></div></div>'}).join('')+'</div><div class="lwat">Charts by <a onclick="openLink(\'https://www.tradingview.com/\')">TradingView</a></div>';
+ document.body.appendChild(o);MC={g:g,T:T,C:[]};T.forEach(function(tf,i){mcMount(i)});MC.iv=setInterval(function(){if(!MC||S.page!==MC.g){mcClose();return}if(!document.hidden)MC.T.forEach(function(tf,i){mcLoad(i)})},15000)}
+function mcMount(i){var el=document.querySelector('#mcg .mcx[data-i="'+i+'"]');if(!el||!MC)return;if(MC.C[i]){try{MC.C[i].ch.remove()}catch(e){}}
+ var ch=LightweightCharts.createChart(el,{autoSize:true,layout:{attributionLogo:false,background:{type:'solid',color:'rgba(0,0,0,0)'},textColor:'rgba(200,205,194,.62)',fontSize:10},
+  grid:{vertLines:{color:'rgba(255,255,255,.03)'},horzLines:{color:'rgba(255,255,255,.03)'}},rightPriceScale:{borderColor:'rgba(255,255,255,.08)'},
+  timeScale:{borderColor:'rgba(255,255,255,.08)',timeVisible:true,rightOffset:4},crosshair:{mode:0},localization:{locale:'en-US',timeFormatter:lwTimeFmt}});
+ ch.timeScale().applyOptions({tickMarkFormatter:lwTickFmt});
+ var se=ch.addCandlestickSeries({upColor:'#c2f23a',downColor:'#ff5c5c',borderVisible:false,wickUpColor:'#c2f23a',wickDownColor:'#ff5c5c',priceFormat:LW.se?LW.se.options().priceFormat:undefined});
+ MC.C[i]={ch:ch,se:se,first:1};mcLoad(i)}
+function mcLoad(i){if(!MC)return;var g=MC.g,tf=MC.T[i],q={tf:tf,view:g.view,cx:g.cx,df:g.df,sig:g.sig},C=MC.C[i];
+ termReq(q).then(function(d){if(!MC||MC.C[i]!==C||MC.T[i]!==tf)return;var rows=(d.c||[]).map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}});
+  C.se.setData(rows);if(C.first&&rows.length){C.first=0;C.ch.timeScale().setVisibleLogicalRange({from:rows.length-80,to:rows.length+3})}}).catch(function(){})}
+function mcTf(i,tf){if(!MC)return;MC.T[i]=tf;try{localStorage.setItem('tc_mc',JSON.stringify(MC.T))}catch(e){}
+ [].forEach.call(document.querySelectorAll('#mcg .mcc')[i].querySelectorAll('.mct i'),function(x){x.classList.toggle('on',x.textContent==tf)});mcMount(i)}
+function mcGo(i){if(!MC)return;var tf=MC.T[i];mcClose();termTf(tf)}
+function mcClose(){if(MC){clearInterval(MC.iv);MC.C.forEach(function(c){try{c.ch.remove()}catch(e){}})}MC=null;var o=document.getElementById('mcg');if(o)o.remove()}
+/* 425: klaviatura (kompyuter): Del — tanlangan chizmani o'chirish; Ctrl/⌘+Z — orqaga; Esc — asbob/tanlov/oyna/to'liq ekrandan chiqish;
+   Alt+T trend, Alt+H gorizontal, Alt+R blok, Alt+F Fib, Alt+V AVP, Alt+A alert, Alt+I indikatorlar, Shift+F to'liq ekran, ←/→ replay qadam */
+document.addEventListener('keydown',function(e){var g=S.page;if(!g||g.id!='term'||!LW.g)return;var tg_=e.target,tn=tg_&&tg_.tagName;if(tn=='INPUT'||tn=='TEXTAREA'||tg_&&tg_.isContentEditable)return;
+ var k=e.key,c=e.code,mod=e.ctrlKey||e.metaKey;
+ if(k=='Escape'){if(MC){mcClose()}else if(document.getElementById('lwset')){setClose()}else if(document.getElementById('sheet')&&document.getElementById('sheet').classList.contains('show')){sheetClose()}
+  else if(LW.g.tool){LW.g.tool=null;LW.dd=null;drTb()}else if(LW.sel){LW.sel=null;LW.dsig='';drTb()}else if(LW.fs){lwFs(false)}else return;e.preventDefault();return}
+ if(document.getElementById('lwset')||MC)return;
+ if((k=='Delete'||k=='Backspace')&&LW.sel){drDel();e.preventDefault();return}
+ if(mod&&(k=='z'||k=='Z'||c=='KeyZ')){lwUndo();e.preventDefault();return}
+ if(e.altKey&&!mod){var m={KeyT:'tl',KeyH:'hl',KeyR:'rc',KeyF:'fb',KeyV:'vp',KeyA:'al'}[c];if(m){drTool(m);e.preventDefault();return}if(c=='KeyI'){indSet();e.preventDefault();return}}
+ if(e.shiftKey&&!mod&&!e.altKey&&c=='KeyF'){lwFs(!LW.fs);e.preventDefault();return}
+ if(LW.g.rp&&(k=='ArrowRight'||k==' ')){rpPlay(LW.g,0);rpStep(LW.g);e.preventDefault()}});
 function lwLines(force){var g=LW.g,se=LW.se;if(!g||!se||LW.drag&&!force)return;var i=termItem();if(!i)return;var L=(g.view?[]:termLines(i,g)).concat(alLines(g));LW.L=L;
  var sig=JSON.stringify(L.map(function(l){return[l.k,l.p,l.lb,l.c,l.hit,l.dr]}))+(g.xarm?g.xarm.k:'')+(LW.arm?LW.arm.k:'');
  if(sig!==LW.sig||force){LW.sig=sig;
@@ -2141,7 +2183,7 @@ function navSame(e){return e&&e.tab==S.tab&&e.cur==S.cur&&(e.key||null)==(S.page
 function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);if(navSame(S.nh[S.nh.length-1]))return;   /* 377: takror yozilmaydi */
  S.nh.push({tab:S.tab,cur:S.cur,re:S.page?S.pageRe:null,key:S.page?S.pageKey:null,y:S.page?0:window.scrollY});if(S.nh.length>40)S.nh.shift();backSync()}
 function backSync(){try{var on=S.nh.length||S.page||document.getElementById('sheet').classList.contains('show');if(on)tg.BackButton.show();else tg.BackButton.hide()}catch(e){}}
-function navBack(fromPage){if(LW.fs){lwFs(false);return}if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
+function navBack(fromPage){if(typeof MC!="undefined"&&MC){mcClose();return}if(LW.fs){lwFs(false);return}if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
  /* 380: grafik (terminal) ochiq bo'lsa — «Orqaga» uni to'liq yopadi: saqlanmagan surish bekor, tarixdagi har qanday
     terminal holati (signal/birja/Dip Funded) tashlab o'tiladi; grafik ichidagi qaytarish — faqat «↶» */
  var tm=S.page&&S.page.id=='term';if(tm){S.page.pend=null;S.page.drag=null}
