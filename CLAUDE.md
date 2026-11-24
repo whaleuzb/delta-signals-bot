@@ -8659,3 +8659,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - ⚙ Grafik sozlamalari → Ko'rinish → Fon: tayyor ranglarga qo'shimcha «O'z rangi» (`bg:'cus'`) va «Gradient» (`bg:'grd'`). `bg1`/`bg2` — 13 ta to'q rang (`BGP`) + «+» (ixtiyoriy rang, `<input type=color>`, setCtl turi `bc`); `gd` yo'nalish v ↓ / h → / d ↘ / u ↗ / r ◎ (radial); `ga` rang kuchi 20–100%.
 - `bgCss(K)` CSS fonni `LW.el.style.background`ga qo'yadi, LWC fon shaffof bo'ladi (LWC faqat vertikal gradientni biladi). Sozlama `cs` orqali serverga sinxronlanadi.
 - chSet cancel ham endi `LW.dk=''` qilmaydi (zoom saqlanadi).
+
+## 450. Oq va och fonlar
+- Fon tanlovida «Oq» (`#ffffff`), rang palitrasi `BGP` boshiga 6 ta och rang (oq, kulrang, och ko'k, krem, och yashil, och pushti).
+- `bgLum(K)` — fon yorqinligi (gradientda ikki rang o'rtachasi × rang kuchi); > .45 bo'lsa `LW.lite`: o'q matni to'q, panjara/chegara/kursor qora tusda; standart sham ranglari to'qroq (#089981 / #f23645), foydalanuvchi o'zi tanlagan ranglar o'zgarmaydi.
+- Tayyor rangli fonlar ham endi CSS orqali `LW.el`ga (narx/vaqt o'qlari ham bir xil fon).
