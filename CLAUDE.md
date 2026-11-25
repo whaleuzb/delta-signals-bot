@@ -8742,3 +8742,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 462. Birja tanlash — BUY yonida belgi
 - `#bsb` ga BUY yonida `.bsx` (`data-bs="ex"`): joriy birja logosi (`exB(BP.ex,22)`), tanlanmagan bo'lsa «+». Bosilganda `bsxMenu` (flyOpen): Dip Funded → Simulyator → ulangan birjalar (`S.cex.acc`, kerak bo'lsa `api('cex')`), «+ Birja ulash» (`brkOpen`), «Savdo paneli — ko'rsatish/yashirish» (`bsxPanel`). Tanlash `bsxPick` — `BP.ex`, panel ochiladi, `bpLoad(1)`.
 - Pastki panel ✕ bilan yopilsa ham shu belgidan qayta ochiladi. `bsbDraw` kaliti narx + `BP.ex` + `BP.open`. Matnlar `BSXT` (uz/ru/en).
+
+## 463. Grafikda o'ng tugma menyusi (TradingView kabi)
+- `contextmenu` (faqat `pointer:fine`, `LW.el` ichida) → `cmOpen(e)` (flyOpen, `.cmx`): Grafik ko'rinishini tiklash (`cmReset`, Alt+R), Narxni nusxalash (`cmCopy`, clipboard), Chizmani qo'yish (`cmPaste`, Ctrl+V; Ctrl+C — tanlangan chizma `LW.clip`ga), Alert (`cmAlert` → `alAdd`, Alt+A), Sotib olish/Sotish limit va Order qo'shish (`cmOrd` → `OT.type='limit'`, `OT.price`, `bsClick`; faqat `bpOn()`; Alt+Shift+B / Alt+Shift+S / Shift+T), Gorizontal chiziq (`cmHl`), Vertikal chiziqni vaqtga qulflash (`LW.vlk`, `cmVlSvg` drDraw'da), Obyektlar ro'yxati (`cmTree`: chizmalar — tanlash/✕, indikatorlar → indSet), Rasm yuklab olish, Chizmalarni o'chirish (N), Indikatorlarni o'chirish (N, `on=0`), Sozlamalar.
+- Qisqa tugmalar kursor narxi bo'yicha ishlaydi (`LW.mxy` — mousemove, `cmPx`). Chizish jarayonida o'ng tugma chizmani bekor qiladi. Matnlar `CMT` (uz/ru/en), ikonkalar `CMI`.

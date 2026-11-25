@@ -414,6 +414,8 @@ html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide
 #drfly .fi:hover,#drfly .fi.on{background:rgba(194,242,58,.14);color:#c2f23a}#drfly .fi em{margin-left:auto;color:#c2f23a;font-style:normal}
 #drfly svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}#drfly .fi b{display:none}
 /* 460: TradingView kabi asboblar menyusi va sevimlilar paneli */
+.cmx{min-width:330px;max-width:420px}#drfly .cmx .fi{padding:7px 10px;font-size:13px;font-weight:500}#drfly .cmx .cmn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#drfly .cmx .cms{font-style:normal;font-size:11px;color:rgba(232,236,223,.4);margin-left:14px;white-space:nowrap}
+#drfly .cmx .fi.dis{opacity:.35;pointer-events:none}#drfly .cmx svg{width:19px;height:19px}#drfly hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:4px 2px}#drfly .cmt{max-height:70vh;overflow:auto;min-width:300px}#drfly .cmx .cmd{cursor:pointer;font-size:13px;padding:0 4px}#drfly .cmx .cmd:hover{color:#ff5c5c}#drfly .cme{padding:6px 12px;font-size:12px;color:rgba(232,236,223,.45)}
 #drfly .gxm{min-width:300px;max-height:min(78vh,720px);overflow:auto;padding:2px}#drfly .gxh{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:rgba(232,236,223,.45);padding:8px 10px 4px}
 #drfly hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:6px 4px}#drfly .gxi{padding:6px 10px;font-weight:500;font-size:13px}#drfly .gxi svg{width:24px;height:24px;stroke-width:1.3}
 #drfly .gxi span{flex:1}#drfly .gxs{font-style:normal;font-size:11px;color:rgba(232,236,223,.45);margin-left:12px;white-space:nowrap}#drfly .gxi b.gxf{display:inline;color:rgba(232,236,223,.2);font-size:15px;margin-left:8px;cursor:pointer;width:18px;text-align:center}
@@ -1986,6 +1988,53 @@ document.addEventListener('keydown',function(e){if(!LW.g||!LW.se)return;var a=do
  if(e.key=='Enter'&&LW.gd&&GXM[LW.gd.k]&&GXM[LW.gd.k].p=='m'){gxFin(LW.gd.pts.slice(0,-1));return}
  if(!e.altKey)return;var c=(e.code||'').replace('Key',''),k=null;
  if(e.shiftKey&&c=='R')k='rc';else if(!e.shiftKey)k={T:'tl',H:'hl',J:'xhr',V:'xvl',C:'xcl',F:'fb'}[c];if(!k)return;e.preventDefault();if(LW.g.tool!==k)drTool(k)});
+/* 463: o'ng tugma menyusi (TradingView kabi): tiklash, narx nusxasi, chizma qo'yish, alert, buy/sell limit, order, gorizontal chiziq,
+   vertikal chiziqni vaqtga qulflash, obyektlar ro'yxati, rasm, chizma/indikatorlarni o'chirish, sozlamalar. Qisqa tugmalar ham shu yerda. */
+var CMT={uz:{rst:'Grafik ko\'rinishini tiklash',cp:'Narxni nusxalash',ps:'Chizmani qo\'yish',al:'Alert qo\'shish: ',buy:'Sotib olish',sell:'Sotish',lim:'limit',ord:'Order qo\'shish: ',vl:'Vertikal kursor chizig\'ini vaqtga qulflash',vlu:'Vertikal chiziq qulfini olish',tree:'Obyektlar ro\'yxati',shot:'Rasmini yuklab olish',rmd:'Chizmalarni o\'chirish',rmi:'Indikatorlarni o\'chirish',set:'Sozlamalar…',cpd:'Nusxalandi',hl:'Gorizontal chiziq',none:'Obyekt yo\'q',drs:'Chizmalar',inds:'Indikatorlar',cpy:'Chizma nusxalandi (Ctrl+V — qo\'yish)'},
+ ru:{rst:'Сбросить вид графика',cp:'Копировать цену',ps:'Вставить рисунок',al:'Добавить алерт: ',buy:'Купить',sell:'Продать',lim:'лимит',ord:'Добавить ордер: ',vl:'Закрепить вертикальную линию курсора по времени',vlu:'Открепить вертикальную линию',tree:'Дерево объектов',shot:'Скачать изображение',rmd:'Удалить рисунки',rmi:'Удалить индикаторы',set:'Настройки…',cpd:'Скопировано',hl:'Горизонтальная линия',none:'Нет объектов',drs:'Рисунки',inds:'Индикаторы',cpy:'Рисунок скопирован (Ctrl+V — вставить)'},
+ en:{rst:'Reset chart view',cp:'Copy price',ps:'Paste',al:'Add alert on ',buy:'Buy',sell:'Sell',lim:'limit',ord:'Add order on ',vl:'Lock vertical cursor line by time',vlu:'Unlock vertical cursor line',tree:'Object tree',shot:'Download image',rmd:'Remove drawings',rmi:'Remove indicators',set:'Settings…',cpd:'Copied',hl:'Horizontal line',none:'No objects',drs:'Drawings',inds:'Indicators',cpy:'Drawing copied (Ctrl+V to paste)'}};
+function cmT(k){return(CMT[S.lang]||CMT.uz)[k]||CMT.uz[k]}
+var CMI={rst:'<svg viewBox="0 0 20 20"><path d="M4 7.5A6.5 6.5 0 1 1 3.5 11"/><path d="M3.5 3.5v4h4"/></svg>',up:'<svg viewBox="0 0 20 20"><path d="M5 12l5-5 5 5"/><path d="M5 16l5-5 5 5" opacity=".5"/></svg>',dn:'<svg viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/><path d="M5 4l5 5 5-5" opacity=".5"/></svg>',
+ ord:'<svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M5 13l3-3 2 2 4-4"/><path d="M14 2v3M12.5 3.5h3"/></svg>',tree:'<svg viewBox="0 0 20 20"><path d="M4 4h4M4 4v12M4 10h5M4 16h5"/><rect x="10" y="2.5" width="7" height="3" rx="1"/><rect x="10" y="8.5" width="7" height="3" rx="1"/><rect x="10" y="14.5" width="7" height="3" rx="1"/></svg>',
+ vl:'<svg viewBox="0 0 20 20"><path d="M10 2v16" stroke-dasharray="2 2"/><rect x="12.5" y="9" width="5" height="4" rx="1"/><path d="M13.5 9V7.5a1.5 1.5 0 0 1 3 0V9"/></svg>',cp:'<svg viewBox="0 0 20 20"><rect x="6.5" y="6.5" width="10" height="10" rx="2"/><path d="M13.5 6.5V4.5a1 1 0 0 0-1-1h-8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2"/></svg>',
+ ps:'<svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="13.5" rx="2"/><path d="M7.5 4V2.5h5V4"/></svg>',ind:'<svg viewBox="0 0 20 20"><path d="M3 15l4-6 4 3 6-8"/><path d="M3 18h14"/></svg>'};
+function cmPt(e){LW.mxy={clientX:e.clientX,clientY:e.clientY}}
+function cmPx(){var e=LW.mxy,p=e&&drPt(e,false);return p}
+function cmOpen(e){var p=drPt(e,false);if(!p||!LW.g)return;LW.cmp=p;var sym=bpSym(),px=fp(p.p),D=drGet(),I=indList().filter(function(x){return x.on}),tr=bpOn(),
+  it=function(ic,txt,f,sc,dis){return'<div class="fi'+(dis?' dis':'')+'" onclick="flyClose();'+f+'">'+(ic||'<svg viewBox="0 0 20 20"></svg>')+'<span class="cmn">'+esc(txt)+'</span>'+(sc?'<i class="cms">'+sc+'</i>':'')+'</div>'};
+ var h='<div class="cmx">'+it(CMI.rst,cmT('rst'),'cmReset()','Alt + R')+'<hr>'+it(CMI.cp,cmT('cp')+' '+px,'cmCopy()')+it(CMI.ps,cmT('ps'),'cmPaste()','Ctrl + V',!LW.clip)+'<hr>'
+  +it(ALI,cmT('al')+sym+' @ '+px,'cmAlert()','Alt + A')
+  +(tr?it(CMI.up,cmT('buy')+' '+sym+' @ '+px+' '+cmT('lim'),'cmOrd(\'buy\')','Alt + Shift + B')+it(CMI.dn,cmT('sell')+' '+sym+' @ '+px+' '+cmT('lim'),'cmOrd(\'sell\')','Alt + Shift + S')+it(CMI.ord,cmT('ord')+sym+' @ '+px,'cmOrd(OT.side||\'buy\')','Shift + T'):'')
+  +it(DRI.hl,cmT('hl')+' @ '+px,'cmHl()')+'<hr>'+it(CMI.vl,cmT(LW.vlk?'vlu':'vl'),'cmVl()')+'<hr>'
+  +it(CMI.tree,cmT('tree'),'cmTree()')+it(FSI.dl,cmT('shot'),'lwShot(\'dl\')')+'<hr>'
+  +(D.length?it(DRI.del,cmT('rmd')+' ('+D.length+')','cmRmD()'):'')+(I.length?it(CMI.ind,cmT('rmi')+' ('+I.length+')','cmRmI()'):'')+(D.length||I.length?'<hr>':'')
+  +it(MTI.set,cmT('set'),'chSet()')+'</div>';
+ var x=e.clientX,y=e.clientY;flyOpen({getBoundingClientRect:function(){return{left:x,right:x,top:y-6,bottom:y-6}}},h,false)}
+function cmReset(){try{LW.ch.timeScale().resetTimeScale();LW.ch.priceScale('right').applyOptions({autoScale:true});lwRt()}catch(e){}}
+function cmCopy(){var v=String(+termRound(LW.cmp.p).toPrecision(10));try{navigator.clipboard.writeText(v).then(function(){toast(esc(cmT('cpd')+': '+v))},function(){toast(esc(v))})}catch(e){toast(esc(v))}}
+function cmAlert(p){p=p||LW.cmp;if(p&&LW.g)alAdd(LW.g,p.p)}
+function cmOrd(side,p){p=p||LW.cmp;if(!p||!bpOn())return;OT.type='limit';OT.price=String(+termRound(p.p).toPrecision(10));bsClick(side);if(document.getElementById('ot'))otDraw()}
+function cmHl(){if(LW.cmp)drAdd({k:'hl',a:LW.cmp})}
+function cmVl(){LW.vlk=LW.vlk?null:LW.cmp&&LW.cmp.t;LW.dv++;drDraw()}
+function cmVlSvg(P){if(!LW.vlk)return'';var x=drX(LW.vlk);if(x==null||x<0||x>P.w)return'';return'<line x1="'+x+'" y1="0" x2="'+x+'" y2="'+P.h+'" stroke="rgba(232,236,223,.55)" stroke-width="1" stroke-dasharray="4 4" pointer-events="none"/>'}
+function cmCopyDr(){var d=LW.sel&&drGet().filter(function(x){return x.id==LW.sel})[0];if(!d)return false;LW.clip=JSON.stringify(d);toast(esc(cmT('cpy')));return true}
+function cmPaste(){if(!LW.clip||!LW.g)return;var c=JSON.parse(LW.clip),sh=5*drSec();c.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);delete c.lk;
+ if(c.a)c.a.t+=sh;if(c.b)c.b.t+=sh;if(c.t2)c.t2+=sh;if(c.pts)c.pts.forEach(function(q){q.t+=sh});drGet();LW.D.push(c);LW.sel=c.id;drSave();drTb();LW.clip=JSON.stringify(c)}
+function cmRmD(){if(!drGet().length)return;LW.D=[];LW.sel=null;drSave();drTb()}
+function cmRmI(){var L=indList().map(function(x){x.on=0;return x});indLSave(L);indApply(true);lwVdRefresh();indLayout();indChip()}
+function cmTree(){var D=drGet(),I=indList().filter(function(x){return x.on}),x=Math.round(window.innerWidth/2-150),y=90;
+ var h='<div class="cmx cmt"><div class="gxh">'+esc(cmT('drs').toUpperCase())+' ('+D.length+')</div>'+(D.length?D.map(function(d){return'<div class="fi'+(LW.sel==d.id?' on':'')+'" onclick="LW.sel=\''+d.id+'\';LW.dv++;drTb()">'+(DRI[d.k]||'')+'<span class="cmn">'+esc(gxName(d.k))+(d.lk?' 🔒':'')+'</span><i class="cms cmd" onclick="event.stopPropagation();LW.sel=\''+d.id+'\';drDel();cmTree()">✕</i></div>'}).join(''):'<div class="cme">'+esc(cmT('none'))+'</div>')
+  +'<hr><div class="gxh">'+esc(cmT('inds').toUpperCase())+' ('+I.length+')</div>'+(I.length?I.map(function(z){return'<div class="fi" onclick="flyClose();indSet()">'+CMI.ind+'<span class="cmn">'+esc(indName(z))+'</span></div>'}).join(''):'<div class="cme">'+esc(cmT('none'))+'</div>')+'</div>';
+ flyOpen({getBoundingClientRect:function(){return{left:x,right:x,top:y,bottom:y}}},h,false)}
+document.addEventListener('mousemove',function(e){if(LW.el&&LW.el.contains(e.target))cmPt(e)},true);
+document.addEventListener('contextmenu',function(e){if(!LW.el||!LW.g||!LW.se||!LW.el.contains(e.target))return;if(!(window.matchMedia&&matchMedia('(pointer:fine)').matches))return;
+ e.preventDefault();if(LW.g.tool&&(LW.gd||LW.fd||LW.dd)){LW.gd=LW.fd=LW.dd=null;LW.g.tool=null;drTb();LW.dv++;return}cmOpen(e)});
+document.addEventListener('keydown',function(e){if(!LW.g||!LW.se)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;var c=(e.code||'').replace('Key','');
+ if((e.ctrlKey||e.metaKey)&&!e.altKey){if(c=='C'&&LW.sel){if(cmCopyDr())e.preventDefault()}else if(c=='V'&&LW.clip){e.preventDefault();cmPaste()}return}
+ if(e.altKey&&!e.shiftKey&&c=='R'){e.preventDefault();cmReset();return}
+ var p=null;if(e.altKey&&!e.shiftKey&&c=='A'){p=cmPx();if(p){e.preventDefault();cmAlert(p)}return}
+ if(e.altKey&&e.shiftKey&&(c=='B'||c=='S')){p=cmPx();if(p){e.preventDefault();cmOrd(c=='B'?'buy':'sell',p)}return}
+ if(e.shiftKey&&!e.altKey&&!e.ctrlKey&&c=='T'){p=cmPx();if(p){e.preventDefault();cmOrd(OT.side||'buy',p)}}});
 /* ---- kiritish: ko'p nuqtali (LW.gd) va erkin (LW.fd) ---- */
 function gxDown(e,k,p){var m=GXM[k];if(!m||!m.g)return false;var n=m.p;
  if(n==1){drAdd({k:k,a:p,pts:[p]});return true}
@@ -2305,9 +2354,9 @@ function drLock(id){var d=drGet().filter(function(x){return x.id==id})[0];if(!d)
 function drClone(id){var d=drGet().filter(function(x){return x.id==id})[0];if(!d)return;var c=JSON.parse(JSON.stringify(d)),sh=5*drSec();c.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);delete c.lk;
  c.a.t+=sh;if(c.b)c.b.t+=sh;if(c.t2)c.t2+=sh;LW.D.push(c);LW.sel=c.id;drSave();drTb()}
 function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var D=drGet(),P=drPlot(),vr=LW.ch.timeScale().getVisibleLogicalRange(),rp=LW.rlast||1;
- var sig=[LW.g&&LW.g.tf,LW.indKey||'',P.w,P.h,vr?vr.from.toFixed(3)+','+vr.to.toFixed(3):'',LW.se.priceToCoordinate(rp),LW.se.priceToCoordinate(rp*1.01),LW.dv,LW.sel,LW.dd?JSON.stringify(LW.dd):'',LW.rt.length,rp].join('|');
+ var sig=[LW.g&&LW.g.tf,LW.indKey||'',P.w,P.h,vr?vr.from.toFixed(3)+','+vr.to.toFixed(3):'',LW.se.priceToCoordinate(rp),LW.se.priceToCoordinate(rp*1.01),LW.dv,LW.sel,LW.vlk||'',LW.dd?JSON.stringify(LW.dd):'',LW.rt.length,rp].join('|');
  if(sig===LW.dsig)return;LW.dsig=sig;sv.setAttribute('width',P.w);sv.setAttribute('height',P.h);sv.style.width=P.w+'px';sv.style.height=P.h+'px';
- LW.selH=null;var o=sessSvg(P)+svpSvg(P)+obwSvg(P)+shSvg(P);D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);if(LW.gd)o+=drOne({k:LW.gd.k,a:LW.gd.pts[0],b:LW.gd.pts[1],pts:LW.gd.pts},P,true);if(LW.fd)o+=drOne({k:LW.fd.k,a:LW.fd.pts[0],pts:LW.fd.pts},P,true);sv.innerHTML=o;drMt(P)}
+ LW.selH=null;var o=cmVlSvg(P)+sessSvg(P)+svpSvg(P)+obwSvg(P)+shSvg(P);D.forEach(function(d){if(drVisible(d))o+=drOne(d,P,false)});if(LW.dd&&LW.dd.b)o+=drOne(LW.dd,P,true);if(LW.gd)o+=drOne({k:LW.gd.k,a:LW.gd.pts[0],b:LW.gd.pts[1],pts:LW.gd.pts},P,true);if(LW.fd)o+=drOne({k:LW.fd.k,a:LW.fd.pts[0],pts:LW.fd.pts},P,true);sv.innerHTML=o;drMt(P)}
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('[data-g]'),function(x){var n=x.getAttribute('data-g'),G=DRG.filter(function(q){return q[0]==n})[0];if(!G)return;var k=drgCur(n);x.classList.toggle('on',G[1].indexOf(g.tool)>=0);if(x.getAttribute('data-k')!==k){x.setAttribute('data-k',k);x.innerHTML=DRI[k]}});[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}if(k=='mc')return;
   if(k=='vd'||k=='ind'||k=='ct')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
