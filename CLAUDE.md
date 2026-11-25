@@ -8777,3 +8777,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `extOpen(u)` (desk.html va webapp.html): Tauri ichida (`__TC_DESKTOP` — 0.1.2 dan `initialization_script`, yoki `__TAURI_INTERNALS__`/`__TAURI__`) asosiy oyna (`top.location`) shu manzilga yo'naltiriladi → `on_navigation` uni to'xtatib tizim brauzerida ochadi; oddiy brauzerda `window.open`, bloklansa — shu oynada. `a[target=_blank]` bosilishi ham (capture) shunga o'tadi; `deskOpen`, ulashish tugmalari ham `extOpen`.
 - Nomlar `'__TAURI_'+'INTERNALS__'` ko'rinishida bo'lib yozilgan (jscheck `__X__` ni almashtiradi).
 - Ilova 0.1.2 (main.rs: `.initialization_script("window.__TC_DESKTOP = 1;")`).
+
+## 472. Akkaunt menyusi (TradingView kabi)
+- desk.html `#me` → `amOpen`: katta avatar (✎ — rasm) + ism/@username; Sozlamalar (Ctrl+,), Yangi tab (Ctrl+T), Yopilgan tabni qayta ochish (Ctrl+Shift+T; `CLS` steki — `tclose` yozadi, `treopen`), Buferdagi havolani ochish (`amClip`: tanga nomi → grafik tab, havola → `extOpen`), Masshtab − 100% + (`zmSet`, `tc_zoom`, 50–200%, `html.style.zoom`; Ctrl+= / Ctrl+- / Ctrl+0), Til, Rasmni o'zgartirish / Telegram rasmiga qaytarish, Ilovani yuklab olish, Chiqish. Matnlar `AMT`, ikonkalar `AMI`.
+- iframe (grafik) ichida bosilgan Ctrl+, = - 0 T W Tab qobiqqa `{tc:'key'}` bilan uzatiladi (webapp.html, `DESK&&EMB`).
+- Mavzu (Tizim/Qorong'i/Yorug') hali yo'q — butun ilova faqat qorong'i.

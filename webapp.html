@@ -564,6 +564,7 @@ function deskOpen(u){u=String(u||'');var m=u.match(/^https:\/\/t\.me\/share\/url
  if(/^https?:/.test(u)&&u.indexOf(location.origin)!==0){extOpen(u);return}location.href=u}
 /* 455: kompyuter ilovasi qobig'i (/desk) — tablar; ilova faqat qobiq ichida (iframe, emb=1). Eski mobil ko'rinish: ?desk=1&m=1 */
 var EMB=window.top!==window;var DQ=new URLSearchParams(EMB?location.search:'');window.__dsig=EMB&&+DQ.get('sig')||0;if(EMB&&/[?&]solo=1/.test(location.search))document.documentElement.classList.add('solo');if(EMB&&/[?&]tcol=1/.test(location.search))document.documentElement.classList.add('tcol');
+if(DESK&&EMB)document.addEventListener('keydown',function(e){if(!(e.ctrlKey||e.metaKey)||e.altKey)return;var k=e.key,ok=k==','||k=='='||k=='+'||k=='-'||k=='0'||k=='t'||k=='T'||k=='w'||k=='Tab';if(!ok)return;var a=document.activeElement;if(k!=','&&a&&/INPUT|TEXTAREA/.test(a.tagName)&&(k=='-'||k=='0'))return;e.preventDefault();try{parent.postMessage({tc:'key',key:k,code:e.code,shift:e.shiftKey},location.origin)}catch(q){}});
 if(DESK&&!EMB&&(deskGet()||{}).sid&&!/[?&]m=1/.test(location.search)){location.replace('/desk')}
 if(DESK){(function(){var d=deskGet()||{},n=function(){},hf={impactOccurred:n,notificationOccurred:n,selectionChanged:n},bb={show:n,hide:n,onClick:n,offClick:n,isVisible:false};
  tg={initData:d.sid||'',initDataUnsafe:{user:d.user||{}},platform:'desktop',version:'6.0',isVersionAtLeast:function(){return false},ready:n,expand:n,onEvent:n,offEvent:n,setHeaderColor:n,setBackgroundColor:n,disableVerticalSwipes:n,

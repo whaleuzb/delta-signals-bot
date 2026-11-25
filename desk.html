@@ -64,6 +64,10 @@ table.t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .t.cal{table-layout:fixed}.t.cal td:nth-child(2){white-space:normal}.t.cal th:nth-child(2){text-align:left}.t.cal tr.nx td{background:rgba(194,242,58,.07)}.t.cal tr.ps td{opacity:.6}
 .cal .orig{color:var(--mu);font-size:11px;margin-top:2px}
 /* menyu */
+.amn{width:330px;padding:8px}.amn .ami span{white-space:nowrap}.amn .amh{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 4px;cursor:default}.amn .amh:hover{background:none}.amn .amh b{font-size:14px}.amn .amh small{color:var(--mu);font-size:12px;margin-top:-4px}
+.amn .ami{display:flex;align-items:center;gap:12px;padding:8px 10px}.amn .ami span{flex:1}.amn .ami i{font-style:normal;font-size:11.5px;color:var(--mu)}.amn .ami.dis{opacity:.4;cursor:default}.amn .ami.dis:hover{background:none}.amn svg{flex:none;color:var(--tx)}
+.amn .amz{display:flex;align-items:center;gap:12px;padding:6px 10px;cursor:default}.amn .amz:hover,.amn .aml:hover{background:none}.amn .amz span{flex:1}.amn .amz b{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:rgba(255,255,255,.08);cursor:pointer;padding:0;font-size:16px}.amn .amz b:hover{background:rgba(255,255,255,.16)}.amn .amz em{font-style:normal;width:44px;text-align:center;cursor:pointer;font-weight:600}
+.amn .aml{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:default;flex-wrap:wrap}.amn .aml span{flex:1 0 100%;color:var(--mu);font-size:11.5px}.amn .aml b{flex:1;text-align:center;padding:6px 4px;border-radius:7px;background:rgba(255,255,255,.06);cursor:pointer;font-weight:600;font-size:12.5px}.amn .aml b.on{background:#e8ecdf;color:#0b0b0c}
 .mn{position:fixed;z-index:100;min-width:220px;background:#18181a;border:1px solid var(--ln2);border-radius:10px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.6)}
 .mn div{padding:8px 12px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:10px}.mn div:hover{background:rgba(255,255,255,.07)}.mn hr{border:0;border-top:1px solid var(--ln);margin:6px 0}.mn .mh{color:var(--mu);font-size:11px;cursor:default;padding:6px 12px}.mn .mh:hover{background:none}.mn .ck{margin-left:auto;color:var(--g)}
 .empty{color:var(--mu);text-align:center;padding:60px 0}
@@ -181,8 +185,9 @@ function topen(k,o,bg){o=o||{};if(k=='chart'&&o.sym)rcPut(o.sym);var t={id:'t'+(
  /* bo'sh «Yangi tab»dan ochilsa — shu tab o'rniga */
  if(cur&&cur.k=='home'&&!bg){var i=TABS.indexOf(cur);TABS[i]=t;var p=PANES[cur.id];if(p){p.remove();delete PANES[cur.id]}}else TABS.push(t);
  if(!bg)ACT=t.id;tsave();tdraw();tshow();return t}
-function tclose(id){var i=TABS.findIndex(function(t){return t.id==id});if(i<0)return;var p=PANES[id];if(p){p.remove();delete PANES[id]}TABS.splice(i,1);
+var CLS=[];function tclose(id){var i=TABS.findIndex(function(t){return t.id==id});if(i<0)return;var ct=TABS[i];if(ct&&ct.k!='home'){CLS.push(JSON.parse(JSON.stringify(ct)));if(CLS.length>15)CLS.shift()}var p=PANES[id];if(p){p.remove();delete PANES[id]}TABS.splice(i,1);
  if(!TABS.length)TABS.push({id:'t'+(++TI),k:'home'});if(ACT==id)ACT=(TABS[i]||TABS[i-1]).id;tsave();tdraw();tshow()}
+function treopen(){var t=CLS.pop();if(!t)return;t.id='t'+(++TI);TABS.push(t);ACT=t.id;tsave();tdraw();tshow()}
 function tact(id){if(!tget(id))return;ACT=id;tsave();tdraw();tshow()}
 function tshow(){setTimeout(function(){sbDraw();sbPoll()},0);var t=tget(ACT);Object.keys(PANES).forEach(function(k){PANES[k].classList.toggle('on',k==ACT)});if(!t)return;var p=PANES[t.id];if(!p){p=document.createElement('div');p.className='pane on';p.setAttribute('data-p',t.id);document.getElementById('main').appendChild(p);PANES[t.id]=p;pbuild(t,p)}else if(p.__re)p.__re()}
 var PG={home:homeP,scr:scrP,heat:heatP,cal:calP,sig:sigP,stat:statP,top:topP,tour:tourP,set:setP,port:function(p){portP(p)},dip:function(p){dipP(p)},df:function(p){dfP(p)}};
@@ -561,9 +566,43 @@ function avMe(){var u=(D&&D.user)||{},nm=(u.first_name||u.username||'T'),me=docu
 function avLoad(op,b){b=b||{};b.op=op||'get';return api('avatar',b).then(function(d){AV.url=d.url||null;AV.own=!!d.own;avMe();if(window.__avRe)window.__avRe();return d})}
 function avPick(){var f=document.createElement('input');f.type='file';f.accept='image/*';f.onchange=function(){var x=f.files&&f.files[0];if(!x)return;var rd=new FileReader();rd.onload=function(){var im=new Image();im.onload=function(){var s=Math.min(im.width,im.height),c=document.createElement('canvas');c.width=c.height=512;c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,512,512);
   avLoad('put',{img:c.toDataURL('image/jpeg',.9)}).then(function(){toast(avT(2))}).catch(function(){toast(avT(3))})};im.onerror=function(){toast(avT(3))};im.src=rd.result};rd.readAsDataURL(x)};f.click()}
+/* 472: akkaunt menyusi (TradingView kabi): avatar + ism, Sozlamalar, Yangi tab, Yopilgan tabni qayta ochish, Buferdagi havolani ochish,
+   Masshtab (− 100% +, tc_zoom), Til, Rasm, Ilovani yuklab olish, Chiqish. Qisqa tugmalar: Ctrl+, Ctrl+T Ctrl+Shift+T Ctrl+= Ctrl+- Ctrl+0 */
+var AMT={uz:['Sozlamalar','Yangi tab','Yopilgan tabni qayta ochish','Buferdagi havolani ochish','Masshtab','Til','Chiqish','Buferda tanga yoki havola topilmadi'],
+ ru:['Настройки','Новая вкладка','Открыть закрытую вкладку','Открыть ссылку из буфера','Масштаб','Язык','Выйти','В буфере нет монеты или ссылки'],
+ en:['Settings','New tab','Reopen closed tab','Open link from clipboard','Zoom','Language','Log out','No coin or link in clipboard']};
+function amT(i){return(AMT[L]||AMT.uz)[i]}
+var ZM=100;try{ZM=+localStorage.getItem('tc_zoom')||100}catch(e){}
+function zmSet(v){ZM=Math.max(50,Math.min(200,Math.round(v/10)*10));try{localStorage.setItem('tc_zoom',String(ZM))}catch(e){}document.documentElement.style.zoom=ZM==100?'':String(ZM/100);var z=document.getElementById('amz');if(z)z.textContent=ZM+'%'}
+zmSet(ZM);
+var AMI={set:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.8l8 4.6v9.2l-8 4.6-8-4.6V7.4z"/><circle cx="12" cy="12" r="3"/></svg>',
+ nt:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>',
+ ro:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 8.5A8 8 0 1 1 4.5 14"/><path d="M4.5 4v4.5H9"/></svg>',
+ cb:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M10 14l4-4"/><path d="M8.5 11.5l-2 2a3.5 3.5 0 0 0 5 5l2-2M15.5 12.5l2-2a3.5 3.5 0 0 0-5-5l-2 2"/></svg>',
+ zm:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" stroke-dasharray="3 2"/></svg>',
+ ph:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l5-4.5 3.5 3 3-2.5L20 17"/></svg>',
+ dl:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>',
+ out:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4.5H5.5v15H10M14 8l4 4-4 4M18 12H9"/></svg>'};
+function amOpen(el){var u=(D&&D.user)||{},nm=u.first_name||u.username||'T',it=function(a,ic,txt,sc,dis){return'<div class="ami'+(dis?' dis':'')+'" data-am="'+a+'">'+ic+'<span>'+esc(txt)+'</span>'+(sc?'<i>'+sc+'</i>':'')+'</div>'};
+ var h='<div class="amh"><span class="avw" data-am="avc" title="'+esc(avT(0))+'">'+avHtml(56,22)+'<em>✎</em></span><b>'+esc(nm)+'</b>'+(u.username?'<small>@'+esc(u.username)+'</small>':'')+'</div><hr>'
+  +it('set',AMI.set,amT(0),'Ctrl + ,')+it('nt',AMI.nt,amT(1),'Ctrl + T')+it('ro',AMI.ro,amT(2),'Ctrl + Shift + T',!CLS.length)+it('cb',AMI.cb,amT(3))+'<hr>'
+  +'<div class="amz">'+AMI.zm+'<span>'+esc(amT(4))+'</span><b data-am="z-">−</b><em id="amz" data-am="z0" title="100%">'+ZM+'%</em><b data-am="z+">+</b></div><hr>'
+  +'<div class="aml"><span>'+esc(amT(5))+'</span>'+[['uz',"O'zbekcha"],['ru','Русский'],['en','English']].map(function(x){return'<b class="'+(L==x[0]?'on':'')+'" data-al="'+x[0]+'">'+x[1]+'</b>'}).join('')+'</div><hr>'
+  +it('avc',AMI.ph,avT(0))+(AV.own?it('avt',AMI.ro,avT(1)):'')+it('dl',AMI.dl,TX.dl)+'<hr>'+it('out',AMI.out,amT(6));
+ mopen(el,h,true);var m=document.getElementById('mn');m.classList.add('amn');
+ m.onclick=function(e){var l=e.target.closest('[data-al]');if(l){try{localStorage.setItem('tc_lang',l.getAttribute('data-al'))}catch(q){}location.reload();return}var a=e.target.closest('[data-am]');if(!a||a.classList.contains('dis'))return;var k=a.getAttribute('data-am');
+  if(k=='z+'||k=='z-'||k=='z0'){zmSet(k=='z0'?100:ZM+(k=='z+'?10:-10));return}mclose();
+  if(k=='set')topen('set');else if(k=='nt')document.getElementById('plus').onclick();else if(k=='ro')treopen();else if(k=='cb')amClip();else if(k=='avc')avPick();else if(k=='avt')avLoad('del').catch(function(){});
+  else if(k=='dl')location.href='/desktop';else if(k=='out'){try{localStorage.removeItem('tc_dsk')}catch(q){}location.replace('/app?desk=1')}}}
+function amClip(){var go=function(tx){tx=String(tx||'').trim();if(!tx){toast(amT(7));return}var m=tx.match(/startapp=ch_([A-Za-z0-9_-]+)/);if(m){extOpen(tx);return}
+  if(/^https?:\/\//.test(tx)){if(tx.indexOf(location.origin)==0){topen('chart',{sym:'BTC'});return}extOpen(tx);return}var s=tx.toUpperCase().match(/^#?\$?([A-Z0-9]{2,15})(\/?USDT|\/?USDC|\/?USD)?(\.P)?$/);if(s){topen('chart',{sym:base(s[1])});return}toast(amT(7))};
+ try{navigator.clipboard.readText().then(go,function(){toast(amT(7))})}catch(e){toast(amT(7))}}
+document.addEventListener('keydown',function(e){var c=e.ctrlKey||e.metaKey;if(!c)return;if(e.key==','){e.preventDefault();topen('set')}else if(e.shiftKey&&(e.code=='KeyT')){e.preventDefault();e.stopImmediatePropagation();treopen()}
+ else if(e.key=='='||e.key=='+'){e.preventDefault();zmSet(ZM+10)}else if(e.key=='-'){e.preventDefault();zmSet(ZM-10)}else if(e.key=='0'){e.preventDefault();zmSet(100)}},true);
+/* iframe ichidan yuborilgan qisqa tugmalar */
+window.addEventListener('message',function(e){if(e.origin!==location.origin||!e.data||e.data.tc!=='key')return;var d=e.data;document.dispatchEvent(new KeyboardEvent('keydown',{key:d.key,code:d.code,ctrlKey:true,shiftKey:!!d.shift,bubbles:true}))});
 (function(){var u=(D&&D.user)||{},nm=(u.first_name||u.username||'T');var me=document.getElementById('me');avMe();if(D&&D.sid)avLoad().catch(function(){});
- me.onclick=function(e){e.stopPropagation();mopen(me,'<div class="mh">'+esc(TX.lang)+'</div>'+[['uz',"O'zbekcha"],['ru','Русский'],['en','English']].map(function(x){return'<div data-l="'+x[0]+'">'+x[1]+(L==x[0]?'<span class="ck">✓</span>':'')+'</div>'}).join('')
-  +'<hr><div data-a="avc">🖼 '+esc(avT(0))+'</div>'+(AV.own?'<div data-a="avt">↺ '+esc(avT(1))+'</div>':'')+'<hr><div data-a="set">⚙ '+esc(TX.set)+'</div><div data-a="dl">⬇ '+esc(TX.dl)+'</div><hr><div data-a="out" style="color:#ff6b6b">⎋ '+esc(TX.out)+'</div>',true)}})();
+ me.onclick=function(e){e.stopPropagation();amOpen(me)}})();
 function mopen(el,h,right){mclose();var m=document.createElement('div');m.className='mn';m.id='mn';m.innerHTML=h;document.body.appendChild(m);var r=el.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';if(right)m.style.right=(window.innerWidth-r.right+4)+'px';else m.style.left=r.left+'px';
  m.onclick=function(e){var l=e.target.closest('[data-l]');if(l){try{localStorage.setItem('tc_lang',l.getAttribute('data-l'))}catch(q){}location.reload();return}var a=e.target.closest('[data-a]');if(!a)return;var k=a.getAttribute('data-a');mclose();
   if(k=='avc'){avPick();return}if(k=='avt'){avLoad('del').catch(function(){});return}
