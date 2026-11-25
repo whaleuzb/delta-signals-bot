@@ -8763,3 +8763,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 467. Tanga qidiruvi (TradingView «Symbol search»)
 - Kompyuter sarlavhasida tanga yumaloq qutichada (`.dsy`: logo + nom + 🔍) → `ssOpen()`; yonida ⊕ (`.dsc`) → `ssOpen('',1)` taqqoslash rejimi. Grafikda harf/raqam yozilsa (modifikatorsiz) oyna shu belgi bilan ochiladi.
 - Oyna `#ssm`: katta qidiruv maydoni, toifalar Hammasi/Spot/Futures/Ro'yxatim (`SS.cat`), bo'sh qidiruvda «Oxirgilar» (`tc_ssr`, 8 ta) + ro'yxat; har qatorda logo, juftlik, turi (perpetual/spot), narx, 24s %, + ro'yxatga (`wlAddS`), taqqoslash rejimida ⇄ (`ssCmp` → Compare indikatori). ↑↓ / Enter / Esc. Manba `wlAllList` (tc_wlall), narxlar `api('tickers')` (14 ta, 350 ms kechikish). Tanlash `ssPick` → `wlGo`. Matnlar `SST`.
+
+## 468. OHLC qatori grafik ustida (shaffof)
+- Kompyuterda `#lwfso` alohida qator emas: `lwFs` uni `#lwfsc` ichiga ko'chiradi (`#lwfsc>#lwfso` — chap tepada, fonsiz, `pointer-events:none`, matn soyasi). Boshida «BTCUSDT · 1h» (`.lgn`). SELL/BUY uning ostida (`html.dwide #lwfsc>#bsb` top:30px left:10px). Och fonda `html.lw-lite` (chOpts) — to'q matn.
