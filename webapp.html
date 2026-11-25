@@ -187,6 +187,10 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);margin:0 4px 1px 0}
 .dot.on{background:var(--g);box-shadow:0 0 8px var(--g)}
 .acts{display:flex;flex-wrap:wrap;gap:6px}
+#dsklog{position:fixed;inset:0;z-index:900;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(194,242,58,.08),transparent 60%),#050506}
+#dsklog .dl{width:min(380px,100%);padding:30px 26px;border-radius:22px;text-align:center}#dsklog .dlg{width:64px;height:64px;margin:0 auto 14px;border-radius:18px;display:grid;place-items:center;background:rgba(194,242,58,.12);color:var(--ink)}
+#dsklog h2{margin:0 0 4px;font-size:20px;letter-spacing:-.02em}#dsklog p{font-size:13px;line-height:1.5;color:rgba(232,236,223,.7);margin:16px 0 20px}#dsklog .btn{width:100%;padding:13px;font-size:14px}
+#dsklog .dlw{margin-top:16px;font-size:12px;line-height:1.5}#dsklog code{display:block;margin-top:6px;word-break:break-all;user-select:all;font-size:11px;padding:8px;border-radius:8px;background:rgba(255,255,255,.05)}
 .btn{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 10px;font-weight:700;font-size:12px;color:var(--ink);
  background:rgba(255,255,255,.07);cursor:pointer;flex:1;min-width:52px;white-space:nowrap;transition:transform .2s var(--ease),opacity .2s}
 .btn.p{background:rgba(194,242,58,.15);color:var(--g);border-color:rgba(194,242,58,.25)}
@@ -454,6 +458,28 @@ var I={home:'<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
  layers:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>'};
 function ic(n,z){z=z||22;return '<svg class="ic" width="'+z+'" height="'+z+'" viewBox="0 0 24 24">'+I[n]+'</svg>'}
 var tg=window.Telegram&&window.Telegram.WebApp;
+/* 452: kompyuter ilovasi (Tauri, /app?desk=1) — Telegram tashqarisida. Telegram orqali kirish (bot /start desk_<tok>) bilan olingan
+   sessiya `desk.<uid>.<exp>.<sig>` initData o'rnida yuboriladi; tg — Telegram.WebApp o'rniga shim (confirm, havolalar, haptic yo'q). */
+var DESK=(function(){if(tg&&tg.initData)return false;var q=/[?&]desk=1/.test(location.search);try{if(q)localStorage.setItem('tc_desk','1');return q||localStorage.getItem('tc_desk')==='1'}catch(e){return q}})();
+function deskGet(){try{return JSON.parse(localStorage.getItem('tc_dsk')||'null')}catch(e){return null}}
+function deskOpen(u){location.href=u}
+if(DESK){(function(){var d=deskGet()||{},n=function(){},hf={impactOccurred:n,notificationOccurred:n,selectionChanged:n},bb={show:n,hide:n,onClick:n,offClick:n,isVisible:false};
+ tg={initData:d.sid||'',initDataUnsafe:{user:d.user||{}},platform:'desktop',version:'6.0',isVersionAtLeast:function(){return false},ready:n,expand:n,onEvent:n,offEvent:n,setHeaderColor:n,setBackgroundColor:n,disableVerticalSwipes:n,
+  HapticFeedback:hf,BackButton:bb,safeAreaInset:{top:0,bottom:0,left:0,right:0},contentSafeAreaInset:{top:0,bottom:0,left:0,right:0},
+  showConfirm:function(m,cb){var r=window.confirm(m);if(cb)cb(r)},showAlert:function(m,cb){window.alert(m);if(cb)cb()},openLink:deskOpen,openTelegramLink:deskOpen,
+  downloadFile:function(o){var a=document.createElement('a');a.href=o.url;a.download=o.file_name||'';document.body.appendChild(a);a.click();a.remove()}};
+ document.documentElement.classList.add('desk')})()}
+function deskGet2(){var u=location.origin+'/desktop';try{if(tg&&tg.openLink&&tg.initData){tg.openLink(u);return}}catch(e){}window.open(u,'_blank')}
+function deskOut(){try{localStorage.removeItem('tc_dsk')}catch(e){}location.reload()}
+function deskLogin(){var L=S.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])L=sl}catch(e){}var TX={uz:['Kompyuter uchun ilova','Kirish uchun Telegram\'da botni oching va «Start» tugmasini bosing.','Telegram orqali kirish','Telegram\'da tasdiqlanishini kutyapmiz…','Havola ochilmadimi? Uni nusxalab Telegram\'da oching:'],
+  ru:['Приложение для компьютера','Чтобы войти, откройте бота в Telegram и нажмите «Start».','Войти через Telegram','Ждём подтверждения в Telegram…','Ссылка не открылась? Скопируйте её и откройте в Telegram:'],
+  en:['Desktop app','To sign in, open the bot in Telegram and press “Start”.','Sign in with Telegram','Waiting for confirmation in Telegram…','Link did not open? Copy it and open in Telegram:']}[L]||[];
+ var m=document.createElement('div');m.id='dsklog';m.innerHTML='<div class="dl glass"><div class="dlg">'+ic('bot',34)+'</div><h2>Trade Controller</h2><div class="m">'+esc(TX[0])+'</div><p>'+esc(TX[1])+'</p><button class="btn p" id="dskb">'+esc(TX[2])+'</button><div class="m dlw" id="dskw" hidden></div></div>';
+ document.body.appendChild(m);var tm=null,end=0;
+ document.getElementById('dskb').onclick=function(){var b=this;b.disabled=true;fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'start'})}).then(function(r){if(!r.ok)throw r.status;return r.json()}).then(function(d){
+   deskOpen(d.url);var w=document.getElementById('dskw');w.hidden=false;w.innerHTML=esc(TX[3])+'<br><br>'+esc(TX[4])+'<br><code>'+esc(d.url)+'</code>';b.disabled=false;end=Date.now()+14*60000;clearInterval(tm);
+   tm=setInterval(function(){if(Date.now()>end){clearInterval(tm);return}fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'poll',tok:d.tok})}).then(function(r){return r.json()}).then(function(x){if(x&&x.ok){clearInterval(tm);try{localStorage.setItem('tc_dsk',JSON.stringify({sid:x.sid,user:x.user}))}catch(e){}location.replace('/app?desk=1')}}).catch(function(){})},2000)
+  }).catch(function(){b.disabled=false;toast('⚠️')})}}
 var TABS=['home','wallet','signals','dip','top','tour','profile'];
 var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
 /* 378: ko'z tugmasi — balans/summalarni yashirish (qurilmada eslab qolinadi) */
@@ -470,7 +496,7 @@ function mn(v){return S.hide?'••••':n2(v)}   /* 378: ko'z — summalarni
 function fm(x){if(S.hide)return(x>=0?'+':'−')+'$••••';return(x>=0?'+':'−')+'$'+Math.abs(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function f0(x){if(S.hide)return'$••••';return '$'+x.toLocaleString('en-US',{maximumFractionDigits:0})}
 function fpc(x){return(x>=0?'+':'')+x.toFixed(2)+'%'}
-function api(p,b){b=b||{};b.initData=tg?tg.initData:'';return fetch('/api/app/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){if(!r.ok)throw r.status;return r.json()})}
+function api(p,b){b=b||{};b.initData=tg?tg.initData:'';return fetch('/api/app/'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){if(!r.ok){if(r.status==403&&DESK&&p=='me')deskOut();throw r.status}return r.json()})}
 function noEmoji(s){return String(s).replace(/[✀-➿☀-⛿️]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF]/g,'').trim()}
 function toast(m){var e=document.getElementById('toast');e.innerHTML=m;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},4200)}
 function haptic(k){try{tg.HapticFeedback.notificationOccurred(k)}catch(e){}}
@@ -2396,7 +2422,7 @@ function pickWs(id){S.cur=id;S.items=[];S.spark={};try{localStorage.setItem('tc_
 function profile(v,w){var u=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user)||{};var nm=((u.first_name||'')+' '+(u.last_name||'')).trim()||'Trader';
  var av=u.photo_url?'<img src="'+esc(u.photo_url)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">':'<span style="font-size:26px;font-weight:800">'+esc(nm.charAt(0).toUpperCase())+'</span>';
  var h='<div class="rise" style="text-align:center;margin:26px 0 18px"><div class="logo glass" style="margin:0 auto 12px;width:84px;height:84px;border-radius:50%;color:var(--ink)">'+av+'</div>'
-  +'<div style="font-size:18px;font-weight:800;letter-spacing:-.02em">'+esc(nm)+'</div>'+(u.username?'<div class="m" style="font-size:12px;margin-top:2px">@'+esc(u.username)+'</div>':'')+'</div>';
+  +'<div style="font-size:18px;font-weight:800;letter-spacing:-.02em">'+esc(nm)+'</div>'+(u.username?'<div class="m" style="font-size:12px;margin-top:2px">@'+esc(u.username)+'</div>':'')+(DESK?'<button class="btn glass" style="margin-top:10px;padding:6px 14px;font-size:12px" onclick="deskOut()">⎋ '+esc(S.lang=='ru'?'Выйти':S.lang=='en'?'Sign out':'Chiqish')+'</button>':'<button class="btn glass" style="margin-top:10px;padding:6px 14px;font-size:12px" onclick="deskGet2()">💻 '+esc(S.lang=='ru'?'Приложение для компьютера':S.lang=='en'?'Desktop app':'Kompyuter uchun ilova')+'</button>')+'</div>';
  h+='<h3 class="rise" style="font-size:15px">'+esc(t('journals'))+'</h3>';
  h+=S.ws.map(function(x){var on=x.id==S.cur;return'<div class="card glass rise'+(on?' acc':'')+'" style="min-height:0;display:flex;align-items:center;gap:12px" onclick="pickWs('+x.id+')">'
   +'<span style="color:'+(on?'var(--g)':'var(--mut)')+'">'+wsIc(x)+'</span><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(wsName(x))+'</div>'
@@ -3163,6 +3189,7 @@ navWrap(['openGroup','cxTerm','cxStats','openTerm','dfTrades','dfTerm','newSig',
  try{var nv=performance.getEntriesByType('navigation')[0];var sv=sessionStorage.getItem('tc_nav');if(nv&&nv.type=='reload'&&sv)q0=new URLSearchParams(sv)}catch(e){}
  var sp=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.start_param)||'';
  if(/^g\d+$/.test(sp)&&!q0.get('g'))q0.set('g',sp.slice(1));if(/^sg_\d+$/.test(sp))setTimeout(function(){sgOpen(+sp.slice(3))},700);if(/^(ch|tp)_[A-Za-z0-9_-]{4,40}$/.test(sp))setTimeout(function(){chOpenKey(sp.slice(3))},900);if(TABS.indexOf(sp)>=0&&!q0.get('tab'))q0.set('tab',sp);
+ if(DESK&&!tg.initData){deskLogin();return}
  if(!tg||!tg.initData){S.pub=true;S.bot=BOT;var nl=q0.get('lang');S.lang=T[nl]?nl:'uz';try{var sl0=localStorage.getItem('tc_lang');if(sl0&&T[sl0])S.lang=sl0}catch(e){}
   document.getElementById('tBot').textContent=t('bot');document.getElementById('botIc').innerHTML=ic('bot',16);
   document.getElementById('botLink').onclick=function(e){e.preventDefault();openLink(botUrl())};

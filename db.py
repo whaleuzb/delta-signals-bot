@@ -748,6 +748,14 @@ CREATE TABLE IF NOT EXISTS user_chart (
     at      BIGINT NOT NULL,
     PRIMARY KEY (user_id, k)
 );
+-- 452: kompyuter ilovasiga kirish — ilova tok yaratadi, bot /start desk_<tok> da user_id yozadi, ilova so'rab sessiya oladi
+CREATE TABLE IF NOT EXISTS desk_login (
+    tok     TEXT PRIMARY KEY,
+    user_id BIGINT,
+    name    TEXT,
+    uname   TEXT,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -3238,6 +3246,29 @@ async def chart_put(uid: int, items: list) -> int:
 
 
 # ─────────────────────────── 437: ulashilgan grafiklar ───────────────────────────
+
+async def desk_new(tok: str) -> bool:
+    async with pool().acquire() as c:
+        await c.execute("DELETE FROM desk_login WHERE at < now() - interval '15 minutes'")
+        if await c.fetchval("SELECT count(*) FROM desk_login") > 5000:
+            return False
+        await c.execute("INSERT INTO desk_login (tok) VALUES ($1)", tok)
+        return True
+
+
+async def desk_confirm(tok: str, uid: int, name: str, uname: str) -> bool:
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE desk_login SET user_id=$2, name=$3, uname=$4 WHERE tok=$1 AND user_id IS NULL "
+                            "AND at > now() - interval '15 minutes'", tok, uid, name[:64], uname[:64])
+        return r.endswith(" 1")
+
+
+async def desk_take(tok: str):
+    """Tasdiqlangan bo'lsa qatorni o'chirib qaytaradi (bir martalik)."""
+    async with pool().acquire() as c:
+        return await c.fetchrow("DELETE FROM desk_login WHERE tok=$1 AND user_id IS NOT NULL "
+                                "AND at > now() - interval '15 minutes' RETURNING user_id, name, uname", tok)
+
 
 async def chart_share_put(key: str, uid: int, kind: str, sym: str | None, tf: str | None, data_json: str) -> None:
     async with pool().acquire() as c:

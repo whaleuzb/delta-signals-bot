@@ -37,6 +37,7 @@ WS_ACTIONS = ("dep", "fdep", "df", "dfacc", "dfone", "dfstats", "newsig", "ref",
 
 # `web.build_app` o'rnatadi (aylanma importsiz): web.verify_init_data.
 VERIFY = None
+DESK_SIGN = None
 
 
 def _verify(init_data: str) -> int | None:
@@ -439,6 +440,40 @@ async def api_orderflow(request):
 
 
 _PUB_KEY = re.compile(r"^[A-Za-z0-9_-]{4,40}$")
+
+
+async def api_desk(request):
+    """452: kompyuter ilovasiga Telegram orqali kirish.
+    op=start -> {tok, url (t.me/<bot>?start=desk_<tok>)}; op=poll {tok} -> {ok:false} yoki {ok, sid, user}.
+    sid = `desk.<uid>.<exp>.<sig>` — ilova uni initData o'rnida yuboradi (web.desk_verify)."""
+    import secrets
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    op = str(body.get("op") or "")
+    bot = request.app["bot_username"] or ""
+    if op == "start":
+        tok = secrets.token_urlsafe(18)
+        if not bot or not await db.desk_new(tok):
+            raise web.HTTPServiceUnavailable()
+        return web.json_response({"tok": tok, "url": f"https://t.me/{bot}?start=desk_{tok}"}, headers=NO_CACHE)
+    if op == "poll":
+        tok = str(body.get("tok") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{20,40}", tok):
+            raise web.HTTPBadRequest()
+        r = await db.desk_take(tok)
+        if not r or not DESK_SIGN:
+            return web.json_response({"ok": False}, headers=NO_CACHE)
+        return web.json_response({"ok": True, "sid": DESK_SIGN(r["user_id"]),
+                                  "user": {"id": r["user_id"], "first_name": r["name"] or "", "username": r["uname"] or ""}},
+                                 headers=NO_CACHE)
+    if op == "me":
+        uid = _verify(str(body.get("initData") or ""))
+        if uid is None:
+            raise web.HTTPForbidden()
+        return web.json_response({"ok": True, "id": uid}, headers=NO_CACHE)
+    raise web.HTTPBadRequest()
 
 
 async def api_chartpub(request):
@@ -1328,6 +1363,75 @@ async def api_tour(request):
 
 
 _INVITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "invite.jpg")
+
+
+# 452: kompyuter ilovasini yuklab olish sahifasi — GitHub Release (ochiq repo) dan oxirgi desktop-v* reliz fayllari.
+_DESK_REPO = "whaleuzb/delta-signals-bot"
+_DESK_C = {"at": 0.0, "rel": None}
+_DESK_ICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "desktop", "src-tauri", "icons", "128x128@2x.png")
+
+
+async def _desk_release():
+    import aiohttp
+    if time.time() - _DESK_C["at"] < 600 and _DESK_C["rel"] is not None:
+        return _DESK_C["rel"]
+    rel = _DESK_C["rel"]
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+            async with s.get(f"https://api.github.com/repos/{_DESK_REPO}/releases?per_page=20",
+                             headers={"Accept": "application/vnd.github+json", "User-Agent": "trade-controller"}) as r:
+                if r.status == 200:
+                    rel = next((x for x in await r.json() if str(x.get("tag_name", "")).startswith("desktop-v")
+                                and not x.get("draft")), None) or {}
+    except Exception:
+        log.warning("Desktop reliz ro'yxati olinmadi", exc_info=True)
+    _DESK_C.update(at=time.time(), rel=rel if rel is not None else {})
+    return _DESK_C["rel"]
+
+
+def _desk_pick(assets, *ends):
+    for e in ends:
+        for a in assets:
+            if a.get("name", "").lower().endswith(e):
+                return a
+    return None
+
+
+async def desktop_page(request):
+    import html as _h
+    rel = await _desk_release() or {}
+    A = rel.get("assets") or []
+    ua = request.headers.get("User-Agent", "")
+    me = "mac" if "Mac OS" in ua or "Macintosh" in ua else "lin" if "Linux" in ua and "Android" not in ua else "win"
+    rows = [("win", "Windows 10 / 11", _desk_pick(A, "-setup.exe", ".exe", ".msi")),
+            ("mac", "macOS (Intel + Apple Silicon)", _desk_pick(A, "universal.dmg", ".dmg")),
+            ("lin", "Linux (.AppImage)", _desk_pick(A, ".appimage")),
+            ("deb", "Linux (.deb — Ubuntu/Debian)", _desk_pick(A, ".deb"))]
+    rows.sort(key=lambda r: r[0] != me)
+    ver = _h.escape(str(rel.get("tag_name", "")).replace("desktop-v", "v"))
+    btn = "".join(
+        f'<a class="b{" p" if i == 0 else ""}" href="{_h.escape(a["browser_download_url"])}"><b>{n}</b>'
+        f'<span>{_h.escape(a["name"])} · {a.get("size", 0) / 1048576:.1f} MB</span></a>' if a else
+        f'<div class="b off"><b>{n}</b><span>tayyorlanmoqda…</span></div>'
+        for i, (k, n, a) in enumerate(rows))
+    page = f"""<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trade Controller — kompyuter uchun</title><link rel="icon" href="/desktop/icon.png"><style>
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 20%,rgba(194,242,58,.10),transparent 60%),#050506;color:#e8ecdf;font:15px/1.5 -apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif;padding:16px;box-sizing:border-box}}
+.c{{width:min(520px,100%);text-align:center}}img{{width:104px;height:104px}}h1{{margin:10px 0 2px;font-size:26px;letter-spacing:-.02em}}.m{{color:rgba(232,236,223,.55);font-size:13px}}
+.b{{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:10px 0;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:inherit;text-decoration:none}}
+.b span{{font-size:12px;color:rgba(232,236,223,.55)}}.b.p{{background:rgba(194,242,58,.14);border-color:rgba(194,242,58,.5)}}.b.p b{{color:#c2f23a}}.b.off{{opacity:.45}}
+.n{{text-align:left;margin-top:22px;font-size:13px;color:rgba(232,236,223,.7)}}.n b{{color:#e8ecdf}}</style></head><body><div class="c">
+<img src="/desktop/icon.png" alt=""><h1>Trade Controller</h1><div class="m">Kompyuter uchun ilova {ver}</div><div style="margin-top:18px">{btn}</div>
+<div class="n"><p><b>Kirish:</b> ilovani oching → «Telegram orqali kirish» → Telegram'da botda «Start» bosing. Ilova o'zi ochiladi.</p>
+<p><b>Windows:</b> «Windows protected your PC» chiqsa — «More info» → «Run anyway» (ilova hali raqamli imzolanmagan).</p>
+<p><b>macOS:</b> birinchi marta Finder'da ilovani o'ng tugma → «Open» bilan oching. «Damaged» desa, Terminal'da:<br><code>xattr -cr "/Applications/Trade Controller.app"</code></p>
+<p><b>Yangilanishlar</b> — interfeys serverdan yuklanadi, shuning uchun yangi funksiyalar qayta o'rnatmasdan keladi.</p></div></div></body></html>"""
+    return web.Response(text=page, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+async def desktop_icon(request):
+    with open(_DESK_ICON, "rb") as fh:
+        return web.Response(body=fh.read(), content_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def invite_jpg(request):
@@ -2375,6 +2479,8 @@ def routes() -> list:
         web.get("/app", app_page),
         web.get("/api/app/ver", api_ver),
         web.get("/invite.jpg", invite_jpg),
+        web.get("/desktop", desktop_page),
+        web.get("/desktop/icon.png", desktop_icon),
         web.get("/lwc.js", lwc_js),
         web.get(r"/coins/{c:[a-z0-9]{1,12}}.svg", coin_svg),
         web.get(r"/coinx/{c:[a-z0-9]{1,15}}", coin_ext),
@@ -2391,6 +2497,7 @@ def routes() -> list:
         web.post("/api/app/alerts", api_alerts),
         web.post("/api/app/chart", api_chart),
         web.post("/api/app/chartpub", api_chartpub),
+        web.post("/api/app/desk", api_desk),
         web.post("/api/app/orderflow", api_orderflow),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),

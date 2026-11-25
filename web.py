@@ -275,6 +275,33 @@ _member_cache: dict[tuple[int, int], tuple[float, bool]] = {}
 MEMBER_TTL = 300.0
 
 
+DESK_DAYS = 180
+
+
+def _desk_key(token: str) -> bytes:
+    return hmac.new(b"DeskApp", token.encode(), hashlib.sha256).digest()
+
+
+def desk_sign(uid: int, token: str | None = None) -> str:
+    """452: kompyuter ilovasi sessiyasi `desk.<uid>.<exp>.<sig>` — Mini App initData o'rnida yuboriladi."""
+    token = token if token is not None else config.BOT_TOKEN
+    exp = int(time.time()) + DESK_DAYS * 86400
+    sig = hmac.new(_desk_key(token), f"{uid}.{exp}".encode(), hashlib.sha256).hexdigest()[:40]
+    return f"desk.{uid}.{exp}.{sig}"
+
+
+def desk_verify(s: str, token: str) -> int | None:
+    p = s.split(".")
+    if len(p) != 4 or p[0] != "desk" or not p[1].isdigit() or not p[2].isdigit():
+        return None
+    want = hmac.new(_desk_key(token), f"{p[1]}.{p[2]}".encode(), hashlib.sha256).hexdigest()[:40]
+    if not hmac.compare_digest(want, p[3]):
+        return None
+    if int(p[2]) < time.time():
+        return None
+    return int(p[1])
+
+
 def verify_init_data(init_data: str, token: str | None = None) -> int | None:
     """Telegram Mini App initData imzosi (HMAC-SHA256, kalit
     HMAC("WebAppData", BOT_TOKEN)). To'g'ri va 24 soatdan yangi bo'lsa —
@@ -282,6 +309,8 @@ def verify_init_data(init_data: str, token: str | None = None) -> int | None:
     token = token if token is not None else config.BOT_TOKEN
     if not token or not init_data:
         return None
+    if init_data.startswith("desk."):          # 452: kompyuter ilovasi sessiyasi
+        return desk_verify(init_data, token)
     try:
         pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
     except ValueError:
@@ -477,6 +506,7 @@ def build_app() -> web.Application:
     ])
     # 238: Mini App (bosh sahifa + ochiq signallar boshqaruvi).
     webapp.VERIFY = verify_init_data
+    webapp.DESK_SIGN = desk_sign
     webapp.W = sys.modules[__name__]
     app.add_routes(webapp.routes())
     app.on_startup.append(on_start)

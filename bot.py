@@ -7847,6 +7847,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Savdo widjeti yuborilmadi")
             await update.effective_message.reply_text(i18n.t("wg.fail", lang))
             return
+    if ctx.args and ctx.args[0].startswith("desk_") and update.effective_chat.type == "private":   # 452: kompyuter ilovasiga kirish
+        lang = await user_lang(uid)
+        u = update.effective_user
+        ok = False
+        try:
+            ok = await db.desk_confirm(ctx.args[0][5:], uid, u.full_name or "", u.username or "")
+        except Exception:
+            log.exception("Kompyuter ilovasiga kirish")
+        await update.effective_message.reply_text(i18n.t("desk.ok" if ok else "desk.bad", lang))
+        return
     if ctx.args and ctx.args[0].startswith("nws_"):
         await _news_share(update, ctx, ctx.args[0][4:])
         return
