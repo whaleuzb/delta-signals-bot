@@ -8738,3 +8738,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `dw()` rejimida `lwFsHdr` → `drActW(g)`: intervallar qatorda (`TFL`, `tfLb`: 1d→D, 1w→W, 1M→M), grafik turi, «ƒx Indikatorlar», «Alert», «Replay» (matnli, `DWL` uz/ru/en), ↶↷ doim ko'rinadi (bo'sh bo'lsa xira, `DWI`), keyin `#gxslot` — sevimli asboblar paneli shu yerda; o'ngda `drActR(g)` (ko'p grafik, sozlamalar, 📎) + yuklab olish/ulashish. Mobil (`drAct`) o'zgarmagan.
 - Ramkasiz: `html.dwide` da yuqori qator va chap paneldagi `.chip` lar fon/ramkasiz, faqat hover va faol (lime) fon.
 - Sevimlilar paneli rejimi `tc_dfbar`: `'0'` o'chiq, `'f'` grafik ustida suzadi (`tc_dfpos`), boshqa — yuqori qatorga joylashgan (`#gxbar.dock`, `gxDock/gxHost/gxMode`). ⠿ dan tortib chiqarilsa suzuvchi bo'ladi; yuqori qatorga qaytarib tortilsa yoki ⠿ 2 marta bosilsa — joyiga qaytadi. Joy yetmasa `#gxslot` gorizontal suriladi (g'ildirak).
+
+## 462. Birja tanlash — BUY yonida belgi
+- `#bsb` ga BUY yonida `.bsx` (`data-bs="ex"`): joriy birja logosi (`exB(BP.ex,22)`), tanlanmagan bo'lsa «+». Bosilganda `bsxMenu` (flyOpen): Dip Funded → Simulyator → ulangan birjalar (`S.cex.acc`, kerak bo'lsa `api('cex')`), «+ Birja ulash» (`brkOpen`), «Savdo paneli — ko'rsatish/yashirish» (`bsxPanel`). Tanlash `bsxPick` — `BP.ex`, panel ochiladi, `bpLoad(1)`.
+- Pastki panel ✕ bilan yopilsa ham shu belgidan qayta ochiladi. `bsbDraw` kaliti narx + `BP.ex` + `BP.open`. Matnlar `BSXT` (uz/ru/en).
