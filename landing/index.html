@@ -142,7 +142,7 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 .win .bar{display:flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:rgb(255 255 255 / .03)}
 .win .bar i{width:10px;height:10px;border-radius:50%;background:rgb(255 255 255 / .16)}.win .bar i:first-child{background:#ff5f57}.win .bar i:nth-child(2){background:#febc2e}.win .bar i:nth-child(3){background:#28c840}
 .win .bar span{margin-left:10px;font-size:12px;color:var(--dim)}
-.win .scr{position:relative;aspect-ratio:16/9;background:#0b0b0c}
+.win .scr{position:relative;aspect-ratio:2000/1086;background:#0b0b0c}
 .win .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.025);transition:opacity .9s var(--ease),transform 1.4s var(--ease)}
 .win .scr img.on{opacity:1;transform:none}
 .shw .glow{position:absolute;left:10%;right:10%;bottom:-60px;height:140px;background:radial-gradient(closest-side,rgb(194 242 58 / .22),transparent);filter:blur(30px);z-index:-1}
@@ -157,7 +157,7 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 .shw .fc.g2{right:-30px;top:44%;animation:float 7s -2s ease-in-out infinite}
 .shw .fc.g3{left:12%;bottom:-26px;animation:float 8s -4s ease-in-out infinite}
 .fc b{color:var(--fg-strong)}.fc .up{color:var(--up)}.fc .dn{color:var(--down)}.fc small{display:block;color:var(--dim);font-size:11px}
-.cap{text-align:center;color:var(--muted);font-size:15px;margin:14px auto 0;max-width:640px;min-height:24px;transition:opacity .4s}
+.cap{text-align:center;color:var(--muted);font-size:15px;margin:44px auto 0;max-width:640px;min-height:24px;transition:opacity .4s}
 .phs{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:130px}
 .phs ul{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
 .phs li{display:flex;gap:12px;align-items:flex-start;color:var(--muted);font-size:15px;line-height:1.5}
@@ -252,23 +252,25 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 </div></section>
 
 <section class="sec" id="screens" style="padding-top:20px"><div class="wrap">
- <div class="head reveal"><div><div class="eyebrow">Ilova ichida</div><h2 class="h2">Haqiqiy <span class="tone">terminal</span> ko'rinishi</h2></div><p class="lead">Order flow, derivativlar, Ichimoku, bir ekranda 4 ta grafik va simulyator — hammasi bitta oynada, tez va tiniq.</p></div>
+ <div class="head reveal"><div><div class="eyebrow">Ilova ichida</div><h2 class="h2">Haqiqiy <span class="tone">terminal</span> ko'rinishi</h2></div><p class="lead">Volume Profile, sessiyalar, chizmalar, likvidlik, Ichimoku, bir ekranda 4 ta grafik va simulyator — hammasi bitta oynada, tez va tiniq.</p></div>
  <div class="shw reveal" id="shw">
-  <div class="win glass"><div class="bar"><i></i><i></i><i></i><span>Trade Controller — BTCUSDT</span></div>
+  <div class="win glass"><div class="bar"><i></i><i></i><i></i><span>Trade Controller — Desktop</span></div>
    <div class="scr">
-    <img class="on" src="/l/s_of.webp" alt="Order flow: Session Volume Profile, Order Book heatmap, Volume Delta va CVD" data-c="Session Volume Profile, Order Book heatmap, sessiyalar, Volume Delta va CVD — 15 daqiqalik grafikda">
-    <img loading="lazy" src="/l/s_der.webp" alt="Derivativlar: Open Interest, Funding va likvidatsiyalar" data-c="Open Interest, Funding va likvidatsiyalar · o'ng tomonda watchlist">
+    <img class="on" src="/l/r_spx.webp" alt="SPX500: kunlik Volume Profile va umumiy profil" data-c="Volume Profile: har kunlik profil, Value Area chegaralari va o'ngda butun davr profili — SPX500, 1 soat">
+    <img loading="lazy" src="/l/r_btc.webp" alt="BTC: ABC to'lqinlar, trend chizig'i, Fibonacci va long pozitsiya" data-c="Chizmalar: ABC to'lqinlar, trend chizig'i, Fibonacci darajalari va long pozitsiya o'lchagichi — BTC, 1 soat">
+    <img loading="lazy" src="/l/r_sess.webp" alt="DOGE: Tokyo, London, New York sessiyalari, profil, RSI va Volume Delta" data-c="Sessiyalar: Tokyo, London, New York diapazonlari, sessiya profili, RSI va Volume Delta — DOGE, 15 daqiqa">
+    <img loading="lazy" src="/l/r_liq.webp" alt="DOGE: hajm profili, zonalar va order book devorlari" data-c="Likvidlik: hajm profili, talab/taklif zonalari va order book'dagi yirik buyurtmalar — DOGE, 15 daqiqa">
     <img loading="lazy" src="/l/s_ich.webp" alt="Ichimoku buluti, MACD va RSI" data-c="Ichimoku buluti va Chikou, MACD, RSI — sozlamalari TradingView kabi">
     <img loading="lazy" src="/l/s_mc.webp" alt="Bir ekranda 4 ta grafik" data-c="Multi-chart: bitta juftlik 4 xil taymfreymda bir vaqtda">
     <img loading="lazy" src="/l/s_sim.webp" alt="Simulyator: savdo paneli va pozitsiyalar" data-c="Simulyator: pul tikmasdan savdo, TP/SL, pozitsiyalar — va guruhga signal yuborish">
    </div></div>
-  <div class="fc glass g1"><small>Session VP · POC</small><b>101 240</b> <span class="up">▲ ko'p hajm</span></div>
-  <div class="fc glass g2"><small>Funding · 8h</small><b class="up">+0.0124%</b><br><small>OI $7.4B · L/S 1.62</small></div>
-  <div class="fc glass g3"><small>Simulyator · BTC LONG 10x</small><b class="up">+$1 444.80</b> <span class="up">+29.7%</span></div>
+  <div class="fc glass g1"><small>Volume Profile · POC</small><b>Value Area</b> <span class="up">▲ ko'p hajm</span></div>
+  <div class="fc glass g2"><small>Order book</small><b>Yirik buyurtmalar</b><br><small>grafik ustida, real vaqtda</small></div>
+  <div class="fc glass g3"><small>BTCUSDT · Long pozitsiya</small><b class="up">+$3 059.88</b> <span class="up">+5.35%</span></div>
   <div class="glow"></div>
  </div>
- <p class="cap" id="shcap">Session Volume Profile, Order Book heatmap, sessiyalar, Volume Delta va CVD — 15 daqiqalik grafikda</p>
- <div class="tabs reveal" id="shtabs"><button class="on">Order flow</button><button>Derivativlar</button><button>Ichimoku</button><button>Multi-chart</button><button>Simulyator</button></div>
+ <p class="cap" id="shcap">Volume Profile: har kunlik profil, Value Area chegaralari va o'ngda butun davr profili — SPX500, 1 soat</p>
+ <div class="tabs reveal" id="shtabs"><button class="on">Volume Profile</button><button>Chizmalar</button><button>Sessiyalar</button><button>Likvidlik</button><button>Ichimoku</button><button>Multi-chart</button><button>Simulyator</button></div>
 
  <div class="phs">
   <div class="reveal"><div class="eyebrow">Telefonda</div><h2 class="h2">Signal — <span class="tone">cho'ntagingizda</span></h2>
