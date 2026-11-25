@@ -748,6 +748,55 @@ CREATE TABLE IF NOT EXISTS user_chart (
     at      BIGINT NOT NULL,
     PRIMARY KEY (user_id, k)
 );
+-- 459: simulyator (paper trading) — virtual hisob, pozitsiyalar, limit orderlar, tarix
+CREATE TABLE IF NOT EXISTS paper_acc (
+    user_id BIGINT PRIMARY KEY,
+    balance DOUBLE PRECISION NOT NULL,
+    start   DOUBLE PRECISION NOT NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS paper_pos (
+    id      BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    sym     TEXT NOT NULL,
+    side    TEXT NOT NULL,
+    qty     DOUBLE PRECISION NOT NULL,
+    entry   DOUBLE PRECISION NOT NULL,
+    lev     INTEGER NOT NULL,
+    margin  DOUBLE PRECISION NOT NULL,
+    tp      DOUBLE PRECISION,
+    sl      DOUBLE PRECISION,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paper_pos_u ON paper_pos (user_id);
+CREATE TABLE IF NOT EXISTS paper_ord (
+    id      BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    sym     TEXT NOT NULL,
+    side    TEXT NOT NULL,
+    price   DOUBLE PRECISION NOT NULL,
+    lev     INTEGER NOT NULL,
+    margin  DOUBLE PRECISION NOT NULL,
+    tp      DOUBLE PRECISION,
+    sl      DOUBLE PRECISION,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paper_ord_u ON paper_ord (user_id);
+CREATE TABLE IF NOT EXISTS paper_hist (
+    id      BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    sym     TEXT NOT NULL,
+    side    TEXT NOT NULL,
+    qty     DOUBLE PRECISION NOT NULL,
+    entry   DOUBLE PRECISION NOT NULL,
+    exit    DOUBLE PRECISION NOT NULL,
+    lev     INTEGER NOT NULL,
+    pnl     DOUBLE PRECISION NOT NULL,
+    reason  TEXT NOT NULL,
+    opened  TIMESTAMPTZ,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paper_hist_u ON paper_hist (user_id, at DESC);
 -- 452: kompyuter ilovasiga kirish — ilova tok yaratadi, bot /start desk_<tok> da user_id yozadi, ilova so'rab sessiya oladi
 CREATE TABLE IF NOT EXISTS desk_login (
     tok     TEXT PRIMARY KEY,
@@ -3246,6 +3295,107 @@ async def chart_put(uid: int, items: list) -> int:
 
 
 # ─────────────────────────── 437: ulashilgan grafiklar ───────────────────────────
+
+# ---- 459: simulyator (paper trading). Hisob-kitob webapp.api_paper'da, bu yerda faqat saqlash. ----
+PAPER_START = 10000.0
+
+
+async def paper_acc(uid: int):
+    async with pool().acquire() as c:
+        r = await c.fetchrow("SELECT balance, start FROM paper_acc WHERE user_id=$1", uid)
+        if r is None:
+            await c.execute("INSERT INTO paper_acc (user_id, balance, start) VALUES ($1,$2,$2) ON CONFLICT DO NOTHING", uid, PAPER_START)
+            r = await c.fetchrow("SELECT balance, start FROM paper_acc WHERE user_id=$1", uid)
+        return r
+
+
+async def paper_rows(uid: int):
+    async with pool().acquire() as c:
+        pos = await c.fetch("SELECT * FROM paper_pos WHERE user_id=$1 ORDER BY id", uid)
+        ords = await c.fetch("SELECT * FROM paper_ord WHERE user_id=$1 ORDER BY id", uid)
+        hist = await c.fetch("SELECT * FROM paper_hist WHERE user_id=$1 ORDER BY at DESC LIMIT 200", uid)
+        return pos, ords, hist
+
+
+async def paper_open(uid: int, sym: str, side: str, price: float, lev: int, margin: float, tp, sl) -> bool:
+    """Pozitsiya ochish (balansdan marja yechiladi). Balans yetmasa False."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            r = await c.execute("UPDATE paper_acc SET balance=balance-$2 WHERE user_id=$1 AND balance >= $2", uid, margin)
+            if not r.endswith(" 1"):
+                return False
+            await c.execute("INSERT INTO paper_pos (user_id, sym, side, qty, entry, lev, margin, tp, sl) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+                            uid, sym, side, margin * lev / price, price, lev, margin, tp, sl)
+            return True
+
+
+async def paper_limit(uid: int, sym: str, side: str, price: float, lev: int, margin: float, tp, sl) -> bool:
+    """Limit order — marja darhol band qilinadi (bekor qilinsa qaytadi)."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            r = await c.execute("UPDATE paper_acc SET balance=balance-$2 WHERE user_id=$1 AND balance >= $2", uid, margin)
+            if not r.endswith(" 1"):
+                return False
+            await c.execute("INSERT INTO paper_ord (user_id, sym, side, price, lev, margin, tp, sl) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+                            uid, sym, side, price, lev, margin, tp, sl)
+            return True
+
+
+async def paper_fill(uid: int, oid: int) -> None:
+    """Limit order bajarildi — pozitsiyaga aylanadi (marja allaqachon band)."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            o = await c.fetchrow("DELETE FROM paper_ord WHERE id=$1 AND user_id=$2 RETURNING *", oid, uid)
+            if o:
+                await c.execute("INSERT INTO paper_pos (user_id, sym, side, qty, entry, lev, margin, tp, sl) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+                                uid, o["sym"], o["side"], o["margin"] * o["lev"] / o["price"], o["price"], o["lev"], o["margin"], o["tp"], o["sl"])
+
+
+async def paper_cancel(uid: int, oid: int) -> bool:
+    async with pool().acquire() as c:
+        async with c.transaction():
+            o = await c.fetchrow("DELETE FROM paper_ord WHERE id=$1 AND user_id=$2 RETURNING margin", oid, uid)
+            if not o:
+                return False
+            await c.execute("UPDATE paper_acc SET balance=balance+$2 WHERE user_id=$1", uid, o["margin"])
+            return True
+
+
+async def paper_close(uid: int, pid: int, price: float, frac: float, reason: str) -> float | None:
+    """Pozitsiyani (qisman) yopish: balansga marja ulushi + PnL (zarar marjadan oshmaydi). Natija — PnL."""
+    async with pool().acquire() as c:
+        async with c.transaction():
+            p = await c.fetchrow("SELECT * FROM paper_pos WHERE id=$1 AND user_id=$2 FOR UPDATE", pid, uid)
+            if not p:
+                return None
+            frac = max(0.0, min(1.0, frac))
+            d = 1 if p["side"] == "long" else -1
+            qty, mg = p["qty"] * frac, p["margin"] * frac
+            pnl = max(-mg, qty * (price - p["entry"]) * d)
+            if frac >= 0.9999:
+                await c.execute("DELETE FROM paper_pos WHERE id=$1", pid)
+            else:
+                await c.execute("UPDATE paper_pos SET qty=qty-$2, margin=margin-$3 WHERE id=$1", pid, qty, mg)
+            await c.execute("UPDATE paper_acc SET balance=balance+$2 WHERE user_id=$1", uid, mg + pnl)
+            await c.execute("INSERT INTO paper_hist (user_id, sym, side, qty, entry, exit, lev, pnl, reason, opened) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+                            uid, p["sym"], p["side"], qty, p["entry"], price, p["lev"], pnl, reason, p["at"])
+            return pnl
+
+
+async def paper_tpsl(uid: int, pid: int, tp, sl) -> bool:
+    async with pool().acquire() as c:
+        r = await c.execute("UPDATE paper_pos SET tp=$3, sl=$4 WHERE id=$1 AND user_id=$2", pid, uid, tp, sl)
+        return r.endswith(" 1")
+
+
+async def paper_reset(uid: int, bal: float) -> None:
+    async with pool().acquire() as c:
+        async with c.transaction():
+            for t in ("paper_pos", "paper_ord", "paper_hist"):
+                await c.execute(f"DELETE FROM {t} WHERE user_id=$1", uid)
+            await c.execute("INSERT INTO paper_acc (user_id, balance, start) VALUES ($1,$2,$2) "
+                            "ON CONFLICT (user_id) DO UPDATE SET balance=$2, start=$2, at=now()", uid, bal)
+
 
 async def desk_new(tok: str) -> bool:
     async with pool().acquire() as c:

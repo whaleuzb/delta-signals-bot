@@ -388,6 +388,123 @@ async def api_coins(request):
     return web.json_response({"r": rows, "x": xs}, headers={"Cache-Control": "private, max-age=60"})
 
 
+_PAPER_SYM = re.compile(r"^[A-Z0-9]{1,20}USDT$")
+
+
+async def _paper_px() -> dict:
+    import exchange as _ex
+    try:
+        return {k + "USDT": v[0] for k, v in (await _ex.ticker_map()).items()}
+    except Exception:
+        log.warning("Simulyator narxlari olinmadi", exc_info=True)
+        return {}
+
+
+def _paper_liq(side: str, entry: float, lev: int) -> float:
+    # marja (izolyatsiya) to'liq yo'qolganda: ~1/lev harakat (texnik marja 0.5% hisobga)
+    k = max(0.0, 1.0 / lev - 0.005)
+    return entry * (1 - k) if side == "long" else entry * (1 + k)
+
+
+async def api_paper(request):
+    """459: simulyator (paper trading). op: state | order {sym, side long/short, type market/limit, price?, margin, lev, tp?, sl?}
+    | close {id, frac} | cancel {id} | tpsl {id, tp, sl} | reset {bal}. Har `state`da narx bo'yicha limit orderlar,
+    TP/SL va likvidatsiya tekshiriladi (joriy narx bilan)."""
+    body, uid = await _body(request)
+    op = str(body.get("op") or "state")
+    if op != "state" and not _act_allowed(uid):
+        raise web.HTTPTooManyRequests()
+    fl = lambda k: (float(body[k]) if body.get(k) not in (None, "") else None)
+    px = await _paper_px()
+    msg = ""
+    try:
+        if op == "order":
+            sym = str(body.get("sym") or "").upper()
+            side = "short" if body.get("side") in ("short", "sell") else "long"
+            lev, margin = max(1, min(int(body.get("lev") or 1), 125)), fl("margin") or 0
+            tp, sl, price = fl("tp"), fl("sl"), fl("price")
+            if not _PAPER_SYM.match(sym) or not (0 < margin < 1e9):
+                raise web.HTTPBadRequest()
+            cur = px.get(sym)
+            if not cur:
+                return web.json_response({"ok": False, "msg": "no price"}, headers=NO_CACHE)
+            await db.paper_acc(uid)
+            if body.get("type") == "limit":
+                if not price or price <= 0:
+                    raise web.HTTPBadRequest()
+                ok = await db.paper_limit(uid, sym, side, price, lev, margin, tp, sl)
+            else:
+                ok = await db.paper_open(uid, sym, side, cur, lev, margin, tp, sl)
+            if not ok:
+                return web.json_response({"ok": False, "msg": "balance"}, headers=NO_CACHE)
+        elif op == "close":
+            pos, _o, _h = await db.paper_rows(uid)
+            p = next((x for x in pos if x["id"] == int(body.get("id"))), None)
+            if p and px.get(p["sym"]):
+                await db.paper_close(uid, p["id"], px[p["sym"]], float(body.get("frac") or 1), "manual")
+        elif op == "cancel":
+            await db.paper_cancel(uid, int(body.get("id")))
+        elif op == "tpsl":
+            await db.paper_tpsl(uid, int(body.get("id")), fl("tp"), fl("sl"))
+        elif op == "reset":
+            await db.paper_reset(uid, max(100.0, min(fl("bal") or db.PAPER_START, 10_000_000.0)))
+        elif op != "state":
+            raise web.HTTPBadRequest()
+    except (TypeError, ValueError):
+        raise web.HTTPBadRequest()
+    acc = await db.paper_acc(uid)
+    pos, ords, hist = await db.paper_rows(uid)
+    # limit orderlar, TP/SL, likvidatsiya — joriy narx bilan
+    ch = False
+    for o in ords:
+        c = px.get(o["sym"])
+        if c and ((o["side"] == "long" and c <= o["price"]) or (o["side"] == "short" and c >= o["price"])):
+            await db.paper_fill(uid, o["id"])
+            ch = True
+    if ch:
+        pos, ords, hist = await db.paper_rows(uid)
+        ch = False
+    for p in pos:
+        c = px.get(p["sym"])
+        if not c:
+            continue
+        lg = p["side"] == "long"
+        liq = _paper_liq(p["side"], p["entry"], p["lev"])
+        why = None
+        if (lg and c <= liq) or (not lg and c >= liq):
+            why, c = "liq", liq
+        elif p["sl"] and ((lg and c <= p["sl"]) or (not lg and c >= p["sl"])):
+            why, c = "sl", p["sl"]
+        elif p["tp"] and ((lg and c >= p["tp"]) or (not lg and c <= p["tp"])):
+            why, c = "tp", p["tp"]
+        if why:
+            await db.paper_close(uid, p["id"], c, 1.0, why)
+            ch = True
+    if ch:
+        acc = await db.paper_acc(uid)
+        pos, ords, hist = await db.paper_rows(uid)
+    P, up, mg = [], 0.0, 0.0
+    for p in pos:
+        c = px.get(p["sym"]) or p["entry"]
+        u = p["qty"] * (c - p["entry"]) * (1 if p["side"] == "long" else -1)
+        up += u
+        mg += p["margin"]
+        P.append({"id": p["id"], "sym": p["sym"], "side": p["side"], "qty": p["qty"], "entry": p["entry"], "mark": c,
+                  "lev": p["lev"], "margin": p["margin"], "upnl": u, "roi": u / p["margin"] * 100 if p["margin"] else 0,
+                  "liq": _paper_liq(p["side"], p["entry"], p["lev"]), "tp": p["tp"], "sl": p["sl"], "t": int(p["at"].timestamp() * 1000)})
+    om = sum(o["margin"] for o in ords)
+    eq = acc["balance"] + mg + om + up
+    return web.json_response({
+        "ok": True, "msg": msg,
+        "acc": {"bal": acc["balance"], "eq": eq, "upnl": up, "start": acc["start"], "pnl": eq - acc["start"], "used": mg + om},
+        "pos": P,
+        "ord": [{"id": o["id"], "sym": o["sym"], "side": o["side"], "price": o["price"], "lev": o["lev"], "margin": o["margin"],
+                 "tp": o["tp"], "sl": o["sl"], "t": int(o["at"].timestamp() * 1000)} for o in ords],
+        "hist": [{"sym": h["sym"], "side": h["side"], "qty": h["qty"], "entry": h["entry"], "exit": h["exit"], "lev": h["lev"],
+                  "pnl": h["pnl"], "why": h["reason"], "t": int(h["at"].timestamp() * 1000)} for h in hist],
+    }, headers=NO_CACHE)
+
+
 async def api_screener(request):
     """455: kompyuter ilovasi — skrinner va issiqlik xaritasi: [[nom, narx, %, hajm, yuqori, past], ...] (≤1500)."""
     import exchange as _ex
@@ -2633,6 +2750,7 @@ def routes() -> list:
         web.post("/api/app/screener", api_screener),
         web.post("/api/app/econ", api_econ),
         web.post("/api/app/coins", api_coins),
+        web.post("/api/app/paper", api_paper),
         web.get("/desktop/icon.png", desktop_icon),
         web.get("/desktop/logo.png", desktop_logo),
         web.get("/lwc.js", lwc_js),
