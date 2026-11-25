@@ -8664,3 +8664,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Fon tanlovida «Oq» (`#ffffff`), rang palitrasi `BGP` boshiga 6 ta och rang (oq, kulrang, och ko'k, krem, och yashil, och pushti).
 - `bgLum(K)` — fon yorqinligi (gradientda ikki rang o'rtachasi × rang kuchi); > .45 bo'lsa `LW.lite`: o'q matni to'q, panjara/chegara/kursor qora tusda; standart sham ranglari to'qroq (#089981 / #f23645), foydalanuvchi o'zi tanlagan ranglar o'zgarmaydi.
 - Tayyor rangli fonlar ham endi CSS orqali `LW.el`ga (narx/vaqt o'qlari ham bir xil fon).
+
+## 451. Och fonda volume va indikatorlar to'qlashadi
+- `lcWrap(ch)` (lwMount'da) chart'ning addLine/Histogram/Area/BaselineSeries'ini o'raydi: `LW.lite` bo'lsa seriya opsiyalaridagi `*Color` va setData/update'dagi har nuqta `color`i `lcol()` orqali o'tadi.
+- `lcol(c)`: oq/kulrang (L>.72, past to'yinganlik) → to'q kulrang; yorqin rang (L>.4) → `max(.55,.45/L)` ko'paytma bilan to'qroq, shaffoflari ×1.5 kuchliroq; to'q ranglar o'zgarmaydi. Kesh `LCC`. Qorong'i fonda hech narsa o'zgarmaydi.
+- chOpts `LW.lite` o'zgarganda indikatorlarni qayta quradi (`indApply(true)`) va volume'ni yangilaydi.
