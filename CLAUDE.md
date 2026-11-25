@@ -8795,3 +8795,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Animatsiyalar (`tcPop`, `tcPopOut`, `tcFade`, `tcFadeOut`, `tcRise`, `tcSlide`; ease cubic-bezier(.22,1,.36,1), 120–240 ms): desk — `.mn` menyular, `#mdl` oynalar (fon + quti), `.pane.on` tab almashishi, `#side`; webapp — `#drfly` (barcha menyular: asboblar, o'ng tugma, shkala, birjalar), `#brk`/`#dsh`/`#ssm` oynalar, `#ot` order chiptasi, `#lwrp`/`#lwwl` o'ng panellar (siljib), `#lwbp`, suzuvchi `#gxbar`; tugmalar hover rangi `transition`.
 - Yopish `fadeRm(el,ms)`: elementdan `id` darhol olinadi (shu zahoti qayta ochish mumkin), `.tc-out` animatsiyasidan keyin o'chiriladi — `mclose`, `mdlClose`, `flyClose`, `brkClose`, `dshClose`, `ssClose`.
 - `prefers-reduced-motion` da animatsiyalar o'chadi. desk: oyna fokusni yo'qotib iframe'ga o'tsa (grafikka bosish) `.mn` menyu yopiladi.
+
+## 476. Yanada yumshoq + shaffof (shisha) oynalar
+- Animatsiyalar uzaytirildi va yumshatildi (ease cubic-bezier(.16,1,.3,1)): menyular `tcPop2` .32s (biroz blurdan ochiladi), oynalar `tcRise2` .42s, fon `tcFade2` .3s, yopilish `tcOut2`/`tcDrop2` .2–.26s (`fadeRm` kechikishlari 200–260 ms), o'ng panellar `tcSlide2` .38s, tab almashishi .32s, hover o'tishlari .25s.
+- Shisha: `.mn`, `#mdl .mb`, `#drfly`, `#brk .bkx`, `#dsh .dsx`, `#ssm .ssx`, `#ot`, `#lwset .sbx` — fon rgba(22,23,20,.66) + `backdrop-filter: blur(22px) saturate(160%)`, ichki yorug' chiziq; `#lwrp` .72 + blur(18px). Oyna orqa foni rgba(0,0,0,.32) + blur(3px). Birja kartalari hover'da 2px ko'tariladi.
