@@ -185,7 +185,9 @@ function pbuild(t,p){if(PG[t.k]&&t.k!='chart')PG[t.k](p);
 /* iframe'dan: joriy tanga va narx (tab nomi), boshqa tangaga o'tish */
 window.addEventListener('message',function(e){if(e.origin!==location.origin||!e.data||!e.data.tc)return;var fr=[].filter.call(document.querySelectorAll('iframe'),function(f){return f.contentWindow===e.source})[0];if(!fr)return;var t=tget(fr.__tab);if(!t)return;
  if(e.data.tc=='sym'){var ch=t.sym!==e.data.sym;t.sym=e.data.sym;t.px=e.data.px;t.ch=e.data.ch;if(ch&&t.k=='chart'){rcPut(t.sym);tsave()}tdraw()}
- else if(e.data.tc=='open'&&e.data.sym){topen('chart',{sym:e.data.sym})}});
+ else if(e.data.tc=='open'&&e.data.sym){topen('chart',{sym:e.data.sym})}
+ else if(e.data.tc=='open'&&e.data.k&&PG[e.data.k]){topen(e.data.k)}
+ else if(e.data.tc=='fs'){try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen()}catch(q){}}});
 document.getElementById('tabs').addEventListener('mousedown',function(e){var x=e.target.closest('[data-x]');if(x){e.stopPropagation();tclose(x.getAttribute('data-x'));return}var b=e.target.closest('[data-id]');if(!b)return;if(e.button==1){e.preventDefault();tclose(b.getAttribute('data-id'));return}tact(b.getAttribute('data-id'))});
 document.getElementById('logo').onclick=function(){var h=TABS.filter(function(t){return t.k=='home'})[0];if(h)tact(h.id);else{TABS.push({id:'t'+(++TI),k:'home'});ACT='t'+TI;tsave();tdraw();tshow()}};
 document.addEventListener('keydown',function(e){var c=e.ctrlKey||e.metaKey;if(!c)return;var k=e.key.toLowerCase();

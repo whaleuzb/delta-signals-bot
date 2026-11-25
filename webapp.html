@@ -416,6 +416,14 @@ html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide
 /* 460: TradingView kabi asboblar menyusi va sevimlilar paneli */
 .cmx{min-width:330px;max-width:420px}#drfly .cmx .fi{padding:7px 10px;font-size:13px;font-weight:500}#drfly .cmx .cmn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#drfly .cmx .cms{font-style:normal;font-size:11px;color:rgba(232,236,223,.4);margin-left:14px;white-space:nowrap}
 #drfly .cmx .fi.dis{opacity:.35;pointer-events:none}#drfly .cmx svg{width:19px;height:19px}#drfly hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:4px 2px}#drfly .cmt{max-height:70vh;overflow:auto;min-width:300px}#drfly .cmx .cmd{cursor:pointer;font-size:13px;padding:0 4px}#drfly .cmx .cmd:hover{color:#ff5c5c}#drfly .cme{padding:6px 12px;font-size:12px;color:rgba(232,236,223,.45)}
+html.dwide #lwfs .dtr{gap:2px}.dtrd{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 4px;margin-left:6px;border-radius:16px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#e8ecdf;flex:none}.dtrd:hover{background:rgba(255,255,255,.07)}.dtrd b{font-size:13px;font-weight:600}.dtrd>i{display:flex;opacity:.6;padding-left:4px;border-left:1px solid rgba(255,255,255,.15)}.dtrd .av{margin:0}
+.dtpr{display:inline-flex;align-items:center;height:30px;padding:0 14px;margin-left:6px;border-radius:16px;background:#e8ecdf;color:#0b0b0c;font-size:13px;font-weight:700;cursor:pointer;flex:none;white-space:nowrap}.dtpr:hover{background:#c2f23a}
+#lwrail{order:9;width:46px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:8px;border-left:1px solid rgba(255,255,255,.08);background:#0b0b0c}#lwrail span{width:36px;height:36px;border-radius:6px;display:grid;place-items:center;color:rgba(232,236,223,.75);cursor:pointer}#lwrail span:hover{background:rgba(255,255,255,.07);color:#e8ecdf}#lwrail span.on{color:#c2f23a;background:rgba(194,242,58,.1)}#lwrail i{width:24px;height:1px;background:rgba(255,255,255,.1);margin:4px 0}
+html.dwide #lwwl{order:8}#lwrp{order:8;width:280px;flex:none;display:flex;flex-direction:column;background:#0d0e0b;border-left:1px solid rgba(255,255,255,.08);min-height:0}
+#lwrp .rph{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.06)}#lwrp .rpa{font-size:12px;font-weight:700;color:#c2f23a;cursor:pointer;padding:3px 8px;border-radius:6px;background:rgba(194,242,58,.1)}
+#lwrp .rpl{flex:1;overflow:auto}#lwrp .rps{padding:10px 12px 4px;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:rgba(232,236,223,.45);text-transform:uppercase}#lwrp .rpe{padding:8px 12px;font-size:12px;color:rgba(232,236,223,.45)}
+#lwrp .rpr{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)}#lwrp .rpr:hover{background:rgba(255,255,255,.04)}#lwrp .rpr.on{background:rgba(194,242,58,.09);color:#c2f23a}#lwrp .rpr.hit{opacity:.5}
+#lwrp .rpr svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5}#lwrp .rpn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#lwrp .rpn small{display:block;font-size:10.5px;color:rgba(232,236,223,.45)}#lwrp .u{color:#22c55e}#lwrp .d{color:#ff5c5c}#lwrp .rpr i{font-style:normal;color:rgba(232,236,223,.4);padding:0 3px}#lwrp .rpr i:hover{color:#ff5c5c}
 #drfly .gxm{min-width:300px;max-height:min(78vh,720px);overflow:auto;padding:2px}#drfly .gxh{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:rgba(232,236,223,.45);padding:8px 10px 4px}
 #drfly hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:6px 4px}#drfly .gxi{padding:6px 10px;font-weight:500;font-size:13px}#drfly .gxi svg{width:24px;height:24px;stroke-width:1.3}
 #drfly .gxi span{flex:1}#drfly .gxs{font-style:normal;font-size:11px;color:rgba(232,236,223,.45);margin-left:12px;white-space:nowrap}#drfly .gxi b.gxf{display:inline;color:rgba(232,236,223,.2);font-size:15px;margin-left:8px;cursor:pointer;width:18px;text-align:center}
@@ -1510,8 +1518,49 @@ function drActW(g){var L=gxL(),u='<span data-u="1" class="chip glass lwun" oncli
   +'<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="'+esc(stl('ind'))+'"><b class="dfx">ƒx</b><i class="dlb">'+DWL[0][L]+'</i></span><span class="lwsep"></span>'
   +'<span class="chip glass'+(g.tool=='al'?' on':'')+'" data-t="al" onclick="drTool(\'al\')" title="Alert">'+ALI+'<i class="dlb">'+DWL[1][L]+'</i></span>'
   +'<span class="chip glass'+(g.rp||g.tool=='rp'?' on':'')+'" data-t="rp" onclick="rpTog()" title="Replay">'+RPI.rp+'<i class="dlb">'+DWL[2][L]+'</i></span><span class="lwsep"></span>'+u+'<span class="lwsep"></span>'}
-function drActR(g){return'<span class="lwtb fsa"><span class="chip glass" data-t="mc" onclick="mcOpen()" title="'+esc(stl('mc'))+'">'+RPI.mc+'</span>'
-  +'<span class="chip glass" onclick="chSet()" title="'+esc(stl('cs'))+'">'+MTI.set+'</span>'+(g.sig?'<span class="chip glass" onclick="sigAttach()" title="'+esc(stl('sa'))+'">📎</span>':'')+'</span>'}
+function drActR(g){var L=gxL(),T=TRI;return'<span class="lwtb fsa dtr"><span class="chip glass" data-t="mc" onclick="mcOpen()" title="'+esc(stl('mc'))+'">'+RPI.mc+'</span>'+(g.sig?'<span class="chip glass" onclick="sigAttach()" title="'+esc(stl('sa'))+'">📎</span>':'')+'<span class="lwsep"></span>'
+  +'<span class="chip glass" onclick="chSet()" title="'+esc(stl('cs'))+'">'+T.set+'</span>'
+  +'<span class="chip glass" onclick="dtFs()" title="'+esc(TRT[L][0])+'">'+T.fs+'</span>'
+  +'<span class="chip glass" onclick="dtShot(this)" title="'+esc(TRT[L][1])+'">'+T.cam+'</span>'
+  +'<span class="chip glass" onclick="dtOpen(\'sig\')" title="'+esc(TRT[L][2])+'">'+T.idea+'</span>'
+  +'<span class="dtrd" onclick="bsxMenu(this)">'+(BP.ex?exB(BP.ex,20):T.trade)+'<b>'+esc(TRT[L][3])+'</b><i>'+T.dn+'</i></span>'
+  +'<span class="dtpr" onclick="dtOpen(\'df\')">Dip Funded</span></span>'}
+/* 464: TradingView kabi o'ng burchak ikonkalari va o'ng vertikal panel (ro'yxat, alertlar, obyektlar) */
+var TRT=[['To\'liq ekran','Grafik rasmi','Signallar (g\'oyalar)','Savdo','Ro\'yxat','Alertlar','Obyektlar','Savdo paneli','Yuklab olish','Ulashish','Alert qo\'shish','Alert yo\'q','Rasmni nusxalash','Nusxalandi'],
+ ['Полный экран','Снимок графика','Сигналы (идеи)','Торговля','Список','Алерты','Объекты','Торговая панель','Скачать','Поделиться','Добавить алерт','Алертов нет','Копировать изображение','Скопировано'],
+ ['Fullscreen','Chart snapshot','Signals (ideas)','Trade','Watchlist','Alerts','Objects','Trading panel','Download','Share','Add alert','No alerts','Copy image','Copied']];
+var TRI={set:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.8l8 4.6v9.2l-8 4.6-8-4.6V7.4z"/><circle cx="12" cy="12" r="3"/></svg>',
+ fs:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>',
+ cam:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3.5 8.5a2 2 0 0 1 2-2h2.3l1.5-2.2h5.4l1.5 2.2h2.3a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.6"/></svg>',
+ idea:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17.5h6M10 20.5h4"/><path d="M8.6 14.6A6 6 0 1 1 15.4 14.6c-.8.6-1.4 1.5-1.4 2.4V17.5h-4V17c0-.9-.6-1.8-1.4-2.4z"/></svg>',
+ trade:'<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="11" fill="#c2f23a"/><path d="M8 7v10M12 5.5v13M16 8v8" stroke="#0b0b0c" stroke-width="1.4"/><rect x="6.6" y="9" width="2.8" height="5" rx=".6" fill="#0b0b0c"/><rect x="10.6" y="8" width="2.8" height="6.5" rx=".6" fill="#0b0b0c"/><rect x="14.6" y="10" width="2.8" height="4" rx=".6" fill="#0b0b0c"/></svg>',
+ dn:'<svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>',
+ wl:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5.5 3.5h13v17l-6.5-4-6.5 4z"/><path d="M9 8h6M9 11.5h6"/></svg>',
+ al:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M4 5l3-2.5M20 5l-3-2.5"/></svg>',
+ ly:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.5l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+ bp:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14.5h18M7 17.3h5"/></svg>'};
+function dtFs(){try{parent.postMessage({tc:'fs'},location.origin)}catch(e){}}
+function dtOpen(k){try{parent.postMessage({tc:'open',k:k},location.origin)}catch(e){}}
+function dtShot(el){var L=gxL(),it=function(ic,n,f){return'<div class="fi" onclick="flyClose();'+f+'">'+ic+'<span>'+esc(n)+'</span></div>'};
+ flyOpen(el,it(FSI.dl,TRT[L][8],'lwShot(\'dl\')')+it(CMI.cp,TRT[L][12],'dtCopyImg()')+it(FSI.sh,TRT[L][9],'lwShot(\'share\')'),false)}
+function dtCopyImg(){var L=gxL();lwShotCanvas().then(function(o){o.toBlob(function(b){try{navigator.clipboard.write([new ClipboardItem({'image/png':b})]).then(function(){toast(esc(TRT[L][13]))},function(){lwShot('dl')})}catch(e){lwShot('dl')}},'image/png')}).catch(function(){})}
+/* o'ng vertikal panel: LW.rp = 'al' | 'tr' (ro'yxat — LW.wl) */
+function rlDraw(){var f=document.getElementById('lwfsb');if(!f)return;var r=document.getElementById('lwrail');if(!r){r=document.createElement('div');r.id='lwrail';f.appendChild(r);
+  r.addEventListener('click',function(e){var x=e.target.closest('[data-rl]');if(x)rlClick(x.getAttribute('data-rl'))})}
+ var L=gxL(),T=TRI,b=function(k,ic,n,on){return'<span data-rl="'+k+'" class="'+(on?'on':'')+'" title="'+esc(n)+'">'+ic+'</span>'};
+ r.innerHTML=b('wl',T.wl,TRT[L][4],LW.wl)+b('al',T.al,TRT[L][5],LW.rp=='al')+b('tr',T.ly,TRT[L][6],LW.rp=='tr')+(bpOn()?'<i></i>'+b('bp',T.bp,TRT[L][7],BP.open&&BP.ex):'');rpDraw()}
+function rlClick(k){if(k=='wl'){LW.rp=null;wlTog();return}if(k=='bp'){if(BP.ex)bsxPanel();else bsxMenu(document.querySelector('#lwrail [data-rl=bp]'));rlDraw();return}
+ if(LW.wl){LW.wl=false;wlRender();clearTimeout(LW.wlT)}LW.rp=LW.rp==k?null:k;if(LW.rp=='al'&&LW.g)alLoad(LW.g);rlDraw()}
+function rpDraw(){var f=document.getElementById('lwfsb'),p=document.getElementById('lwrp');if(!f)return;if(!LW.rp||LW.wl){if(p)p.remove();return}
+ if(!p){p=document.createElement('div');p.id='lwrp';f.appendChild(p);p.addEventListener('click',rpClick)}var L=gxL(),g=LW.g,h='';
+ if(LW.rp=='al'){var A=(g&&g.al||[]).filter(function(a){return a.sym===(g.alS||'')}),cur=LW.rlast||0;
+  h='<div class="rph"><b>'+esc(TRT[L][5])+'</b><span class="rpa" data-ra="add">+ '+esc(TRT[L][10])+'</span></div><div class="rpl">'+(A.length?A.map(function(a){var d=cur?(a.p-cur)/cur*100:0;return'<div class="rpr'+(a.hit?' hit':'')+'">'+TRI.al.replace(/22/g,'16')+'<span class="rpn"><b>'+esc(g.alS||'')+'</b> '+(a.p>=cur?'≥':'≤')+' '+fp(a.p)+(a.note?'<small>'+esc(a.note)+'</small>':'')+'</span><span class="'+(d>=0?'u':'d')+'">'+(d>=0?'+':'')+d.toFixed(2)+'%</span><i data-rd="'+a.id+'">✕</i></div>'}).join(''):'<div class="rpe">'+esc(TRT[L][11])+'</div>')+'</div>'}
+ else{var D=drGet(),I=indList().filter(function(x){return x.on});
+  h='<div class="rph"><b>'+esc(TRT[L][6])+'</b></div><div class="rpl"><div class="rps">'+esc(cmT('drs'))+' ('+D.length+')</div>'+(D.length?D.map(function(d){return'<div class="rpr'+(LW.sel==d.id?' on':'')+'" data-rs="'+d.id+'">'+(DRI[d.k]||'')+'<span class="rpn">'+esc(gxName(d.k))+(d.lk?' 🔒':'')+'</span><i data-rx="'+d.id+'">✕</i></div>'}).join(''):'<div class="rpe">'+esc(cmT('none'))+'</div>')
+   +'<div class="rps">'+esc(cmT('inds'))+' ('+I.length+')</div>'+(I.length?I.map(function(z){return'<div class="rpr" data-ri="1">'+CMI.ind+'<span class="rpn">'+esc(indName(z))+'</span></div>'}).join(''):'<div class="rpe">'+esc(cmT('none'))+'</div>')+'</div>'}
+ p.innerHTML=h}
+function rpClick(e){var g=LW.g,x;if((x=e.target.closest('[data-ra]'))){drTool('al');return}if((x=e.target.closest('[data-rd]'))){alDel(g,'al'+x.getAttribute('data-rd'));setTimeout(rpDraw,50);return}
+ if((x=e.target.closest('[data-rx]'))){LW.sel=x.getAttribute('data-rx');drDel();rpDraw();return}if((x=e.target.closest('[data-rs]'))){LW.sel=x.getAttribute('data-rs');LW.dv++;drTb();rpDraw();return}if(e.target.closest('[data-ri]'))indSet()}
 var DWI={un:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4L2.5 7.5 6 11"/><path d="M2.5 7.5H11a4.5 4.5 0 0 1 0 9H8"/></svg>',
  re:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l3.5 3.5L12 11"/><path d="M15.5 7.5H7a4.5 4.5 0 0 0 0 9h3"/></svg>'};
 function moreMenu(el){var g=LW.g;if(!g)return;var it=function(ic,n,f){return'<div class="fi" onclick="flyClose();'+f+'">'+ic+'<span>'+esc(n)+'</span></div>'};
@@ -2360,7 +2409,7 @@ function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var 
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('[data-g]'),function(x){var n=x.getAttribute('data-g'),G=DRG.filter(function(q){return q[0]==n})[0];if(!G)return;var k=drgCur(n);x.classList.toggle('on',G[1].indexOf(g.tool)>=0);if(x.getAttribute('data-k')!==k){x.setAttribute('data-k',k);x.innerHTML=DRI[k]}});[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}if(k=='mc')return;
   if(k=='vd'||k=='ind'||k=='ct')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
- if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1;var gb=document.getElementById('gxbar'),gh=gxHost();if(!gb||gb.parentNode!==gh)gxBar();else gxBarSync()}
+ if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1;var gb=document.getElementById('gxbar'),gh=gxHost();if(!gb||gb.parentNode!==gh)gxBar();else gxBarSync();if(LW.rp=='tr')rpDraw()}
 function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.gd=null;LW.fd=null;LW.sel=null;drTb();gxBarSync();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='rp'?'rp_p':k=='al'?'al_p':k=='hl'||k=='vp'||k=='lp'||k=='sp'||k=='tx'?'dr_p1':'dr_p2')))}}
 /* 422: qo'shimcha asboblar menyusi — nur, strelka, parallel kanal, matn, o'lchov */
 function drMore(){var g=LW.g;if(!g)return;if(DRX.indexOf(g.tool)>=0){drTool(g.tool);return}
@@ -2484,7 +2533,7 @@ function bsxMenu(el){var draw=function(){var A=((S.cex||{}).acc||[]).filter(func
  draw();if(!S.cex)api('cex',{}).then(function(d){S.cex={acc:d.acc||[],at:Date.now()};if(document.getElementById('drfly'))draw()}).catch(function(){})}
 function bsxPick(ex){if(ex=='dipfunded'){try{parent.postMessage({tc:'open',k:'df'},location.origin)}catch(q){}toast(esc(bt('df')));return}
  BP.ex=ex;BP.open=1;BP.min=0;BP.acc=null;BP.ord=[];BP.tr=null;bpSave();bpMount();bpLoad(1);bsbDraw()}
-function bsxPanel(){BP.open=BP.open?0:1;BP.min=0;bpSave();if(BP.open){bpMount();bpLoad(1)}else bpUnmount();bsbDraw()}
+function bsxPanel(){BP.open=BP.open?0:1;BP.min=0;bpSave();if(BP.open){bpMount();bpLoad(1)}else bpUnmount();bsbDraw();if(document.getElementById('lwrail'))rlDraw()}
 function bsClick(side){if(BP.ex=='paper'){otOpen(side);return}if(!BP.ex||BP.ex=='dipfunded'||!cexAcc(BP.ex)){brkOpen(side);return}otOpen(side)}
 /* 459: simulyator belgisi va nomi */
 function exB(ex,z){if(ex!='paper')return cexBadge(ex,z);return'<div class="av" style="width:'+z+'px;height:'+z+'px;background:#1f2a12;border-color:#c2f23a55;display:flex;align-items:center;justify-content:center"><svg width="'+Math.round(z*.6)+'" height="'+Math.round(z*.6)+'" viewBox="0 0 24 24" fill="none" stroke="#c2f23a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/></svg></div>'}
@@ -2590,7 +2639,7 @@ function wlNew2(){var i=document.getElementById('wlnn'),n=(i&&i.value||'').trim(
 function wlRm(){flyClose();var o=wlAll();if(Object.keys(o.L).length<2)return;confirmBox(stl('wl_rm')+': '+o.n+'?',function(){delete o.L[o.n];o.n=Object.keys(o.L)[0];wlPut(o);wlPoll();wlRender()})}
 function wlBase(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/(USDT|USDC|FDUSD)$/,'')}
 function termOwnSym(){var i=termItem();return i?wlBase(i.symbol):''}
-function wlTog(){LW.wl=!LW.wl;wlRender();lwFsHdr();if(LW.wl)wlPoll();else clearTimeout(LW.wlT)}
+function wlTog(){LW.wl=!LW.wl;if(LW.wl)LW.rp=null;wlRender();lwFsHdr();if(LW.wl)wlPoll();else clearTimeout(LW.wlT)}
 function wlPoll(){clearTimeout(LW.wlT);if(!LW.wl||!LW.fs)return;var L=wlGet(),own=termOwnSym();if(own&&L.indexOf(own)<0)L=[own].concat(L);
  api('tickers',{syms:L}).then(function(d){LW.wlp=d.t||{};wlRender();deskPost()}).catch(function(){});LW.wlT=setTimeout(wlPoll,document.hidden?30000:12000)}
 function wlRender(){var f=document.getElementById('lwfsb');if(!f)return;var p=document.getElementById('lwwl');if(!LW.wl){if(p)p.remove();return}
@@ -2621,9 +2670,9 @@ function wlGo(s){var g=LW.g;if(!g)return;try{tg.HapticFeedback.selectionChanged(
  var own=termOwnSym(),nv=s===own?null:s;if(nv===(g.view||null))return;g.view=nv;g.c=null;g.cEnd=0;g.src=null;g.vr=null;tick();termRender();termLoad();setTimeout(wlRender,50)}
 function lwFsHdr(){var h=document.getElementById('lwfsh'),g=LW.g;if(!h||!g)return;var i=termItem()||{};
  var vs=g.view,vp=vs&&LW.wlp&&LW.wlp[vs]?LW.wlp[vs][0]:null;
- h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span><span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span><span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+(dw()?drActW(g):drAct(g))+'</span>'+(dw()?'<span id="gxslot"></span>':'')+'<span class="sp"></span>'+(dw()?drActR(g):'')
-  +'<span class="fsx wd" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="fsx wd" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="fsx" onclick="lwFs(false)" title="exit">'+FSI.out+'</span>';
- var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);lwFsCtl();drTb();lwLeg(null);deskPost()}
+ h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span>'+(dw()?'':'<span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span>')+'<span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+(dw()?drActW(g):drAct(g))+'</span>'+(dw()?'<span id="gxslot"></span>':'')+'<span class="sp"></span>'+(dw()?drActR(g):'')
+  +(dw()?'':'<span class="fsx wd" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="fsx wd" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span>')+'<span class="fsx" onclick="lwFs(false)" title="exit">'+FSI.out+'</span>';
+ var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);if(dw())rlDraw();lwFsCtl();drTb();lwLeg(null);deskPost()}
 /* 455: qobiqqa (tab nomi) — joriy tanga, narx, 24s % */
 function deskPost(){if(!EMB||!DESK||!LW.g)return;var g=LW.g,i=termItem()||{},vs=g.view,sym=vs||wlBase(i.symbol),P=LW.wlp&&LW.wlp[sym],px=vs?(P?P[0]:null):(i.price!=null?i.price:P?P[0]:null);var k=sym+'|'+px;if(k===LW.dpk)return;LW.dpk=k;try{parent.postMessage({tc:'sym',sym:sym,px:px,ch:P?P[1]:null},location.origin)}catch(e){}}
 /* 411: to'liq ekranda limit/TP/SL boshqaruvi (Saqlash/Bekor, + TP/SL/Limit) — sahifadagi #tctl nusxasi grafik ostida */
@@ -2654,7 +2703,7 @@ function lwArmed(k){return LW.arm&&LW.arm.k==k&&Date.now()<LW.arm.u}
 var ALI='<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V7.2a4 4 0 0 1 8 0V11l1.2 1.5H2.8zM6.5 14a1.6 1.6 0 0 0 3 0"/></svg>';
 function alKey(g){if(g.view)return{s:String(g.view).replace(/(USDT|USDC)$/,'')+'USDT',m:'crypto'};if(g.cx)return{s:g.cx.sym.replace(/(USDT|USDC|FDUSD)$/,'')+'USDT',m:'crypto'};
  if(g.df)return{s:String(g.df.sym).replace(/(USDT|USDC)$/,'')+'USDT',m:'crypto'};var i=termItem();return i?{s:i.symbol,m:i.market=='futures'?'futures':'crypto'}:null}
-function alReq(g,a){var k=alKey(g);if(!k)return Promise.reject();a.sym=k.s;a.mkt=k.m;var s0=k.s;return api('alerts',a).then(function(d){if(S.page===g&&(alKey(g)||{}).s===s0){g.al=d.a||[];g.alT=Date.now();lwLines(true)}return d})}
+function alReq(g,a){var k=alKey(g);if(!k)return Promise.reject();a.sym=k.s;a.mkt=k.m;var s0=k.s;return api('alerts',a).then(function(d){if(S.page===g&&(alKey(g)||{}).s===s0){g.al=d.a||[];g.alT=Date.now();lwLines(true);if(LW.rp=='al')rpDraw()}return d})}
 function alLoad(g){var k=alKey(g);if(!k)return;if(g.alS===k.s&&Date.now()-(g.alT||0)<30000)return;g.alS=k.s;g.alT=Date.now();alReq(g,{op:'list'}).catch(function(){})}
 function alLines(g){return(g.al||[]).filter(function(a){return a.sym===(g.alS||'')}).map(function(a){return{k:'al'+a.id,p:a.p,lb:'🔔'+(a.note?' '+a.note:''),c:'#ffc83d',dr:!a.hit,x:true,hit:a.hit,np:0}})}
 function alAdd(g,p){p=termRound(p);alReq(g,{op:'add',price:p}).then(function(d){if(d.ok===false){toast(esc(t('al_max')));return}haptic('success');toast(esc(t('al_ok')))}).catch(function(){toast(esc(t('err')))})}
