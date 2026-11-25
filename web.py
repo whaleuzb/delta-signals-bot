@@ -453,6 +453,13 @@ def _to_app(query: str):
     return h
 
 
+async def _root(request):
+    """485: o'z domenimiz (tradecontroller.app) — tanishtiruv sayti; Railway manzili — avvalgidek /app (bot o'zgarmaydi)."""
+    if request.host.split(":")[0].lower() in webapp.LAND_HOSTS:
+        return await webapp.landing_page(request)
+    raise web.HTTPFound("/app?")
+
+
 async def _to_group(request):
     raise web.HTTPFound(f"/app?g={int(request.match_info['wid'])}")
 
@@ -494,7 +501,7 @@ def build_app() -> web.Application:
     app["mini_sem"] = asyncio.Semaphore(2)
     app.add_routes([
         # 252: eski HTML sahifalar o'chirildi — hammasi yagona Mini App'da.
-        web.get("/", _to_app("")),   # 273: Telegram ichida — Bosh; brauzerda baribir Top
+        web.get("/", _root),         # 273/485: tradecontroller.app — landing; boshqa manzil — Mini App
         web.get("/healthz", healthz),
         web.get(r"/g/{wid:\d+}", _to_group),
         web.get(r"/g/{wid:\d+}/", _to_group),

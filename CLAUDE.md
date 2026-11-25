@@ -8831,3 +8831,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Namecheap'da olingan; Railway web servisiga custom domain (ALIAS @ → exwmrape.up.railway.app, TXT `_railway-verify`), SSL — Railway (VALID). Railway CNAME tekshiruvi «REQUIRES_UPDATE» ko'rsatadi — ALIAS IP qaytargani uchun, ishlashga ta'sir qilmaydi.
 - Kompyuter ilovasi 0.1.3: `tradecontroller.app/app?desk=1` ni ochadi; `on_navigation` o'z sayt sifatida `HOSTS` (yangi + eski Railway manzili) ni qabul qiladi. desktop.yml reliz matnida yangi manzil.
 - `WEB_URL` (bot va web servislari) hali eski — almashtirish egasi tasdig'idan keyin; config.py standarti ham.
+
+## 485. tradecontroller.app — tanishtiruv sayti (landing)
+- `landing/index.html` (+ `hero/drawing/indicators.webp` — ilovaning haqiqiy skrinshotlari). Ranglar o'zimizniki: fon #050506, laym #c2f23a (tugmalar, aksent, porlash), matn #e8ecdf; Inter shrifti; sticky shaffof header, so'z-so'z blurdan chiquvchi sarlavha (`data-split`), scroll'da `reveal` (IntersectionObserver), to'r fon ustidagi nur, birja logolari marquee (Mini App CEX/CXL bo'lagi, `__CXL__`), porlovchi Dip Funded kartasi, aylanuvchi chegara (kompyuter ilovasi), FAQ, `prefers-reduced-motion`.
+- Server: `webapp.landing_page` (bot havolasi `__TG__`, reliz fayllari `__WIN__/__MAC__/__VER__` — `_desk_release`, 5 daqiqa kesh), `/l/<nom>.webp`, `/site` (ko'rib chiqish). `web._root`: Host `tradecontroller.app`/`www` bo'lsa landing, aks holda avvalgidek `/app` — bot va eski manzil o'zgarmagan.

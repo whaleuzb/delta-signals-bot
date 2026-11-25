@@ -1755,6 +1755,53 @@ def _desk_pick(assets, *ends):
     return None
 
 
+_LAND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landing")
+_LAND_C: dict = {}
+LAND_HOSTS = ("tradecontroller.app", "www.tradecontroller.app")
+
+
+async def landing_page(request):
+    """485: tradecontroller.app — tanishtiruv sayti (landing/index.html). Bot havolasi, kompyuter ilovasi fayllari
+    (GitHub reliz) va birja logolari (Mini App CEX/CXL bo'lagi) serverda qo'yiladi. 5 daqiqa kesh."""
+    import gzip as _gz
+    import html as _h
+    p = os.path.join(_LAND_DIR, "index.html")
+    st = os.stat(p).st_mtime
+    c = _LAND_C.get("c")
+    if not c or c[0] != st or time.time() - c[4] > 300:
+        rel = await _desk_release() or {}
+        A = rel.get("assets") or []
+        win, mac = _desk_pick(A, "-setup.exe", ".exe"), _desk_pick(A, "universal.dmg", ".dmg")
+        sz = lambda a: f"{_h.escape(a['name'])} · {a.get('size', 0) / 1048576:.1f} MB" if a else "tayyorlanmoqda…"
+        bot = request.app.get("bot_username") or ""
+        with open(p, "r", encoding="utf-8") as fh:
+            raw = fh.read()
+        i, j = PAGE.find("var CEX=["), PAGE.find("var CXN=0;")
+        rep = {"__TG__": f"https://t.me/{bot}" if bot else "#", "__VER__": _h.escape(str(rel.get("tag_name", "")).replace("desktop-v", "v")),
+               "__WIN__": _h.escape(win["browser_download_url"]) if win else "#", "__WINC__": "" if win else "off", "__WINS__": sz(win),
+               "__MAC__": _h.escape(mac["browser_download_url"]) if mac else "#", "__MACC__": "" if mac else "off", "__MACS__": sz(mac),
+               "__CXL__": (PAGE[i:j] + "var CXN=0;") if 0 <= i < j else ""}
+        for k, v in rep.items():
+            raw = raw.replace(k, v)
+        b = raw.encode()
+        c = _LAND_C["c"] = (st, b, _gz.compress(b, 6), '"l%d-%d"' % (int(st), len(b)), time.time())
+    hdr = {"Cache-Control": "public, max-age=300", "ETag": c[3], "Vary": "Accept-Encoding"}
+    if c[3] in request.headers.get("If-None-Match", ""):
+        return web.Response(status=304, headers=hdr)
+    if "gzip" in request.headers.get("Accept-Encoding", ""):
+        return web.Response(body=c[2], content_type="text/html", charset="utf-8", headers={**hdr, "Content-Encoding": "gzip"})
+    return web.Response(body=c[1], content_type="text/html", charset="utf-8", headers=hdr)
+
+
+async def landing_file(request):
+    """485: landing rasmlari (/l/<nom>.webp)."""
+    n = request.match_info["name"]
+    p = os.path.join(_LAND_DIR, n + ".webp")
+    if not re.fullmatch(r"[a-z0-9_-]{1,40}", n) or not os.path.isfile(p):
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400", "Content-Type": "image/webp"})
+
+
 async def desktop_page(request):
     import html as _h
     rel = await _desk_release() or {}
@@ -2841,6 +2888,8 @@ def routes() -> list:
         web.get("/api/app/ver", api_ver),
         web.get("/invite.jpg", invite_jpg),
         web.get("/desktop", desktop_page),
+        web.get("/site", landing_page),
+        web.get(r"/l/{name}.webp", landing_file),
         web.get("/desk", desk_page),
         web.post("/api/app/screener", api_screener),
         web.post("/api/app/econ", api_econ),
