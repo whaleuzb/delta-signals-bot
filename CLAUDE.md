@@ -8766,3 +8766,9 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 468. OHLC qatori grafik ustida (shaffof)
 - Kompyuterda `#lwfso` alohida qator emas: `lwFs` uni `#lwfsc` ichiga ko'chiradi (`#lwfsc>#lwfso` — chap tepada, fonsiz, `pointer-events:none`, matn soyasi). Tanga nomi qo'yilmaydi (sarlavhada bor). SELL/BUY uning ostida (`html.dwide #lwfsc>#bsb` top:30px left:10px). Och fonda `html.lw-lite` (chOpts) — to'q matn.
+
+## 470. Akkaunt avatari (kompyuter ilovasi)
+- `user_avatars.own` (yangi ustun): true — foydalanuvchi o'zi yuklagan rasm; `db.set_user_avatar(uid,img,own)` Telegram rasmi (own=False) bilan o'z rasmini almashtirmaydi, rasm o'zgarsa `key` yangilanadi (kesh). `db.user_avatar_info`, `db.clear_own_avatar`. DIP reytingi avatar sikli (`dip_avatar_job`) ham shu qoidaga bo'ysunadi.
+- `POST /api/app/avatar` op: `get` (rasm yo'q yoki 24 soatdan eski va o'ziniki emas — `_tg_user_avatar`: Bot API getUserProfilePhotos → 256px kvadrat JPEG), `put` {img data-URL} (`_avatar_jpeg`, own=true), `del` (Telegram rasmiga qaytish). URL `/av/<key>.jpg`.
+- desk.html: `AV`, `avLoad`, `avPick` (fayl → 512px kvadrat canvas → put), `avHtml`; o'ng yuqori `#me` da rasm (bo'lmasa harf), menyu: «Rasmni o'zgartirish», «Telegram rasmiga qaytarish» (own bo'lsa); Sozlamalar → Hisob: katta avatar (✎ bosiladi) + tugmalar. Kirishda avtomatik `avLoad()` — Telegram rasmi o'zi yuklanadi.
+- Email orqali ro'yxatdan o'tish hozir yo'q (kirish faqat Telegram orqali).

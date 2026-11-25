@@ -715,6 +715,8 @@ CREATE TABLE IF NOT EXISTS user_avatars (
     img     BYTEA,
     at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 470: own=true — foydalanuvchi o'zi yuklagan rasm (Telegram avatari ustidan yozilmaydi)
+ALTER TABLE user_avatars ADD COLUMN IF NOT EXISTS own BOOLEAN NOT NULL DEFAULT FALSE;
 -- 418: narx alertlari (grafikdagi 🔔 chiziq) — narx `price` ni kesib o'tsa Telegram xabar, keyin fired_at
 CREATE TABLE IF NOT EXISTS price_alerts (
     id       BIGSERIAL PRIMARY KEY,
@@ -1358,13 +1360,30 @@ async def avatar_targets(top: int = 50, limit: int = 15) -> list[int]:
     return [r["user_id"] for r in rows]
 
 
-async def set_user_avatar(user_id: int, img: bytes | None) -> None:
+async def set_user_avatar(user_id: int, img: bytes | None, own: bool = False) -> None:
+    """Telegram avatari (own=False) foydalanuvchi o'zi yuklagan rasmni (own=True) almashtirmaydi.
+    Rasm o'zgarsa kalit ham yangilanadi — brauzer keshi eski rasmni ko'rsatmaydi."""
     import secrets
     async with pool().acquire() as c:
         await c.execute(
-            "INSERT INTO user_avatars (user_id, key, img) VALUES ($1,$2,$3) "
-            "ON CONFLICT (user_id) DO UPDATE SET img=EXCLUDED.img, at=now()",
-            user_id, secrets.token_urlsafe(9), img)
+            "INSERT INTO user_avatars (user_id, key, img, own) VALUES ($1,$2,$3,$4) "
+            "ON CONFLICT (user_id) DO UPDATE SET img=EXCLUDED.img, at=now(), own=EXCLUDED.own, "
+            "key=CASE WHEN user_avatars.img IS DISTINCT FROM EXCLUDED.img THEN EXCLUDED.key ELSE user_avatars.key END "
+            "WHERE NOT user_avatars.own OR EXCLUDED.own",
+            user_id, secrets.token_urlsafe(9), img, own)
+
+
+async def user_avatar_info(user_id: int):
+    """470: {key, has (rasm bor), own, age_h} yoki None."""
+    async with pool().acquire() as c:
+        return await c.fetchrow(
+            "SELECT key, img IS NOT NULL AS has, own, EXTRACT(EPOCH FROM now()-at)/3600 AS age_h "
+            "FROM user_avatars WHERE user_id=$1", user_id)
+
+
+async def clear_own_avatar(user_id: int) -> None:
+    async with pool().acquire() as c:
+        await c.execute("UPDATE user_avatars SET own=FALSE, img=NULL, at=now()-interval '2 days' WHERE user_id=$1", user_id)
 
 
 async def user_avatar(key: str) -> bytes | None:

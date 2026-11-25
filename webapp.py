@@ -865,6 +865,72 @@ async def api_alerts(request):
                                                   "note": r["note"], "hit": bool(r["fired_at"])} for r in rows]}, headers=NO_CACHE)
 
 
+async def _tg_user_avatar(uid: int) -> bytes | None:
+    """470: foydalanuvchining Telegram profil rasmi — 256px kvadrat JPEG (Bot API). Yo'q/yashirin bo'lsa None."""
+    import aiohttp
+    from PIL import Image
+    api = f"https://api.telegram.org/bot{config.BOT_TOKEN}"
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as cs:
+        async with cs.get(api + "/getUserProfilePhotos", params={"user_id": uid, "limit": 1}) as r:
+            ph = (await r.json()).get("result") or {}
+        sizes = (ph.get("photos") or [[]])[0]
+        if not sizes:
+            return None
+        fid = next((x for x in sizes if x.get("width", 0) >= 256), sizes[-1])["file_id"]
+        async with cs.get(api + "/getFile", params={"file_id": fid}) as r:
+            path = (await r.json())["result"]["file_path"]
+        async with cs.get(f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{path}") as r:
+            raw = await r.read()
+    return _avatar_jpeg(raw)
+
+
+def _avatar_jpeg(raw: bytes) -> bytes:
+    from PIL import Image
+    im = Image.open(io.BytesIO(raw))
+    if im.width * im.height > 40_000_000:
+        raise ValueError("katta")
+    im = im.convert("RGB")
+    side = min(im.size)
+    l, t = (im.width - side) // 2, (im.height - side) // 2
+    im = im.crop((l, t, l + side, t + side)).resize((256, 256))
+    out = io.BytesIO()
+    im.save(out, format="JPEG", quality=88)
+    return out.getvalue()
+
+
+async def api_avatar(request):
+    """470: akkaunt avatari. op=get -> {url|null, own} (rasm yo'q yoki 24 soatdan eski bo'lsa — Telegram profil rasmi
+    avtomatik olinadi; o'zi yuklagan rasm tegilmaydi); op=put {img: data-URL} -> o'z rasmi (256px JPEG);
+    op=del -> o'z rasmini olib tashlab Telegram rasmiga qaytish. URL: /av/<key>.jpg"""
+    import base64
+    body, uid = await _body(request)
+    op = body.get("op") or "get"
+    if op == "put":
+        raw = str(body.get("img") or "")
+        if raw.startswith("data:image/"):
+            raw = raw.split(",", 1)[-1]
+        if not raw or len(raw) > 7_000_000:
+            raise web.HTTPBadRequest()
+        try:
+            data = _avatar_jpeg(base64.b64decode(raw))
+        except Exception:
+            raise web.HTTPBadRequest()
+        await db.set_user_avatar(uid, data, own=True)
+    elif op == "del":
+        await db.clear_own_avatar(uid)
+    a = await db.user_avatar_info(uid)
+    if not a or (not a["own"] and (a["age_h"] or 0) > 24) or (a and not a["own"] and not a["has"] and (a["age_h"] or 0) > 1):
+        try:
+            data = await _tg_user_avatar(uid)
+        except Exception as ex:
+            log.info("Avatar olinmadi (%s): %s", uid, ex)
+            data = None
+        await db.set_user_avatar(uid, data)
+        a = await db.user_avatar_info(uid)
+    url = f"/av/{a['key']}.jpg" if a and a["has"] else None
+    return web.json_response({"url": url, "own": bool(a and a["own"])}, headers=NO_CACHE)
+
+
 _BLOGO: dict = {"at": 0.0, "data": None}
 
 
@@ -2770,6 +2836,7 @@ def routes() -> list:
         web.post("/api/app/chart", api_chart),
         web.post("/api/app/chartpub", api_chartpub),
         web.post("/api/app/desk", api_desk),
+        web.post("/api/app/avatar", api_avatar),
         web.post("/api/app/orderflow", api_orderflow),
         web.post("/api/app/dfcandles", api_dfcandles),
         web.post("/api/app/pairs", api_pairs),
