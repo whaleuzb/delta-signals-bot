@@ -1760,6 +1760,49 @@ _LAND_C: dict = {}
 LAND_HOSTS = ("tradecontroller.app", "www.tradecontroller.app")
 
 
+# 487m: qidiruv tizimlari (SEO) — har til uchun sarlavha/tavsif serverda (Google/Yandex JS'siz ham ko'radi)
+_SEO = {
+    "uz": ("Trade Controller — kripto signallar boti, professional grafik va birjalar",
+           "Telegram guruh va kanallar uchun kripto signallarni boshqarish boti: TP/SL avtomatik kuzatuv, statistika, Volume Profile va 75+ chizma asbobli grafik, Binance, Bybit va boshqa birjalar, Dip Funded, simulyator. Bepul — Telegram, Mini App, Windows va macOS.",
+           "uz_UZ"),
+    "ru": ("Trade Controller — бот для крипто-сигналов, профессиональный график и биржи",
+           "Бот для управления крипто-сигналами в группах и каналах Telegram: автоматическое отслеживание TP/SL, статистика, график с Volume Profile и 75+ инструментами, Binance, Bybit и другие биржи, Dip Funded, симулятор. Бесплатно — Telegram, Mini App, Windows и macOS.",
+           "ru_RU"),
+    "en": ("Trade Controller — crypto signal bot, pro charting and exchanges in one app",
+           "A bot for managing crypto signals in Telegram groups and channels: automatic TP/SL tracking, stats, a chart with Volume Profile and 75+ drawing tools, Binance, Bybit and more, Dip Funded and a simulator. Free — Telegram, Mini App, Windows and macOS.",
+           "en_US"),
+}
+_SITE = "https://tradecontroller.app"
+
+
+def _seo_verify() -> str:
+    """Search Console / Yandex Webmaster / Bing tasdiqlash meta-teglari — env orqali (kod o'zgarmasdan)."""
+    import html as _h
+    out = ""
+    for env, name in (("GOOGLE_SITE_VERIFICATION", "google-site-verification"), ("YANDEX_VERIFICATION", "yandex-verification"),
+                      ("BING_SITE_VERIFICATION", "msvalidate.01")):
+        v = os.getenv(env, "").strip()
+        if v:
+            out += f'<meta name="{name}" content="{_h.escape(v)}">\n'
+    return out
+
+
+def _seo_jsonld(lang: str, bot: str) -> str:
+    t, d, _ = _SEO[lang]
+    tg = f"https://t.me/{bot}" if bot else ""
+    g = [
+        {"@type": "Organization", "@id": _SITE + "/#org", "name": "Trade Controller", "url": _SITE + "/",
+         "logo": _SITE + "/desktop/icon.png", **({"sameAs": [tg]} if tg else {})},
+        {"@type": "WebSite", "@id": _SITE + "/#site", "url": _SITE + "/", "name": "Trade Controller",
+         "inLanguage": ["uz", "ru", "en"], "publisher": {"@id": _SITE + "/#org"}},
+        {"@type": "SoftwareApplication", "name": "Trade Controller", "description": d, "url": _SITE + "/",
+         "applicationCategory": "FinanceApplication", "operatingSystem": "Windows, macOS, Telegram",
+         "image": _SITE + "/l/og.jpg", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+         "publisher": {"@id": _SITE + "/#org"}},
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": g}, ensure_ascii=False).replace("</", "<\\/")
+
+
 async def landing_page(request):
     """485: tradecontroller.app — tanishtiruv sayti (landing/index.html). Bot havolasi, kompyuter ilovasi fayllari
     (GitHub reliz) va birja logolari (Mini App CEX/CXL bo'lagi) serverda qo'yiladi. 5 daqiqa kesh."""
@@ -1767,7 +1810,9 @@ async def landing_page(request):
     import html as _h
     p = os.path.join(_LAND_DIR, "index.html")
     st = os.stat(p).st_mtime
-    c = _LAND_C.get("c")
+    lang = request.query.get("lang", "uz")
+    lang = lang if lang in _SEO else "uz"
+    c = _LAND_C.get(lang)
     if not c or c[0] != st or time.time() - c[4] > 300:
         rel = await _desk_release() or {}
         A = rel.get("assets") or []
@@ -1781,12 +1826,19 @@ async def landing_page(request):
                "__WIN__": _h.escape(win["browser_download_url"]) if win else "#", "__WINC__": "" if win else "off", "__WINS__": sz(win),
                "__MAC__": _h.escape(mac["browser_download_url"]) if mac else "#", "__MACC__": "" if mac else "off", "__MACS__": sz(mac),
                "__CXL__": (PAGE[i:j] + "var CXN=0;") if 0 <= i < j else "",
-               "__NEX__": str(len(re.findall(r"\[\s*'([a-z0-9]+)'", PAGE[i:PAGE.find("];", i)])) if i >= 0 else 9)}
+               "__NEX__": str(len(re.findall(r"\[\s*'([a-z0-9]+)'", PAGE[i:PAGE.find("];", i)])) if i >= 0 else 9),
+               "__LANG__": lang, "__TITLE__": _h.escape(_SEO[lang][0]), "__DESC__": _h.escape(_SEO[lang][1]),
+               "__TITLE_UZ__": _h.escape(_SEO["uz"][0]), "__DESC_UZ__": _h.escape(_SEO["uz"][1]), "__OGLOC__": _SEO[lang][2],
+               "__CANON__": _SITE + "/" + ("" if lang == "uz" else "?lang=" + lang), "__VERIFY__": _seo_verify(),
+               "__JSONLD__": _seo_jsonld(lang, bot),
+               "__SEOJS__": json.dumps({k: {"t": v[0], "d": v[1]} for k, v in _SEO.items()}, ensure_ascii=False).replace("</", "<\\/")}
         for k, v in rep.items():
             raw = raw.replace(k, v)
         b = raw.encode()
-        c = _LAND_C["c"] = (st, b, _gz.compress(b, 6), '"l%d-%d"' % (int(st), len(b)), time.time())
+        c = _LAND_C[lang] = (st, b, _gz.compress(b, 6), '"l%s%d-%d"' % (lang, int(st), len(b)), time.time())
     hdr = {"Cache-Control": "public, max-age=300", "ETag": c[3], "Vary": "Accept-Encoding"}
+    if request.path == "/site" or request.host.split(":")[0].lower() not in LAND_HOSTS:
+        hdr["X-Robots-Tag"] = "noindex"  # 487m: ko'rib chiqish nusxasi qidiruvda dublikat bo'lmasin
     if c[3] in request.headers.get("If-None-Match", ""):
         return web.Response(status=304, headers=hdr)
     if "gzip" in request.headers.get("Accept-Encoding", ""):
@@ -1795,12 +1847,36 @@ async def landing_page(request):
 
 
 async def landing_file(request):
-    """485: landing rasmlari (/l/<nom>.webp)."""
-    n = request.match_info["name"]
-    p = os.path.join(_LAND_DIR, n + ".webp")
-    if not re.fullmatch(r"[a-z0-9_-]{1,40}", n) or not os.path.isfile(p):
+    """485: landing rasmlari (/l/<nom>.webp; 487m: og.jpg ham)."""
+    n, ext = request.match_info["name"], request.match_info.get("ext", "webp")
+    p = os.path.join(_LAND_DIR, n + "." + ext)
+    if ext not in ("webp", "jpg") or not re.fullmatch(r"[a-z0-9_-]{1,40}", n) or not os.path.isfile(p):
         raise web.HTTPNotFound()
-    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400", "Content-Type": "image/webp"})
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400", "Content-Type": "image/" + ("jpeg" if ext == "jpg" else ext)})
+
+
+async def robots_txt(request):
+    """487m: tradecontroller.app — indekslash ochiq (ilova/API yopiq); boshqa manzillar (Railway) — butunlay yopiq."""
+    if request.host.split(":")[0].lower() in LAND_HOSTS:
+        t = ("User-agent: *\nAllow: /$\nAllow: /l/\nAllow: /desktop/icon.png\nDisallow: /app\nDisallow: /api/\n"
+             "Disallow: /desk\nDisallow: /site\nDisallow: /g/\n\nHost: tradecontroller.app\nSitemap: " + _SITE + "/sitemap.xml\n")
+    else:
+        t = "User-agent: *\nDisallow: /\n"
+    return web.Response(text=t, content_type="text/plain", headers={"Cache-Control": "public, max-age=3600"})
+
+
+async def sitemap_xml(request):
+    """487m: sayt xaritasi — 3 til (hreflang bilan)."""
+    import datetime as _dt
+    p = os.path.join(_LAND_DIR, "index.html")
+    lm = _dt.datetime.utcfromtimestamp(os.stat(p).st_mtime).strftime("%Y-%m-%d")
+    alt = "".join(f'<xhtml:link rel="alternate" hreflang="{l}" href="{_SITE}/{"" if l == "uz" else "?lang=" + l}"/>' for l in ("uz", "ru", "en"))
+    alt += f'<xhtml:link rel="alternate" hreflang="x-default" href="{_SITE}/"/>'
+    urls = "".join(f'<url><loc>{_SITE}/{"" if l == "uz" else "?lang=" + l}</loc><lastmod>{lm}</lastmod><changefreq>weekly</changefreq>'
+                   f'<priority>{"1.0" if l == "uz" else "0.9"}</priority>{alt}</url>' for l in ("uz", "ru", "en"))
+    x = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+         'xmlns:xhtml="http://www.w3.org/1999/xhtml">' + urls.replace("?lang=", "?lang=") + "</urlset>\n")
+    return web.Response(text=x, content_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
 
 
 async def desktop_page(request):
@@ -2890,7 +2966,9 @@ def routes() -> list:
         web.get("/invite.jpg", invite_jpg),
         web.get("/desktop", desktop_page),
         web.get("/site", landing_page),
-        web.get(r"/l/{name}.webp", landing_file),
+        web.get(r"/l/{name}.{ext:(webp|jpg)}", landing_file),
+        web.get("/robots.txt", robots_txt),
+        web.get("/sitemap.xml", sitemap_xml),
         web.get("/desk", desk_page),
         web.post("/api/app/screener", api_screener),
         web.post("/api/app/econ", api_econ),
