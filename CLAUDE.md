@@ -8818,3 +8818,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 481. Kompyuter ilovasi — faqat Windows va macOS
 - desktop.yml matritsasidan ubuntu va Linux kutubxonalari olib tashlandi; tauri.conf.json `bundle.targets` = nsis, dmg. `/desktop` sahifasida faqat Windows 10/11 (.exe) va macOS (universal .dmg); qurilma aniqlash mac/win.
+
+## 482. Xavfsizlik: kompyuter ilovasiga kirishni o'g'irlash (login hijack) yopildi
+- Avval `/start desk_<tok>` darhol kirishni tasdiqlardi — firibgar o'z kompyuterida havola olib, boshqaga yuborsa, o'sha odam Start bosishi bilan uning akkaunti (birjalar, savdo) 180 kunga firibgarda qolardi.
+- Endi bot faqat ogohlantirish + 4 xonali kod (`desk_code(tok)` = sha256 → 4 raqam) va tugmalar yuboradi: «✅ Ha, bu men — kirish» (`dk:y:<tok>` → `db.desk_confirm`) / «❌ Men emasman» (`dk:n`); `on_desk_cb`, faqat shaxsiy chatda. Ilova (`/api/app/desk` op=start → `code`) kirish ekranida shu kodni katta ko'rsatadi — odam solishtiradi. i18n: desk.ask/yes/nobtn/no.

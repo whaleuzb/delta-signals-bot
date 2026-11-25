@@ -717,7 +717,9 @@ async def api_desk(request):
         tok = secrets.token_urlsafe(18)
         if not bot or not await db.desk_new(tok):
             raise web.HTTPServiceUnavailable()
-        return web.json_response({"tok": tok, "url": f"https://t.me/{bot}?start=desk_{tok}"}, headers=NO_CACHE)
+        import hashlib as _hl
+        code = f"{int(_hl.sha256(tok.encode()).hexdigest()[:8], 16) % 10000:04d}"     # 482: botdagi kod bilan bir xil
+        return web.json_response({"tok": tok, "code": code, "url": f"https://t.me/{bot}?start=desk_{tok}"}, headers=NO_CACHE)
     if op == "poll":
         tok = str(body.get("tok") or "")
         if not re.fullmatch(r"[A-Za-z0-9_-]{20,40}", tok):

@@ -4501,6 +4501,35 @@ async def _admin_diplog_view() -> tuple[str, InlineKeyboardMarkup]:
     return "\n".join(lines), kb
 
 
+def desk_code(tok: str) -> str:
+    """482: kirish tokenidan 4 xonali kod — ilova va bot bir xil ko'rsatadi (odam solishtiradi)."""
+    import hashlib as _hl
+    return f"{int(_hl.sha256(tok.encode()).hexdigest()[:8], 16) % 10000:04d}"
+
+
+async def on_desk_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """482: kompyuter ilovasiga kirishni tasdiqlash / rad etish."""
+    q = update.callback_query
+    u = q.from_user
+    lang = await user_lang(u.id)
+    await q.answer()
+    if q.message and q.message.chat.type != "private":
+        return
+    ok = False
+    if q.data.startswith("dk:y:"):
+        try:
+            ok = await db.desk_confirm(q.data[5:], u.id, u.full_name or "", u.username or "")
+        except Exception:
+            log.exception("Kompyuter ilovasiga kirish")
+        txt = i18n.t("desk.ok" if ok else "desk.bad", lang)
+    else:
+        txt = i18n.t("desk.no", lang)
+    try:
+        await q.edit_message_text(txt)
+    except Exception:
+        pass
+
+
 async def dip_avatar_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """271: DIP reytingidagilarning Telegram avatari — 128px JPEG bazaga
     (veb `/av/<key>.jpg` beradi). Har siklda ko'pi bilan 15 kishi, sutkada
@@ -7848,14 +7877,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await update.effective_message.reply_text(i18n.t("wg.fail", lang))
             return
     if ctx.args and ctx.args[0].startswith("desk_") and update.effective_chat.type == "private":   # 452: kompyuter ilovasiga kirish
+        # 482: darhol kiritmaymiz — firibgar o'z kompyuteridagi kirish havolasini boshqaga yuborib akkauntni egallamasin.
+        # Avval ogohlantirish + ilovadagi kod, odam «Ha, bu men» ni bosgandagina kirish tasdiqlanadi.
         lang = await user_lang(uid)
-        u = update.effective_user
-        ok = False
-        try:
-            ok = await db.desk_confirm(ctx.args[0][5:], uid, u.full_name or "", u.username or "")
-        except Exception:
-            log.exception("Kompyuter ilovasiga kirish")
-        await update.effective_message.reply_text(i18n.t("desk.ok" if ok else "desk.bad", lang))
+        tok = ctx.args[0][5:]
+        if not re.fullmatch(r"[A-Za-z0-9_-]{20,40}", tok):
+            await update.effective_message.reply_text(i18n.t("desk.bad", lang))
+            return
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(i18n.t("desk.yes", lang), callback_data=f"dk:y:{tok}")],
+                                   [InlineKeyboardButton(i18n.t("desk.nobtn", lang), callback_data="dk:n")]])
+        await update.effective_message.reply_text(i18n.t("desk.ask", lang, code=desk_code(tok)), reply_markup=kb, parse_mode="HTML")
         return
     if ctx.args and ctx.args[0].startswith("nws_"):
         await _news_share(update, ctx, ctx.args[0][4:])
@@ -12385,6 +12416,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler(["widgets", "vidjet"], cmd_widgets))
     app.add_handler(CallbackQueryHandler(on_widgets_cb, pattern=r"^wg:"))
+    app.add_handler(CallbackQueryHandler(on_desk_cb, pattern=r"^dk:"))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("menu", cmd_start))
     app.add_handler(CommandHandler("setup", cmd_setup))
