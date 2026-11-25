@@ -108,6 +108,7 @@ section.sec{padding:110px 0}.head{display:grid;grid-template-columns:1fr 1fr;gap
 .wall{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px;-webkit-mask-image:linear-gradient(180deg,transparent,#000 22%,#000 78%,transparent);mask-image:linear-gradient(180deg,transparent,#000 22%,#000 78%,transparent)}
 .wall .col{overflow:hidden}.wall .tr{display:flex;flex-direction:column;gap:10px;animation:wUp 24s linear infinite}.wall .col:nth-child(2) .tr{animation-name:wDown;animation-duration:28s}.wall .col:nth-child(3) .tr{animation-duration:20s}
 @keyframes wUp{to{transform:translateY(-50%)}}@keyframes wDown{from{transform:translateY(-50%)}to{transform:none}}
+.av{border-radius:7px;flex:none;display:grid;place-items:center;font-weight:800;overflow:hidden;background:rgb(255 255 255 / .08);border:1px solid rgb(255 255 255 / .1);line-height:1}.av img{width:100%;height:100%;object-fit:cover;display:block}
 .coin{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:12px;background:rgb(255 255 255 / .04);border:1px solid rgb(255 255 255 / .06);font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden}.coin .av{margin:0!important;flex:none}
 .dd-limit{stroke:var(--down);stroke-dasharray:6 6;animation:dashMove 1.6s linear infinite}@keyframes dashMove{to{stroke-dashoffset:-24}}
 .dd-area{fill:rgb(194 242 58 / .1);opacity:0;animation:fadeIn 1s 1.6s forwards}.dd-dot{fill:var(--up);opacity:0;animation:fadeIn .3s 2.2s forwards,pulseDot 2s 2.5s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
@@ -410,7 +411,11 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function dfLogo(z){return'<svg width="'+z+'" height="'+z+'" viewBox="0 0 24 24" fill="none" stroke="#e8ecdf" stroke-width="1.6"><path d="M12 3L3 20h18z"/><path d="M12 9l-4.5 8h9z"/></svg>'}
+/* 487h: Dip Funded'ning haqiqiy logosi (webapp.html dfLogo bilan bir xil) */
+var DFL=0;function dfLogo(z){var id='dfl'+(DFL++);return'<svg width="'+z+'" height="'+z+'" viewBox="290 230 527 517" style="overflow:visible;flex:none"><defs>'
+ +'<linearGradient id="'+id+'f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity=".04"/></linearGradient>'
+ +'<linearGradient id="'+id+'s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".5" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#c2f23a" stop-opacity=".55"/></linearGradient></defs>'
+ +'<path fill="url(#'+id+'f)" stroke="url(#'+id+'s)" stroke-width="10" stroke-linejoin="round" fill-rule="evenodd" d="M553 244 803 733H304ZM521 397Q538 368 555 397L689 662Q703 693 672 693H399Q368 693 382 662Z"/></svg>'}
 __CXL__
 (function(){
  var NS='http://www.w3.org/2000/svg',seed=7,rnd=function(){seed=(seed*9301+49297)%233280;return seed/233280};
