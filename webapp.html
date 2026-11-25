@@ -415,6 +415,7 @@ html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide
 #drfly svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}#drfly .fi b{display:none}
 /* 460: TradingView kabi asboblar menyusi va sevimlilar paneli */
 .cmx{min-width:330px;max-width:420px}#drfly .cmx .fi{padding:7px 10px;font-size:13px;font-weight:500}#drfly .cmx .cmn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#drfly .cmx .cms{font-style:normal;font-size:11px;color:rgba(232,236,223,.4);margin-left:14px;white-space:nowrap}
+#drfly .psm{min-width:300px}#drfly .psk{width:19px;flex:none;text-align:center;font-style:normal;color:#e8ecdf;margin:0!important}#drfly .fi:hover .psk{color:#c2f23a}
 #drfly .cmx .fi.dis{opacity:.35;pointer-events:none}#drfly .cmx svg{width:19px;height:19px}#drfly hr{border:0;border-top:1px solid rgba(255,255,255,.08);margin:4px 2px}#drfly .cmt{max-height:70vh;overflow:auto;min-width:300px}#drfly .cmx .cmd{cursor:pointer;font-size:13px;padding:0 4px}#drfly .cmx .cmd:hover{color:#ff5c5c}#drfly .cme{padding:6px 12px;font-size:12px;color:rgba(232,236,223,.45)}
 #dsh{position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.6);display:grid;place-items:center}#dsh .dsx{position:relative;width:min(620px,94vw);max-height:90vh;overflow:auto;background:#141415;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.7)}
 #dsh h3{margin:0 0 14px;font-size:16px}#dsh .dst{font-size:13px;color:rgba(232,236,223,.75);margin-bottom:12px;white-space:pre-wrap}#dsh .bx{position:absolute;right:16px;top:14px;cursor:pointer;opacity:.6}#dsh .bx:hover{opacity:1}#dsh .dsi{border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:#0b0b0c;min-height:120px;display:grid;place-items:center}#dsh .dsi img{width:100%;display:block}#dsh .dsw{color:rgba(232,236,223,.5);font-size:13px}
@@ -1407,7 +1408,7 @@ function termRedraw(){if(LW.g===S.page)lwLines(true)}
 function lwP2(n){return('0'+n).slice(-2)}
 var LWM=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 /* 429: grafik sozlamalari (⚙) — sham ranglari, pilik/ramka, oxirgi narx chizig'i, fon, panjara, kursor (oddiy/magnit), vaqt mintaqasi. localStorage tc_cs (+ server sinxroni 'cs') */
-var CSD={up:'#c2f23a',dn:'#ff5c5c',wk:1,bd:0,pl:1,bg:'none',grid:1,cm:'0',tz:'loc',sco:1,bg1:'#131722',bg2:'#3a1d5c',gd:'v',ga:100};
+var CSD={up:'#c2f23a',dn:'#ff5c5c',wk:1,bd:0,pl:1,lv:1,bg:'none',grid:1,cm:'0',tz:'loc',sco:1,bg1:'#131722',bg2:'#3a1d5c',gd:'v',ga:100};
 var CSC=null;
 function csG(){if(CSC)return CSC;var o={},v={};try{v=JSON.parse(localStorage.getItem('tc_cs')||'{}')||{}}catch(e){}for(var k in CSD)o[k]=v[k]!=null?v[k]:CSD[k];CSC=o;return o}
 function lwD(t){var K=csG();if(K.tz=='loc')return new Date(t*1000);var off=K.tz=='utc'?0:parseFloat(K.tz)||0;return new Date((t+off*3600)*1000+new Date(t*1000).getTimezoneOffset()*60000)}
@@ -2098,6 +2099,27 @@ function cmOpen(e){var p=drPt(e,false);if(!p||!LW.g)return;LW.cmp=p;var sym=bpSy
   +(D.length?it(DRI.del,cmT('rmd')+' ('+D.length+')','cmRmD()'):'')+(I.length?it(CMI.ind,cmT('rmi')+' ('+I.length+')','cmRmI()'):'')+(D.length||I.length?'<hr>':'')
   +it(MTI.set,cmT('set'),'chSet()')+'</div>';
  var x=e.clientX,y=e.clientY;flyOpen({getBoundingClientRect:function(){return{left:x,right:x,top:y-6,bottom:y-6}}},h,false)}
+/* 466: narx shkalasida o'ng tugma (TradingView kabi): tiklash, avto, faqat shamlar bo'yicha, teskari, Oddiy/Foiz/100 ga indeks/Logarifmik,
+   Yorliqlar va Chiziqlar (ichki menyu), sozlamalar. Holat: tc_ct {pm 0..3, inv}, tc_cs {sco, lv, pl, grid}. */
+var PST={uz:{rst:'Narx shkalasini tiklash',auto:'Avto (ma\'lumotni ekranga sig\'dirish)',sco:'Faqat narx grafigi bo\'yicha masshtab',inv:'Shkalani teskari qilish',pm0:'Oddiy',pm2:'Foiz',pm3:'100 ga indekslangan',pm1:'Logarifmik',lb:'Yorliqlar',ln:'Chiziqlar',lv:'Oxirgi narx yorlig\'i',pl:'Oxirgi narx chizig\'i',grid:'Panjara chiziqlari',back:'Orqaga',more:'Boshqa sozlamalar…'},
+ ru:{rst:'Сбросить шкалу цены',auto:'Авто (вписать данные в экран)',sco:'Масштабировать только график цены',inv:'Инвертировать шкалу',pm0:'Обычная',pm2:'Проценты',pm3:'Индексированная к 100',pm1:'Логарифмическая',lb:'Метки',ln:'Линии',lv:'Метка последней цены',pl:'Линия последней цены',grid:'Линии сетки',back:'Назад',more:'Другие настройки…'},
+ en:{rst:'Reset price scale',auto:'Auto (fits data to screen)',sco:'Scale price chart only',inv:'Invert scale',pm0:'Regular',pm2:'Percent',pm3:'Indexed to 100',pm1:'Logarithmic',lb:'Labels',ln:'Lines',lv:'Symbol last price label',pl:'Symbol last price line',grid:'Grid lines',back:'Back',more:'More settings…'}};
+function psT(k){return(PST[S.lang]||PST.uz)[k]||PST.uz[k]}
+function psMenu(e,sub){var x=e.clientX,y=e.clientY;LW.pse={clientX:x,clientY:y};var C=ctS(),K=csG(),au=true;try{au=LW.ch.priceScale('right').options().autoScale!==false}catch(q){}
+ var ck=function(on){return'<em class="psk">'+(on?'✓':'')+'</em>'},it=function(on,txt,f,sc,ar){return'<div class="fi" onclick="'+f+'">'+ck(on)+'<span class="cmn">'+esc(txt)+'</span>'+(sc?'<i class="cms">'+sc+'</i>':'')+(ar?'<i class="cms">›</i>':'')+'</div>'},
+  h='<div class="cmx psm">';
+ if(sub=='lb')h+=it(0,'‹ '+psT('back'),'psMenu(LW.pse)')+'<hr>'+it(K.lv,psT('lv'),'psCs(\'lv\',\'lb\')');
+ else if(sub=='ln')h+=it(0,'‹ '+psT('back'),'psMenu(LW.pse)')+'<hr>'+it(K.pl,psT('pl'),'psCs(\'pl\',\'ln\')')+it(K.grid,psT('grid'),'psCs(\'grid\',\'ln\')');
+ else h+='<div class="fi" onclick="flyClose();psReset()">'+CMI.rst+'<span class="cmn">'+esc(psT('rst'))+'</span><i class="cms">Alt + R</i></div><hr>'
+  +it(au,psT('auto'),'flyClose();psAuto()')+it(K.sco,psT('sco'),'psCs(\'sco\')')+it(C.inv,psT('inv'),'flyClose();ctSet(\'inv\','+(C.inv?0:1)+')','Alt + I')+'<hr>'
+  +it(C.pm==0,psT('pm0'),'flyClose();ctSet(\'pm\',0)')+it(C.pm==2,psT('pm2'),'flyClose();ctSet(\'pm\','+(C.pm==2?0:2)+')','Alt + P')+it(C.pm==3,psT('pm3'),'flyClose();ctSet(\'pm\','+(C.pm==3?0:3)+')')+it(C.pm==1,psT('pm1'),'flyClose();ctSet(\'pm\','+(C.pm==1?0:1)+')','Alt + L')+'<hr>'
+  +it(0,psT('lb'),'psMenu(LW.pse,\'lb\')',0,1)+it(0,psT('ln'),'psMenu(LW.pse,\'ln\')',0,1)+'<hr>'
+  +'<div class="fi" onclick="flyClose();chSet()">'+TRI.set.replace(/20/g,'19')+'<span class="cmn">'+esc(psT('more'))+'</span></div>';
+ h+='</div>';flyOpen({getBoundingClientRect:function(){return{left:x,right:x,top:y-6,bottom:y-6}}},h,false)}
+function psReset(){try{LW.ch.priceScale('right').applyOptions({autoScale:true})}catch(e){}}
+function psAuto(){try{var ps=LW.ch.priceScale('right');ps.applyOptions({autoScale:ps.options().autoScale===false})}catch(e){}}
+function psCs(k,sub){var o={};try{o=JSON.parse(localStorage.getItem('tc_cs')||'{}')||{}}catch(e){}var K=csG();o[k]=K[k]?0:1;try{localStorage.setItem('tc_cs',JSON.stringify(o))}catch(e){}CSC=null;try{csPush('cs',o)}catch(e){}
+ LW.cst=null;if(LW.g){lwData(LW.g);LW.indKey=null;indApply(true)}if(sub)psMenu(LW.pse,sub);else flyClose()}
 function cmReset(){try{LW.ch.timeScale().resetTimeScale();LW.ch.priceScale('right').applyOptions({autoScale:true});lwRt()}catch(e){}}
 function cmCopy(){var v=String(+termRound(LW.cmp.p).toPrecision(10));try{navigator.clipboard.writeText(v).then(function(){toast(esc(cmT('cpd')+': '+v))},function(){toast(esc(v))})}catch(e){toast(esc(v))}}
 function cmAlert(p){p=p||LW.cmp;if(p&&LW.g)alAdd(LW.g,p.p)}
@@ -2116,10 +2138,11 @@ function cmTree(){var D=drGet(),I=indList().filter(function(x){return x.on}),x=M
  flyOpen({getBoundingClientRect:function(){return{left:x,right:x,top:y,bottom:y}}},h,false)}
 document.addEventListener('mousemove',function(e){if(LW.el&&LW.el.contains(e.target))cmPt(e)},true);
 document.addEventListener('contextmenu',function(e){if(!LW.el||!LW.g||!LW.se||!LW.el.contains(e.target))return;if(!(window.matchMedia&&matchMedia('(pointer:fine)').matches))return;
- e.preventDefault();if(LW.g.tool&&(LW.gd||LW.fd||LW.dd)){LW.gd=LW.fd=LW.dd=null;LW.g.tool=null;drTb();LW.dv++;return}cmOpen(e)});
+ e.preventDefault();if(LW.g.tool&&(LW.gd||LW.fd||LW.dd)){LW.gd=LW.fd=LW.dd=null;LW.g.tool=null;drTb();LW.dv++;return}var r=LW.el.getBoundingClientRect(),sw=0;try{sw=LW.ch.priceScale('right').width()}catch(q){}if(sw&&e.clientX>r.right-sw){psMenu(e);return}cmOpen(e)});
 document.addEventListener('keydown',function(e){if(!LW.g||!LW.se)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;var c=(e.code||'').replace('Key','');
  if((e.ctrlKey||e.metaKey)&&!e.altKey){if(c=='C'&&LW.sel){if(cmCopyDr())e.preventDefault()}else if(c=='V'&&LW.clip){e.preventDefault();cmPaste()}return}
  if(e.altKey&&!e.shiftKey&&c=='R'){e.preventDefault();cmReset();return}
+ if(e.altKey&&!e.shiftKey&&(c=='I'||c=='P'||c=='L')){e.preventDefault();var C0=ctS();if(c=='I')ctSet('inv',C0.inv?0:1);else ctSet('pm',C0.pm==(c=='P'?2:1)?0:(c=='P'?2:1));return}
  var p=null;if(e.altKey&&!e.shiftKey&&c=='A'){p=cmPx();if(p){e.preventDefault();cmAlert(p)}return}
  if(e.altKey&&e.shiftKey&&(c=='B'||c=='S')){p=cmPx();if(p){e.preventDefault();cmOrd(c=='B'?'buy':'sell',p)}return}
  if(e.shiftKey&&!e.altKey&&!e.ctrlKey&&c=='T'){p=cmPx();if(p){e.preventDefault();cmOrd(OT.side||'buy',p)}}});
@@ -2755,23 +2778,23 @@ var CTI={c:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="
  bar:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 3v10M3 5h2M5 11h2M11 2v11M9 4h2M11 10h2"/></svg>',
  line:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12l4-5 3 3 5-7"/></svg>',
  area:'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 12l4-5 3 3 5-7v11H2z" fill="currentColor" fill-opacity=".3"/></svg>'};
-function ctS(){var o={t:'c',log:0};try{var v=JSON.parse(localStorage.getItem('tc_ct')||'{}')||{};if(CTI[v.t])o.t=v.t;o.log=v.log?1:0}catch(e){}return o}
+function ctS(){var o={t:'c',log:0,pm:0,inv:0};try{var v=JSON.parse(localStorage.getItem('tc_ct')||'{}')||{};if(CTI[v.t])o.t=v.t;o.pm=v.pm>=0&&v.pm<=3?+v.pm:v.log?1:0;o.log=o.pm==1?1:0;o.inv=v.inv?1:0}catch(e){}return o}
 function haRows(R){var o=[],po=0,pc=0;R.forEach(function(r,i){var c=(r.open+r.high+r.low+r.close)/4,op=i?(po+pc)/2:(r.open+r.close)/2;o.push({time:r.time,open:op,high:Math.max(r.high,op,c),low:Math.min(r.low,op,c),close:c});po=op;pc=c});return o}
 function ctApply(rows,full){var se=LW.se,ch=LW.ch;if(!se||!ch)return;var C=ctS(),t=C.t,ov=t=='bar'||t=='line'||t=='area';
  if(LW.cst!==t){if(LW.cs){try{ch.removeSeries(LW.cs)}catch(e){}LW.cs=null}LW.cst=t;full=true;var tr='rgba(0,0,0,0)';
   var K=csG();chOpts(K);var KU=LW.lite&&K.up==CSD.up?'#089981':K.up,KD=LW.lite&&K.dn==CSD.dn?'#f23645':K.dn;
-  se.applyOptions(ov?{upColor:tr,downColor:tr,wickUpColor:tr,wickDownColor:tr,borderVisible:false,lastValueVisible:false,priceLineVisible:false}:{upColor:KU,downColor:KD,wickVisible:!!K.wk,wickUpColor:KU,wickDownColor:KD,borderVisible:!!K.bd,borderUpColor:KU,borderDownColor:KD,lastValueVisible:true,priceLineVisible:!!K.pl});
-  var po={priceLineVisible:!!K.pl,lastValueVisible:true,priceLineStyle:2,priceFormat:se.options().priceFormat};
+  se.applyOptions(ov?{upColor:tr,downColor:tr,wickUpColor:tr,wickDownColor:tr,borderVisible:false,lastValueVisible:false,priceLineVisible:false}:{upColor:KU,downColor:KD,wickVisible:!!K.wk,wickUpColor:KU,wickDownColor:KD,borderVisible:!!K.bd,borderUpColor:KU,borderDownColor:KD,lastValueVisible:!!K.lv,priceLineVisible:!!K.pl});
+  var po={priceLineVisible:!!K.pl,lastValueVisible:!!K.lv,priceLineStyle:2,priceFormat:se.options().priceFormat};
   if(t=='bar')LW.cs=ch.addBarSeries(Object.assign({upColor:K.up,downColor:K.dn,thinBars:false},po));
   else if(t=='line')LW.cs=ch.addLineSeries(Object.assign({color:K.up,lineWidth:2},po));
   else if(t=='area')LW.cs=ch.addAreaSeries(Object.assign({lineColor:K.up,lineWidth:2,topColor:hexA(K.up,.32),bottomColor:hexA(K.up,0)},po))}
- if(LW.cmode!==C.log){LW.cmode=C.log;try{ch.priceScale('right').applyOptions({mode:C.log?1:0})}catch(e){}}
+ var cm=C.pm+'|'+C.inv;if(LW.cmode!==cm){LW.cmode=cm;try{ch.priceScale('right').applyOptions({mode:C.pm,invertScale:!!C.inv})}catch(e){}}
  var D=t=='ha'?haRows(rows):rows;if(full)se.setData(D);else if(D.length)se.update(D[D.length-1]);
  if(LW.cs){var cd=t=='bar'?rows:rows.map(function(r){return{time:r.time,value:r.close}});if(full)LW.cs.setData(cd);else if(cd.length)LW.cs.update(cd[cd.length-1])}}
 function ctMenu(){var C=ctS(),N={c:stl('ct_c'),ha:'Heikin Ashi',bar:stl('ct_bar'),line:stl('ct_line'),area:stl('ct_area')};
  sheetOpen('<h4>'+esc(stl('ct'))+'</h4><div style="display:flex;flex-direction:column;gap:6px">'+Object.keys(CTI).map(function(k){return'<div class="chip glass'+(C.t==k?' on':'')+'" style="display:flex;gap:10px;align-items:center;justify-content:flex-start;padding:10px 12px" onclick="ctSet(\'t\',\''+k+'\')">'+CTI[k]+'<b>'+esc(N[k])+'</b></div>'}).join('')
   +'<div class="chip glass'+(C.log?' on':'')+'" style="display:flex;gap:10px;align-items:center;justify-content:flex-start;padding:10px 12px;margin-top:6px" onclick="ctSet(\'log\','+(C.log?0:1)+')"><b style="width:16px;text-align:center">㏒</b><b>'+esc(stl('ct_log'))+'</b></div></div>')}
-function ctSet(k,v){var C=ctS();C[k]=v;try{localStorage.setItem('tc_ct',JSON.stringify(C))}catch(e){}if(LW.g){LW.cst=null;lwData(LW.g)}
+function ctSet(k,v){var C=ctS();C[k]=v;if(k=='log')C.pm=v?1:0;if(k=='pm')C.log=v==1?1:0;try{localStorage.setItem('tc_ct',JSON.stringify(C))}catch(e){}if(LW.g){LW.cst=null;lwData(LW.g)}
  [].forEach.call(document.querySelectorAll('.lwtb [data-t=ct]'),function(b){b.innerHTML=CTI[C.t]});haptic('success');sheetClose()}
 /* 423: Bar Replay — boshlanish shamini bosing, keyin ▶ (o'ynatish), ⏭ (bitta sham), tezlik, ✕. Grafik faqat g.rp.t gacha bo'lgan shamlarni ko'rsatadi
    (indikatorlar, VΔ, chizmalar ham); jonli narx va yangi shamlar replay paytida qo'shilmaydi. TF almashsa vaqt bo'yicha davom etadi */
@@ -2817,7 +2840,8 @@ document.addEventListener('keydown',function(e){var g=S.page;if(!g||g.id!='term'
  if((k=='Delete'||k=='Backspace')&&LW.sel){drDel();e.preventDefault();return}
  if(mod&&(c=='KeyY'||(c=='KeyZ'&&e.shiftKey))){lwRedo();e.preventDefault();return}
  if(mod&&(k=='z'||k=='Z'||c=='KeyZ')){lwUndo();e.preventDefault();return}
- if(e.altKey&&!mod){var m={KeyT:'tl',KeyH:'hl',KeyR:'rc',KeyF:'fb',KeyV:'vp',KeyA:'al'}[c];if(m){drTool(m);e.preventDefault();return}if(c=='KeyI'){indSet();e.preventDefault();return}}
+ /* 466: Alt+harf qisqa tugmalari 460/463 ishlovchilarida (Alt+T/H/J/V/C/F, Alt+Shift+R, Alt+R/A/I/P/L); indikatorlar — «/» (TradingView kabi) */
+ if(!mod&&!e.altKey&&k=='/'){indSet();e.preventDefault();return}
  if(e.shiftKey&&!mod&&!e.altKey&&c=='KeyF'){lwFs(!LW.fs);e.preventDefault();return}
  if(LW.g.rp&&(k=='ArrowRight'||k==' ')){rpPlay(LW.g,0);rpStep(LW.g);e.preventDefault()}});
 /* 437: «faqat grafik» sahifa (istalgan tanga; pozitsiyasiz) + ulashilgan tahlil (chizmalar faqat ko'rish uchun, «Nusxa olish») */
