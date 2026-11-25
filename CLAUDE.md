@@ -8772,3 +8772,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `POST /api/app/avatar` op: `get` (rasm yo'q yoki 24 soatdan eski va o'ziniki emas — `_tg_user_avatar`: Bot API getUserProfilePhotos → 256px kvadrat JPEG), `put` {img data-URL} (`_avatar_jpeg`, own=true), `del` (Telegram rasmiga qaytish). URL `/av/<key>.jpg`.
 - desk.html: `AV`, `avLoad`, `avPick` (fayl → 512px kvadrat canvas → put), `avHtml`; o'ng yuqori `#me` da rasm (bo'lmasa harf), menyu: «Rasmni o'zgartirish», «Telegram rasmiga qaytarish» (own bo'lsa); Sozlamalar → Hisob: katta avatar (✎ bosiladi) + tugmalar. Kirishda avtomatik `avLoad()` — Telegram rasmi o'zi yuklanadi.
 - Email orqali ro'yxatdan o'tish hozir yo'q (kirish faqat Telegram orqali).
+
+## 471. Tashqi havolalar (Dip Funded «Hisob olish» va h.k.) kompyuter ilovasida
+- `extOpen(u)` (desk.html va webapp.html): Tauri ichida (`__TC_DESKTOP` — 0.1.2 dan `initialization_script`, yoki `__TAURI_INTERNALS__`/`__TAURI__`) asosiy oyna (`top.location`) shu manzilga yo'naltiriladi → `on_navigation` uni to'xtatib tizim brauzerida ochadi; oddiy brauzerda `window.open`, bloklansa — shu oynada. `a[target=_blank]` bosilishi ham (capture) shunga o'tadi; `deskOpen`, ulashish tugmalari ham `extOpen`.
+- Nomlar `'__TAURI_'+'INTERNALS__'` ko'rinishida bo'lib yozilgan (jscheck `__X__` ni almashtiradi).
+- Ilova 0.1.2 (main.rs: `.initialization_script("window.__TC_DESKTOP = 1;")`).

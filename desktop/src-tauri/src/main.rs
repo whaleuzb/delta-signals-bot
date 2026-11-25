@@ -25,6 +25,8 @@ fn main() {
                 .inner_size(1360.0, 860.0)
                 .min_inner_size(400.0, 560.0)
                 .center()
+                // 471: sahifa kompyuter ilovasida ekanini bilsin — tashqi havolalar tizim brauzerida ochiladi
+                .initialization_script("window.__TC_DESKTOP = 1;")
                 .on_navigation(move |u| {
                     let own = u.host_str() == Some(HOST);
                     if own || matches!(u.scheme(), "about" | "data" | "blob" | "tauri") {

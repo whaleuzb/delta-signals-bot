@@ -555,8 +555,13 @@ var tg=window.Telegram&&window.Telegram.WebApp;
    sessiya `desk.<uid>.<exp>.<sig>` initData o'rnida yuboriladi; tg — Telegram.WebApp o'rniga shim (confirm, havolalar, haptic yo'q). */
 var DESK=(function(){if(tg&&tg.initData)return false;var q=/[?&]desk=1/.test(location.search);try{if(q)localStorage.setItem('tc_desk','1');return q||localStorage.getItem('tc_desk')==='1'}catch(e){return q}})();
 function deskGet(){try{return JSON.parse(localStorage.getItem('tc_dsk')||'null')}catch(e){return null}}
+/* 471: tashqi havola — kompyuter ilovasida (Tauri) asosiy oyna shu manzilga yo'naltiriladi: ilova o'tishni to'xtatib,
+   tizim brauzerida ochadi (on_navigation). Oddiy brauzerda yangi tab; bloklansa — shu oynada. */
+function extOpen(u){if(!u)return;var T=null;try{T=window.top}catch(e){}var tau=false;var K1='__TAURI_'+'INTERNALS__',K2='__TAURI'+'__',K3='__TC_'+'DESKTOP';try{tau=!!(window[K1]||window[K2]||window[K3]||T&&(T[K1]||T[K2]||T[K3]))}catch(e){}
+ if(tau){try{(T||window).location.href=u}catch(e){location.href=u}return}var w=null;try{w=window.open(u,'_blank')}catch(e){}if(!w){try{(T||window).location.href=u}catch(e){location.href=u}}}
+if(DESK)document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a||!a.href)return;e.preventDefault();extOpen(a.href)},true);
 function deskOpen(u){u=String(u||'');var m=u.match(/^https:\/\/t\.me\/share\/url\?(.*)$/);if(m){var q={};m[1].split('&').forEach(function(x){var i=x.indexOf('=');if(i>0)try{q[x.slice(0,i)]=decodeURIComponent(x.slice(i+1).replace(/\+/g,' '))}catch(e){}});dshLink(q.url||'',q.text||'');return}
- if(/^https?:/.test(u)&&u.indexOf(location.origin)!==0){window.open(u,'_blank');return}location.href=u}
+ if(/^https?:/.test(u)&&u.indexOf(location.origin)!==0){extOpen(u);return}location.href=u}
 /* 455: kompyuter ilovasi qobig'i (/desk) — tablar; ilova faqat qobiq ichida (iframe, emb=1). Eski mobil ko'rinish: ?desk=1&m=1 */
 var EMB=window.top!==window;var DQ=new URLSearchParams(EMB?location.search:'');window.__dsig=EMB&&+DQ.get('sig')||0;if(EMB&&/[?&]solo=1/.test(location.search))document.documentElement.classList.add('solo');if(EMB&&/[?&]tcol=1/.test(location.search))document.documentElement.classList.add('tcol');
 if(DESK&&!EMB&&(deskGet()||{}).sid&&!/[?&]m=1/.test(location.search)){location.replace('/desk')}
@@ -1574,7 +1579,7 @@ function dshShare(){if(!LW.ch||LW.shot)return;LW.shot=1;var L=gxL(),T=DSH[L];dsh
   var e=encodeURIComponent;b.innerHTML=row(T[1],cl)+row(T[2],iu)
    +'<div class="dss"><a data-ext="https://t.me/share/url?url='+e(main)+'&text='+e(txt)+'"><i style="background:#229ED9">'+DSHI.tg+'</i>Telegram</a><a data-ext="https://twitter.com/intent/tweet?text='+e(txt)+'&url='+e(main)+'"><i style="background:#000;border:1px solid #333">'+DSHI.x+'</i>X</a>'
    +'<a data-ext="https://wa.me/?text='+e(txt+' '+main)+'"><i style="background:#25D366">'+DSHI.wa+'</i>WhatsApp</a><a data-ci="1"><i>'+CMI.cp+'</i>'+esc(T[5])+'</a><a data-dl="1"><i>'+FSI.dl+'</i>'+esc(T[6])+'</a></div>';
-  b.onclick=function(ev){var x=ev.target.closest('[data-cp]');if(x){dshCopy(x.getAttribute('data-cp'),x);return}x=ev.target.closest('[data-ext]');if(x){window.open(x.getAttribute('data-ext'),'_blank');return}
+  b.onclick=function(ev){var x=ev.target.closest('[data-cp]');if(x){dshCopy(x.getAttribute('data-cp'),x);return}x=ev.target.closest('[data-ext]');if(x){extOpen(x.getAttribute('data-ext'));return}
    if(ev.target.closest('[data-ci]')){dtCopyImg();return}if(ev.target.closest('[data-dl]')){var a=document.createElement('a');a.href=LW.dsh.cv.toDataURL('image/jpeg',.92);a.download=LW.dsh.name;document.body.appendChild(a);a.click();a.remove()}}})
  .catch(function(){LW.shot=0;var b=document.getElementById('dsb');if(b)b.innerHTML='<div class="dse">'+esc(T[8])+'</div>'})}
 /* umumiy ulashish oynasi (signal, natija kartasi, referal va h.k. — kompyuterda t.me/share o'rniga) */
@@ -1584,7 +1589,7 @@ function dshLink(url,txt){var T=DSH[gxL()],e=encodeURIComponent;dshClose();var m
   +'<div class="dss" style="grid-template-columns:repeat(4,1fr)"><a data-ext="https://t.me/share/url?url='+e(url)+'&text='+e(txt)+'"><i style="background:#229ED9">'+DSHI.tg+'</i>Telegram</a><a data-ext="https://twitter.com/intent/tweet?text='+e(txt)+'&url='+e(url)+'"><i style="background:#000;border:1px solid #333">'+DSHI.x+'</i>X</a>'
   +'<a data-ext="https://wa.me/?text='+e((txt?txt+' ':'')+url)+'"><i style="background:#25D366">'+DSHI.wa+'</i>WhatsApp</a><a data-cp="'+esc((txt?txt+'\n':'')+url)+'"><i>'+CMI.cp+'</i>'+esc(T[3])+'</a></div></div>';
  document.body.appendChild(m);m.addEventListener('mousedown',function(ev){if(ev.target===m)dshClose()});
- m.onclick=function(ev){if(ev.target.closest('[data-x]')){dshClose();return}var x=ev.target.closest('[data-cp]');if(x){dshCopy(x.getAttribute('data-cp'),x.tagName=='BUTTON'?x:null);if(x.tagName!='BUTTON')toast(esc(T[4]));return}x=ev.target.closest('[data-ext]');if(x)window.open(x.getAttribute('data-ext'),'_blank')}}
+ m.onclick=function(ev){if(ev.target.closest('[data-x]')){dshClose();return}var x=ev.target.closest('[data-cp]');if(x){dshCopy(x.getAttribute('data-cp'),x.tagName=='BUTTON'?x:null);if(x.tagName!='BUTTON')toast(esc(T[4]));return}x=ev.target.closest('[data-ext]');if(x)extOpen(x.getAttribute('data-ext'))}}
 function dshCopy(v,el){var T=DSH[gxL()],ok=function(){if(el){var o=el.textContent;el.textContent='✓ '+T[4];setTimeout(function(){el.textContent=o},1500)}};try{navigator.clipboard.writeText(v).then(ok,function(){})}catch(e){}}
 function dshClose(){var m=document.getElementById('dsh');if(m)m.remove()}
 var DSHI={tg:'<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#fff" d="M9.8 15.3l-.4 4.1c.6 0 .8-.2 1.1-.5l2.6-2.5 5.4 4c1 .5 1.7.3 2-.9L23.9 3.6c.3-1.5-.5-2.1-1.5-1.7L1.2 10.1c-1.4.6-1.4 1.4-.2 1.8l5.4 1.7L19 5.7c.6-.4 1.1-.2.7.2z"/></svg>',
