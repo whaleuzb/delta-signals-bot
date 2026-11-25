@@ -19,7 +19,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 480: reliz avval bitta joyda yaratiladi — uch platforma bir vaqtda yaratmoqchi bo'lib bir-birining fayllarini yo'qotmasin
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.r.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
+          T="desktop-v$V"
+          if ! gh release view "$T" >/dev/null 2>&1; then
+            gh release create "$T" --target "$GITHUB_SHA" --title "Trade Controller v$V" --notes "Trade Controller — kompyuter uchun ilova.
+          Windows: *_x64-setup.exe · macOS: *.dmg · Linux: *.AppImage yoki *.deb
+          Yuklab olish sahifasi: https://web-production-addc3.up.railway.app/desktop"
+          fi
+          echo "id=$(gh api repos/$GITHUB_REPOSITORY/releases/tags/$T --jq .id)" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: release
     strategy:
       fail-fast: false
       matrix:
@@ -61,12 +82,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: desktop
-          tagName: desktop-v__VERSION__
-          releaseName: "Trade Controller v__VERSION__"
-          releaseBody: |
-            Trade Controller — kompyuter uchun ilova.
-            Windows: *_x64-setup.exe · macOS: *.dmg · Linux: *.AppImage yoki *.deb
-            Yuklab olish sahifasi: https://web-production-addc3.up.railway.app/desktop
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ needs.release.outputs.id }}
           args: ${{ matrix.args }}

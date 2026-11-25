@@ -8812,3 +8812,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 479. Ichimoku buluti (Kumo) va Chikou
 - `ichSvg(P)` (drDraw SVG qatlami): Senkou A ((Tenkan+Kijun)/2) va Senkou B (sb davr o'rtasi) orasi `kj−1` sham oldinga surilgan holda bo'yaladi; A≥B — `p.up`, aks holda `p.dn` rangi, shaffoflik `p.fo` (0.22); belgilar kesishganda poligon kesishish nuqtasida bo'linadi. `p.cf=0` — bo'yamaydi (Uslub tabida «Bulut (Kumo) bo'yash»). TF ko'rinishi (`indTfOk`) hisobga olinadi.
 - Chikou (Lagging span) — yangi 5-chiziq `p.lg` (#66bb6a), close `kj−1` sham orqaga. Senkou chiziqlari ham `kj−1` ga surildi (TradingView kabi). INDF ich: lg, cf, fo qo'shildi; ICN nomlari Senkou A/B.
+
+## 480. Kompyuter ilovasi relizi — poyga xatosi tuzatildi
+- 0.1.2 da Windows va Linux yig'ildi, lekin uch platforma bir vaqtda «desktop-v0.1.2» relizini yaratmoqchi bo'lib, faqat .dmg qoldi. desktop.yml: avval `release` job (`gh release create`, mavjud bo'lsa tegmaydi) → `id`; `build` jobs `needs: release` va `tauri-action` ga `releaseId` beriladi.
