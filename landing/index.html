@@ -135,6 +135,46 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 @keyframes vela{0%{opacity:0;filter:blur(14px);transform:translateY(8px)}100%{opacity:1;filter:blur(0);transform:none}}
 @keyframes revealIn{0%{opacity:0;filter:blur(10px);transform:translateY(18px)}100%{opacity:1;filter:blur(0);transform:none}}
 .w{display:inline-block;opacity:0;animation:vela .75s var(--ease) forwards}
+/* 487: ilova skrinshotlari — oyna ramkasi, tablar, telefon maketi, suzuvchi kartalar */
+.shw{position:relative;perspective:1600px}
+.shw .win{position:relative;border-radius:18px;overflow:hidden;padding:0;transform:rotateX(9deg) scale(.96);transform-origin:50% 100%;transition:transform 1.2s var(--ease);box-shadow:0 40px 120px -30px rgb(194 242 58 / .18),0 30px 80px -20px rgb(0 0 0 / .8)}
+.shw.is-in .win,.shw .win:hover{transform:none}
+.win .bar{display:flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:rgb(255 255 255 / .03)}
+.win .bar i{width:10px;height:10px;border-radius:50%;background:rgb(255 255 255 / .16)}.win .bar i:first-child{background:#ff5f57}.win .bar i:nth-child(2){background:#febc2e}.win .bar i:nth-child(3){background:#28c840}
+.win .bar span{margin-left:10px;font-size:12px;color:var(--dim)}
+.win .scr{position:relative;aspect-ratio:16/9;background:#0b0b0c}
+.win .scr img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.025);transition:opacity .9s var(--ease),transform 1.4s var(--ease)}
+.win .scr img.on{opacity:1;transform:none}
+.shw .glow{position:absolute;left:10%;right:10%;bottom:-60px;height:140px;background:radial-gradient(closest-side,rgb(194 242 58 / .22),transparent);filter:blur(30px);z-index:-1}
+.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:28px}
+.tabs button{position:relative;overflow:hidden;font:inherit;font-size:14px;font-weight:500;color:var(--muted);padding:10px 18px;border-radius:var(--pill);border:1px solid var(--line);background:rgb(255 255 255 / .03);cursor:pointer;transition:color .3s,border-color .3s,background .3s}
+.tabs button:hover{color:var(--fg-strong)}
+.tabs button.on{color:var(--fg-strong);border-color:rgb(194 242 58 / .45);background:var(--accent-soft)}
+.tabs button.on::after{content:"";position:absolute;left:0;bottom:0;height:2px;background:var(--accent);animation:tabp var(--tdur,6s) linear forwards}
+@keyframes tabp{from{width:0}to{width:100%}}
+.shw .fc{max-width:220px}
+.shw .fc.g1{left:-34px;top:22%;animation:float 6s ease-in-out infinite}
+.shw .fc.g2{right:-30px;top:44%;animation:float 7s -2s ease-in-out infinite}
+.shw .fc.g3{left:12%;bottom:-26px;animation:float 8s -4s ease-in-out infinite}
+.fc b{color:var(--fg-strong)}.fc .up{color:var(--up)}.fc .dn{color:var(--down)}.fc small{display:block;color:var(--dim);font-size:11px}
+.cap{text-align:center;color:var(--muted);font-size:15px;margin:14px auto 0;max-width:640px;min-height:24px;transition:opacity .4s}
+.phs{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:130px}
+.phs ul{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
+.phs li{display:flex;gap:12px;align-items:flex-start;color:var(--muted);font-size:15px;line-height:1.5}
+.phs li::before{content:"";flex:0 0 8px;height:8px;margin-top:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+.phw{position:relative;display:flex;justify-content:center;padding:20px 0}
+.phw::before{content:"";position:absolute;width:420px;height:420px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(closest-side,rgb(194 242 58 / .2),transparent);filter:blur(20px)}
+.phone{position:relative;width:300px;border-radius:46px;padding:10px;background:linear-gradient(160deg,#2a2b2e,#0d0d0f);border:1px solid var(--line-2);box-shadow:0 50px 100px -30px rgb(0 0 0 / .9),inset 0 0 0 2px rgb(255 255 255 / .04);transform:rotate(-4deg);transition:transform 1.2s var(--ease)}
+.phw.is-in .phone{transform:rotate(0)}
+.phone .sc{position:relative;border-radius:37px;overflow:hidden;background:#000;padding-top:36px}.phone .sc img{display:block;width:100%}
+.phone .sb{position:absolute;top:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:space-between;padding:4px 26px 0 30px;font-size:12.5px;font-weight:600;color:#fff}.phone .sb i{display:inline-block;width:22px;height:10px;border:1.5px solid rgb(255 255 255 / .8);border-radius:3px;position:relative}.phone .sb i::after{content:"";position:absolute;inset:1.5px;right:4px;background:#fff;border-radius:1px}
+.phone::after{content:"";position:absolute;top:20px;left:50%;width:84px;height:24px;margin-left:-42px;border-radius:14px;background:#000}
+.phw .fc.p1{left:2%;top:16%;animation:float 6s ease-in-out infinite}
+.phw .fc.p2{right:0;top:46%;animation:float 7s -3s ease-in-out infinite}
+.phw .fc.p3{left:6%;bottom:12%;animation:float 8s -1s ease-in-out infinite;display:flex;gap:10px;align-items:center}
+.fc .ic{width:30px;height:30px;flex:0 0 30px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700}
+@media (max-width:1000px){.phs{grid-template-columns:1fr;gap:30px}.shw .fc.g1{left:-6px}.shw .fc.g2{right:-6px}}
+@media (max-width:640px){.shw .fc{display:none}.shw .win{transform:none}.tabs button{padding:8px 13px;font-size:13px}.phone{width:250px}.phw .fc{font-size:11.5px;padding:9px 11px}.phw .fc.p1{left:-4px}.phw .fc.p2{right:-4px}.phw .fc.p3{left:0;bottom:6%}.phs{margin-top:90px}}
 .reveal{opacity:0}.reveal.is-in{animation:revealIn .85s var(--ease) forwards}
 .reveal:not(.is-in) .illo *,.reveal:not(.is-in) .sv *{animation-play-state:paused!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal,.w,.cdl,.msg,.kumo,.dd-area,.dd-dot,.vp-poc{opacity:1!important;filter:none!important;transform:none!important}.ln-draw,.st-price{stroke-dashoffset:0!important}}
@@ -147,7 +187,7 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
 
 <header class="hdr"><div class="wrap">
  <a class="brand" href="#top"><img src="/desktop/icon.png" alt="">Trade Controller</a>
- <nav class="nav"><a href="#features">Imkoniyatlar</a><a href="#flow">Order flow</a><a href="#desktop">Kompyuter ilovasi</a><a href="#how">Qanday ishlaydi</a><a href="#faq">Savollar</a></nav>
+ <nav class="nav"><a href="#features">Imkoniyatlar</a><a href="#screens">Ekranlar</a><a href="#flow">Order flow</a><a href="#desktop">Kompyuter ilovasi</a><a href="#how">Qanday ishlaydi</a><a href="#faq">Savollar</a></nav>
  <div class="r"><a class="btn btn-g" href="#desktop">Yuklab olish</a><a class="btn btn-p" href="__TG__" target="_blank" rel="noopener">Telegram'da ochish</a></div>
 </div></header>
 
@@ -208,6 +248,38 @@ footer{padding:32px 0 44px;font-size:13px;color:var(--dim)}footer .wrap{display:
    <span class="num">05</span><h3 class="h3">Simulyator</h3><p class="muted">Virtual pul bilan xavfsiz mashq. Pozitsiya bilan birga ulangan guruh va kanallaringizga signal ham yuboring.</p></article>
   <article class="card glass reveal"><div class="illo"><svg class="pnl" viewBox="0 0 220 160" preserveAspectRatio="none" id="pnl"></svg><span class="chip">Oylik PnL</span></div>
    <span class="num">06</span><h3 class="h3">Statistika va reyting</h3><p class="muted">Win rate, PnL egri chizig'i, oylik natijalar, top treyderlar va turnirlar — har bir guruh uchun shaffof.</p></article>
+ </div>
+</div></section>
+
+<section class="sec" id="screens" style="padding-top:20px"><div class="wrap">
+ <div class="head reveal"><div><div class="eyebrow">Ilova ichida</div><h2 class="h2">Haqiqiy <span class="tone">terminal</span> ko'rinishi</h2></div><p class="lead">Order flow, derivativlar, Ichimoku, bir ekranda 4 ta grafik va simulyator — hammasi bitta oynada, tez va tiniq.</p></div>
+ <div class="shw reveal" id="shw">
+  <div class="win glass"><div class="bar"><i></i><i></i><i></i><span>Trade Controller — BTCUSDT</span></div>
+   <div class="scr">
+    <img class="on" src="/l/s_of.webp" alt="Order flow: Session Volume Profile, Order Book heatmap, Volume Delta va CVD" data-c="Session Volume Profile, Order Book heatmap, sessiyalar, Volume Delta va CVD — 15 daqiqalik grafikda">
+    <img loading="lazy" src="/l/s_der.webp" alt="Derivativlar: Open Interest, Funding va likvidatsiyalar" data-c="Open Interest, Funding va likvidatsiyalar · o'ng tomonda watchlist">
+    <img loading="lazy" src="/l/s_ich.webp" alt="Ichimoku buluti, MACD va RSI" data-c="Ichimoku buluti va Chikou, MACD, RSI — sozlamalari TradingView kabi">
+    <img loading="lazy" src="/l/s_mc.webp" alt="Bir ekranda 4 ta grafik" data-c="Multi-chart: bitta juftlik 4 xil taymfreymda bir vaqtda">
+    <img loading="lazy" src="/l/s_sim.webp" alt="Simulyator: savdo paneli va pozitsiyalar" data-c="Simulyator: pul tikmasdan savdo, TP/SL, pozitsiyalar — va guruhga signal yuborish">
+   </div></div>
+  <div class="fc glass g1"><small>Session VP · POC</small><b>101 240</b> <span class="up">▲ ko'p hajm</span></div>
+  <div class="fc glass g2"><small>Funding · 8h</small><b class="up">+0.0124%</b><br><small>OI $7.4B · L/S 1.62</small></div>
+  <div class="fc glass g3"><small>Simulyator · BTC LONG 10x</small><b class="up">+$1 444.80</b> <span class="up">+29.7%</span></div>
+  <div class="glow"></div>
+ </div>
+ <p class="cap" id="shcap">Session Volume Profile, Order Book heatmap, sessiyalar, Volume Delta va CVD — 15 daqiqalik grafikda</p>
+ <div class="tabs reveal" id="shtabs"><button class="on">Order flow</button><button>Derivativlar</button><button>Ichimoku</button><button>Multi-chart</button><button>Simulyator</button></div>
+
+ <div class="phs">
+  <div class="reveal"><div class="eyebrow">Telefonda</div><h2 class="h2">Signal — <span class="tone">cho'ntagingizda</span></h2>
+   <ul><li>Telegram Mini App: o'rnatish shart emas, bot ichida ochiladi</li><li>Kirish, TP va SL chiziqlarini barmoq bilan surib o'zgartirasiz</li><li>Natija, ROI va likvidatsiya narxi real vaqtda</li><li>Ichimoku, Volume Delta va boshqa indikatorlar telefonda ham</li></ul>
+   <div class="cta" style="margin-top:30px"><a class="btn btn-p btn-lg" href="__TG__" target="_blank" rel="noopener">Telegram'da ochish</a></div></div>
+  <div class="phw reveal" id="phw">
+   <div class="phone"><div class="sc"><div class="sb"><span>9:41</span><i></i></div><img loading="lazy" src="/l/s_ph.webp" alt="Telefonda signal terminali: BTCUSDT LONG 10x"></div></div>
+   <div class="fc glass p1"><small>BTCUSDT · LONG 10x</small><b class="up">TP1 104 900</b> yaqin</div>
+   <div class="fc glass p2"><small>ROI</small><b class="up" style="font-size:20px">+29.73%</b></div>
+   <div class="fc glass p3"><span class="ic">✓</span><div><b>Guruhga yuborildi</b><small>Whales Uzb · 1 240 a'zo</small></div></div>
+  </div>
  </div>
 </div></section>
 
@@ -299,6 +371,15 @@ __CXL__
  var io=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;var el=e.target,sib=[].filter.call(el.parentNode.children,function(x){return x.classList.contains('reveal')}),i=sib.indexOf(el);el.style.animationDelay=(Math.max(0,i)*.08)+'s';el.classList.add('is-in');el.querySelectorAll('[data-count]').forEach(count);io.unobserve(el)})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});
  els.forEach(function(e){io.observe(e)});
 })();
+/* 487: skrinshotlar galereyasi — avtomatik almashinadi, tab bosilsa o'sha */
+(function(){var w=document.getElementById('shw'),tb=document.getElementById('shtabs'),cap=document.getElementById('shcap');if(!w||!tb)return;
+ var im=w.querySelectorAll('.scr img'),bt=tb.querySelectorAll('button'),cur=0,tm=null,D=6000;
+ function show(i){cur=i;im.forEach(function(x,j){x.classList.toggle('on',j==i)});bt.forEach(function(b,j){b.classList.remove('on');if(j==i){void b.offsetWidth;b.classList.add('on')}});
+  cap.style.opacity=0;setTimeout(function(){cap.textContent=im[i].getAttribute('data-c');cap.style.opacity=1},200);
+  clearTimeout(tm);tm=setTimeout(function(){show((cur+1)%im.length)},D)}
+ tb.style.setProperty('--tdur',D/1000+'s');
+ bt.forEach(function(b,j){b.addEventListener('click',function(){show(j)})});
+ if('IntersectionObserver' in window){var st=0;new IntersectionObserver(function(e){if(e[0].isIntersecting&&!st){st=1;show(0)}}).observe(w)}else show(0)})();
 </script>
 </body>
 </html>
