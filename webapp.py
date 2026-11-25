@@ -1369,6 +1369,7 @@ _INVITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "in
 _DESK_REPO = "whaleuzb/delta-signals-bot"
 _DESK_C = {"at": 0.0, "rel": None}
 _DESK_ICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "desktop", "src-tauri", "icons", "128x128@2x.png")
+_DESK_LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "desktop", "logo.png")   # 453: Trade Control logosi (512, qora fon)
 
 
 async def _desk_release():
@@ -1417,16 +1418,21 @@ async def desktop_page(request):
     page = f"""<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Trade Controller — kompyuter uchun</title><link rel="icon" href="/desktop/icon.png"><style>
 body{{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 20%,rgba(194,242,58,.10),transparent 60%),#050506;color:#e8ecdf;font:15px/1.5 -apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif;padding:16px;box-sizing:border-box}}
-.c{{width:min(520px,100%);text-align:center}}img{{width:104px;height:104px}}h1{{margin:10px 0 2px;font-size:26px;letter-spacing:-.02em}}.m{{color:rgba(232,236,223,.55);font-size:13px}}
+.c{{width:min(520px,100%);text-align:center}}.lg{{display:block;width:240px;height:240px;margin:-34px auto -54px;mix-blend-mode:screen}}h1{{margin:10px 0 2px;font-size:26px;letter-spacing:-.02em}}.m{{color:rgba(232,236,223,.55);font-size:13px}}
 .b{{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:10px 0;padding:14px 18px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:inherit;text-decoration:none}}
 .b span{{font-size:12px;color:rgba(232,236,223,.55)}}.b.p{{background:rgba(194,242,58,.14);border-color:rgba(194,242,58,.5)}}.b.p b{{color:#c2f23a}}.b.off{{opacity:.45}}
 .n{{text-align:left;margin-top:22px;font-size:13px;color:rgba(232,236,223,.7)}}.n b{{color:#e8ecdf}}</style></head><body><div class="c">
-<img src="/desktop/icon.png" alt=""><h1>Trade Controller</h1><div class="m">Kompyuter uchun ilova {ver}</div><div style="margin-top:18px">{btn}</div>
+<img class="lg" src="/desktop/logo.png" alt="Trade Control"><div class="m">Kompyuter uchun ilova {ver}</div><div style="margin-top:18px">{btn}</div>
 <div class="n"><p><b>Kirish:</b> ilovani oching → «Telegram orqali kirish» → Telegram'da botda «Start» bosing. Ilova o'zi ochiladi.</p>
 <p><b>Windows:</b> «Windows protected your PC» chiqsa — «More info» → «Run anyway» (ilova hali raqamli imzolanmagan).</p>
 <p><b>macOS:</b> birinchi marta Finder'da ilovani o'ng tugma → «Open» bilan oching. «Damaged» desa, Terminal'da:<br><code>xattr -cr "/Applications/Trade Controller.app"</code></p>
 <p><b>Yangilanishlar</b> — interfeys serverdan yuklanadi, shuning uchun yangi funksiyalar qayta o'rnatmasdan keladi.</p></div></div></body></html>"""
     return web.Response(text=page, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+async def desktop_logo(request):
+    with open(_DESK_LOGO, "rb") as fh:
+        return web.Response(body=fh.read(), content_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def desktop_icon(request):
@@ -2481,6 +2487,7 @@ def routes() -> list:
         web.get("/invite.jpg", invite_jpg),
         web.get("/desktop", desktop_page),
         web.get("/desktop/icon.png", desktop_icon),
+        web.get("/desktop/logo.png", desktop_logo),
         web.get("/lwc.js", lwc_js),
         web.get(r"/coins/{c:[a-z0-9]{1,12}}.svg", coin_svg),
         web.get(r"/coinx/{c:[a-z0-9]{1,15}}", coin_ext),

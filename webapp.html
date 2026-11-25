@@ -188,7 +188,7 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .dot.on{background:var(--g);box-shadow:0 0 8px var(--g)}
 .acts{display:flex;flex-wrap:wrap;gap:6px}
 #dsklog{position:fixed;inset:0;z-index:900;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(194,242,58,.08),transparent 60%),#050506}
-#dsklog .dl{width:min(380px,100%);padding:30px 26px;border-radius:22px;text-align:center}#dsklog .dlg{width:64px;height:64px;margin:0 auto 14px;border-radius:18px;display:grid;place-items:center;background:rgba(194,242,58,.12);color:var(--ink)}
+#dsklog .dl{width:min(380px,100%);padding:30px 26px;border-radius:22px;text-align:center}#dsklog .dlg{display:block;width:220px;height:220px;margin:-40px auto -52px;mix-blend-mode:screen}
 #dsklog h2{margin:0 0 4px;font-size:20px;letter-spacing:-.02em}#dsklog p{font-size:13px;line-height:1.5;color:rgba(232,236,223,.7);margin:16px 0 20px}#dsklog .btn{width:100%;padding:13px;font-size:14px}
 #dsklog .dlw{margin-top:16px;font-size:12px;line-height:1.5}#dsklog code{display:block;margin-top:6px;word-break:break-all;user-select:all;font-size:11px;padding:8px;border-radius:8px;background:rgba(255,255,255,.05)}
 .btn{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 10px;font-weight:700;font-size:12px;color:var(--ink);
@@ -474,7 +474,7 @@ function deskOut(){try{localStorage.removeItem('tc_dsk')}catch(e){}location.relo
 function deskLogin(){var L=S.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])L=sl}catch(e){}var TX={uz:['Kompyuter uchun ilova','Kirish uchun Telegram\'da botni oching va «Start» tugmasini bosing.','Telegram orqali kirish','Telegram\'da tasdiqlanishini kutyapmiz…','Havola ochilmadimi? Uni nusxalab Telegram\'da oching:'],
   ru:['Приложение для компьютера','Чтобы войти, откройте бота в Telegram и нажмите «Start».','Войти через Telegram','Ждём подтверждения в Telegram…','Ссылка не открылась? Скопируйте её и откройте в Telegram:'],
   en:['Desktop app','To sign in, open the bot in Telegram and press “Start”.','Sign in with Telegram','Waiting for confirmation in Telegram…','Link did not open? Copy it and open in Telegram:']}[L]||[];
- var m=document.createElement('div');m.id='dsklog';m.innerHTML='<div class="dl glass"><div class="dlg">'+ic('bot',34)+'</div><h2>Trade Controller</h2><div class="m">'+esc(TX[0])+'</div><p>'+esc(TX[1])+'</p><button class="btn p" id="dskb">'+esc(TX[2])+'</button><div class="m dlw" id="dskw" hidden></div></div>';
+ var m=document.createElement('div');m.id='dsklog';m.innerHTML='<div class="dl glass"><img class="dlg" src="/desktop/logo.png" alt="Trade Control"><div class="m">'+esc(TX[0])+'</div><p>'+esc(TX[1])+'</p><button class="btn p" id="dskb">'+esc(TX[2])+'</button><div class="m dlw" id="dskw" hidden></div></div>';
  document.body.appendChild(m);var tm=null,end=0;
  document.getElementById('dskb').onclick=function(){var b=this;b.disabled=true;fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'start'})}).then(function(r){if(!r.ok)throw r.status;return r.json()}).then(function(d){
    deskOpen(d.url);var w=document.getElementById('dskw');w.hidden=false;w.innerHTML=esc(TX[3])+'<br><br>'+esc(TX[4])+'<br><code>'+esc(d.url)+'</code>';b.disabled=false;end=Date.now()+14*60000;clearInterval(tm);

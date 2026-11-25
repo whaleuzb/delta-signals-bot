@@ -8677,3 +8677,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Kirish: `POST /api/app/desk` op=start → `{tok, url=t.me/<bot>?start=desk_<tok>}`; bot `/start desk_<tok>` → `db.desk_confirm` (jadval `desk_login`, 15 daqiqa); ilova har 2 s op=poll → `db.desk_take` (bir martalik) → `sid = desk.<uid>.<exp>.<sig>` (`web.desk_sign`, HMAC kaliti BOT_TOKEN'dan, 180 kun). `web.verify_init_data` `desk.` bilan boshlansa `desk_verify` — sid Mini App initData o'rnida ishlaydi (barcha API o'zgarishsiz).
 - webapp.html: `DESK` (?desk=1 → localStorage `tc_desk`; Telegram initData bo'lsa o'chiq), sessiya `tc_dsk` {sid,user}. `tg` — shim (confirm/alert, havolalar `deskOpen` → location.href → Tauri tashqariga ochadi, haptic/BackButton bo'sh, `isVersionAtLeast` false, downloadFile → <a download>). Sessiyasiz → `deskLogin()` ekrani; `me` 403 bersa `deskOut()`. Profil: DESK'da «Chiqish», aks holda «💻 Kompyuter uchun ilova» → `/desktop`.
 - `/desktop` — yuklab olish sahifasi (GitHub API releases, 10 daqiqa kesh, User-Agent bo'yicha OS birinchi), `/desktop/icon.png`.
+
+## 453. Kompyuter ilovasi — Trade Control logosi
+- `desktop/logo.png` — foydalanuvchi bergan rasmiy logo (shamlar + «TRADE CONTROL», qora fon, 512 px). Kirish ekrani (`#dsklog .dlg`) va `/desktop` sahifasida (`/desktop/logo.png`, `mix-blend-mode:screen` — qora fon ko'rinmaydi).
+- Ilova ikonkasi `desktop/icon.png` — logodagi shamlar belgisi (matnsiz, kichik o'lchamda o'qilishi uchun) qora yumaloq kvadratda; `npx tauri icon` bilan `src-tauri/icons/`. Versiya 0.1.1 (yangi reliz).
+- Repo `.gitignore` `*.png` ni e'tiborsiz qoldiradi — desktop PNG'larini `git add -f` bilan qo'shish kerak.
