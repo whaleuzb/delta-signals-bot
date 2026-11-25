@@ -8808,3 +8808,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 478. Indikatorlar oynasi (TradingView «Indicators, metrics and strategies»)
 - Kompyuterda `indSet()` → `ibOpen()` (`#ibm`, shisha): qidiruv (nomi/qisqa nomi), chapda SHAXSIY — Sevimlilar (`tc_indfav`, standart: Ichimoku, RSI, MACD, Volume Delta, Sessions, SVP), Grafikda (son bilan), Shablonlar (`tplAll().inds`); ICHKI — Texnik, Hajm va order flow, Derivativ metrikalar, Sessiyalar va profillar, Avtomatik (`IBC`). To'liq nomlar `IBN`, turi (grafik ustida / alohida panel).
 - Qatorni bosish — indikator qo'shiladi (oyna ochiq qoladi, qator yonib o'chadi, grafikdagilar ● bilan); ★ — sevimli. «Grafikda»: 👁 yoqish/o'chirish, ⚙ → `indDlg` (Sessions — eski `indSet0`), ✕ o'chirish. Mobil — eski forma (`indSet0`).
+
+## 479. Ichimoku buluti (Kumo) va Chikou
+- `ichSvg(P)` (drDraw SVG qatlami): Senkou A ((Tenkan+Kijun)/2) va Senkou B (sb davr o'rtasi) orasi `kj−1` sham oldinga surilgan holda bo'yaladi; A≥B — `p.up`, aks holda `p.dn` rangi, shaffoflik `p.fo` (0.22); belgilar kesishganda poligon kesishish nuqtasida bo'linadi. `p.cf=0` — bo'yamaydi (Uslub tabida «Bulut (Kumo) bo'yash»). TF ko'rinishi (`indTfOk`) hisobga olinadi.
+- Chikou (Lagging span) — yangi 5-chiziq `p.lg` (#66bb6a), close `kj−1` sham orqaga. Senkou chiziqlari ham `kj−1` ga surildi (TradingView kabi). INDF ich: lg, cf, fo qo'shildi; ICN nomlari Senkou A/B.
