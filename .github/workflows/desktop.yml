@@ -1,4 +1,4 @@
-# 452: Trade Controller kompyuter ilovasi — Windows (.exe), macOS (.dmg, Intel + Apple Silicon), Linux (.AppImage, .deb).
+# 452: Trade Controller kompyuter ilovasi — Windows (.exe) va macOS (.dmg, Intel + Apple Silicon). 481: Linux olib tashlandi.
 # desktop/ o'zgarganda yoki qo'lda (Actions → Desktop → Run workflow) yig'iladi va GitHub Release'ga
 # (teg desktop-v<versiya>) yuklanadi. Yangi reliz uchun desktop/src-tauri/tauri.conf.json'dagi versiyani oshiring.
 name: Desktop
@@ -34,7 +34,7 @@ jobs:
           T="desktop-v$V"
           if ! gh release view "$T" >/dev/null 2>&1; then
             gh release create "$T" --target "$GITHUB_SHA" --title "Trade Controller v$V" --notes "Trade Controller — kompyuter uchun ilova.
-          Windows: *_x64-setup.exe · macOS: *.dmg · Linux: *.AppImage yoki *.deb
+          Windows: *_x64-setup.exe · macOS: *.dmg
           Yuklab olish sahifasi: https://web-production-addc3.up.railway.app/desktop"
           fi
           echo "id=$(gh api repos/$GITHUB_REPOSITORY/releases/tags/$T --jq .id)" >> "$GITHUB_OUTPUT"
@@ -49,8 +49,6 @@ jobs:
             args: ""
           - platform: macos-latest
             args: "--target universal-apple-darwin"
-          - platform: ubuntu-22.04
-            args: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -62,12 +60,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Linux kutubxonalari
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - uses: swatinem/rust-cache@v2
         with:

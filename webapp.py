@@ -1729,11 +1729,9 @@ async def desktop_page(request):
     rel = await _desk_release() or {}
     A = rel.get("assets") or []
     ua = request.headers.get("User-Agent", "")
-    me = "mac" if "Mac OS" in ua or "Macintosh" in ua else "lin" if "Linux" in ua and "Android" not in ua else "win"
+    me = "mac" if "Mac OS" in ua or "Macintosh" in ua else "win"      # 481: faqat Windows va macOS
     rows = [("win", "Windows 10 / 11", _desk_pick(A, "-setup.exe", ".exe", ".msi")),
-            ("mac", "macOS (Intel + Apple Silicon)", _desk_pick(A, "universal.dmg", ".dmg")),
-            ("lin", "Linux (.AppImage)", _desk_pick(A, ".appimage")),
-            ("deb", "Linux (.deb — Ubuntu/Debian)", _desk_pick(A, ".deb"))]
+            ("mac", "macOS (Intel + Apple Silicon)", _desk_pick(A, "universal.dmg", ".dmg"))]
     rows.sort(key=lambda r: r[0] != me)
     ver = _h.escape(str(rel.get("tag_name", "")).replace("desktop-v", "v"))
     btn = "".join(

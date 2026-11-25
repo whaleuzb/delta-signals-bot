@@ -8815,3 +8815,6 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 
 ## 480. Kompyuter ilovasi relizi — poyga xatosi tuzatildi
 - 0.1.2 da Windows va Linux yig'ildi, lekin uch platforma bir vaqtda «desktop-v0.1.2» relizini yaratmoqchi bo'lib, faqat .dmg qoldi. desktop.yml: avval `release` job (`gh release create`, mavjud bo'lsa tegmaydi) → `id`; `build` jobs `needs: release` va `tauri-action` ga `releaseId` beriladi.
+
+## 481. Kompyuter ilovasi — faqat Windows va macOS
+- desktop.yml matritsasidan ubuntu va Linux kutubxonalari olib tashlandi; tauri.conf.json `bundle.targets` = nsis, dmg. `/desktop` sahifasida faqat Windows 10/11 (.exe) va macOS (universal .dmg); qurilma aniqlash mac/win.
