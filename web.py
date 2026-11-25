@@ -276,6 +276,7 @@ MEMBER_TTL = 300.0
 
 
 DESK_DAYS = 180
+DESK_REV: dict = {}       # 483: user_id -> bekor qilingan vaqt (epoch); webapp.desk_rev_sync yangilaydi
 
 
 def _desk_key(token: str) -> bytes:
@@ -285,7 +286,7 @@ def _desk_key(token: str) -> bytes:
 def desk_sign(uid: int, token: str | None = None) -> str:
     """452: kompyuter ilovasi sessiyasi `desk.<uid>.<exp>.<sig>` — Mini App initData o'rnida yuboriladi."""
     token = token if token is not None else config.BOT_TOKEN
-    exp = int(time.time()) + DESK_DAYS * 86400
+    exp = int(time.time()) + 1 + DESK_DAYS * 86400
     sig = hmac.new(_desk_key(token), f"{uid}.{exp}".encode(), hashlib.sha256).hexdigest()[:40]
     return f"desk.{uid}.{exp}.{sig}"
 
@@ -298,6 +299,9 @@ def desk_verify(s: str, token: str) -> int | None:
     if not hmac.compare_digest(want, p[3]):
         return None
     if int(p[2]) < time.time():
+        return None
+    # 483: sessiya berilgan vaqt (exp − muddat) «barcha qurilmalardan chiqish» vaqtidan oldin bo'lsa — bekor
+    if int(p[2]) - DESK_DAYS * 86400 <= DESK_REV.get(int(p[1]), 0):
         return None
     return int(p[1])
 

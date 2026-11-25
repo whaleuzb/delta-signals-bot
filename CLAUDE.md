@@ -8822,3 +8822,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 482. Xavfsizlik: kompyuter ilovasiga kirishni o'g'irlash (login hijack) yopildi
 - Avval `/start desk_<tok>` darhol kirishni tasdiqlardi — firibgar o'z kompyuterida havola olib, boshqaga yuborsa, o'sha odam Start bosishi bilan uning akkaunti (birjalar, savdo) 180 kunga firibgarda qolardi.
 - Endi bot faqat ogohlantirish + 4 xonali kod (`desk_code(tok)` = sha256 → 4 raqam) va tugmalar yuboradi: «✅ Ha, bu men — kirish» (`dk:y:<tok>` → `db.desk_confirm`) / «❌ Men emasman» (`dk:n`); `on_desk_cb`, faqat shaxsiy chatda. Ilova (`/api/app/desk` op=start → `code`) kirish ekranida shu kodni katta ko'rsatadi — odam solishtiradi. i18n: desk.ask/yes/nobtn/no.
+
+## 483. Barcha qurilmalardan chiqish (kompyuter ilovasi sessiyalari)
+- Jadval `desk_revoke(user_id, at)`; `db.desk_revoke`, `db.desk_revokes`. `web.DESK_REV` (xotira, `webapp.desk_rev_sync` 30 s da bir bazadan yangilaydi — `_body` va `api_desk`). `desk_verify`: sessiya berilgan vaqt (exp − DESK_DAYS) ≤ bekor qilingan vaqt bo'lsa — rad (`desk_sign` exp ga +1 s, bir soniyadagi yangi sessiya bekor bo'lmasin).
+- `/api/app/desk` op=revoke (har qanday kirish bilan) → hamma kompyuter sessiyalari bekor; chaqiruvchi kompyuterga yangi `sid` qaytadi (qoladi). desk.html: akkaunt menyusi va Sozlamalar → «Barcha qurilmalardan chiqish» (`deskRevoke` → tc_dsk yangilanadi, qayta yuklanadi). Bot: `/desklogout` (desk.ok xabarida eslatiladi).

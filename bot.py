@@ -4507,6 +4507,15 @@ def desk_code(tok: str) -> str:
     return f"{int(_hl.sha256(tok.encode()).hexdigest()[:8], 16) % 10000:04d}"
 
 
+async def cmd_desklogout(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """483: /desklogout — barcha kompyuter ilovasi sessiyalarini bekor qilish (veb 30 s ichida qabul qiladi)."""
+    if update.effective_chat.type != "private":
+        return
+    uid = update.effective_user.id
+    await db.desk_revoke(uid)
+    await update.effective_message.reply_text(i18n.t("desk.revoked", await user_lang(uid)))
+
+
 async def on_desk_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """482: kompyuter ilovasiga kirishni tasdiqlash / rad etish."""
     q = update.callback_query
@@ -12417,6 +12426,7 @@ def main() -> None:
     app.add_handler(CommandHandler(["widgets", "vidjet"], cmd_widgets))
     app.add_handler(CallbackQueryHandler(on_widgets_cb, pattern=r"^wg:"))
     app.add_handler(CallbackQueryHandler(on_desk_cb, pattern=r"^dk:"))
+    app.add_handler(CommandHandler("desklogout", cmd_desklogout))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("menu", cmd_start))
     app.add_handler(CommandHandler("setup", cmd_setup))

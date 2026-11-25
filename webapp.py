@@ -44,7 +44,24 @@ def _verify(init_data: str) -> int | None:
     return VERIFY(init_data) if VERIFY else None
 
 
+_DREV = {"at": 0.0}
+
+
+async def desk_rev_sync(force: bool = False) -> None:
+    """483: bekor qilingan kompyuter sessiyalari ro'yxati (web.DESK_REV) — 30 s da bir yangilanadi (bir nechta nusxa bo'lsa ham)."""
+    if not force and time.time() - _DREV["at"] < 30:
+        return
+    _DREV["at"] = time.time()
+    try:
+        import web as _w
+        _w.DESK_REV.clear()
+        _w.DESK_REV.update(await db.desk_revokes())
+    except Exception as ex:
+        log.info("desk_revoke o'qilmadi: %s", ex)
+
+
 async def _body(request) -> tuple[dict, int]:
+    await desk_rev_sync()
     try:
         body = await request.json()
     except Exception:
@@ -730,7 +747,19 @@ async def api_desk(request):
         return web.json_response({"ok": True, "sid": DESK_SIGN(r["user_id"]),
                                   "user": {"id": r["user_id"], "first_name": r["name"] or "", "username": r["uname"] or ""}},
                                  headers=NO_CACHE)
+    if op == "revoke":
+        # 483: barcha kompyuter sessiyalarini bekor qilish; chaqirgan kompyuterga yangi sessiya qaytariladi (u chiqib ketmaydi)
+        await desk_rev_sync()
+        idata = str(body.get("initData") or "")
+        uid = _verify(idata)
+        if uid is None:
+            raise web.HTTPForbidden()
+        import web as _w
+        _w.DESK_REV[uid] = await db.desk_revoke(uid)
+        sid = DESK_SIGN(uid) if (DESK_SIGN and idata.startswith("desk.") and body.get("keep") is not False) else None
+        return web.json_response({"ok": True, "sid": sid}, headers=NO_CACHE)
     if op == "me":
+        await desk_rev_sync()
         uid = _verify(str(body.get("initData") or ""))
         if uid is None:
             raise web.HTTPForbidden()

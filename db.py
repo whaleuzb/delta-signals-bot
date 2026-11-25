@@ -715,6 +715,11 @@ CREATE TABLE IF NOT EXISTS user_avatars (
     img     BYTEA,
     at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- 483: «barcha qurilmalardan chiqish» — shu vaqtdan oldin berilgan kompyuter sessiyalari bekor
+CREATE TABLE IF NOT EXISTS desk_revoke (
+    user_id BIGINT PRIMARY KEY,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 -- 470: own=true — foydalanuvchi o'zi yuklagan rasm (Telegram avatari ustidan yozilmaydi)
 ALTER TABLE user_avatars ADD COLUMN IF NOT EXISTS own BOOLEAN NOT NULL DEFAULT FALSE;
 -- 418: narx alertlari (grafikdagi 🔔 chiziq) — narx `price` ni kesib o'tsa Telegram xabar, keyin fired_at
@@ -3414,6 +3419,19 @@ async def paper_reset(uid: int, bal: float) -> None:
                 await c.execute(f"DELETE FROM {t} WHERE user_id=$1", uid)
             await c.execute("INSERT INTO paper_acc (user_id, balance, start) VALUES ($1,$2,$2) "
                             "ON CONFLICT (user_id) DO UPDATE SET balance=$2, start=$2, at=now()", uid, bal)
+
+
+async def desk_revoke(user_id: int) -> float:
+    async with pool().acquire() as c:
+        at = await c.fetchval("INSERT INTO desk_revoke (user_id, at) VALUES ($1, now()) ON CONFLICT (user_id) DO UPDATE SET at=now() "
+                              "RETURNING EXTRACT(EPOCH FROM at)", user_id)
+        return float(at)
+
+
+async def desk_revokes() -> dict:
+    async with pool().acquire() as c:
+        rows = await c.fetch("SELECT user_id, EXTRACT(EPOCH FROM at) AS t FROM desk_revoke")
+    return {r["user_id"]: float(r["t"]) for r in rows}
 
 
 async def desk_new(tok: str) -> bool:
