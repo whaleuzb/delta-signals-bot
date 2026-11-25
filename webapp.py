@@ -339,6 +339,9 @@ async def desk_page(request):
     if not c or c[0] != st:
         with open(_DESK_HTML, "rb") as fh:
             raw = fh.read().replace(b"__COINS__", json.dumps(COINS).encode())
+        # 456: birja logolari (rasmiy belgilar) — Mini App'dagi CEX/CXL/cexMeta/cexBadge bo'lagi aynan qo'yiladi
+        i, j = PAGE.find("var CEX=["), PAGE.find("var CXN=0;")
+        raw = raw.replace(b"__CXL__", (PAGE[i:j] + "var CXN=0;" if 0 <= i < j else "").encode())
         c = _DESK_PC["c"] = (st, raw, _gz.compress(raw, 6), '"d%d"' % int(st))
     hdr = {"Cache-Control": "no-cache", "ETag": c[3], "Vary": "Accept-Encoding"}
     if c[3] in request.headers.get("If-None-Match", ""):
