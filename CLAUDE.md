@@ -8790,3 +8790,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 474. Simulyatordan guruh/kanalga signal
 - Simulyator order oynasida (`BP.ex=='paper'`) «📣 Guruhga signal ham yuborish» (`OT.sig`) va ulangan guruh/kanallar (`sgWs()` — `S.ws` dan shaxsiy bo'lmaganlari, bir nechtasini tanlash `OT.sws`); holat `tc_otsig`. TP maydoniga bir nechta TP vergul bilan (simulyator pozitsiyasiga birinchisi).
 - `otGo`: signal yoqilgan va guruh tanlangan bo'lsa SL + kamida bitta TP majburiy; tasdiqlash oynasida guruhlar ko'rsatiladi. Simulyator order muvaffaqiyatli bo'lgach `otSigSend` har bir guruhga `api('act',{action:'newsig',args:{ws,sym,kind:'fut',lev,side,mode,tf (grafik TF),entry (limit bo'lsa),sl,tps,amount (marja)}})` — odatdagi «Yangi signal» bilan bir xil server yo'li (huquqni bot tekshiradi). Natija har guruh uchun toast. Matnlar `SGT`.
+
+## 475. Yumshoq ochilish/yopilish
+- Animatsiyalar (`tcPop`, `tcPopOut`, `tcFade`, `tcFadeOut`, `tcRise`, `tcSlide`; ease cubic-bezier(.22,1,.36,1), 120–240 ms): desk — `.mn` menyular, `#mdl` oynalar (fon + quti), `.pane.on` tab almashishi, `#side`; webapp — `#drfly` (barcha menyular: asboblar, o'ng tugma, shkala, birjalar), `#brk`/`#dsh`/`#ssm` oynalar, `#ot` order chiptasi, `#lwrp`/`#lwwl` o'ng panellar (siljib), `#lwbp`, suzuvchi `#gxbar`; tugmalar hover rangi `transition`.
+- Yopish `fadeRm(el,ms)`: elementdan `id` darhol olinadi (shu zahoti qayta ochish mumkin), `.tc-out` animatsiyasidan keyin o'chiriladi — `mclose`, `mdlClose`, `flyClose`, `brkClose`, `dshClose`, `ssClose`.
+- `prefers-reduced-motion` da animatsiyalar o'chadi. desk: oyna fokusni yo'qotib iframe'ga o'tsa (grafikka bosish) `.mn` menyu yopiladi.
