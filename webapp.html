@@ -419,6 +419,18 @@ html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide
 #lwfsc>#gxbar{inset:auto}#gxbar .gxg{width:14px;height:28px;display:grid;place-items:center;cursor:grab;color:rgba(232,236,223,.4);font-size:12px}#gxbar .gxk{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;cursor:pointer;color:#e8ecdf}
 #gxbar .gxk:hover{background:rgba(255,255,255,.08)}#gxbar .gxk.on{background:rgba(194,242,58,.18);color:#c2f23a}#gxbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .gxbt.on{color:#ffc83d}
+/* 461: ramkasiz asboblar — kompyuter yuqori qatori va chap panel (TradingView kabi, faqat hover/faol fon) */
+#gxbar:not(.dock){background:rgba(18,19,16,.78);border:0;box-shadow:0 2px 10px rgba(0,0,0,.25);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#gxslot{display:flex;align-items:center;flex:0 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}#gxslot::-webkit-scrollbar{display:none}html.dwide #lwfs .fsh>.lwtb,html.dwide #lwfs .fsh>.fsx,html.dwide #lwfs .fsh>.sym,html.dwide #lwfs .fsh>.px{flex:none}html.dwide #lwfs .fsh{overflow:hidden}#gxbar.dock{position:static;padding:0;background:none;border:0;box-shadow:none;border-radius:0}#gxbar.dock .gxk{width:30px;height:32px}#gxbar.dock .gxg{height:32px}
+html.dwide #lwfs .fsh{gap:1px;padding:3px 8px}html.dwide #lwfs .fsh .lwsep{margin:7px 4px}
+html.dwide #lwfs .fsh .chip,html.dwide #lwfs .fsh .fsx,html.dwide #lwfs .fsl .chip{background:none!important;border:0!important;box-shadow:none!important;color:#d9ddd0}
+html.dwide #lwfs .fsh .chip{height:32px;padding:0 7px;border-radius:6px;gap:5px}html.dwide #lwfs .fsh .chip:hover,html.dwide #lwfs .fsh .fsx:hover,html.dwide #lwfs .fsl .chip:hover{background:rgba(255,255,255,.07)!important}
+html.dwide #lwfs .fsh .chip.on,html.dwide #lwfs .fsl .chip.on{background:rgba(194,242,58,.12)!important;color:#c2f23a}html.dwide #lwfs .fsx.on{background:rgba(194,242,58,.12)!important;color:#c2f23a}
+html.dwide #lwfs .fsl{gap:2px;padding:6px 4px;width:44px}html.dwide #lwfs .fsl .chip{width:36px;height:34px;border-radius:6px}html.dwide #lwfs .fsl .chip svg{width:20px;height:20px}
+html.dwide #lwfs .fsl .gxbt.on{color:#ffc83d}
+.dtf{display:flex;align-items:center;flex:none}.dtf span{padding:6px 6px;border-radius:5px;font-size:12.5px;font-weight:600;color:rgba(232,236,223,.62);cursor:pointer;white-space:nowrap}.dtf span:hover{background:rgba(255,255,255,.07);color:#e8ecdf}.dtf span.on{color:#c2f23a;background:rgba(194,242,58,.1)}
+.dlb{font-style:normal;font-size:12.5px;font-weight:600}.dfx{font-style:italic;font-family:Georgia,serif;font-size:15px}
+html.dwide #lwfsh [data-u],html.dwide #lwfsh [data-r]{display:inline-flex!important}html.dwide #lwfsh [data-u][style*="none"],html.dwide #lwfsh [data-r][style*="none"]{opacity:.3;pointer-events:none}
 #drfly .ftf{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;min-width:200px}#drfly .ftf span{padding:8px 4px;text-align:center;border-radius:8px;font-size:12.5px;font-weight:700;color:rgba(232,236,223,.75);cursor:pointer}
 #drfly .ftf span.on{background:#c2f23a;color:#0b0b0c}
 .drg{position:relative}.drg.mul::after{content:'';position:absolute;right:4px;bottom:4px;width:5px;height:5px;background:currentColor;clip-path:polygon(100% 0,100% 100%,0 100%);opacity:.6}
@@ -1484,6 +1496,19 @@ function drAct(g){var u='<span data-u="1" class="chip glass lwun" onclick="lwUnd
   +'<span class="chip glass wd" data-t="mc" onclick="mcOpen()" title="layout">'+RPI.mc+'</span>'+u
   +'<span class="chip glass wd" onclick="chSet()" title="settings">'+MTI.set+'</span>'+(g.sig?'<span class="chip glass wd" onclick="sigAttach()" title="attach">📎</span>':'')
   +'<span class="chip glass nw" onclick="moreMenu(this)" title="more" style="font-weight:800;font-size:15px">⋯</span>'}
+/* 461: kompyuter — TradingView kabi yuqori qator: intervallar qatorda, matnli tugmalar, ↶↷ doim, sevimlilar paneli shu qatorga joylashadi */
+var DWL=[['Indikatorlar','Индикаторы','Indicators'],['Alert','Алерт','Alert'],['Replay','Replay','Replay']];
+function tfLb(x){return x=='1d'?'D':x=='1w'?'W':x=='1M'?'M':x}
+function drActW(g){var L=gxL(),u='<span data-u="1" class="chip glass lwun" onclick="lwUndo()" style="display:'+(g.uh&&g.uh.length?'inline-flex':'none')+'" title="Ctrl+Z">'+DWI.un+'</span><span data-r="1" class="chip glass" onclick="lwRedo()" style="display:'+(g.rh&&g.rh.length?'inline-flex':'none')+'" title="Ctrl+Y">'+DWI.re+'</span>';
+ return'<span class="dtf">'+TFL.map(function(x){return'<span class="'+(g.tf==x?'on':'')+'" onclick="termTf(\''+x+'\')">'+tfLb(x)+'</span>'}).join('')+'</span><span class="lwsep"></span>'
+  +'<span class="chip glass" data-t="ct" onclick="ctMenu()" title="'+esc(stl('ct'))+'">'+CTI[ctS().t]+'</span><span class="lwsep"></span>'
+  +'<span class="chip glass'+(indList().some(function(x){return x.on})?' on':'')+'" data-t="ind" onclick="indSet()" title="'+esc(stl('ind'))+'"><b class="dfx">ƒx</b><i class="dlb">'+DWL[0][L]+'</i></span><span class="lwsep"></span>'
+  +'<span class="chip glass'+(g.tool=='al'?' on':'')+'" data-t="al" onclick="drTool(\'al\')" title="Alert">'+ALI+'<i class="dlb">'+DWL[1][L]+'</i></span>'
+  +'<span class="chip glass'+(g.rp||g.tool=='rp'?' on':'')+'" data-t="rp" onclick="rpTog()" title="Replay">'+RPI.rp+'<i class="dlb">'+DWL[2][L]+'</i></span><span class="lwsep"></span>'+u+'<span class="lwsep"></span>'}
+function drActR(g){return'<span class="lwtb fsa"><span class="chip glass" data-t="mc" onclick="mcOpen()" title="'+esc(stl('mc'))+'">'+RPI.mc+'</span>'
+  +'<span class="chip glass" onclick="chSet()" title="'+esc(stl('cs'))+'">'+MTI.set+'</span>'+(g.sig?'<span class="chip glass" onclick="sigAttach()" title="'+esc(stl('sa'))+'">📎</span>':'')+'</span>'}
+var DWI={un:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4L2.5 7.5 6 11"/><path d="M2.5 7.5H11a4.5 4.5 0 0 1 0 9H8"/></svg>',
+ re:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l3.5 3.5L12 11"/><path d="M15.5 7.5H7a4.5 4.5 0 0 0 0 9h3"/></svg>'};
 function moreMenu(el){var g=LW.g;if(!g)return;var it=function(ic,n,f){return'<div class="fi" onclick="flyClose();'+f+'">'+ic+'<span>'+esc(n)+'</span></div>'};
  flyOpen(el,it(RPI.rp,'Replay','rpTog()')+it(RPI.mc,stl('mc'),'mcOpen()')+it(MTI.set,stl('cs'),'chSet()')+(g.sig?it('<b style="width:17px;text-align:center">📎</b>',stl('sa'),'sigAttach()'):'')+(LW.fs?it(FSI.dl,stl('dl'),'lwShot(\'dl\')')+it(FSI.sh,stl('shr'),'lwShot(\'share\')'):''),false)}
 function drBar(g,fs){var d='<span class="chip glass lwdl" data-t="del" onclick="drDel()">'+DRI.del+'</span>';
@@ -1928,19 +1953,30 @@ function gxMenu(n,el){var G=GXS.filter(function(x){return x[0]==n})[0],g=LW.g;if
  flyOpen(el,h,side)}
 /* sevimlilar paneli — grafik ustida suriladigan doimiy qator (TradingView «Favorites toolbar») */
 function gxBarOn(){try{return localStorage.getItem('tc_dfbar')!=='0'}catch(e){return true}}
-function gxBar(){var host=LW.fs?document.getElementById('lwfsc'):LW.el&&LW.el.parentNode;var b=document.getElementById('gxbar');var fav=gxFav(),g=LW.g;
+/* 461: kompyuterda standart — yuqori qatorga joylashgan (ramkasiz); ⠿ dan tortib chiqarilsa grafik ustida suzadi ('f'), qayta yuqoriga tortilsa yoki ⠿ 2 marta bosilsa — joyiga qaytadi */
+function gxDock(){var m;try{m=localStorage.getItem('tc_dfbar')}catch(e){}return dw()&&LW.fs&&m!=='f'&&!!document.getElementById('gxslot')}
+function gxHost(){return gxDock()?document.getElementById('gxslot'):LW.fs?document.getElementById('lwfsc'):LW.el&&LW.el.parentNode}
+function gxMode(m){try{localStorage.setItem('tc_dfbar',m)}catch(e){}var b=document.getElementById('gxbar');if(b)b.remove();gxBar()}
+function gxBar(){var host=gxHost();var b=document.getElementById('gxbar');var fav=gxFav(),g=LW.g;
  if(!host||!g||!gxBarOn()||!fav.length){if(b)b.remove();return}
  if(!b||b.parentNode!==host){if(b)b.remove();b=document.createElement('div');b.id='gxbar';host.appendChild(b);gxBarDrag(b);
   b.addEventListener('click',function(e){var x=e.target.closest('[data-gk]');if(x){var k=x.getAttribute('data-gk');if(g&&LW.g)drTool(k);gxBarSync()}})}
  var pos=null;try{pos=JSON.parse(localStorage.getItem('tc_dfpos')||'null')}catch(e){}var W=host.clientWidth,H=host.clientHeight;
  b.innerHTML='<span class="gxg" title="⠿">⠿</span>'+fav.filter(function(k){return DRI[k]}).map(function(k){return'<span class="gxk'+(LW.g&&LW.g.tool==k?' on':'')+'" data-gk="'+k+'" title="'+esc(gxName(k))+'">'+DRI[k]+'</span>'}).join('');
- var x=pos?pos.x:Math.max(60,(W-b.offsetWidth)/2),y=pos?pos.y:8;b.style.left=Math.max(0,Math.min(W-b.offsetWidth,x))+'px';b.style.top=Math.max(0,Math.min(H-b.offsetHeight,y))+'px'}
+ var x=pos?pos.x:Math.max(60,(W-b.offsetWidth)/2),y=pos?pos.y:8;if(gxDock()){b.className='dock';b.style.left=b.style.top='';host.onwheel=function(e){if(host.scrollWidth>host.clientWidth){host.scrollLeft+=e.deltaY||e.deltaX;e.preventDefault()}};return}b.className='';b.style.left=Math.max(0,Math.min(W-b.offsetWidth,x))+'px';b.style.top=Math.max(0,Math.min(H-b.offsetHeight,y))+'px'}
 function gxBarSync(){var b=document.getElementById('gxbar');if(!b)return;var t=LW.g&&LW.g.tool;[].forEach.call(b.querySelectorAll('[data-gk]'),function(x){x.classList.toggle('on',x.getAttribute('data-gk')==t)})}
-function gxBarDrag(b){b.addEventListener('pointerdown',function(e){if(!e.target.closest('.gxg'))return;e.preventDefault();e.stopPropagation();var host=b.parentNode,r=host.getBoundingClientRect(),ox=e.clientX-b.offsetLeft,oy=e.clientY-b.offsetTop;
+function gxBarDrag(b){b.addEventListener('dblclick',function(e){if(e.target.closest('.gxg')&&dw()&&LW.fs)gxMode('d')});
+ b.addEventListener('pointerdown',function(e){if(!e.target.closest('.gxg'))return;e.preventDefault();e.stopPropagation();
+ if(b.classList.contains('dock')){var c=document.getElementById('lwfsc');if(!c)return;var cr=c.getBoundingClientRect(),br=b.getBoundingClientRect();try{localStorage.setItem('tc_dfpos',JSON.stringify({x:br.left-cr.left,y:8}))}catch(q){}gxMode('f');b=document.getElementById('gxbar');if(!b)return;
+  var ox0=e.clientX-br.left,mv0=function(ev){b.style.left=Math.max(0,Math.min(c.clientWidth-b.offsetWidth,ev.clientX-cr.left-ox0))+'px';b.style.top=Math.max(0,Math.min(c.clientHeight-b.offsetHeight,ev.clientY-cr.top-10))+'px'},
+  up0=function(){window.removeEventListener('pointermove',mv0);window.removeEventListener('pointerup',up0);try{localStorage.setItem('tc_dfpos',JSON.stringify({x:b.offsetLeft,y:b.offsetTop}))}catch(q){}};
+  window.addEventListener('pointermove',mv0);window.addEventListener('pointerup',up0);return}
+ var host=b.parentNode,r=host.getBoundingClientRect(),ox=e.clientX-b.offsetLeft,oy=e.clientY-b.offsetTop;
  var mv=function(ev){var x=Math.max(0,Math.min(host.clientWidth-b.offsetWidth,ev.clientX-ox)),y=Math.max(0,Math.min(host.clientHeight-b.offsetHeight,ev.clientY-oy));b.style.left=x+'px';b.style.top=y+'px'},
-  up=function(){window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);try{localStorage.setItem('tc_dfpos',JSON.stringify({x:b.offsetLeft,y:b.offsetTop}))}catch(q){}};
+  up=function(ev){window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);try{localStorage.setItem('tc_dfpos',JSON.stringify({x:b.offsetLeft,y:b.offsetTop}))}catch(q){}
+   if(dw()&&LW.fs&&ev.clientY<r.top-4)gxMode('d')};
  window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up)},true)}
-function gxBarTog(){var on=!gxBarOn();try{localStorage.setItem('tc_dfbar',on?'1':'0')}catch(e){}gxBar();[].forEach.call(document.querySelectorAll('.gxbt'),function(x){x.classList.toggle('on',on)})}
+function gxBarTog(){var on=!gxBarOn();try{localStorage.setItem('tc_dfbar',on?'d':'0')}catch(e){}gxBar();[].forEach.call(document.querySelectorAll('.gxbt'),function(x){x.classList.toggle('on',on)})}
 /* qisqa tugmalar (Alt+T, Alt+H, Alt+J, Alt+V, Alt+C, Alt+F, Alt+Shift+R) */
 document.addEventListener('keydown',function(e){if(!LW.g||!LW.se)return;var a=document.activeElement;if(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName))return;
  if(e.key=='Escape'&&(LW.gd||LW.fd)){LW.gd=null;LW.fd=null;if(LW.g)LW.g.tool=null;drTb();LW.dv++;return}
@@ -2272,7 +2308,7 @@ function drDraw(){var sv=LW.sv;if(!sv||!LW.se||!LW.rt||!LW.rt.length)return;var 
 function drTb(){var g=LW.g;if(!g)return;[].forEach.call(document.querySelectorAll('[data-g]'),function(x){var n=x.getAttribute('data-g'),G=DRG.filter(function(q){return q[0]==n})[0];if(!G)return;var k=drgCur(n);x.classList.toggle('on',G[1].indexOf(g.tool)>=0);if(x.getAttribute('data-k')!==k){x.setAttribute('data-k',k);x.innerHTML=DRI[k]}});[].forEach.call(document.querySelectorAll('.lwtb [data-t]'),function(x){var k=x.getAttribute('data-t');
   if(k=='rp'){x.classList.toggle('on',!!(g.rp||g.tool=='rp'));return}if(k=='mc')return;
   if(k=='vd'||k=='ind'||k=='ct')return;x.classList.toggle('on',k=='del'?!!LW.sel:g.tool==k);if(k=='del')x.style.visibility=drGet().length?'':'hidden'});
- if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1;var gb=document.getElementById('gxbar'),gh=LW.fs?document.getElementById('lwfsc'):LW.el&&LW.el.parentNode;if(!gb||gb.parentNode!==gh)gxBar();else gxBarSync()}
+ if(LW.cl)LW.cl.style.display=g.tool?'block':'none';LW.dv=(LW.dv||0)+1;var gb=document.getElementById('gxbar'),gh=gxHost();if(!gb||gb.parentNode!==gh)gxBar();else gxBarSync()}
 function drTool(k){var g=LW.g;if(!g||!LW.se)return;g.tool=g.tool==k?null:k;LW.dd=null;LW.gd=null;LW.fd=null;LW.sel=null;drTb();gxBarSync();if(g.tool){try{tg.HapticFeedback.selectionChanged()}catch(e){}toast(esc(t(k=='rp'?'rp_p':k=='al'?'al_p':k=='hl'||k=='vp'||k=='lp'||k=='sp'||k=='tx'?'dr_p1':'dr_p2')))}}
 /* 422: qo'shimcha asboblar menyusi — nur, strelka, parallel kanal, matn, o'lchov */
 function drMore(){var g=LW.g;if(!g)return;if(DRX.indexOf(g.tool)>=0){drTool(g.tool);return}
@@ -2517,7 +2553,7 @@ function wlGo(s){var g=LW.g;if(!g)return;try{tg.HapticFeedback.selectionChanged(
  var own=termOwnSym(),nv=s===own?null:s;if(nv===(g.view||null))return;g.view=nv;g.c=null;g.cEnd=0;g.src=null;g.vr=null;tick();termRender();termLoad();setTimeout(wlRender,50)}
 function lwFsHdr(){var h=document.getElementById('lwfsh'),g=LW.g;if(!h||!g)return;var i=termItem()||{};
  var vs=g.view,vp=vs&&LW.wlp&&LW.wlp[vs]?LW.wlp[vs][0]:null;
- h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span><span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span><span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+drAct(g)+'</span><span class="sp"></span>'
+ h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span><span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span><span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+(dw()?drActW(g):drAct(g))+'</span>'+(dw()?'<span id="gxslot"></span>':'')+'<span class="sp"></span>'+(dw()?drActR(g):'')
   +'<span class="fsx wd" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="fsx wd" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="fsx" onclick="lwFs(false)" title="exit">'+FSI.out+'</span>';
  var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);lwFsCtl();drTb();lwLeg(null);deskPost()}
 /* 455: qobiqqa (tab nomi) — joriy tanga, narx, 24s % */

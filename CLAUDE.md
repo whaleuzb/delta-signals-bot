@@ -8733,3 +8733,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Chizish: `gxDown/gxMove/gxUp/gxFin` — 1 nuqta → `drAdd`; 'f' (mo'yqalam) → `LW.fd`; 2 nuqta → `LW.dd`; ≥3 yoki 'm' → `LW.gd` (bosib-bosib; 'm' — ikki marta bosish yoki Enter bilan tugaydi, Esc — bekor). Ko'p nuqtalilar `d.pts`da saqlanadi, chizish `gxOne`, tutqichlar `p<i>`.
 - Qisqa tugmalar: Alt+T (trend), Alt+H (gorizontal), Alt+J (gor. nur), Alt+V (vertikal), Alt+C (kesishma), Alt+F (Fib), Alt+Shift+R (to'rtburchak).
 - Soddalashtirilganlar: Gann kvadrat yoylari, ichki vilka, ghost feed — taxminiy. Sozlamalardagi koordinatalar faqat birinchi 2 nuqtani o'zgartiradi.
+
+## 461. Kompyuter grafigi — TradingView kabi yuqori qator, ramkasiz asboblar
+- `dw()` rejimida `lwFsHdr` → `drActW(g)`: intervallar qatorda (`TFL`, `tfLb`: 1d→D, 1w→W, 1M→M), grafik turi, «ƒx Indikatorlar», «Alert», «Replay» (matnli, `DWL` uz/ru/en), ↶↷ doim ko'rinadi (bo'sh bo'lsa xira, `DWI`), keyin `#gxslot` — sevimli asboblar paneli shu yerda; o'ngda `drActR(g)` (ko'p grafik, sozlamalar, 📎) + yuklab olish/ulashish. Mobil (`drAct`) o'zgarmagan.
+- Ramkasiz: `html.dwide` da yuqori qator va chap paneldagi `.chip` lar fon/ramkasiz, faqat hover va faol (lime) fon.
+- Sevimlilar paneli rejimi `tc_dfbar`: `'0'` o'chiq, `'f'` grafik ustida suzadi (`tc_dfpos`), boshqa — yuqori qatorga joylashgan (`#gxbar.dock`, `gxDock/gxHost/gxMode`). ⠿ dan tortib chiqarilsa suzuvchi bo'ladi; yuqori qatorga qaytarib tortilsa yoki ⠿ 2 marta bosilsa — joyiga qaytadi. Joy yetmasa `#gxslot` gorizontal suriladi (g'ildirak).
