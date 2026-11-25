@@ -8782,3 +8782,7 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - desk.html `#me` → `amOpen`: katta avatar (✎ — rasm) + ism/@username; Sozlamalar (Ctrl+,), Yangi tab (Ctrl+T), Yopilgan tabni qayta ochish (Ctrl+Shift+T; `CLS` steki — `tclose` yozadi, `treopen`), Buferdagi havolani ochish (`amClip`: tanga nomi → grafik tab, havola → `extOpen`), Masshtab − 100% + (`zmSet`, `tc_zoom`, 50–200%, `html.style.zoom`; Ctrl+= / Ctrl+- / Ctrl+0), Til, Rasmni o'zgartirish / Telegram rasmiga qaytarish, Ilovani yuklab olish, Chiqish. Matnlar `AMT`, ikonkalar `AMI`.
 - iframe (grafik) ichida bosilgan Ctrl+, = - 0 T W Tab qobiqqa `{tc:'key'}` bilan uzatiladi (webapp.html, `DESK&&EMB`).
 - Mavzu (Tizim/Qorong'i/Yorug') hali yo'q — butun ilova faqat qorong'i.
+
+## 473. Kompyuterda shrift va raqamlar (TradingView kabi tiniq)
+- Shrift to'plami `TVF` = -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif (TradingView'niki; Windows'da Trebuchet MS — avval Arial'ga tushib qolardi). `html.dwide` va desk.html'da; `font-variant-numeric:tabular-nums` (raqamlar bir xil kenglikda), `font-feature-settings:normal`.
+- Grafik (`chOpts`, faqat dw): shkala/vaqt matni 12px (avval 10), rang `#b2b5be` to'liq (avval 62% shaffof), och fonda `#131722`. Mobil o'zgarmagan.
