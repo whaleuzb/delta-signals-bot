@@ -790,7 +790,7 @@ async def api_chartpub(request):
     return web.json_response({"ok": True, "key": key}, headers=NO_CACHE)
 
 
-_CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds|cs|wl|il|dl)$")
+_CH_KEY = re.compile(r"^(dr:[A-Z0-9]{1,20}|tpl|tpd|inds|cs|wl|il|dl|drfav)$")
 
 
 async def api_chart(request):
