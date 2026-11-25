@@ -1762,14 +1762,14 @@ LAND_HOSTS = ("tradecontroller.app", "www.tradecontroller.app")
 
 # 487m: qidiruv tizimlari (SEO) — har til uchun sarlavha/tavsif serverda (Google/Yandex JS'siz ham ko'radi)
 _SEO = {
-    "uz": ("Trade Controller — kripto signallar boti, professional grafik va birjalar",
-           "Telegram guruh va kanallar uchun kripto signallarni boshqarish boti: TP/SL avtomatik kuzatuv, statistika, Volume Profile va 75+ chizma asbobli grafik, Binance, Bybit va boshqa birjalar, Dip Funded, simulyator. Bepul — Telegram, Mini App, Windows va macOS.",
+    "uz": ("Trade Controller — treyderlar uchun savdo terminali: grafik, birjalar, Telegram guruhlar",
+           "Kompyuter uchun bepul savdo terminali (Windows, macOS): Volume Profile va 75+ chizma asbobli grafik, Binance, Bybit va boshqa birjalarda savdo, Dip Funded, simulyator, Telegram guruhlarni boshqarish va bepul savdo kundaligi.",
            "uz_UZ"),
-    "ru": ("Trade Controller — бот для крипто-сигналов, профессиональный график и биржи",
-           "Бот для управления крипто-сигналами в группах и каналах Telegram: автоматическое отслеживание TP/SL, статистика, график с Volume Profile и 75+ инструментами, Binance, Bybit и другие биржи, Dip Funded, симулятор. Бесплатно — Telegram, Mini App, Windows и macOS.",
+    "ru": ("Trade Controller — торговый терминал для трейдеров: график, биржи, Telegram-группы",
+           "Бесплатный торговый терминал для компьютера (Windows, macOS): график с Volume Profile и 75+ инструментами, торговля на Binance, Bybit и других биржах, Dip Funded, симулятор, управление Telegram-группами и бесплатный дневник сделок.",
            "ru_RU"),
-    "en": ("Trade Controller — crypto signal bot, pro charting and exchanges in one app",
-           "A bot for managing crypto signals in Telegram groups and channels: automatic TP/SL tracking, stats, a chart with Volume Profile and 75+ drawing tools, Binance, Bybit and more, Dip Funded and a simulator. Free — Telegram, Mini App, Windows and macOS.",
+    "en": ("Trade Controller — trading terminal for traders: charts, exchanges, Telegram groups",
+           "A free desktop trading terminal (Windows, macOS): charting with Volume Profile and 75+ drawing tools, trading on Binance, Bybit and more, Dip Funded, a simulator, Telegram group management and a free trading journal.",
            "en_US"),
 }
 _SITE = "https://tradecontroller.app"
