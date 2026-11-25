@@ -6,7 +6,9 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
-const HOST: &str = "web-production-addc3.up.railway.app";
+// 484: asosiy manzil — o'z domenimiz; eski Railway manzili ham o'z sayt sifatida qabul qilinadi (o'tish davri)
+const HOST: &str = "tradecontroller.app";
+const HOSTS: [&str; 2] = ["tradecontroller.app", "web-production-addc3.up.railway.app"];
 
 fn main() {
     tauri::Builder::default()
@@ -28,7 +30,7 @@ fn main() {
                 // 471: sahifa kompyuter ilovasida ekanini bilsin — tashqi havolalar tizim brauzerida ochiladi
                 .initialization_script("window.__TC_DESKTOP = 1;")
                 .on_navigation(move |u| {
-                    let own = u.host_str() == Some(HOST);
+                    let own = u.host_str().map_or(false, |h| HOSTS.contains(&h));
                     if own || matches!(u.scheme(), "about" | "data" | "blob" | "tauri") {
                         return true;
                     }

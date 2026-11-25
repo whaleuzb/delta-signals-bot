@@ -35,7 +35,7 @@ jobs:
           if ! gh release view "$T" >/dev/null 2>&1; then
             gh release create "$T" --target "$GITHUB_SHA" --title "Trade Controller v$V" --notes "Trade Controller — kompyuter uchun ilova.
           Windows: *_x64-setup.exe · macOS: *.dmg
-          Yuklab olish sahifasi: https://web-production-addc3.up.railway.app/desktop"
+          Yuklab olish sahifasi: https://tradecontroller.app/desktop"
           fi
           echo "id=$(gh api repos/$GITHUB_REPOSITORY/releases/tags/$T --jq .id)" >> "$GITHUB_OUTPUT"
 
