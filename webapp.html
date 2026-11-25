@@ -2797,8 +2797,7 @@ function lwLeg(pr){if(DESK)bsbDraw();var o=document.getElementById('lwfso');if(!
  var k=c.length-1;if(pr&&pr.time!=null&&LW.rt){var t=pr.time,lo=0,hi=LW.rt.length-1;while(lo<hi){var m=(lo+hi+1)>>1;if(LW.rt[m]<=t)lo=m;else hi=m-1}k=lo}
  var x=c[k],op=+x[1],hh=+x[2],ll=+x[3],cl=k==c.length-1&&LW.rlast?LW.rlast:+x[4],ch=op?(cl-op)/op*100:0,col=cl>=op?'#c2f23a':'#ff5c5c',v=+x[5]||0;
  var dl=x[6]!=null&&v>0?2*x[6]-v:null;
- var nm='';if(dw()){var it=termItem()||{},vs=LW.g.view;nm='<span class="lgn">'+esc(vs?vs+'USDT':String(it.symbol||''))+' · '+esc(tfLb(LW.g.tf||''))+'</span>'}
- o.innerHTML=nm+'<span>O <b style="color:'+col+'">'+fp(op)+'</b></span><span>H <b style="color:'+col+'">'+fp(hh)+'</b></span><span>L <b style="color:'+col+'">'+fp(ll)+'</b></span><span>C <b style="color:'+col+'">'+fp(cl)+'</b></span><b style="color:'+col+'">'+(ch>=0?'+':'')+ch.toFixed(2)+'%</b>'
+ o.innerHTML='<span>O <b style="color:'+col+'">'+fp(op)+'</b></span><span>H <b style="color:'+col+'">'+fp(hh)+'</b></span><span>L <b style="color:'+col+'">'+fp(ll)+'</b></span><span>C <b style="color:'+col+'">'+fp(cl)+'</b></span><b style="color:'+col+'">'+(ch>=0?'+':'')+ch.toFixed(2)+'%</b>'
   +(v?'<span>Vol <b>'+lwK(v)+'</b></span>':'')+(dl!=null?'<span>Δ <b style="color:'+(dl>=0?'#c2f23a':'#ff5c5c')+'">'+(dl>=0?'+':'−')+lwK(Math.abs(dl))+'</b></span>':'')}
 function lwK(v){return v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(2)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':(+v.toFixed(2)).toString()}
 function lwRt(){try{LW.ch.timeScale().scrollToRealTime()}catch(e){}}
