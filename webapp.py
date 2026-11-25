@@ -298,6 +298,96 @@ async def _wl_fut() -> dict:
         return {}
 
 
+# 457: kripto bozori (TradingView «Crypto market → Coins» kabi) — CoinGecko /coins/markets, 1000 tanga, 5 daqiqa kesh;
+# kategoriyalar (Memes, AI, DeFi, L1, L2, RWA, Gaming, Stablecoins, ...) — har biri alohida so'rov, 6 soat kesh.
+_CGM = {"at": 0.0, "r": None, "lock": None}
+_CGC = {"at": 0.0, "m": {}}
+CG_CATS = [("layer-1", "L1"), ("layer-2", "L2"), ("meme-token", "Meme"), ("artificial-intelligence", "AI"),
+           ("decentralized-finance-defi", "DeFi"), ("real-world-assets-rwa", "RWA"), ("gaming", "Gaming"),
+           ("stablecoins", "Stable"), ("exchange-based-tokens", "CEX"), ("decentralized-exchange", "DEX"),
+           ("privacy-coins", "Privacy"), ("solana-ecosystem", "Solana")]
+
+
+async def _cg_cats(cs) -> dict:
+    if _CGC["m"] and time.time() - _CGC["at"] < 6 * 3600:
+        return _CGC["m"]
+    m: dict = {}
+    for cid, lbl in CG_CATS:
+        try:
+            async with cs.get("https://api.coingecko.com/api/v3/coins/markets",
+                              params={"vs_currency": "usd", "category": cid, "order": "market_cap_desc", "per_page": 250, "page": 1}) as r:
+                if r.status != 200:
+                    await asyncio.sleep(6)
+                    continue
+                for x in await r.json() or []:
+                    m.setdefault(x.get("id"), []).append(lbl)
+        except Exception:
+            pass
+        await asyncio.sleep(2.5)
+    if m:
+        _CGC.update(at=time.time(), m=m)
+    else:
+        _CGC["at"] = time.time() - 6 * 3600 + 900
+    return _CGC["m"]
+
+
+async def _cg_markets() -> list:
+    import aiohttp
+    if _CGM["r"] is not None and time.time() - _CGM["at"] < 300:
+        return _CGM["r"]
+    if _CGM["lock"] is None:
+        _CGM["lock"] = asyncio.Lock()
+    async with _CGM["lock"]:
+        if _CGM["r"] is not None and time.time() - _CGM["at"] < 300:
+            return _CGM["r"]
+        rows = []
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as cs:
+                for pg in range(1, 5):
+                    async with cs.get("https://api.coingecko.com/api/v3/coins/markets",
+                                      params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 250, "page": pg,
+                                              "price_change_percentage": "1h,24h,7d,30d,1y"}) as r:
+                        if r.status != 200:
+                            break
+                        part = await r.json() or []
+                    rows += part
+                    if len(part) < 250:
+                        break
+                    await asyncio.sleep(2.5)
+                cats = await _cg_cats(cs) if rows else {}
+        except Exception:
+            log.warning("CoinGecko bozor ma'lumoti olinmadi", exc_info=True)
+            cats = _CGC["m"]
+        if rows:
+            f = lambda v: round(float(v), 8) if v is not None else None
+            _CGM["r"] = [[x.get("market_cap_rank"), str(x.get("symbol") or "").upper(), x.get("name"), x.get("image"),
+                          f(x.get("current_price")), f(x.get("price_change_percentage_1h_in_currency")),
+                          f(x.get("price_change_percentage_24h_in_currency")), f(x.get("price_change_percentage_7d_in_currency")),
+                          f(x.get("price_change_percentage_30d_in_currency")), f(x.get("price_change_percentage_1y_in_currency")),
+                          f(x.get("market_cap")), f(x.get("total_volume")), f(x.get("circulating_supply")),
+                          f(x.get("max_supply")), f(x.get("ath")), f(x.get("ath_change_percentage")),
+                          f(x.get("high_24h")), f(x.get("low_24h")), f(x.get("fully_diluted_valuation")),
+                          cats.get(x.get("id"), [])] for x in rows]
+            _CGM["at"] = time.time()
+        elif _CGM["r"] is None:
+            _CGM["at"] = time.time() - 240          # 1 daqiqadan keyin qayta
+            return []
+        return _CGM["r"]
+
+
+async def api_coins(request):
+    """457: [[rank, tiker, nom, rasm, narx, 1s%, 24s%, 7k%, 30k%, 1y%, kapitalizatsiya, hajm, aylanmada, maks,
+    ATH, ATH%, 24s yuqori, 24s past, FDV, [kategoriyalar]], ...] + `x` — birjada savdo qilinadigan tikerlar."""
+    import exchange as _ex
+    await _body(request)
+    rows = await _cg_markets()
+    try:
+        xs = [r[0] for r in await _ex.ticker_full()]
+    except Exception:
+        xs = []
+    return web.json_response({"r": rows, "x": xs}, headers={"Cache-Control": "private, max-age=60"})
+
+
 async def api_screener(request):
     """455: kompyuter ilovasi — skrinner va issiqlik xaritasi: [[nom, narx, %, hajm, yuqori, past], ...] (≤1500)."""
     import exchange as _ex
@@ -318,10 +408,10 @@ async def api_econ(request):
     import econcalendar
     await _body(request)
     if _ECON["r"] is None or time.time() - _ECON["at"] > 600:
-        ev = await econcalendar.fetch_week()
+        ev = await econcalendar.fetch_all()          # 457: hamma davlatlar va ta'sir darajalari (ilova filtrlaydi)
         if ev or _ECON["r"] is None:
             _ECON["r"] = [{"t": e["title"], "tu": econcalendar.title_uz(e["title"]), "at": int(e["when"].timestamp() * 1000),
-                           "f": e["forecast"], "p": e["previous"], "a": e["actual"], "im": e["impact"]} for e in ev]
+                           "c": e["country"], "f": e["forecast"], "p": e["previous"], "a": e["actual"], "im": e["impact"]} for e in ev]
         _ECON["at"] = time.time()
     return web.json_response({"r": _ECON["r"]}, headers=NO_CACHE)
 
@@ -2542,6 +2632,7 @@ def routes() -> list:
         web.get("/desk", desk_page),
         web.post("/api/app/screener", api_screener),
         web.post("/api/app/econ", api_econ),
+        web.post("/api/app/coins", api_coins),
         web.get("/desktop/icon.png", desktop_icon),
         web.get("/desktop/logo.png", desktop_logo),
         web.get("/lwc.js", lwc_js),

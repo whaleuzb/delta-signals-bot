@@ -33,6 +33,41 @@ def _parse_dt(raw) -> datetime | None:
     return dt
 
 
+async def fetch_all() -> list[dict]:
+    """457: kompyuter ilovasi taqvimi — joriy (va bo'lsa keyingi) haftaning BARCHA hodisalari:
+    hamma davlatlar, ta'sir High/Medium/Low/Holiday. `{title, country, when, forecast, previous, actual, impact}`.
+    Xato bo'lsa — bo'sh ro'yxat."""
+    out = []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for url in (CALENDAR_URL, CALENDAR_URL.replace("thisweek", "nextweek")):
+            try:
+                r = await client.get(url)
+                if r.status_code != 200:
+                    continue
+                raw = r.json()
+            except Exception:
+                if url == CALENDAR_URL:
+                    log.warning("Iqtisodiy taqvim (hammasi) olinmadi", exc_info=True)
+                continue
+            for item in raw if isinstance(raw, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                when = _parse_dt(item.get("date") or item.get("datetime"))
+                if when is None:
+                    continue
+                out.append({"title": item.get("title") or item.get("name") or "?",
+                            "country": str(item.get("country") or item.get("currency") or ""),
+                            "when": when, "forecast": item.get("forecast") or "", "previous": item.get("previous") or "",
+                            "actual": item.get("actual") or "", "impact": item.get("impact") or ""})
+    seen, uniq = set(), []
+    for e in out:
+        k = (e["title"], e["country"], e["when"])
+        if k not in seen:
+            seen.add(k)
+            uniq.append(e)
+    return uniq
+
+
 async def fetch_week() -> list[dict]:
     """Joriy haftaning FAQAT AQSH (USD) va YUQORI ta'sirli hodisalari.
 
