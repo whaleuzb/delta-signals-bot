@@ -354,6 +354,36 @@ async def price_list() -> list[tuple[str, float]]:
     return _plist[1]
 
 
+_tfull: tuple[float, list] = (0.0, [])
+
+
+async def ticker_full() -> list[list]:
+    """455: kompyuter ilovasi skrinneri / issiqlik xaritasi — barcha USDT spot juftliklari
+    [nom, narx, 24s %, 24s hajm (USDT), 24s yuqori, 24s past] hajm bo'yicha kamayib. Bitta so'rov, 20 s kesh."""
+    global _tfull
+    if _tfull[1] and time.monotonic() - _tfull[0] < 20:
+        return _tfull[1]
+    r = await _client.get("/api/v3/ticker/24hr")
+    r.raise_for_status()
+    rows = []
+    for t in r.json():
+        sym = t.get("symbol", "")
+        if not sym.endswith(config.QUOTE):
+            continue
+        try:
+            last = float(t["lastPrice"])
+            op = float(t.get("openPrice") or t.get("prevClosePrice") or 0)
+            qv = float(t.get("quoteVolume") or 0)
+            hi, lo = float(t.get("highPrice") or 0), float(t.get("lowPrice") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if last > 0 and qv > 0:
+            rows.append([sym[: -len(config.QUOTE)], last, round((last - op) / op * 100, 2) if op > 0 else 0.0, round(qv), hi, lo])
+    rows.sort(key=lambda x: -x[3])
+    _tfull = (time.monotonic(), rows)
+    return rows
+
+
 _tmap: tuple[float, dict] = (0.0, {})
 
 

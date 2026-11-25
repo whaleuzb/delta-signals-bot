@@ -306,6 +306,8 @@ html.dwide .toast{left:calc(100% - var(--dw) + 14px);right:14px}
 html.dwide #lwfs{right:var(--dw);border-right:1px solid rgba(255,255,255,.08);padding:0!important}
 html.dwide #lwfs .fsx[onclick^="lwFs(false)"]{display:none}html.dwide #lwfs .lwfb{display:none}
 html.dwide #lwfs .fsh{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.07)}
+html.solo.dwide{--dw:0px}html.solo.dwide .top,html.solo.dwide #view,html.solo.dwide #page,html.solo.dwide .nav{display:none!important}
+html.solo.dwide #lwfs{border-right:0}html.solo.dwide .sheet{left:max(8px,calc(50% - 240px));right:max(8px,calc(50% - 240px))}html.solo.dwide .toast{left:max(14px,calc(50% - 226px));right:max(14px,calc(50% - 226px))}
 html.dwide #lwwl{position:relative;width:260px;flex:none;box-shadow:none;background:#0d0e0b}
 html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide #page .lwat{display:none}
 .ghd{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
@@ -478,6 +480,9 @@ var tg=window.Telegram&&window.Telegram.WebApp;
 var DESK=(function(){if(tg&&tg.initData)return false;var q=/[?&]desk=1/.test(location.search);try{if(q)localStorage.setItem('tc_desk','1');return q||localStorage.getItem('tc_desk')==='1'}catch(e){return q}})();
 function deskGet(){try{return JSON.parse(localStorage.getItem('tc_dsk')||'null')}catch(e){return null}}
 function deskOpen(u){location.href=u}
+/* 455: kompyuter ilovasi qobig'i (/desk) — tablar; ilova faqat qobiq ichida (iframe, emb=1). Eski mobil ko'rinish: ?desk=1&m=1 */
+var EMB=window.top!==window;if(EMB&&/[?&]solo=1/.test(location.search))document.documentElement.classList.add('solo');
+if(DESK&&!EMB&&(deskGet()||{}).sid&&!/[?&]m=1/.test(location.search)){location.replace('/desk')}
 if(DESK){(function(){var d=deskGet()||{},n=function(){},hf={impactOccurred:n,notificationOccurred:n,selectionChanged:n},bb={show:n,hide:n,onClick:n,offClick:n,isVisible:false};
  tg={initData:d.sid||'',initDataUnsafe:{user:d.user||{}},platform:'desktop',version:'6.0',isVersionAtLeast:function(){return false},ready:n,expand:n,onEvent:n,offEvent:n,setHeaderColor:n,setBackgroundColor:n,disableVerticalSwipes:n,
   HapticFeedback:hf,BackButton:bb,safeAreaInset:{top:0,bottom:0,left:0,right:0},contentSafeAreaInset:{top:0,bottom:0,left:0,right:0},
@@ -489,8 +494,9 @@ function dw(){return document.documentElement.classList.contains('dwide')}
 function dwSet(){var on=DESK&&window.innerWidth>=1100,was=dw();document.documentElement.classList.toggle('dwide',on);if(on&&!was&&S.ws)setTimeout(deskChart,50);if(!on&&was&&LW.fs&&S.page&&S.page.ch){lwFs(false)}}
 if(DESK){window.addEventListener('resize',function(){clearTimeout(window.__dwT);window.__dwT=setTimeout(dwSet,200)})}
 /* keng oynada grafik doim ochiq: sahifa yopilsa yoki hech narsa ochiq bo'lmasa — oxirgi tanga grafigi (tc_dsym) */
-function deskChart(){if(!dw())return;if(S.page&&S.page.id=='term'){if(!LW.fs)setTimeout(function(){lwFs(true);if(!LW.wl)wlTog()},250);return}if(S.page)return;
- var b='BTC';try{b=localStorage.getItem('tc_dsym')||'BTC'}catch(e){}chTerm(b);setTimeout(function(){if(!dw())return;lwFs(true);if(!LW.wl)wlTog()},300)}
+function dwFs(n){n=n||0;if(!dw()||LW.fs&&LW.g===S.page)return;if(LW.el&&LW.g&&LW.g===S.page){lwFs(true);if(!LW.wl)wlTog();return}if(n<60)setTimeout(function(){dwFs(n+1)},150)}
+function deskChart(){if(!dw())return;if(S.page&&S.page.id=='term'){dwFs();return}if(S.page)return;
+ var b='BTC';try{b=localStorage.getItem('tc_dsym')||'BTC'}catch(e){}var qs=(location.search.match(/[?&]sym=([A-Za-z0-9]{1,20})/)||[])[1];if(qs&&!window.__dsq){window.__dsq=1;b=qs.toUpperCase()}chTerm(b);dwFs()}
 function pgOn(){return!!S.page&&!(dw()&&S.page.ch)}
 function dwPage(){var p=document.getElementById('page');if(p)p.classList.toggle('dhid',dw()&&!!(S.page&&S.page.ch))}
 function deskOut(){try{localStorage.removeItem('tc_dsk')}catch(e){}location.reload()}
@@ -501,7 +507,7 @@ function deskLogin(){var L=S.lang||'uz';try{var sl=localStorage.getItem('tc_lang
  document.body.appendChild(m);var tm=null,end=0;
  document.getElementById('dskb').onclick=function(){var b=this;b.disabled=true;fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'start'})}).then(function(r){if(!r.ok)throw r.status;return r.json()}).then(function(d){
    deskOpen(d.url);var w=document.getElementById('dskw');w.hidden=false;w.innerHTML=esc(TX[3])+'<br><br>'+esc(TX[4])+'<br><code>'+esc(d.url)+'</code>';b.disabled=false;end=Date.now()+14*60000;clearInterval(tm);
-   tm=setInterval(function(){if(Date.now()>end){clearInterval(tm);return}fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'poll',tok:d.tok})}).then(function(r){return r.json()}).then(function(x){if(x&&x.ok){clearInterval(tm);try{localStorage.setItem('tc_dsk',JSON.stringify({sid:x.sid,user:x.user}))}catch(e){}location.replace('/app?desk=1')}}).catch(function(){})},2000)
+   tm=setInterval(function(){if(Date.now()>end){clearInterval(tm);return}fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'poll',tok:d.tok})}).then(function(r){return r.json()}).then(function(x){if(x&&x.ok){clearInterval(tm);try{localStorage.setItem('tc_dsk',JSON.stringify({sid:x.sid,user:x.user}))}catch(e){}location.replace('/desk')}}).catch(function(){})},2000)
   }).catch(function(){b.disabled=false;toast('⚠️')})}}
 var TABS=['home','wallet','signals','dip','top','tour','profile'];
 var S={ws:[],cur:null,lang:'uz',tab:'home',items:[],filter:'all',slide:0,anim:true,dir:'',prev:{},spark:{}};
@@ -2113,7 +2119,7 @@ function wlBase(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').r
 function termOwnSym(){var i=termItem();return i?wlBase(i.symbol):''}
 function wlTog(){LW.wl=!LW.wl;wlRender();lwFsHdr();if(LW.wl)wlPoll();else clearTimeout(LW.wlT)}
 function wlPoll(){clearTimeout(LW.wlT);if(!LW.wl||!LW.fs)return;var L=wlGet(),own=termOwnSym();if(own&&L.indexOf(own)<0)L=[own].concat(L);
- api('tickers',{syms:L}).then(function(d){LW.wlp=d.t||{};wlRender()}).catch(function(){});LW.wlT=setTimeout(wlPoll,document.hidden?30000:12000)}
+ api('tickers',{syms:L}).then(function(d){LW.wlp=d.t||{};wlRender();deskPost()}).catch(function(){});LW.wlT=setTimeout(wlPoll,document.hidden?30000:12000)}
 function wlRender(){var f=document.getElementById('lwfsb');if(!f)return;var p=document.getElementById('lwwl');if(!LW.wl){if(p)p.remove();return}
  if(!p){p=document.createElement('div');p.id='lwwl';f.appendChild(p)}var ae=document.activeElement&&document.activeElement.id=='wlin',iv=ae?document.getElementById('wlin').value:'';
  var O=wlAll(),so=O.so||'m',L=wlGet(),own=termOwnSym(),g=LW.g,cur=g&&g.view?g.view:own,P=LW.wlp||{},L2=L.filter(function(x){return x!==own}),ch_=function(x){return P[x]?P[x][1]:-1e9};
@@ -2144,7 +2150,9 @@ function lwFsHdr(){var h=document.getElementById('lwfsh'),g=LW.g;if(!h||!g)retur
  var vs=g.view,vp=vs&&LW.wlp&&LW.wlp[vs]?LW.wlp[vs][0]:null;
  h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span><span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span><span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span><span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+drAct(g)+'</span><span class="sp"></span>'
   +'<span class="fsx wd" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="fsx wd" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span><span class="fsx" onclick="lwFs(false)" title="exit">'+FSI.out+'</span>';
- var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);lwFsCtl();drTb();lwLeg(null)}
+ var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);lwFsCtl();drTb();lwLeg(null);deskPost()}
+/* 455: qobiqqa (tab nomi) — joriy tanga, narx, 24s % */
+function deskPost(){if(!EMB||!DESK||!LW.g)return;var g=LW.g,i=termItem()||{},vs=g.view,sym=vs||wlBase(i.symbol),P=LW.wlp&&LW.wlp[sym],px=vs?(P?P[0]:null):(i.price!=null?i.price:P?P[0]:null);var k=sym+'|'+px;if(k===LW.dpk)return;LW.dpk=k;try{parent.postMessage({tc:'sym',sym:sym,px:px,ch:P?P[1]:null},location.origin)}catch(e){}}
 /* 411: to'liq ekranda limit/TP/SL boshqaruvi (Saqlash/Bekor, + TP/SL/Limit) — sahifadagi #tctl nusxasi grafik ostida */
 function lwFsCtl(){var f=document.getElementById('lwfsf');if(!f)return;var c=document.getElementById('tctl'),h=c?c.innerHTML.replace(/ id="[^"]*"/g,''):'';
  if(LW.g&&LW.g.view)h='';var key=(h.match(/onclick="[^"]*"/g)||[]).join('|')+'#'+(h.match(/class="[^"]*"/g)||[]).join('|');

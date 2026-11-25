@@ -298,6 +298,56 @@ async def _wl_fut() -> dict:
         return {}
 
 
+async def api_screener(request):
+    """455: kompyuter ilovasi — skrinner va issiqlik xaritasi: [[nom, narx, %, hajm, yuqori, past], ...] (≤1500)."""
+    import exchange as _ex
+    await _body(request)
+    try:
+        rows = await _ex.ticker_full()
+    except Exception:
+        log.warning("Skrinner ma'lumoti olinmadi", exc_info=True)
+        rows = []
+    return web.json_response({"r": rows[:1500]}, headers={"Cache-Control": "private, max-age=15"})
+
+
+_ECON = {"at": 0.0, "r": None}
+
+
+async def api_econ(request):
+    """455: kompyuter ilovasi — AQSH iqtisodiy taqvimi (Forex Factory, High/Medium), 10 daqiqa kesh."""
+    import econcalendar
+    await _body(request)
+    if _ECON["r"] is None or time.time() - _ECON["at"] > 600:
+        ev = await econcalendar.fetch_week()
+        if ev or _ECON["r"] is None:
+            _ECON["r"] = [{"t": e["title"], "tu": econcalendar.title_uz(e["title"]), "at": int(e["when"].timestamp() * 1000),
+                           "f": e["forecast"], "p": e["previous"], "a": e["actual"], "im": e["impact"]} for e in ev]
+        _ECON["at"] = time.time()
+    return web.json_response({"r": _ECON["r"]}, headers=NO_CACHE)
+
+
+_DESK_HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "desk.html")
+_DESK_PC: dict = {}
+
+
+async def desk_page(request):
+    """455: kompyuter ilovasi qobig'i — tablar, bosh sahifa (plitkalar), skrinner, issiqlik xaritasi, taqvim;
+    grafik va ilova bo'limlari tab ichida /app?desk=1&emb=1 (iframe)."""
+    import gzip as _gz
+    st = os.stat(_DESK_HTML).st_mtime
+    c = _DESK_PC.get("c")
+    if not c or c[0] != st:
+        with open(_DESK_HTML, "rb") as fh:
+            raw = fh.read().replace(b"__COINS__", json.dumps(COINS).encode())
+        c = _DESK_PC["c"] = (st, raw, _gz.compress(raw, 6), '"d%d"' % int(st))
+    hdr = {"Cache-Control": "no-cache", "ETag": c[3], "Vary": "Accept-Encoding"}
+    if c[3] in request.headers.get("If-None-Match", ""):
+        return web.Response(status=304, headers=hdr)
+    if "gzip" in request.headers.get("Accept-Encoding", ""):
+        return web.Response(body=c[2], content_type="text/html", charset="utf-8", headers={**hdr, "Content-Encoding": "gzip"})
+    return web.Response(body=c[1], content_type="text/html", charset="utf-8", headers=hdr)
+
+
 async def api_wllist(request):
     """440: watchlist qidiruvi uchun barcha USDT juftliklari bitta ro'yxatda — ilova 1 soat qurilmada saqlab, o'zi qidiradi.
     [[nom, narx, 24s %|null, faqat_fyuchers 0/1], ...] hajm tartibida."""
@@ -2486,6 +2536,9 @@ def routes() -> list:
         web.get("/api/app/ver", api_ver),
         web.get("/invite.jpg", invite_jpg),
         web.get("/desktop", desktop_page),
+        web.get("/desk", desk_page),
+        web.post("/api/app/screener", api_screener),
+        web.post("/api/app/econ", api_econ),
         web.get("/desktop/icon.png", desktop_icon),
         web.get("/desktop/logo.png", desktop_logo),
         web.get("/lwc.js", lwc_js),

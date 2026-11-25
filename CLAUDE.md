@@ -8689,3 +8689,13 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - Oddiy grafik terminali (`S.page.ch`) sahifasi o'ng ustunda yashirin (`.page.dhid`, `dwPage()`), signal/birja/Dip Funded terminalida esa o'ng ustunda pozitsiya, TP/SL, savdo formasi; u yerdagi takror `#lwtb`, `#tbox`, `.thint` yashirin.
 - dwide'da `lwFs(false)` ishlamaydi, `lwMount` yangi terminalda to'liq ekranni yopmaydi (`LW` qayta yaratilganda fs/wl/wlp saqlanadi, eski `LW.el` olib tashlanadi), `navBack` to'liq ekranni yopmaydi; ✕ va ⛶ tugmalari yashirin.
 - `pgOn()` — avtomatik yangilanish shartlarida `!S.page` o'rnida (dwide'da fon grafik terminali «sahifa ochiq» deb hisoblanmaydi).
+
+## 455. Kompyuter ilovasi qobig'i — TradingView Desktop uslubi (`/desk`)
+- `desk.html` (alohida fayl, `webapp.desk_page` — gzip+ETag, `__COINS__` qo'yiladi). Bot va Mini App o'zgarmaydi; kompyuterda top-level `/app?desk=1` sessiya bo'lsa `/desk`ga o'tadi (eski ko'rinish: `&m=1`), kirishdan keyin ham `/desk`.
+- Yuqorida tablar (`tcd_tabs`, `tcd_act` localStorage; Ctrl+T / Ctrl+W / Ctrl+Tab, o'rta tugma bilan yopish). Tab turlari: `home` (Yangi tab), `chart` (sym), `scr`, `heat`, `cal`, `app` (tab=wallet/signals/top/tour/dip/df).
+- Yangi tab: «Trade Controller», tanga qidiruvi (skrinner ma'lumotidan), grafik maketlari (`tcd_rc` — oxirgi 8 grafik, 3 tasi ko'rinadi) + «Yangi grafik», gradient tasma, 10 plitka (Grafiklar, Skrinner, Issiqlik xaritasi, Iqtisodiy taqvim, Birja·Portfel, Signallar, Top, Turnir, DIP, Dip Funded).
+- Skrinner: `POST /api/app/screener` (`exchange.ticker_full` — [nom, narx, %, hajm, yuqori, past], 20 s kesh, ≤1500); filtrlar, qidiruv, ustun bo'yicha saralash, diapazon belgisi, 150+200 qator; qatorni bosish → grafik tabi (Ctrl — fonda). 20 s'da yangilanadi (faqat ko'rinayotgan tab).
+- Issiqlik xaritasi: o'sha ma'lumot, squarified treemap (o'lcham √hajm, rang 24s %), Top 50/100/200.
+- Iqtisodiy taqvim: `POST /api/app/econ` (econcalendar.fetch_week, 10 daqiqa kesh), kunlar bo'yicha, keyingi hodisa ajratilgan, o'zbekcha nom + asl nom.
+- Grafik va bo'lim tablari — iframe `/app?desk=1&emb=1` (`EMB`); grafik tabi `&solo=1` (`html.solo` — o'ng ilova ustuni yo'q, grafik butun kenglikda) va `&sym=` (deskChart bir marta oladi). Ichki ilova `deskPost()` bilan qobiqqa `{tc:'sym', sym, px, ch}` yuboradi (tab nomida jonli narx). `dwFs()` — grafik o'rnatilguncha kutib to'liq ekranga o'tkazadi.
+- Foydalanuvchi menyusi: til, mobil ko'rinish (app tab), yuklab olish sahifasi, chiqish.
