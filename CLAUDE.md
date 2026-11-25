@@ -8682,3 +8682,10 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 - `desktop/logo.png` — foydalanuvchi bergan rasmiy logo (shamlar + «TRADE CONTROL», qora fon, 512 px). Kirish ekrani (`#dsklog .dlg`) va `/desktop` sahifasida (`/desktop/logo.png`, `mix-blend-mode:screen` — qora fon ko'rinmaydi).
 - Ilova ikonkasi `desktop/icon.png` — logodagi shamlar belgisi (matnsiz, kichik o'lchamda o'qilishi uchun) qora yumaloq kvadratda; `npx tauri icon` bilan `src-tauri/icons/`. Versiya 0.1.1 (yangi reliz).
 - Repo `.gitignore` `*.png` ni e'tiborsiz qoldiradi — desktop PNG'larini `git add -f` bilan qo'shish kerak.
+
+## 454. Kompyuter ilovasi — keng ekran (TradingView kabi)
+- `DESK` va oyna ≥ 1100 px → `html.dwide` (`dwSet()`, resize'da qayta). Chapda doimiy to'liq ekran grafik `#lwfs` (`right:var(--dw)`): yuqorida asboblar, chapda chizma asboblari, o'rtada grafik, o'ngda watchlist (`#lwwl` — dwide'da overlay emas, alohida ustun). O'ngda ilova ustuni `--dw:400px` (body, .nav, .page, .sheet, .toast shu ustunga).
+- `deskChart()` — hech qanday sahifa ochiq bo'lmasa oxirgi tanga (`tc_dsym`, chTerm yozadi; default BTC) grafigini ochadi va `lwFs(true)` + watchlist. `pageHide()` dwide'da uni qayta chaqiradi.
+- Oddiy grafik terminali (`S.page.ch`) sahifasi o'ng ustunda yashirin (`.page.dhid`, `dwPage()`), signal/birja/Dip Funded terminalida esa o'ng ustunda pozitsiya, TP/SL, savdo formasi; u yerdagi takror `#lwtb`, `#tbox`, `.thint` yashirin.
+- dwide'da `lwFs(false)` ishlamaydi, `lwMount` yangi terminalda to'liq ekranni yopmaydi (`LW` qayta yaratilganda fs/wl/wlp saqlanadi, eski `LW.el` olib tashlanadi), `navBack` to'liq ekranni yopmaydi; ✕ va ⛶ tugmalari yashirin.
+- `pgOn()` — avtomatik yangilanish shartlarida `!S.page` o'rnida (dwide'da fon grafik terminali «sahifa ochiq» deb hisoblanmaydi).

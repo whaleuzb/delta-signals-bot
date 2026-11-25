@@ -293,6 +293,21 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
  .toast{left:max(14px,calc(50% - 226px));right:max(14px,calc(50% - 226px))}
 }
 .page:not(.show){visibility:hidden;transition:transform .5s var(--ease),visibility 0s .5s}
+/* 454: kompyuter ilovasi, keng oyna (≥1100) — TradingView kabi: chapda doimiy katta grafik (#lwfs: asboblar, grafik, watchlist),
+   o'ngda ilova ustuni (--dw) — bosh sahifa, signallar, birja, sahifalar va oynalar shu ustunda */
+html.dwide{--dw:400px}
+html.dwide body{max-width:var(--dw);width:var(--dw);margin:0 0 0 auto;box-sizing:border-box}
+html.dwide.lwfs-on,html.dwide.lwfs-on body{overflow:visible}
+html.dwide .nav{left:calc(100% - var(--dw) / 2);max-width:calc(var(--dw) - 20px)}
+html.dwide .page{left:calc(100% - var(--dw));padding-left:14px;padding-right:14px;border-left:1px solid rgba(255,255,255,.07)}
+html.dwide .page.dhid{visibility:hidden!important}
+html.dwide .sheet{left:calc(100% - var(--dw) + 8px);right:8px}
+html.dwide .toast{left:calc(100% - var(--dw) + 14px);right:14px}
+html.dwide #lwfs{right:var(--dw);border-right:1px solid rgba(255,255,255,.08);padding:0!important}
+html.dwide #lwfs .fsx[onclick^="lwFs(false)"]{display:none}html.dwide #lwfs .lwfb{display:none}
+html.dwide #lwfs .fsh{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.07)}
+html.dwide #lwwl{position:relative;width:260px;flex:none;box-shadow:none;background:#0d0e0b}
+html.dwide #page #lwtb,html.dwide #page #tbox,html.dwide #page .thint,html.dwide #page .lwat{display:none}
 .ghd{display:flex;align-items:center;gap:12px;margin:8px 0 14px}
 .ghd .av{width:54px;height:54px;border-radius:18px;font-size:20px}
 .ghd h2{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
@@ -470,6 +485,14 @@ if(DESK){(function(){var d=deskGet()||{},n=function(){},hf={impactOccurred:n,not
   downloadFile:function(o){var a=document.createElement('a');a.href=o.url;a.download=o.file_name||'';document.body.appendChild(a);a.click();a.remove()}};
  document.documentElement.classList.add('desk')})()}
 function deskGet2(){var u=location.origin+'/desktop';try{if(tg&&tg.openLink&&tg.initData){tg.openLink(u);return}}catch(e){}window.open(u,'_blank')}
+function dw(){return document.documentElement.classList.contains('dwide')}
+function dwSet(){var on=DESK&&window.innerWidth>=1100,was=dw();document.documentElement.classList.toggle('dwide',on);if(on&&!was&&S.ws)setTimeout(deskChart,50);if(!on&&was&&LW.fs&&S.page&&S.page.ch){lwFs(false)}}
+if(DESK){window.addEventListener('resize',function(){clearTimeout(window.__dwT);window.__dwT=setTimeout(dwSet,200)})}
+/* keng oynada grafik doim ochiq: sahifa yopilsa yoki hech narsa ochiq bo'lmasa — oxirgi tanga grafigi (tc_dsym) */
+function deskChart(){if(!dw())return;if(S.page&&S.page.id=='term'){if(!LW.fs)setTimeout(function(){lwFs(true);if(!LW.wl)wlTog()},250);return}if(S.page)return;
+ var b='BTC';try{b=localStorage.getItem('tc_dsym')||'BTC'}catch(e){}chTerm(b);setTimeout(function(){if(!dw())return;lwFs(true);if(!LW.wl)wlTog()},300)}
+function pgOn(){return!!S.page&&!(dw()&&S.page.ch)}
+function dwPage(){var p=document.getElementById('page');if(p)p.classList.toggle('dhid',dw()&&!!(S.page&&S.page.ch))}
 function deskOut(){try{localStorage.removeItem('tc_dsk')}catch(e){}location.reload()}
 function deskLogin(){var L=S.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])L=sl}catch(e){}var TX={uz:['Kompyuter uchun ilova','Kirish uchun Telegram\'da botni oching va «Start» tugmasini bosing.','Telegram orqali kirish','Telegram\'da tasdiqlanishini kutyapmiz…','Havola ochilmadimi? Uni nusxalab Telegram\'da oching:'],
   ru:['Приложение для компьютера','Чтобы войти, откройте бота в Telegram и нажмите «Start».','Войти через Telegram','Ждём подтверждения в Telegram…','Ссылка не открылась? Скопируйте её и откройте в Telegram:'],
@@ -731,7 +754,7 @@ function stkLoad(all){var K=stkS(),sym=K.sym;
  stkApi('stk_info',{sym:sym}).then(function(d){if(S.stk!==K||K.sym!=sym)return;K.info=d.ok?d.r:null;K.err=d.ok?null:d;stkRe()}).catch(function(){});
  if(all||!K.hold)stkApi('stk_hold',{}).then(function(d){if(S.stk!==K)return;K.hold=d.ok?d.r:{pos:[],cash:{}};stkRe()}).catch(function(){});
  stkApi('stk_open',{}).then(function(d){if(S.stk!==K)return;K.open=d.ok?d.r:[];stkRe()}).catch(function(){})}
-function stkRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!S.page&&S.tv&&S.tv.mkt=='stk'&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
+function stkRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!pgOn()&&S.tv&&S.tv.mkt=='stk'&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
 function stkSet(k,v){var K=stkS();stkKeep();K[k]=v;if(k=='sym'){K.info=null;K.price='';K.qty='';K.amt='';stkLoad()}stkRe()}
 function stkKeep(){var K=stkS();['amt','qty','price'].forEach(function(f){var e=document.getElementById('sk_'+f);if(e)K[f]=e.value})}
 function stkIc(s,z){z=z||30;return'<span style="width:'+z+'px;height:'+z+'px;border-radius:50%;background:rgba(194,242,58,.12);color:#c2f23a;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:'+Math.round(z*.34)+'px;flex:none">'+esc(String(s).slice(0,4))+'</span>'}
@@ -868,7 +891,7 @@ function tvBookLoad(){var T=S.tv;if(!T||T.bkl)return;var sym=T.sym,mkt=T.mkt;T.b
   var e=document.getElementById('tv_book');if(e)e.innerHTML=tvBookHtml();var c=document.getElementById('tv_chg');if(c){c.textContent=fpc(d.r.chg);c.className=d.r.chg<0?'r':'g'}
   if(first)tvRe()}).catch(function(){T.bkl=0})}
 var TVP=0;function tvPoll(){clearInterval(TVP);TVP=setInterval(function(){var w=cur();if(!w||w.type!='cex'||S.tab!='signals'||document.hidden||S.page){clearInterval(TVP);return}if(S.tv&&S.tv.mkt=='stk'){stkQ();return}tvBookLoad()},3000)}
-function tvRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!S.page&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
+function tvRe(){var w=cur();if(w&&w.type=='cex'&&S.tab=='signals'&&!pgOn()&&!document.getElementById('sheet').classList.contains('show')){var y=window.scrollY;render();window.scrollTo(0,y)}}
 function tvSet(k,v){var T=S.tv;T[k]=v;if(k=='mkt'||k=='sym'){T.info=null;T.book=null;T.tick0=0;T.bkerr=0;T.price='';T.amt='';T.total='';T.pct=0;T.lev=null;if(k=='mkt')T.tab=v=='fut'?'pos':'orders'}
  if(k=='side'||k=='type'){T.pct=0}tick();tvRe()}
 function tvQ(k,x){var T=S.tv,px=tvPx();if(!px)return;var up=(T.side=='buy')==(k=='tp'),v=+(px*(1+(up?x:-x)/100)).toPrecision(6);T[k]=String(v);var e=document.getElementById('tv_'+k);if(e){e.value=T[k];ph(e)}}
@@ -989,7 +1012,7 @@ function cxEditLimGo(id){var g=S.page,i=termItem(),v=num(document.getElementById
 /* 334: birja statistikasi — saqlangan savdo tarixidan (yil boshidan) */
 function cxStatLoad(ex,per,cb){S.cxst=S.cxst||{};var c=S.cxst[ex]=S.cxst[ex]||{},k='L'+per;if(c[k])return;c[k]=1;
  api('cexstats',{ex:ex,per:per,acc:ex=='dipfunded'?dfCur():undefined}).then(function(d){c[k]=0;c[per]=d;if(per=='ytd')c.ytd=d.supported&&d.all?d.all:{n:0};
-  if(cb)cb(d);else{var w=cur();if(w&&w.ex==ex&&S.tab=='home'&&!S.page)render()}}).catch(function(){c[k]=0})}
+  if(cb)cb(d);else{var w=cur();if(w&&w.ex==ex&&S.tab=='home'&&!pgOn())render()}}).catch(function(){c[k]=0})}
 function cxStats(ex){tick();S.page={id:'cxst',ex:ex,per:(S.cxstPer||'ytd'),mkt:'all',d:null,polls:0};var p=document.getElementById('page');p.scrollTop=0;cxStRender();if(!p.classList.contains('show'))pageShow();cxStGet()}
 function cxStGet(fresh){var g=S.page;if(!g||g.id!='cxst')return;api('cexstats',{ex:g.ex,per:g.per,fresh:!!fresh,acc:g.ex=='dipfunded'?dfCur():undefined}).then(function(d){if(S.page!==g)return;g.d=d;
   S.cxst=S.cxst||{};var c=S.cxst[g.ex]=S.cxst[g.ex]||{};c[g.per]=d;if(g.per=='ytd')c.ytd=d.supported&&d.all?d.all:{n:0};cxStRender();
@@ -1177,7 +1200,7 @@ function mring(p,z){var r=z/2-4,c=2*Math.PI*r,f=Math.max(0,Math.min(100,p))/100*
  return'<svg width="'+z+'" height="'+z+'" viewBox="0 0 '+z+' '+z+'"><circle cx="'+z/2+'" cy="'+z/2+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="5"/>'
   +'<circle cx="'+z/2+'" cy="'+z/2+'" r="'+r+'" fill="none" stroke="#c2f23a" stroke-width="5" stroke-linecap="round" stroke-dasharray="'+f.toFixed(1)+' '+c.toFixed(1)+'" transform="rotate(-90 '+z/2+' '+z/2+')"/>'
   +'<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="#f5f5f7" font-size="'+Math.round(z*.24)+'" font-weight="800">'+Math.round(p)+'%</text></svg>'}
-function loadHst(w){if(!w||S.hstBusy)return;S.hstBusy=1;api('hstat',{id:w.id}).then(function(d){S.hstBusy=0;S.hst=S.hst||{};S.hst[w.id]=d;if(S.tab=='home'&&!S.page&&cur()&&cur().id==w.id){var k=S.slide;S.anim=false;render();S.slide=k}}).catch(function(){S.hstBusy=0})}
+function loadHst(w){if(!w||S.hstBusy)return;S.hstBusy=1;api('hstat',{id:w.id}).then(function(d){S.hstBusy=0;S.hst=S.hst||{};S.hst[w.id]=d;if(S.tab=='home'&&!pgOn()&&cur()&&cur().id==w.id){var k=S.slide;S.anim=false;render();S.slide=k}}).catch(function(){S.hstBusy=0})}
 /* 280: yuqoridagi kartalar bosiladi */
 function openStats(id,kind){openGroup(id);if(S.page)S.page.kind=kind}
 function goSig(id){S.filter='all';go('signals');setTimeout(function(){var e=document.getElementById('s'+id);if(!e)return;e.scrollIntoView({behavior:'smooth',block:'center'});
@@ -1286,14 +1309,14 @@ function termScale(g,L,i){var c=g.c||[],lo=Infinity,hi=-Infinity,w=termWin(g);c.
 function termY(v,sc){return TER.H-(v-sc.lo)/(sc.hi-sc.lo)*TER.H}
 function termP(y,sc){return sc.lo+(TER.H-y)/TER.H*(sc.hi-sc.lo)}
 function termRound(p){if(p<=0)return p;var st=Math.pow(10,Math.floor(Math.log10(p))-4);return Math.round(p/st)*st}
-function termRender(){var g=S.page;if(!g||g.id!='term')return;if(g.ch){chTermRender(g);return}if(g.cx){cxTermRender(g);return}if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
+function termRender(){var g=S.page;if(!g||g.id!='term')return;dwPage();if(g.ch){chTermRender(g);return}if(g.cx){cxTermRender(g);return}if(g.df){dfTermRender(g);return}var i=termItem(),p=document.getElementById('page');if(!i){closeGroup();return}
  TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var long=i.side=='LONG',h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div><h2>'+esc(i.symbol)+' <span class="b '+(long?'bl':'bs')+'">'+i.side+'</span>'+(i.lev>1?'<span class="b bx">'+i.lev+'x</span>':'')+'</h2><div class="rs">#'+i.id+' · '+(i.live!=null?'<b class="'+(i.live>=0?'g':'r')+'">'+fpc(i.live)+'</b>':esc(t('limit')))+'</div></div></div>';
  h+=drBar(g);
  h+='<div class="eq glass" id="tbox" style="padding:8px 6px;position:relative">'+(g.c?termSvg(i,g):'<div class="spk" style="height:'+(TER.H+TER.AX)+'px;margin:0"><div class="sk"></div></div>')+'</div>';
  h+='<div id="tctl">';if(g.pend)h+='<div class="tile2 glass acc" style="margin-top:10px"><div class="k">'+esc(g.pend.lb)+'</div><div class="v" style="font-size:17px">'+fp(g.pend.from)+' → <span class="g">'+fp(g.pend.to)+'</span>'+pendPc(g.pend)+'</div>'
   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="termCancel()">'+esc(t('cancel'))+'</button><button class="btn p" onclick="termSave()">'+esc(t('save'))+'</button></div></div>';
- else h+='<div class="rs" style="text-align:center;margin:10px 4px">'+esc(t('term_hint'))+'</div>';
+ else h+='<div class="rs thint" style="text-align:center;margin:10px 4px">'+esc(t('term_hint'))+'</div>';
  h+='</div>';
  h+=termInfo(i)+termActs(i);
  p.innerHTML=h;termBind()}
@@ -1333,8 +1356,8 @@ function chSet(){var o0=localStorage.getItem('tc_cs'),W={s:csG()},R=function(k,t
 function lwTimeFmt(t){var d=lwD(t);return lwP2(d.getDate())+' '+LWM[d.getMonth()]+" '"+String(d.getFullYear()).slice(2)+'  '+lwP2(d.getHours())+':'+lwP2(d.getMinutes())}
 function lwTickFmt(t,k){var d=lwD(t);if(k===0)return String(d.getFullYear());if(k===1)return LWM[d.getMonth()];if(k===2)return String(d.getDate());return lwP2(d.getHours())+':'+lwP2(d.getMinutes())}
 function lwPrec(p){if(!(p>0))return 2;var k=Math.max(2,Math.min(10,Math.ceil(-Math.log10(p))+4));if(p>=1000)k=2;else if(p>=1)k=Math.min(k,4);return k}
-function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(LW.fs&&LW.g!==g)lwFs(false);if(LW.fs&&document.getElementById('lwfsc'))host=document.getElementById('lwfsc');
- if(LW.g!==g||!LW.el){if(LW.ch){try{LW.ch.remove()}catch(e){}}
+function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(LW.fs&&LW.g!==g&&!dw())lwFs(false);if(LW.fs&&document.getElementById('lwfsc'))host=document.getElementById('lwfsc');
+ if(LW.g!==g||!LW.el){if(LW.ch){try{LW.ch.remove()}catch(e){}}var keep=dw()&&LW.fs?{fs:LW.fs,wl:LW.wl,wlp:LW.wlp,fsev:LW.fsev}:null;if(keep&&LW.el&&LW.el.parentNode)LW.el.remove();
   var el=document.createElement('div');el.style.cssText='position:absolute;inset:0';
   var ch=LightweightCharts.createChart(el,{autoSize:true,
    layout:{attributionLogo:false,background:{type:'solid',color:'rgba(0,0,0,0)'},textColor:'rgba(200,205,194,.62)',fontSize:10,fontFamily:'-apple-system,BlinkMacSystemFont,Inter,Roboto,sans-serif'},
@@ -1355,7 +1378,7 @@ function lwMount(g){var host=document.getElementById('tlw');if(!host)return;if(L
   var ct=document.createElement('div');ct.className='lwct';var bl=document.createElement('img');bl.className='lwbl';bl.src='/blogo.png';bl.alt='';bl.onerror=function(){bl.remove()};el.appendChild(bl);
   ct.innerHTML='<span class="lwrt" onclick="lwRt()" title="realtime">»</span><span class="lwfb" onclick="lwFs(!LW.fs)">'+FSI.in+'</span>';el.appendChild(ct);
   ch.subscribeCrosshairMove(function(pr){lwLeg(pr)});
-  LW={of:{},ofK:{},cs:null,cst:null,indSer:[],indKey:null,bl:bl,ct:ct,vd:vd,el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};
+  LW={of:{},ofK:{},cs:null,cst:null,indSer:[],indKey:null,bl:bl,ct:ct,vd:vd,el:el,ch:ch,se:se,ov:ov,g:g,pl:{},sig:'',dk:'',arm:null,drag:null,L:[],qu:Date.now()+900};if(keep){for(var kk in keep)LW[kk]=keep[kk];setTimeout(function(){lwFsHdr();wlRender();if(LW.wl)wlPoll()},0)}
   ov.addEventListener('pointerdown',lwDown);drInit();
   /* 447: grafik maydonida ikki marta bosish — pastki panel indikatorlarini yashirish/ko'rsatish (narx shkalasi, chizmalar, yorliqlar va asbob tanlanganda emas) */
   el.addEventListener('pointerdown',function(e){LW.pd={x:e.clientX,y:e.clientY,t:Date.now()}},true);
@@ -2060,7 +2083,7 @@ function lwShot(mode){if(!LW.ch||LW.shot)return;LW.shot=1;try{tg.HapticFeedback.
    openLink(r.url)})}).catch(function(){LW.shot=0;toast(esc(t('shot_err')))})}
 function lwFsInset(){var t=0,b=0;try{t=(tg.safeAreaInset&&tg.safeAreaInset.top||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.top||0);b=(tg.safeAreaInset&&tg.safeAreaInset.bottom||0)+(tg.contentSafeAreaInset&&tg.contentSafeAreaInset.bottom||0)}catch(e){}
  var f=document.getElementById('lwfs');if(f){f.style.paddingTop='max('+t+'px, env(safe-area-inset-top))';f.style.paddingBottom='max('+b+'px, env(safe-area-inset-bottom))'}}
-function lwFs(on){var g=LW.g;if(!LW.el||!g)return;on=!!on;if(on===!!LW.fs)return;LW.fs=on;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}
+function lwFs(on){var g=LW.g;if(!LW.el||!g)return;on=!!on;if(on===!!LW.fs)return;if(!on&&dw())return;LW.fs=on;try{tg.HapticFeedback.impactOccurred('light')}catch(e){}
  if(on){var f=document.createElement('div');f.id='lwfs';f.innerHTML='<div class="fsh" id="lwfsh"></div><div class="fso" id="lwfso"></div><div class="fsb" id="lwfsb"><div id="lwfsl"></div><div id="lwfsc"></div></div><div class="fsf" id="lwfsf"></div>';
   document.body.appendChild(f);document.documentElement.classList.add('lwfs-on');document.getElementById('lwfsc').appendChild(LW.el);lwFsHdr();lwFsInset();
   /* 399: Telegram to'liq ekrani faqat telefonda (kompyuterda butun oyna to'liq ekranga o'tib ketardi) */
@@ -2229,7 +2252,7 @@ document.addEventListener('keydown',function(e){var g=S.page;if(!g||g.id!='term'
  if(e.shiftKey&&!mod&&!e.altKey&&c=='KeyF'){lwFs(!LW.fs);e.preventDefault();return}
  if(LW.g.rp&&(k=='ArrowRight'||k==' ')){rpPlay(LW.g,0);rpStep(LW.g);e.preventDefault()}});
 /* 437: «faqat grafik» sahifa (istalgan tanga; pozitsiyasiz) + ulashilgan tahlil (chizmalar faqat ko'rish uchun, «Nusxa olish») */
-function chTerm(base,sh,tf){base=wlBase(base);if(!base)return;tick();S.page={id:'term',ch:base,chi:{symbol:base+'USDT',price:null,market:'crypto',ch:1},tf:tf&&TFS[tf]?tf:'1h',c:null,adds:[],drag:null,pend:null,sh:sh||null};
+function chTerm(base,sh,tf){base=wlBase(base);if(!base)return;tick();try{localStorage.setItem('tc_dsym',base)}catch(e){}S.page={id:'term',ch:base,chi:{symbol:base+'USDT',price:null,market:'crypto',ch:1},tf:tf&&TFS[tf]?tf:'1h',c:null,adds:[],drag:null,pend:null,sh:sh||null};
  var p=document.getElementById('page');p.scrollTop=0;termRender();if(!p.classList.contains('show'))pageShow();termLoad()}
 function chTermRender(g){var i=g.chi,p=document.getElementById('page');TER.W=Math.max(280,Math.min(560,(p.clientWidth||390)-28-12));
  var h='<div class="ghd"><div class="bk glass" onclick="closeGroup()">'+ic('back',18)+'</div><div class="av">'+coinIc(i.symbol,30)+'</div><div style="flex:1;min-width:0"><h2>'+esc(i.symbol)+'</h2><div class="rs">'+(i.price!=null?'<b>'+fp(i.price)+'</b>':'')+'</div></div></div>';
@@ -2481,7 +2504,7 @@ setInterval(function(){document.querySelectorAll('[data-cd]').forEach(function(e
 function openGroup(id){tick();S.page={id:id,kind:'spot',mon:null,data:null};pageRender();var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');
  backSync();
  api('group',{id:id,lang:S.lang}).then(function(d){if(!S.page||S.page.id!=id)return;S.page.data=d;pageRender(true);loadPer()}).catch(function(){var p=document.getElementById('page');p.innerHTML=pageHead(null)+'<div class="empty glass">'+esc(t('not_public'))+'</div>'})}
-function pageHide(){document.getElementById('page').classList.remove('show');S.page=null;S.pageRe=null;S.pageKey=null;saveNav();backSync()}
+function pageHide(){document.getElementById('page').classList.remove('show');S.page=null;S.pageRe=null;S.pageKey=null;saveNav();backSync();if(dw())setTimeout(deskChart,0)}
 function closeGroup(){if(S.page&&S.nh.length)navBack(1);else pageHide()}
 /* 371: ilova ichidagi navigatsiya tarixi (stack). Har bir o'tish (bo'lim, workspace/birja, sahifa) oldidan joriy holat
    saqlanadi; Telegram «Orqaga» tugmasi (va sahifadagi ‹) faqat BITTA oldingi holatga qaytaradi — oldingi sahifa bo'lsa
@@ -2491,7 +2514,7 @@ function navSame(e){return e&&e.tab==S.tab&&e.cur==S.cur&&(e.key||null)==(S.page
 function navPush(){if(NAVT)return;NAVT=1;setTimeout(function(){NAVT=0},0);if(navSame(S.nh[S.nh.length-1]))return;   /* 377: takror yozilmaydi */
  S.nh.push({tab:S.tab,cur:S.cur,re:S.page?S.pageRe:null,key:S.page?S.pageKey:null,y:S.page?0:window.scrollY});if(S.nh.length>40)S.nh.shift();backSync()}
 function backSync(){try{var on=S.nh.length||S.page||document.getElementById('sheet').classList.contains('show');if(on)tg.BackButton.show();else tg.BackButton.hide()}catch(e){}}
-function navBack(fromPage){if(typeof MC!="undefined"&&MC){mcClose();return}if(LW.fs){lwFs(false);return}if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
+function navBack(fromPage){if(typeof MC!="undefined"&&MC){mcClose();return}if(LW.fs&&!dw()){lwFs(false);return}if(!fromPage&&document.getElementById('sheet').classList.contains('show')){sheetClose();return}
  /* 380: grafik (terminal) ochiq bo'lsa — «Orqaga» uni to'liq yopadi: saqlanmagan surish bekor, tarixdagi har qanday
     terminal holati (signal/birja/Dip Funded) tashlab o'tiladi; grafik ichidagi qaytarish — faqat «↶» */
  var tm=S.page&&S.page.id=='term';if(tm){S.page.pend=null;S.page.drag=null}
@@ -2586,7 +2609,7 @@ function dfCall(a,arg){return api('act',{action:a,arg:arg}).then(function(r){var
 function dfHead(back){return'<div class="ghd"><div class="bk glass" onclick="'+(back?'openDf(1)':'closeGroup()')+'">'+ic('back',18)+'</div><div class="av">'+dfLogo(24)+'</div><div><h2>Dip Funded</h2><div class="rs">'+esc(t('df_accs'))+'</div></div></div>'}
 function dfErr(d){var c=d&&d.code;if(c=='not_linked'||c=='profile')return'<div class="empty glass rise">'+ic('link',36)+'<div style="margin:8px 0 14px">'+esc(t('df_nolink'))+'</div><button class="btn p full" style="width:100%" onclick="openLink(S.dflink)">'+esc(t('df_link_btn'))+'</button></div>';
  return'<div class="empty glass rise">'+esc(t('df_unav'))+'</div>'}
-function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');backSync()}
+function pageShow(){var p=document.getElementById('page');p.scrollTop=0;p.classList.add('show');dwPage();backSync()}
 function bar(lbl,usedPct,txt){var u=Math.max(0,Math.min(100,usedPct||0));var col=u>=80?'var(--r)':u>=50?'#e8e8ea':'var(--g)';
  return'<div style="margin:8px 0"><div class="rs" style="display:flex;justify-content:space-between"><span>'+esc(lbl)+'</span><span>'+txt+'</span></div><div class="bar" style="margin-top:6px"><i style="left:0;width:'+u+'%;background:'+col+'"></i></div></div>'}
 /* ===== 346: Dip Funded — birjalar qatorida (kontekst `cx:dipfunded`): ulash/uzish, hisob almashtirish,
@@ -2976,7 +2999,7 @@ function dipView(v){S.dseg=S.dseg||'rank';var top=seg('dseg',[['rank',t('dip_ran
  /* o'zim — ixcham qator (bosilsa Taklif sahifasi: karta, chiqarish) */
  if(!S.pub){var bl=S.ref?+S.ref.dip||0:null;
   h+='<div class="row glass acc rise" onclick="openRef()"><div class="av" style="color:var(--g)">'+ic('dip',20)+'</div><div class="rm"><div class="rn">'+esc(t('dip_you'))+(me?' · #'+me.rank:'')+'</div><div class="rs">'+esc(t('dip_bal'))+(bl!=null?' · ≈ $'+(bl/100).toFixed(2):'')+'</div></div><div class="rv g">'+(bl!=null?dipFmt(bl):me?dipFmt(me.dip):'0')+'<small>DIP</small></div></div>';
-  if(!S.ref&&!S.refBusy){S.refBusy=1;api('act',{action:'ref'}).then(function(r){S.refBusy=0;try{S.ref=JSON.parse(r.msg)}catch(e){}if(S.ref&&S.tab=='dip'&&!S.page){S.anim=false;render()}}).catch(function(){S.refBusy=0})}}
+  if(!S.ref&&!S.refBusy){S.refBusy=1;api('act',{action:'ref'}).then(function(r){S.refBusy=0;try{S.ref=JSON.parse(r.msg)}catch(e){}if(S.ref&&S.tab=='dip'&&!pgOn()){S.anim=false;render()}}).catch(function(){S.refBusy=0})}}
  /* 6+ — ro'yxat */
  var row=function(x){return'<div class="row glass rise'+(x.me?' acc':'')+'" style="cursor:default"><span class="rk">'+x.rank+'</span>'+uav(x,36)+'<div class="rm"><div class="rn">'+esc(x.me?t('dip_you')+' · '+x.name:x.name)+'</div><div class="rs">'+x.refs+' '+esc(t('dip_refs'))+'</div></div><div class="rv g">'+dipFmt(x.dip)+'<small>DIP</small></div></div>'};
  var R=L.slice(5);if(R.length)h+='<div class="sect rise">6 – '+L.length+'</div>'+R.map(row).join('');
@@ -3200,6 +3223,6 @@ navWrap(['openGroup','cxTerm','cxStats','openTerm','dfTrades','dfTerm','newSig',
   var saved=null;try{saved=localStorage.getItem('tc_ws')}catch(e){}
   S.cur=(S.ws.filter(function(x){return x.id==+saved})[0]||S.ws[0]||{}).id;if(saved&&String(saved).indexOf('cx:')==0)S.cur=saved;
   var q=q0;if(TABS.indexOf(q.get('tab'))>=0)S.tab=q.get('tab');if(!S.ws.length&&S.tab=='home')S.tab='top';if(q.get('g'))setTimeout(function(){openGroup(+q.get('g'))},50);if(q.get('df'))setTimeout(function(){dfGo(+q.get('acc')||null)},50);if(q.get('ref'))setTimeout(openRef,50);
-  render();load();setTimeout(function(){if(!S.cex)cexLoad();dfxLoad()},800);setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!S.page&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
+  render();load();if(DESK)dwSet();setTimeout(function(){if(!S.cex)cexLoad();dfxLoad()},800);setInterval(function(){if(!document.hidden&&(S.tab=='home'||S.tab=='signals')&&!pgOn()&&!document.getElementById('sheet').classList.contains('show'))load()},30000)})
  .catch(function(){document.getElementById('view').innerHTML='<div class="empty glass">Error</div>'})})();
 </script></body></html>
