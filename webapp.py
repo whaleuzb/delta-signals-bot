@@ -1780,7 +1780,8 @@ async def landing_page(request):
         rep = {"__TG__": f"https://t.me/{bot}" if bot else "#", "__VER__": _h.escape(str(rel.get("tag_name", "")).replace("desktop-v", "v")),
                "__WIN__": _h.escape(win["browser_download_url"]) if win else "#", "__WINC__": "" if win else "off", "__WINS__": sz(win),
                "__MAC__": _h.escape(mac["browser_download_url"]) if mac else "#", "__MACC__": "" if mac else "off", "__MACS__": sz(mac),
-               "__CXL__": (PAGE[i:j] + "var CXN=0;") if 0 <= i < j else ""}
+               "__CXL__": (PAGE[i:j] + "var CXN=0;") if 0 <= i < j else "",
+               "__NEX__": str(len(re.findall(r"\[\s*'([a-z0-9]+)'", PAGE[i:PAGE.find("];", i)])) if i >= 0 else 9)}
         for k, v in rep.items():
             raw = raw.replace(k, v)
         b = raw.encode()
