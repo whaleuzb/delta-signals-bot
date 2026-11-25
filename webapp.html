@@ -488,6 +488,11 @@ html.dwide #lwfsh [data-u],html.dwide #lwfsh [data-r]{display:inline-flex!import
 .tfdd b{font-size:12.5px}.tfdd i{font-style:normal;font-size:9px;opacity:.6}
 #lwfs .fsa{display:flex;align-items:center;gap:3px;margin:0;flex:none;overflow:visible}#lwfs .fsa .chip{padding:0 8px;height:30px;border-radius:9px;margin:0;flex:none}
 #lwfs .fsh .fsx svg{width:16px;height:16px}
+.idlg .sbx{width:min(420px,96vw)!important}.idlg .stb{display:flex;gap:4px;border-bottom:2px solid rgba(255,255,255,.08);margin:0 0 4px}.idlg .stb span{padding:8px 10px;font-weight:700;font-size:14px;color:rgba(232,236,223,.6);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;background:none!important}.idlg .stb span.on{color:#e8ecdf;border-bottom-color:#e8ecdf}
+.idb{padding:4px 0 8px}.idr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0}.idr>span{font-size:13.5px}.idr input.nm{width:100px;text-align:left;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:8px 10px;color:#e8ecdf;font:inherit}.idr input.nm:focus{border-color:#4da3ff;outline:none}
+.ids{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13.5px}.ids>span{flex:1;min-width:0}.idn{font-style:normal;font-size:12px;color:rgba(232,236,223,.45)}.idh{margin:16px 0 4px;font-size:11px;font-weight:700;letter-spacing:.06em;color:rgba(232,236,223,.45)}.ide{padding:14px 0;color:rgba(232,236,223,.5)}
+.idc{position:relative;width:18px;height:18px;flex:none;cursor:pointer}.idc input{position:absolute;opacity:0}.idc i{position:absolute;inset:0;border:1.5px solid rgba(255,255,255,.35);border-radius:4px}.idc input:checked+i{background:#e8ecdf;border-color:#e8ecdf}.idc input:checked+i::after{content:'';position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #0b0b0c;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.idw{position:relative;width:34px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.2);cursor:pointer;flex:none}.idw input{position:absolute;inset:0;opacity:0;cursor:pointer}.idp{display:none;gap:3px}.ids:hover .idp{display:flex}.idp span{width:14px;height:14px;border-radius:3px;cursor:pointer;border:1px solid rgba(255,255,255,.15)}
 #lwset .ish{margin:14px 0 4px;font-size:11.5px;font-weight:800;letter-spacing:1.5px;color:rgba(232,236,223,.45);text-transform:uppercase}
 #lwset .ich{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px;border-bottom:1px solid rgba(255,255,255,.06)}#lwset .ich span{padding:6px 10px;border-radius:8px;background:rgba(194,242,58,.1);color:#c2f23a;font-size:12.5px;font-weight:700;cursor:pointer}
 #lwset .ir{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}#lwset .ir b{flex:1;font-size:13.5px}#lwset .ia{cursor:pointer;color:rgba(232,236,223,.55);padding:2px 5px;display:flex}#lwset .ia svg{width:16px;height:16px}
@@ -1673,10 +1678,10 @@ function rpDraw(){var f=document.getElementById('lwfsb'),p=document.getElementBy
   h='<div class="rph"><b>'+esc(TRT[L][5])+'</b><span class="rpa" data-ra="add">+ '+esc(TRT[L][10])+'</span></div><div class="rpl">'+(A.length?A.map(function(a){var d=cur?(a.p-cur)/cur*100:0;return'<div class="rpr'+(a.hit?' hit':'')+'">'+TRI.al.replace(/22/g,'16')+'<span class="rpn"><b>'+esc(g.alS||'')+'</b> '+(a.p>=cur?'≥':'≤')+' '+fp(a.p)+(a.note?'<small>'+esc(a.note)+'</small>':'')+'</span><span class="'+(d>=0?'u':'d')+'">'+(d>=0?'+':'')+d.toFixed(2)+'%</span><i data-rd="'+a.id+'">✕</i></div>'}).join(''):'<div class="rpe">'+esc(TRT[L][11])+'</div>')+'</div>'}
  else{var D=drGet(),I=indList().filter(function(x){return x.on});
   h='<div class="rph"><b>'+esc(TRT[L][6])+'</b></div><div class="rpl"><div class="rps">'+esc(cmT('drs'))+' ('+D.length+')</div>'+(D.length?D.map(function(d){return'<div class="rpr'+(LW.sel==d.id?' on':'')+'" data-rs="'+d.id+'">'+(DRI[d.k]||'')+'<span class="rpn">'+esc(gxName(d.k))+(d.lk?' 🔒':'')+'</span><i data-rx="'+d.id+'">✕</i></div>'}).join(''):'<div class="rpe">'+esc(cmT('none'))+'</div>')
-   +'<div class="rps">'+esc(cmT('inds'))+' ('+I.length+')</div>'+(I.length?I.map(function(z){return'<div class="rpr" data-ri="1">'+CMI.ind+'<span class="rpn">'+esc(indName(z))+'</span></div>'}).join(''):'<div class="rpe">'+esc(cmT('none'))+'</div>')+'</div>'}
+   +'<div class="rps">'+esc(cmT('inds'))+' ('+I.length+')</div>'+(I.length?I.map(function(z){return'<div class="rpr" data-ri="'+esc(z.id)+'">'+CMI.ind+'<span class="rpn">'+esc(indName(z))+'</span></div>'}).join(''):'<div class="rpe">'+esc(cmT('none'))+'</div>')+'</div>'}
  p.innerHTML=h}
 function rpClick(e){var g=LW.g,x;if((x=e.target.closest('[data-ra]'))){drTool('al');return}if((x=e.target.closest('[data-rd]'))){alDel(g,'al'+x.getAttribute('data-rd'));setTimeout(rpDraw,50);return}
- if((x=e.target.closest('[data-rx]'))){LW.sel=x.getAttribute('data-rx');drDel();rpDraw();return}if((x=e.target.closest('[data-rs]'))){LW.sel=x.getAttribute('data-rs');LW.dv++;drTb();rpDraw();return}if(e.target.closest('[data-ri]'))indSet()}
+ if((x=e.target.closest('[data-rx]'))){LW.sel=x.getAttribute('data-rx');drDel();rpDraw();return}if((x=e.target.closest('[data-rs]'))){LW.sel=x.getAttribute('data-rs');LW.dv++;drTb();rpDraw();return}var ri=e.target.closest('[data-ri]');if(ri){var I0=indList().filter(function(z){return z.id==ri.getAttribute('data-ri')})[0];if(I0&&I0.t!='sess')indDlg(I0.id);else indSet()}}
 var DWI={un:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4L2.5 7.5 6 11"/><path d="M2.5 7.5H11a4.5 4.5 0 0 1 0 9H8"/></svg>',
  re:'<svg viewBox="0 0 18 18" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l3.5 3.5L12 11"/><path d="M15.5 7.5H7a4.5 4.5 0 0 0 0 9h3"/></svg>'};
 function moreMenu(el){var g=LW.g;if(!g)return;var it=function(ic,n,f){return'<div class="fi" onclick="flyClose();'+f+'">'+ic+'<span>'+esc(n)+'</span></div>'};
@@ -2453,9 +2458,9 @@ function ofNeed(t){var g=LW.g;if(!g)return;var k=alKey(g);if(!k||k.m!='crypto'){
 /* seriyalar va panellar joylashuvi */
 function indApply(full,c,rows){var ch=LW.ch,g=LW.g;if(!ch||!g)return;c=c||g.c||[];if(!rows)rows=c.map(function(x){return{time:Math.floor(x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4]}});
  if(rows.length&&LW.rlast){rows=rows.slice();var lr=rows[rows.length-1];rows[rows.length-1]={time:lr.time,open:lr.open,high:Math.max(lr.high,LW.rlast),low:Math.min(lr.low,LW.rlast),close:LW.rlast}}
- var L=indList().filter(function(x){return x.on&&INDC[x.t]&&x.t!='vd'}),key=JSON.stringify(L);
+ var tu=indTfU(g.tf),L=indList().filter(function(x){return x.on&&INDC[x.t]&&x.t!='vd'&&indTfOk(x,tu)}),key=JSON.stringify(L)+tu;
  if(LW.indKey!==key){(LW.indSer||[]).forEach(function(z){z.s.forEach(function(s){try{ch.removeSeries(s)}catch(e){}})});LW.indSer=[];LW.indKey=key;full=true;
-  L.forEach(function(x){var p=x.p,id='o_'+x.id,ls=function(col,w,ps){var o9={color:col,lineWidth:Math.max(1,Math.round(+w||1)),priceScaleId:ps||'right',lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false};if(!ps&&csG().sco)o9.autoscaleInfoProvider=function(){return null};return ch.addLineSeries(o9)},S=[];
+  L.forEach(function(x){var p=indEff(x.p),id='o_'+x.id,ls=function(col,w,ps){var o9={color:col,lineWidth:Math.max(1,Math.round(+w||1)),lineStyle:+p.lst||0,priceScaleId:ps||'right',lastValueVisible:!!p.lbl&&col!=='rgba(0,0,0,0)',priceLineVisible:false,crosshairMarkerVisible:false};if(!ps&&csG().sco)o9.autoscaleInfoProvider=function(){return null};return ch.addLineSeries(o9)},S=[];
    if(x.t=='ema'||x.t=='sma'||x.t=='vwap')S=[ls(p.c,p.w)];else if(x.t=='bb')S=[ls(p.c,p.w),ls(hexA(p.c,.7),p.w),ls(hexA(p.c,.7),p.w)];
    else if(x.t=='rsi'){S=[ls(p.c,p.w,id)];[+p.ob||70,+p.os||30].forEach(function(v){S[0].createPriceLine({price:v,color:'rgba(255,255,255,.22)',lineWidth:1,lineStyle:2,axisLabelVisible:false})})}
    else if(x.t=='macd')S=[ch.addHistogramSeries({priceScaleId:id,lastValueVisible:false,priceLineVisible:false}),ls(p.c,1.4,id),ls(p.c2,1.4,id)];
@@ -2492,7 +2497,36 @@ function indSet(){var W={L:JSON.parse(JSON.stringify(indList())),op:null},o0=JSO
  var ap=function(W){indLSave(W.L);W.L.forEach(function(x){lastPut('tc_indlast',x.t,x.p)});indApply(true);lwVdRefresh();indLayout();indChip()};
  setOpen(stl('ind'),tabs,W,ap,function(W){indLSave(W.L)},function(){indLSave(JSON.parse(o0));indApply(true);lwVdRefresh();indLayout();indChip()},null,
   {k:'inds',get:function(W){return W.L},put:function(W,v){W.L=JSON.parse(JSON.stringify(v))}})}
+/* 477: indikator sozlamalari (TradingView kabi): sarlavha — nomi; tablar Kirish / Uslub / Ko'rinish.
+   Uslub: har chiziq — ko'rinish belgisi (p.v_<k>=0 yashiradi), rang (kvadrat + palitra), qalinlik/chiziq turi (p.w, p.lst); Chiqish qiymatlari — shkalada yorliq (p.lbl).
+   Ko'rinish: vaqt oraliqlari (p.vt_m/h/d/w/M = 0 — o'sha TF larda yashiriladi). «Standart ▾»: standartga qaytarish / standart sifatida saqlash (tc_indlast). */
+var ICN={ich:{c:'Tenkan-sen (Conversion)',c2:'Kijun-sen (Base)',up:'Kumo — o\'sish',dn:'Kumo — tushish'},macd:{c:'MACD',c2:'Signal',up:'Gistogramma +',dn:'Gistogramma −'},sto:{c:'%K',c2:'%D'},
+ bb:{c:'Bollinger'},st:{up:'Supertrend ↑',dn:'Supertrend ↓'},atl:{up:'Trend ↑',dn:'Trend ↓'},fund:{up:'+',dn:'−'},liq:{up:'Long',dn:'Short'},obw:{up:'Bid',dn:'Ask'},svp:{up:'Xarid',dn:'Sotuv'},vd:{up:'Xarid',dn:'Sotuv'}};
+var IDT={uz:['Kirish','Uslub','Ko\'rinish','Chiziq','Chiqish qiymatlari','Narx shkalasida yorliqlar','Vaqt oraliqlari','Daqiqalar','Soatlar','Kunlar','Haftalar','Oylar','Standart ▾','Standartga qaytarish','Standart sifatida saqlash','Saqlandi','Kirish qiymatlari yo\'q'],
+ ru:['Аргументы','Стиль','Видимость','Линия','Выходные значения','Метки на шкале цены','Интервалы','Минуты','Часы','Дни','Недели','Месяцы','По умолчанию ▾','Сбросить настройки','Сохранить как по умолчанию','Сохранено','Нет аргументов'],
+ en:['Inputs','Style','Visibility','Line','Output values','Labels on price scale','Timeframes','Minutes','Hours','Days','Weeks','Months','Defaults ▾','Reset settings','Save as default','Saved','No inputs']};
+function idT(i){return(IDT[S.lang]||IDT.uz)[i]}
+function indTfU(tf){tf=String(tf||'');return/M$/.test(tf)?'M':/w$/.test(tf)?'w':/d$/.test(tf)?'d':/h$/.test(tf)?'h':'m'}
+function indTfOk(x,u){var p=x.p||{};return p['vt_'+u]!==0}
+function indEff(p){var o={};for(var k in p)o[k]=p[k];for(var k2 in p)if(k2.indexOf('v_')==0&&p[k2]===0&&o[k2.slice(2)]!=null)o[k2.slice(2)]='rgba(0,0,0,0)';return o}
+function indDlg(id){var L=JSON.parse(JSON.stringify(indList())),i=L.findIndex(function(x){return x.id==id});if(i<0)return;var x=L[i],o0=JSON.stringify(indList()),F=INDF[x.t]||[],W={L:L,i:i};
+ var isIn=function(f){return f[1]=='int'||f[1]=='num'||f[1]=='sel'||f[1]=='txt'||(f[1]=='ck'&&f[0]!='poc')},P='L.'+i+'.p.';
+ var row=function(lb,ctl){return'<div class="idr"><span>'+esc(lb)+'</span>'+ctl+'</div>'},ck=function(path,on){return'<label class="idc"><input type="checkbox" data-p="'+path+'"'+(on?' checked':'')+'><i></i></label>'};
+ var tabs=[{n:idT(0),f:function(W){var p=W.L[W.i].p,I=F.filter(isIn);return'<div class="idb">'+(I.length?I.map(function(f){return row(stl('i_'+f[0]),setCtl(P+f[0],f[1],p[f[0]],f[2],f[3],f[4]))}).join(''):'<div class="ide">'+esc(idT(16))+'</div>')+'</div>'}},
+  {n:idT(1),f:function(W){var p=W.L[W.i].p,C=F.filter(function(f){return f[1]=='c'}),N=ICN[x.t]||{},h='<div class="idb">';
+   C.forEach(function(f){var k=f[0],on=p['v_'+k]!==0;h+='<div class="ids">'+ck(P+'v_'+k,on)+'<span>'+esc(N[k]||(C.length>1?stl('i_'+k):INDC[x.t].n))+'</span><label class="idw" style="background:'+esc(p[k])+'"><input type="color" data-p="'+P+k+'" value="'+esc(String(p[k]).slice(0,7))+'"></label><div class="idp">'+PAL.slice(0,10).map(function(c){return'<span data-p="'+P+k+'" data-v="'+c+'" data-s="1" style="background:'+c+'"></span>'}).join('')+'</div></div>'});
+   if(F.some(function(f){return f[1]=='w'}))h+=row(stl('w'),setCtl(P+'w','w',p.w));if(p.lst!=null||F.some(function(f){return f[1]=='w'}))h+=row(stl('ls'),setCtl(P+'lst','ls',+p.lst||0));
+   F.filter(function(f){return f[1]=='rg'||f[0]=='poc'}).forEach(function(f){h+=row(stl('i_'+f[0]),setCtl(P+f[0],f[1],p[f[0]],f[2],f[3],f[4]))});
+   h+='<div class="idh">'+esc(idT(4).toUpperCase())+'</div><div class="ids">'+ck(P+'lbl',!!p.lbl)+'<span>'+esc(idT(5))+'</span></div>';return h+'</div>'}},
+  {n:idT(2),f:function(W){var p=W.L[W.i].p,h='<div class="idb"><div class="idh">'+esc(idT(6).toUpperCase())+'</div>';
+   [['m',7,'1–59'],['h',8,'1–24'],['d',9,'1–366'],['w',10,'1–52'],['M',11,'1–12']].forEach(function(r){h+='<div class="ids">'+ck(P+'vt_'+r[0],p['vt_'+r[0]]!==0)+'<span>'+esc(idT(r[1]))+'</span><i class="idn">'+r[2]+'</i></div>'});return h+'</div>'}}];
+ var ap=function(W){indLSave(W.L);indApply(true);lwVdRefresh();indLayout();indChip()};
+ setOpen(indName(x),tabs,W,ap,function(W){indLSave(W.L);lastPut('tc_indlast',W.L[W.i].t,W.L[W.i].p)},function(){indLSave(JSON.parse(o0));indApply(true);lwVdRefresh();indLayout();indChip()},function(W){W.L[W.i].p=indDefP(W.L[W.i].t)});
+ var m=document.getElementById('lwset');if(!m)return;m.classList.add('idlg');var rb=m.querySelector('.sft .btn.glass');if(rb&&rb.getAttribute('onclick')=='setReset()'){rb.textContent=idT(12);rb.setAttribute('onclick','indDefMenu(this)')}}
+function indDefMenu(el){var it=function(f,n){return'<div class="fi" onclick="flyClose();'+f+'"><span>'+esc(n)+'</span></div>'};flyOpen(el,it('setReset()',idT(13))+it('indDefSave()',idT(14)),false)}
+function indDefSave(){if(!SET||!SET.W||!SET.W.L)return;var x=SET.W.L[SET.W.i];lastPut('tc_indlast',x.t,x.p);toast('✓ '+esc(idT(15)))}
 function indAct(el){var W=SET&&SET.W;if(!W||!W.L)return;var a=el.getAttribute('data-ia'),i=+el.getAttribute('data-ii');
+ if(a=='open'&&W.L[i]&&W.L[i].t!='sess'){var id=W.L[i].id;indLSave(W.L);SET.cancel=null;indApply(true);lwVdRefresh();indLayout();indChip();indDlg(id);return}
  if(a=='add'){var t=el.getAttribute('data-it'),x={id:t=='vd'?'vd':t+Date.now().toString(36),t:t,on:1,p:indLastP(t)};W.L.push(x);W.op=x.id}
  else if(a=='open'){var id=W.L[i]&&W.L[i].id;W.op=W.op===id?null:id}else if(a=='del')W.L.splice(i,1);SET.ap(W);setDraw()}
 function indChip(){var on=indList().some(function(x){return x.on});[].forEach.call(document.querySelectorAll('.lwtb [data-t=ind]'),function(b){b.classList.toggle('on',on)})}

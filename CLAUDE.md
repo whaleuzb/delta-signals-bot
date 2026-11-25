@@ -8799,3 +8799,8 @@ Foydalanuvchi: "xavfsizlik tomonlarini ko'rib chiq keraksiz narsalarni va eski i
 ## 476. Yanada yumshoq + shaffof (shisha) oynalar
 - Animatsiyalar uzaytirildi va yumshatildi (ease cubic-bezier(.16,1,.3,1)): menyular `tcPop2` .32s (biroz blurdan ochiladi), oynalar `tcRise2` .42s, fon `tcFade2` .3s, yopilish `tcOut2`/`tcDrop2` .2–.26s (`fadeRm` kechikishlari 200–260 ms), o'ng panellar `tcSlide2` .38s, tab almashishi .32s, hover o'tishlari .25s.
 - Shisha: `.mn`, `#mdl .mb`, `#drfly`, `#brk .bkx`, `#dsh .dsx`, `#ssm .ssx`, `#ot`, `#lwset .sbx` — fon rgba(22,23,20,.66) + `backdrop-filter: blur(22px) saturate(160%)`, ichki yorug' chiziq; `#lwrp` .72 + blur(18px). Oyna orqa foni rgba(0,0,0,.32) + blur(3px). Birja kartalari hover'da 2px ko'tariladi.
+
+## 477. Indikator sozlamalari (TradingView kabi)
+- `indDlg(id)` — `setOpen` asosida (`.idlg`): sarlavha `indName`, tablar Kirish (INDF dagi int/num/sel/txt/ck — qator: nom + kiritish), Uslub (har rang maydoni: ko'rinish belgisi `p.v_<k>`, rang kvadrati `input[type=color]` + hover'da palitra; qalinlik `w`, chiziq turi `lst`; rg/poc; «Chiqish qiymatlari» — `p.lbl` narx shkalasida yorliq), Ko'rinish (vaqt oraliqlari `p.vt_m/h/d/w/M`). Nomlar `ICN` (Ichimoku: Tenkan/Kijun/Kumo, MACD, Stochastic va h.k.).
+- Pastda «Standart ▾» (`indDefMenu`: standartga qaytarish / standart sifatida saqlash → `tc_indlast`), Bekor, OK. Ro'yxatdagi ⚙ va o'ng paneldagi obyektlar ro'yxati shu oynani ochadi (Sessions — eski forma).
+- `indApply`: `indTfOk` (joriy TF birligi `indTfU`), `indEff` (yashirilgan rang → shaffof), chiziq `lineStyle:p.lst`, `lastValueVisible:p.lbl`; kalitga TF birligi qo'shildi.
