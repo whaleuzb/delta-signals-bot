@@ -11751,6 +11751,52 @@ async def cmd_delsig(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await msg.reply_text(txt)
 
 
+_SITEPOST_TEXT = (
+    "🚀 <b>Trade Controller endi kompyuteringizda!</b>\n\n"
+    "Professional savdo terminali — Windows va macOS uchun <b>bepul</b> ilova:\n\n"
+    "📊 Grafik, Volume Profile va 75+ chizma asbobi\n"
+    "🌍 Tokyo / London / New York sessiyalari\n"
+    "💱 Binance, Bybit, Bitget, MEXC va boshqa birjalarda savdo\n"
+    "🏆 Dip Funded prop-hisoblari\n"
+    "🧪 Simulyator — virtual pul bilan mashq\n"
+    "👥 Telegram guruhlarni boshqarish\n"
+    "📒 Bepul savdo kundaligi\n\n"
+    "🌐 tradecontroller.app"
+)
+
+
+async def cmd_sitepost(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """487p: sayt/kompyuter ilovasi e'loni — rasm (landing/og.jpg) + matn + 3 tugma. Faqat super-admin.
+    `/sitepost` — avval faqat sizga namuna; `/sitepost go` — News Trade kanaliga (NEWS_CHANNEL_ID)."""
+    uid = update.effective_user.id
+    msg = update.effective_message
+    if not is_admin(uid):
+        return
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💻 Yuklab olish (Windows / macOS)", url="https://tradecontroller.app/#desktop")],
+        [InlineKeyboardButton("🌐 Saytga o'tish", url="https://tradecontroller.app/"),
+         InlineKeyboardButton("📱 Telegram Mini App", url=f"https://t.me/{BOT_USERNAME or ctx.bot.username}?startapp")],
+    ])
+    go = bool(ctx.args) and ctx.args[0].lower() == "go"
+    if go and not config.NEWS_CHANNEL_ID:
+        await msg.reply_text("NEWS_CHANNEL_ID sozlanmagan.")
+        return
+    target = config.NEWS_CHANNEL_ID if go else msg.chat_id
+    img = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landing", "og.jpg")
+    try:
+        with open(img, "rb") as fh:
+            sent = await ctx.bot.send_photo(target, InputFile(fh, "trade-controller.jpg"), caption=_SITEPOST_TEXT,
+                                            parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception as e:  # noqa: BLE001
+        log.warning("sitepost yuborilmadi", exc_info=True)
+        await msg.reply_text(f"Yuborilmadi: {e}")
+        return
+    if go:
+        await msg.reply_text(f"✅ Kanalga yuborildi (#{sent.message_id}).")
+    else:
+        await msg.reply_text("Bu namuna. Kanalga yuborish uchun: /sitepost go")
+
+
 async def cmd_repost(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """383: /repost 1126 — bazada bor, lekin guruhga chiqmay qolgan ochiq signalni guruhga yuboradi
     (yangi signaldagi AYNI post: grafik, muallif, «Trade Controller orqali», tugmalar). Posti bor bo'lsa —
@@ -12449,6 +12495,7 @@ def main() -> None:
     app.add_handler(CommandHandler("richtest", cmd_richtest))
     app.add_handler(CommandHandler("delsig", cmd_delsig))
     app.add_handler(CommandHandler("repost", cmd_repost))
+    app.add_handler(CommandHandler("sitepost", cmd_sitepost))  # 487p
     app.add_handler(CommandHandler("emoji", cmd_emoji))
     app.add_handler(CommandHandler("tg_login", cmd_tg_login))
     app.add_handler(CommandHandler("tg_code", cmd_tg_code))

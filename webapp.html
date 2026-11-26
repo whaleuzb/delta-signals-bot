@@ -1453,7 +1453,7 @@ var LW={};
 var TFL=['1m','2m','3m','5m','10m','15m','30m','1h','2h','4h','1d','1w','1M'];
 function lwLoad(cb){if(window.LightweightCharts){cb();return}if(LW.ld){LW.ld.push(cb);return}LW.ld=[cb];var s=document.createElement('script');s.src='/lwc.js';
  s.onload=function(){var q=LW.ld||[];LW.ld=null;q.forEach(function(f){try{f()}catch(e){}})};document.head.appendChild(s)}
-function termSvg(i,g){return'<div id="tlw" style="height:'+(TER.H+TER.AX)+'px;position:relative"></div><div class="lwat">Charts by <a onclick="openLink(\'https://www.tradingview.com/\')">TradingView</a></div>'}
+function termSvg(i,g){return'<div id="tlw" style="height:'+(TER.H+TER.AX)+'px;position:relative"></div>'}
 function termBind(){var g=S.page;if(!document.getElementById('tlw'))return;lwLoad(function(){if(S.page===g&&document.getElementById('tlw'))lwMount(g)})}
 function termRedraw(){if(LW.g===S.page)lwLines(true)}
 function lwP2(n){return('0'+n).slice(-2)}
@@ -3001,7 +3001,7 @@ function rpUi(g){var el=LW.el;if(!el)return;var u=el.querySelector('.rpui');if(!
 var MC=null;
 function mcTfs(){var d=['15m','1h','4h','1d'];try{var v=JSON.parse(localStorage.getItem('tc_mc')||'null');if(Array.isArray(v)&&v.length==4&&v.every(function(x){return TFL.indexOf(x)>=0}))return v}catch(e){}return d}
 function mcOpen(){var g=LW.g;if(!g)return;mcClose();var T=mcTfs(),k=alKey(g),o=document.createElement('div');o.id='mcg';
- o.innerHTML='<div class="mch"><b>'+esc(k?k.s:'')+'</b><span onclick="mcClose()">✕</span></div><div class="mcw">'+T.map(function(tf,i){return'<div class="mcc"><div class="mct"><span onclick="mcGo('+i+')">↗</span>'+TFL.map(function(x){return'<i class="'+(x==tf?'on':'')+'" onclick="mcTf('+i+',\''+x+'\')">'+x+'</i>'}).join('')+'</div><div class="mcx" data-i="'+i+'"></div></div>'}).join('')+'</div><div class="lwat">Charts by <a onclick="openLink(\'https://www.tradingview.com/\')">TradingView</a></div>';
+ o.innerHTML='<div class="mch"><b>'+esc(k?k.s:'')+'</b><span onclick="mcClose()">✕</span></div><div class="mcw">'+T.map(function(tf,i){return'<div class="mcc"><div class="mct"><span onclick="mcGo('+i+')">↗</span>'+TFL.map(function(x){return'<i class="'+(x==tf?'on':'')+'" onclick="mcTf('+i+',\''+x+'\')">'+x+'</i>'}).join('')+'</div><div class="mcx" data-i="'+i+'"></div></div>'}).join('')+'</div>';
  document.body.appendChild(o);MC={g:g,T:T,C:[]};T.forEach(function(tf,i){mcMount(i)});MC.iv=setInterval(function(){if(!MC||S.page!==MC.g){mcClose();return}if(!document.hidden)MC.T.forEach(function(tf,i){mcLoad(i)})},15000)}
 function mcMount(i){var el=document.querySelector('#mcg .mcx[data-i="'+i+'"]');if(!el||!MC)return;if(MC.C[i]){try{MC.C[i].ch.remove()}catch(e){}}
  var ch=LightweightCharts.createChart(el,{autoSize:true,layout:{attributionLogo:false,background:{type:'solid',color:'rgba(0,0,0,0)'},textColor:'rgba(200,205,194,.62)',fontSize:10},
