@@ -1850,9 +1850,10 @@ async def landing_file(request):
     """485: landing rasmlari (/l/<nom>.webp; 487m: og.jpg ham)."""
     n, ext = request.match_info["name"], request.match_info.get("ext", "webp")
     p = os.path.join(_LAND_DIR, n + "." + ext)
-    if ext not in ("webp", "jpg") or not re.fullmatch(r"[a-z0-9_-]{1,40}", n) or not os.path.isfile(p):
+    if ext not in ("webp", "jpg", "mp4") or not re.fullmatch(r"[a-z0-9_-]{1,40}", n) or not os.path.isfile(p):
         raise web.HTTPNotFound()
-    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400", "Content-Type": "image/" + ("jpeg" if ext == "jpg" else ext)})
+    ct = {"jpg": "image/jpeg", "mp4": "video/mp4"}.get(ext, "image/" + ext)  # 488: o'rnatish videosi (Range — FileResponse)
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400", "Content-Type": ct})
 
 
 async def robots_txt(request):
@@ -2966,7 +2967,7 @@ def routes() -> list:
         web.get("/invite.jpg", invite_jpg),
         web.get("/desktop", desktop_page),
         web.get("/site", landing_page),
-        web.get(r"/l/{name}.{ext:(webp|jpg)}", landing_file),
+        web.get(r"/l/{name}.{ext:(webp|jpg|mp4)}", landing_file),
         web.get("/robots.txt", robots_txt),
         web.get("/sitemap.xml", sitemap_xml),
         web.get("/desk", desk_page),
