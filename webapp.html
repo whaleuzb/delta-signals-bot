@@ -187,10 +187,30 @@ h3 small{font-size:12px;color:var(--mut);font-weight:600}
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);margin:0 4px 1px 0}
 .dot.on{background:var(--g);box-shadow:0 0 8px var(--g)}
 .acts{display:flex;flex-wrap:wrap;gap:6px}
-#dsklog{position:fixed;inset:0;z-index:900;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(194,242,58,.08),transparent 60%),#050506}
+/*490*/#dsklog{position:fixed;inset:0;z-index:900;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(194,242,58,.08),transparent 60%),#050506}
 #dsklog .dl{width:min(380px,100%);padding:30px 26px;border-radius:22px;text-align:center}#dsklog .dlg{display:block;width:220px;height:220px;margin:-40px auto -52px;mix-blend-mode:screen}
 #dsklog h2{margin:0 0 4px;font-size:20px;letter-spacing:-.02em}#dsklog p{font-size:13px;line-height:1.5;color:rgba(232,236,223,.7);margin:16px 0 20px}#dsklog .btn{width:100%;padding:13px;font-size:14px}
 #dsklog .dkc{font-size:15px;margin-bottom:6px}#dsklog .dkc b{font-size:26px;letter-spacing:.2em;color:#c2f23a;display:block;margin-top:4px}#dsklog .dkh{font-size:12px;color:rgba(232,236,223,.7);margin-bottom:14px}#dsklog .dlw{margin-top:16px;font-size:12px;line-height:1.5}#dsklog code{display:block;margin-top:6px;word-break:break-all;user-select:all;font-size:11px;padding:8px;border-radius:8px;background:rgba(255,255,255,.05)}
+/* 490: kirish ekrani — ikki ustun */
+#dsklog{overflow:auto}#dsklog .dsw{display:grid;grid-template-columns:minmax(0,1.35fr) 380px;gap:44px;align-items:center;width:min(1240px,100%)}
+#dsklog .dsxh h1{margin:0;font-size:clamp(26px,3vw,40px);letter-spacing:-.03em;line-height:1.08}#dsklog .dsxh p{margin:10px 0 18px;font-size:14px}
+#dsklog .dsxw{border-radius:16px;overflow:hidden;padding:0}.dsxb{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+.dsxb i{width:9px;height:9px;border-radius:50%;background:#ff5f57}.dsxb i:nth-child(2){background:#febc2e}.dsxb i:nth-child(3){background:#28c840}.dsxb span{margin-left:10px;font-size:11.5px;color:rgba(232,236,223,.55)}
+.dsxi{position:relative;aspect-ratio:2000/1086;background:#0b0b0c}.dsxi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .9s ease}.dsxi img.on{opacity:1}
+.dsxd{display:flex;gap:6px;justify-content:center;margin:10px 0 4px}.dsxd i{width:18px;height:4px;border-radius:9px;background:rgba(255,255,255,.15);transition:background .3s,width .3s}.dsxd i.on{background:#c2f23a;width:30px}
+.dsxf{list-style:none;padding:0;margin:14px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}.dsxf li{display:flex;gap:9px;align-items:center;font-size:13px;color:rgba(232,236,223,.8)}.dsxf li::before{content:"";width:6px;height:6px;border-radius:50%;background:#c2f23a;box-shadow:0 0 8px #c2f23a;flex:none}
+.dsxp{display:flex;gap:10px;align-items:stretch;margin-top:18px;flex-wrap:wrap}.dsxp>span{width:100%;font-size:11px;color:rgba(232,236,223,.45);letter-spacing:.06em;text-transform:uppercase}
+.dsxp .adc{flex:1;min-width:220px}
+@media (max-width:980px){#dsklog .dsw{grid-template-columns:1fr;justify-items:center}#dsklog .dsx{display:none}}
+#lwad{position:absolute!important;inset:auto auto 40px 12px!important;height:auto!important;z-index:6;width:300px;pointer-events:auto}#lwad .adc{background:rgba(14,15,13,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-right:26px}
+#lwad .adx{position:absolute;right:-6px;top:-6px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:10px;color:rgba(232,236,223,.75);background:#1b1c1a;border:1px solid rgba(255,255,255,.18);cursor:pointer}#lwad .adx:hover{color:#fff}
+#lwad.in .adc{animation:adIn .6s cubic-bezier(.16,1,.3,1)}@keyframes adIn{from{opacity:0;transform:translateY(8px)}}
+/* 490: hamkor reklama kartasi (kirish ekrani va grafik cheti) */
+.adc{position:relative;display:flex;align-items:center;gap:12px;padding:11px 14px 11px 11px;border-radius:14px;background:linear-gradient(150deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);cursor:pointer;text-decoration:none;color:inherit;transition:border-color .25s,transform .25s}
+.adc:hover{border-color:rgba(194,242,58,.45);transform:translateY(-1px)}.adc .adl{width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;background:#0b0b0c;border:1px solid rgba(255,255,255,.1)}
+.adc b{display:block;font-size:13px;color:#fff}.adc small{display:block;font-size:11.5px;color:rgba(232,236,223,.6);line-height:1.35;margin-top:1px}.adc em{font-style:normal;margin-left:auto;font-size:11.5px;font-weight:700;color:#0b0b0c;background:#c2f23a;padding:5px 10px;border-radius:99px;white-space:nowrap}
+.adc.dw .adl{background:linear-gradient(150deg,#1b1b1f,#0b0b0c)}.adc.dw .adl span{font-weight:900;font-size:20px;color:#fff;letter-spacing:-.04em}
+
 .btn{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 10px;font-weight:700;font-size:12px;color:var(--ink);
  background:rgba(255,255,255,.07);cursor:pointer;flex:1;min-width:52px;white-space:nowrap;transition:transform .2s var(--ease),opacity .2s}
 .btn.p{background:rgba(194,242,58,.15);color:var(--g);border-color:rgba(194,242,58,.25)}
@@ -617,10 +637,28 @@ function deskChart(){if(!dw()||window.__dsig)return;if(S.page&&S.page.id=='term'
 function pgOn(){return!!S.page&&!(dw()&&S.page.ch)}
 function dwPage(){var p=document.getElementById('page');if(p)p.classList.toggle('dhid',dw()&&!!(S.page&&S.page.ch))}
 function deskOut(){try{localStorage.removeItem('tc_dsk')}catch(e){}location.reload()}
+/* 490: hamkor reklama kartalari — Dip Funded va Delta Wear (kirish ekrani va grafik cheti) */
+var ADS={df:{u:'https://dipfunded.com',t:{uz:['Dip Funded','Prop-hisob oling va firma kapitali bilan savdo qiling','Hisob olish'],ru:['Dip Funded','Получите проп-счёт и торгуйте капиталом фирмы','Получить'],en:['Dip Funded','Get a prop account and trade the firm\'s capital','Get funded']}},
+ dw:{u:'https://deltawear.co',t:{uz:['Delta Wear','Kripto uslubidagi kiyim brendi — treyderlar uchun','Do\'kon'],ru:['Delta Wear','Одежда в крипто-стиле — для трейдеров','Магазин'],en:['Delta Wear','Crypto-style clothing brand for traders','Shop']}}};
+function adCard(k,L,cls){var a=ADS[k],t=a.t[L]||a.t.uz,lg=k=='df'?(typeof dfLogo=='function'?dfLogo(26):''):'<span>Δ</span>';
+ return'<a class="adc '+k+(cls?' '+cls:'')+'" data-ad="'+k+'" onclick="adGo(\''+k+'\');return false" href="'+a.u+'"><span class="adl">'+lg+'</span><span><b>'+esc(t[0])+'</b><small>'+esc(t[1])+'</small></span><em>'+esc(t[2])+' ›</em></a>'}
+function adGo(k){var u=(k=='df'&&typeof S!='undefined'&&S.df)||(ADS[k]&&ADS[k].u);if(!u)return;try{if(typeof extOpen=='function'){extOpen(u);return}}catch(e){}try{if(typeof openLink=='function'){openLink(u);return}}catch(e){}window.open(u,'_blank')}
 function deskLogin(){var L=S.lang||'uz';try{var sl=localStorage.getItem('tc_lang');if(sl&&T[sl])L=sl}catch(e){}var TX={uz:['Kompyuter uchun ilova','Kirish uchun Telegram\'da botni oching va «Start» tugmasini bosing.','Telegram orqali kirish','Telegram\'da tasdiqlanishini kutyapmiz…','Havola ochilmadimi? Uni nusxalab Telegram\'da oching:'],
   ru:['Приложение для компьютера','Чтобы войти, откройте бота в Telegram и нажмите «Start».','Войти через Telegram','Ждём подтверждения в Telegram…','Ссылка не открылась? Скопируйте её и откройте в Telegram:'],
   en:['Desktop app','To sign in, open the bot in Telegram and press “Start”.','Sign in with Telegram','Waiting for confirmation in Telegram…','Link did not open? Copy it and open in Telegram:']}[L]||[];
- var m=document.createElement('div');m.id='dsklog';m.innerHTML='<div class="dl glass"><img class="dlg" src="/desktop/logo.png" alt="Trade Control"><div class="m">'+esc(TX[0])+'</div><p>'+esc(TX[1])+'</p><button class="btn p" id="dskb">'+esc(TX[2])+'</button><div class="m dlw" id="dskw" hidden></div></div>';
+ /* 490: kirish ekrani — chapda skrinshotlar va imkoniyatlar, pastida hamkorlar (Dip Funded, Delta Wear) */
+ var SX={uz:['Professional savdo terminali','Grafik, birjalar, Telegram guruhlar va savdo kundaligi — bitta ilovada.',['Volume Profile va sessiyalar','75+ chizma asbobi, 24 indikator','9 ta birja bilan savdo','Dip Funded prop-hisoblari','Telegram guruhlarni boshqarish','Bepul savdo kundaligi'],['Volume Profile','Chizmalar','Sessiyalar','Likvidlik','Multi-chart'],'Hamkorlar'],
+  ru:['Профессиональный торговый терминал','График, биржи, Telegram-группы и дневник сделок — в одном приложении.',['Volume Profile и сессии','75+ инструментов, 24 индикатора','Торговля на 9 биржах','Проп-счета Dip Funded','Управление Telegram-группами','Бесплатный дневник сделок'],['Volume Profile','Рисование','Сессии','Ликвидность','Мультиграфик'],'Партнёры'],
+  en:['A professional trading terminal','Charts, exchanges, Telegram groups and a trading journal — in one app.',['Volume Profile and sessions','75+ drawing tools, 24 indicators','Trade on 9 exchanges','Dip Funded prop accounts','Telegram group management','Free trading journal'],['Volume Profile','Drawings','Sessions','Liquidity','Multi-chart']
+  ,'Partners']}[L]||[];
+ var SI=['r_spx','r_btc','r_sess','r_liq','s_mc'];
+ var m=document.createElement('div');m.id='dsklog';m.innerHTML='<div class="dsw"><div class="dsx"><div class="dsxh"><h1>'+esc(SX[0])+'</h1><p>'+esc(SX[1])+'</p></div>'
+  +'<div class="dsxw glass"><div class="dsxb"><i></i><i></i><i></i><span id="dsxc">'+esc(SX[3][0])+'</span></div><div class="dsxi">'+SI.map(function(n,i){return'<img src="/l/'+n+'.webp" alt=""'+(i?' loading="lazy"':' class="on"')+'>'}).join('')+'</div></div>'
+  +'<div class="dsxd" id="dsxd">'+SI.map(function(n,i){return'<i'+(i?'':' class="on"')+'></i>'}).join('')+'</div>'
+  +'<ul class="dsxf">'+SX[2].map(function(t){return'<li>'+esc(t)+'</li>'}).join('')+'</ul>'
+  +'<div class="dsxp"><span>'+esc(SX[4])+'</span>'+adCard('df',L)+adCard('dw',L)+'</div></div>'
+  +'<div class="dl glass"><img class="dlg" src="/desktop/logo.png" alt="Trade Control"><div class="m">'+esc(TX[0])+'</div><p>'+esc(TX[1])+'</p><button class="btn p" id="dskb">'+esc(TX[2])+'</button><div class="m dlw" id="dskw" hidden></div></div></div>';
+ (function(){var k=0;setInterval(function(){var im=m.querySelectorAll('.dsxi img'),dt=m.querySelectorAll('#dsxd i');if(!im.length||!document.body.contains(m))return;k=(k+1)%im.length;im.forEach(function(x,j){x.classList.toggle('on',j==k)});dt.forEach(function(x,j){x.classList.toggle('on',j==k)});var c=document.getElementById('dsxc');if(c)c.textContent=SX[3][k]},5000)})();
  document.body.appendChild(m);var tm=null,end=0;
  document.getElementById('dskb').onclick=function(){var b=this;b.disabled=true;fetch('/api/app/desk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'start'})}).then(function(r){if(!r.ok)throw r.status;return r.json()}).then(function(d){
    deskOpen(d.url);var w=document.getElementById('dskw');w.hidden=false;w.innerHTML='<div class="dkc">'+esc(({uz:'Botdagi kod',ru:'Код в боте',en:'Code in the bot'})[L]||'Kod')+': <b>'+esc(d.code||'')+'</b></div><div class="dkh">'+esc(({uz:'Telegram\'da kod mos kelsa «Ha, bu men» ni bosing.',ru:'Если код в Telegram совпадает — нажмите «Да, это я».',en:'If the code in Telegram matches — press “Yes, it\'s me”.'})[L]||'')+'</div>'+esc(TX[3])+'<br><br>'+esc(TX[4])+'<br><code>'+esc(d.url)+'</code>';b.disabled=false;end=Date.now()+14*60000;clearInterval(tm);
@@ -1676,6 +1714,13 @@ function dtShot(el){var L=gxL(),it=function(ic,n,f){return'<div class="fi" oncli
  flyOpen(el,it(FSI.dl,TRT[L][8],'lwShot(\'dl\')')+it(CMI.cp,TRT[L][12],'dtCopyImg()')+it(FSI.sh,TRT[L][9],'lwShot(\'share\')'),false)}
 function dtCopyImg(){var L=gxL();lwShotCanvas().then(function(o){o.toBlob(function(b){try{navigator.clipboard.write([new ClipboardItem({'image/png':b})]).then(function(){toast(esc(TRT[L][13]))},function(){lwShot('dl')})}catch(e){lwShot('dl')}},'image/png')}).catch(function(){})}
 /* o'ng vertikal panel: LW.rp = 'al' | 'tr' (ro'yxat — LW.wl) */
+/* 490: grafik chetidagi hamkor reklamasi (faqat kompyuter ilovasi): pastki-chap burchak, 25 s da almashadi, ✕ — 24 soatga yashirinadi */
+var AD={k:0,tm:null};
+function adMount(){var c=document.getElementById('lwfsc');if(!c||!dw())return;var x=0;try{x=+localStorage.getItem('tc_adx')||0}catch(e){}
+ var el=document.getElementById('lwad');if(Date.now()<x){if(el)el.remove();return}
+ if(!el){el=document.createElement('div');el.id='lwad';c.appendChild(el);el.addEventListener('click',function(e){if(e.target.closest('.adx')){e.preventDefault();e.stopPropagation();try{localStorage.setItem('tc_adx',String(Date.now()+864e5))}catch(_){}el.remove();clearInterval(AD.tm);AD.tm=null}})}
+ var draw=function(){var L=(S&&S.lang)||'uz',k=['df','dw'][AD.k%2];el.innerHTML=adCard(k,L)+'<span class="adx" title="✕">✕</span>';el.classList.remove('in');void el.offsetWidth;el.classList.add('in')};
+ draw();if(!AD.tm)AD.tm=setInterval(function(){var e2=document.getElementById('lwad');if(!e2||document.hidden){if(!e2){clearInterval(AD.tm);AD.tm=null}return}AD.k++;draw()},25000)}
 function rlDraw(){var f=document.getElementById('lwfsb');if(!f)return;var r=document.getElementById('lwrail');if(!r){r=document.createElement('div');r.id='lwrail';f.appendChild(r);
   r.addEventListener('click',function(e){var x=e.target.closest('[data-rl]');if(x)rlClick(x.getAttribute('data-rl'))})}
  var L=gxL(),T=TRI,b=function(k,ic,n,on){return'<span data-rl="'+k+'" class="'+(on?'on':'')+'" title="'+esc(n)+'">'+ic+'</span>'};
@@ -2921,7 +2966,7 @@ function lwFsHdr(){var h=document.getElementById('lwfsh'),g=LW.g;if(!h||!g)retur
  var vs=g.view,vp=vs&&LW.wlp&&LW.wlp[vs]?LW.wlp[vs][0]:null;
  h.innerHTML='<span class="fsx" onclick="lwFs(false)">✕</span>'+(dw()?'':'<span class="fsx'+(LW.wl?' on':'')+'" onclick="wlTog()" title="watchlist">☰</span>')+''+(dw()?'<span class="dsy" onclick="ssOpen()" title="'+esc(SST[gxL()][0])+'">'+coinIc(vs||wlBase(i.symbol)||'',18)+'<b>'+esc(vs?vs+'USDT':String(i.symbol||''))+'</b>'+TRS.q+'</span><span class="dsc" onclick="ssOpen(\'\',1)" title="'+esc(SST[gxL()][1])+'">'+TRS.p+'</span>':'<span class="sym">'+esc(vs?vs+'USDT':String(i.symbol||''))+'</span>')+'<span class="px">'+(vs?(vp!=null?fp(vp):''):(i.price!=null?fp(i.price):''))+'</span><span class="lwsep"></span><span class="lwtb fsa">'+(dw()?drActW(g):drAct(g))+'</span>'+(dw()?'<span id="gxslot"></span>':'')+'<span class="sp"></span>'+(dw()?drActR(g):'')
   +(dw()?'':'<span class="fsx wd" onclick="lwShot(\'dl\')" title="download">'+FSI.dl+'</span><span class="fsx wd" onclick="lwShot(\'share\')" title="share">'+FSI.sh+'</span>')+'<span class="fsx" onclick="lwFs(false)" title="exit">'+FSI.out+'</span>';
- var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);if(dw())rlDraw();lwFsCtl();drTb();lwLeg(null);deskPost()}
+ var l=document.getElementById('lwfsl');if(l)l.innerHTML=drBar(g,true);if(dw()){rlDraw();adMount()}lwFsCtl();drTb();lwLeg(null);deskPost()}
 /* 455: qobiqqa (tab nomi) — joriy tanga, narx, 24s % */
 function deskPost(){if(!EMB||!DESK||!LW.g)return;var g=LW.g,i=termItem()||{},vs=g.view,sym=vs||wlBase(i.symbol),P=LW.wlp&&LW.wlp[sym],px=vs?(P?P[0]:null):(i.price!=null?i.price:P?P[0]:null);var k=sym+'|'+px;if(k===LW.dpk)return;LW.dpk=k;try{parent.postMessage({tc:'sym',sym:sym,px:px,ch:P?P[1]:null},location.origin)}catch(e){}}
 /* 411: to'liq ekranda limit/TP/SL boshqaruvi (Saqlash/Bekor, + TP/SL/Limit) — sahifadagi #tctl nusxasi grafik ostida */
