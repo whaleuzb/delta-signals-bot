@@ -5890,6 +5890,31 @@ def _open_on_cex_kb(sig_id: int, d: dict, lang):
         InlineKeyboardButton(i18n.t("sig.chat_trade", lang), url=f"https://t.me/{BOT_USERNAME}?start=tw_{sig_id}")]])
 
 
+def _msg_photo_id(m) -> str | None:
+    """489: yuborilgan xabardagi eng katta rasmning file_id'si — oddiy photo yoki rich xabar
+    (rich javobidagi media PTB'da `api_kwargs` ichida qoladi, shuning uchun rekursiv qidiriladi)."""
+    try:
+        if getattr(m, "photo", None):
+            return m.photo[-1].file_id
+        best = [0, None]
+
+        def walk(x):
+            if isinstance(x, dict):
+                if x.get("file_id") and x.get("width"):
+                    sz = int(x.get("width") or 0) * int(x.get("height") or 0)
+                    if sz >= best[0]:
+                        best[0], best[1] = sz, x["file_id"]
+                for v in x.values():
+                    walk(v)
+            elif isinstance(x, (list, tuple)):
+                for v in x:
+                    walk(v)
+        walk(getattr(m, "api_kwargs", None) or {})
+        return best[1]
+    except Exception:
+        return None
+
+
 async def post_group_signal(bot, ws, sig_id: int, d: dict, uid: int, username, first_name,
                             post_file_id: str | None = None, photo=None) -> int | None:
     """383: signal kartasini guruh/kanalga yuboradi (rich yoki oddiy) va group_msg_id'ni saqlaydi —
@@ -5917,6 +5942,12 @@ async def post_group_signal(bot, ws, sig_id: int, d: dict, uid: int, username, f
                 disable_web_page_preview=True, reply_markup=kb)
         group_msg_id = sent.message_id
         await db.set_group_msg(sig_id, group_msg_id)
+        if photo is not None and not post_file_id:   # 489: grafik bytes'da keldi — file_id'ni saqlaymiz
+            fid = _msg_photo_id(sent)
+            if fid:
+                await db.set_chart_file(sig_id, fid)
+            else:
+                log.info("Signal #%s: grafik file_id topilmadi (nusxada grafik bo'lmaydi)", sig_id)
         _promo_emoji_seen(sent, ws)
     except Exception:
         log.exception("Guruhga yuborib bo'lmadi")
@@ -5963,6 +5994,8 @@ async def publish_signal(ctx, ws, d: dict, uid: int, username: str | None,
                                                    parse_mode=ParseMode.HTML)
             group_msg_id = sent.message_id
             await db.set_group_msg(sig_id, group_msg_id)
+            if photo is not None and not post_file_id and (fid := _msg_photo_id(sent)):
+                await db.set_chart_file(sig_id, fid)   # 489
         except Exception:
             log.exception("Shaxsiy jurnalga yuborib bo'lmadi")
 

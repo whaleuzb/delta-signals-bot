@@ -1966,6 +1966,13 @@ async def set_group_msg(sig_id: int, msg_id: int) -> None:
         await c.execute("UPDATE signals SET group_msg_id=$2 WHERE id=$1", sig_id, msg_id)
 
 
+async def set_chart_file(sig_id: int, file_id: str) -> None:
+    """489: ilova/kompyuterdan (bytes) yuborilgan grafikning Telegram file_id'si — keyingi
+    nusxalash («Kanalga ham qo'shish»), repost va h.k. grafikni qayta ishlata olsin."""
+    async with pool().acquire() as c:
+        await c.execute("UPDATE signals SET chart_file_id=$2 WHERE id=$1 AND chart_file_id IS NULL", sig_id, file_id)
+
+
 async def set_signal_allocation(sig_id: int, alloc_amount: float, deposit_snapshot: float) -> None:
     """Signal tasdiqlangach, unga necha pul ishlatilganini yozadi. deposit_snapshot —
     o'sha paytdagi umumiy depozit (keyinchalik depozit o'zgarsa ham bu signal real
